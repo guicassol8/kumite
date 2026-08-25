@@ -1,0 +1,14 @@
+# Pre-commit gates for the whole monorepo (lefthook runs from the git root).
+# Bypassing with --no-verify / -n / SKIP is denied for agents (.claude/settings.json).
+pre-commit:
+  jobs:
+    - name: format
+      glob: '*.{ts,tsx,js,jsx,json}'
+      run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+    - name: typecheck
+      run: pnpm -r typecheck
+    - name: kata-verify
+      run: pnpm --filter @kumite/back exec kata verify --strict-coverage
+    - name: test
+      run: pnpm -r test

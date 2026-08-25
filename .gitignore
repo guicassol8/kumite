@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+lefthook-local.yml
+data/
+
+# Playwright run artifacts (evidence screenshots under front/e2e/evidence/ ARE committed)
+front/test-results/
+front/playwright-report/
+front/blob-report/

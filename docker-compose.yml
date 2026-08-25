@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: kumite
+      POSTGRES_PASSWORD: kumite
+      POSTGRES_DB: kumite
+    ports:
+      # 5433 on the host: 5432 is commonly taken by other local projects
+      - '5433:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kumite -d kumite']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:

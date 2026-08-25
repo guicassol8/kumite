@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Bash(git commit *--no-verify*)",
+      "Bash(git commit *-n *)",
+      "Bash(git push *--no-verify*)",
+      "Bash(SKIP=*)",
+      "Edit(**/tsconfig.json)",
+      "Edit(**/tsconfig.*.json)",
+      "Edit(biome.json)",
+      "Edit(lefthook.yml)",
+      "Edit(pnpm-lock.yaml)",
+      "Edit(pnpm-workspace.yaml)",
+      "Edit(.github/workflows/**)",
+      "Edit(.claude/settings.json)",
+      "Edit(.claude/hooks/**)",
+      "Edit(front/src/routeTree.gen.ts)",
+      "Write(**/tsconfig.json)",
+      "Write(**/tsconfig.*.json)",
+      "Write(biome.json)",
+      "Write(lefthook.yml)",
+      "Write(pnpm-lock.yaml)",
+      "Write(pnpm-workspace.yaml)",
+      "Write(.github/workflows/**)",
+      "Write(.claude/settings.json)",
+      "Write(.claude/hooks/**)",
+      "Write(front/src/routeTree.gen.ts)",
+      "MultiEdit(**/tsconfig.json)",
+      "MultiEdit(**/tsconfig.*.json)",
+      "MultiEdit(biome.json)",
+      "MultiEdit(lefthook.yml)",
+      "MultiEdit(pnpm-lock.yaml)",
+      "MultiEdit(pnpm-workspace.yaml)",
+      "MultiEdit(.github/workflows/**)",
+      "MultiEdit(.claude/settings.json)",
+      "MultiEdit(.claude/hooks/**)",
+      "MultiEdit(front/src/routeTree.gen.ts)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-tool-use.sh\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop.sh\"",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}

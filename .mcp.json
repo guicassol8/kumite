@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kata-docs": {
+      "command": "npx",
+      "args": ["-y", "@katajs-framework/docs-mcp"]
+    }
+  }
+}

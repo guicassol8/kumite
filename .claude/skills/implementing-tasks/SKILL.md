@@ -1,0 +1,56 @@
+---
+name: implementing-tasks
+description: Implements an approved GitHub Issue plan on a task branch with TDD, runs every gate, and opens a PR linked to the issue. Triggers: "implementa a #N", "bora implementar", "codar a task", "faz a task", "implement #N", "work on #N", "build it".
+---
+
+# Implementing a task
+
+Code an **approved plan** — nothing else. Conventions in @docs/workflow.md;
+package rules in `back/AGENTS.md` / `front/AGENTS.md`.
+
+**Not for:** unplanned work (run `planning-tasks` first), reviewing
+(`reviewing-tasks`).
+
+## Preconditions
+
+- The issue has a `## Plan` comment the user approved. No plan → stop and run
+  `planning-tasks`.
+- `git status` clean; branch off up-to-date `main`:
+
+```bash
+git switch main && git pull && git switch -c task/<N>-<slug>
+```
+
+## Loop — per plan step
+
+1. **RED**: write or extend the test for the step first, watch it fail.
+2. **GREEN**: implement the minimum that passes.
+3. **Gates** (all from the root, in order):
+   `pnpm format` → `pnpm -r typecheck` → `pnpm verify` → `pnpm -r test`.
+4. Extra obligations by surface:
+   - back route added/changed → update the module's `.hurl` and run it against
+     a live server when feasible (`pnpm dev:back` + `pnpm --filter @kumite/back hurl`);
+   - front UI → `data-testid` on new interactive elements + keys in the three
+     i18n catalogs;
+   - db change → `db/schema.ts` + `pnpm --filter @kumite/back db:generate`,
+     commit the migration.
+5. One conventional commit per coherent step (`feat: …`, `test: …`).
+
+## House rules
+
+- Doubt mid-flight → ASK the user (AskUserQuestion). Never guess.
+- Discovered work → new issue via `creating-tasks` with "Discovered from #N";
+  never expand the current scope.
+- Hooks block? That's a real failure — fix the cause. Bypassing (`--no-verify`,
+  `SKIP=`) is denied and prohibited.
+
+## Finish — open the PR
+
+```bash
+git push -u origin task/<N>-<slug>
+gh pr create --title "<issue title>" --body-file -
+```
+
+PR body: `Fixes #N`, a short what/how summary, the test plan, and an empty
+`## Evidence` section — `reviewing-tasks` fills it. Hand off to
+`reviewing-tasks`; the task is NOT done at PR creation.

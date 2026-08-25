@@ -1,0 +1,9 @@
+{
+  "home": {
+    "tagline": "PUCRS × Mérida — block programming showdown",
+    "apiStatus": "API status",
+    "checking": "Checking...",
+    "apiOk": "API ok — {{status}}",
+    "apiDown": "API down"
+  }
+}

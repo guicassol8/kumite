@@ -1,0 +1,9 @@
+{
+  "home": {
+    "tagline": "PUCRS × Mérida — programación con bloques",
+    "apiStatus": "Estado de la API",
+    "checking": "Verificando...",
+    "apiOk": "API ok — {{status}}",
+    "apiDown": "API caída"
+  }
+}

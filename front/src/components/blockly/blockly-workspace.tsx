@@ -1,5 +1,6 @@
 import * as Blockly from 'blockly'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
 
@@ -36,6 +37,7 @@ const defaultOptions: Partial<Blockly.BlocklyOptions> = {
  */
 export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorkspaceProps>(
   function BlocklyWorkspace({ toolbox, initialState, onChange, options, className }, ref) {
+    const { t } = useTranslation()
     const containerRef = useRef<HTMLDivElement>(null)
     const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
     const appliedToolboxRef = useRef(toolbox)
@@ -123,6 +125,7 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
     return (
       <div
         ref={containerRef}
+        aria-label={t('editor.workspaceLabel')}
         data-testid="blockly-workspace"
         className={cn('h-full w-full', className)}
       />

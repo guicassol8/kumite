@@ -5,5 +5,8 @@
     "checking": "Checking...",
     "apiOk": "API ok — {{status}}",
     "apiDown": "API down"
+  },
+  "editor": {
+    "workspaceLabel": "Blocks area"
   }
 }

@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { createRef, StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import '@/i18n'
 import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
@@ -61,6 +62,12 @@ describe('BlocklyWorkspace', () => {
     expect(screen.getByTestId('blockly-workspace').querySelector('svg')).not.toBeNull()
     expect(screen.getByText('Lógica')).toBeDefined()
     expect(screen.getByText('Números')).toBeDefined()
+  })
+
+  it('labels the workspace for screen readers', () => {
+    renderWorkspace()
+
+    expect(screen.getByLabelText('Área de blocos')).toBe(screen.getByTestId('blockly-workspace'))
   })
 
   it('injects a single workspace even when StrictMode mounts it twice', () => {

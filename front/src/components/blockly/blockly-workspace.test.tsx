@@ -23,6 +23,23 @@ function flushBlocklyEvents() {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
+// Stands in for the jsdom shim when a test needs to drive a resize by hand.
+// Blockly builds observers of its own, hence the per-instance target list.
+class RecordingResizeObserver {
+  static instances: RecordingResizeObserver[] = []
+  readonly targets: Element[] = []
+  readonly disconnect = vi.fn()
+  readonly unobserve = vi.fn()
+
+  constructor(readonly callback: ResizeObserverCallback) {
+    RecordingResizeObserver.instances.push(this)
+  }
+
+  observe(target: Element) {
+    this.targets.push(target)
+  }
+}
+
 function renderWorkspace(props: Partial<BlocklyWorkspaceProps> = {}) {
   const ref = createRef<BlocklyWorkspaceHandle>()
   const utils = render(<BlocklyWorkspace ref={ref} toolbox={demoToolbox} {...props} />)
@@ -31,7 +48,11 @@ function renderWorkspace(props: Partial<BlocklyWorkspaceProps> = {}) {
   return { handle, ...utils }
 }
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+})
 
 describe('BlocklyWorkspace', () => {
   it('renders the workspace with the toolbox it got by prop', () => {
@@ -96,6 +117,28 @@ describe('BlocklyWorkspace', () => {
     await flushBlocklyEvents()
 
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('resizes the workspace when its container changes size', () => {
+    RecordingResizeObserver.instances = []
+    vi.stubGlobal('ResizeObserver', RecordingResizeObserver)
+
+    const { handle } = renderWorkspace()
+    const host = screen.getByTestId('blockly-workspace')
+    const observer = RecordingResizeObserver.instances.find((it) => it.targets.includes(host))
+    if (!observer) throw new Error('the container is not observed for resizes')
+    const workspace = handle.getWorkspace()
+    if (!workspace) throw new Error('the workspace was not injected')
+    // `Blockly.svgResize` re-measures the parent svg and then resizes the
+    // workspace — the call below is what proves the observer is wired to it.
+    const resize = vi.spyOn(workspace, 'resize')
+
+    observer.callback([], observer as unknown as ResizeObserver)
+
+    expect(resize).toHaveBeenCalled()
+
+    cleanup()
+    expect(observer.disconnect).toHaveBeenCalled()
   })
 
   it('applies initialState on mount without reporting it as a change', async () => {

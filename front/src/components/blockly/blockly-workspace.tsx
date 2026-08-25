@@ -77,7 +77,16 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       }
       workspace.addChangeListener(listener)
 
+      // The window may never change size while the container does (the editor
+      // layout collapsing on mobile, a panel opening) — observe the box, not
+      // the viewport, or Blockly keeps its stale size and clips blocks.
+      const observer = new ResizeObserver(() => {
+        Blockly.svgResize(workspace)
+      })
+      observer.observe(container)
+
       return () => {
+        observer.disconnect()
         workspace.removeChangeListener(listener)
         workspace.dispose()
         workspaceRef.current = null

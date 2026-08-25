@@ -12,6 +12,10 @@ Task workflow: `docs/workflow.md`.
 - `back/` — API on the **kata** framework (Hono). Has its own `AGENTS.md` with
   the mandatory module layout — read it before touching back code.
 - `front/` — React SPA (Vite, TanStack, Tailwind v4 + shadcn). Own `AGENTS.md`.
+- `blocks/` — `@kumite/blocks`: shared Blockly block definitions (root block,
+  curated toolbox, JS generators) used by both `front/` (editor) and `back/`
+  (headless codegen). The one sanctioned runtime cross-package exception
+  (approved 2026-08-25, #16).
 - `.claude/skills/` — the five task-workflow skills
   (create → pick → plan → implement → review).
 - Tasks are GitHub Issues (`gh`); format and labels in `docs/workflow.md`.
@@ -32,6 +36,8 @@ Task workflow: `docs/workflow.md`.
   schema in `back/`, then run `pnpm -r typecheck` to surface front breakage.
   Never hand-write API types in `front/`.
 - zod stays on **^3** in both packages (kata peer constraint).
+- Blockly block definitions live ONLY in `@kumite/blocks` — never redefine a
+  custom block or the toolbox inside `front/` or `back/`.
 - Conventional commits (`feat:` `fix:` `chore:` `test:` `docs:` `refactor:`) —
   always, on every commit, no exceptions.
 - Never commit directly on `main`: every change lives on a branch

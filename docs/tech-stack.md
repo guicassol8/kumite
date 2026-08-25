@@ -5,13 +5,17 @@ task + user approval.
 
 ## Shape
 
-pnpm monorepo, two packages that stay deliberately decoupled (own package.json,
-own typing). The only cross-package artifact is a **type**.
+pnpm monorepo. `back/` and `front/` stay deliberately decoupled (own
+package.json, own typing); between them, the only cross-package artifact is a
+**type**. The single sanctioned runtime exception is `blocks/` — the shared
+Blockly block definitions both sides must agree on (approved 2026-08-25,
+task #16).
 
 | Package | What | Key deps |
 |---|---|---|
 | `back/` (`@kumite/back`) | API on **kata** (`@katajs-framework/core`, Hono-based) | hono ^4, zod **^3**, drizzle-orm + postgres, @hono/node-server |
 | `front/` (`@kumite/front`) | React SPA | Vite, React 19, Tailwind v4 + shadcn/ui, TanStack Router (file-based) + Query, i18next, zod **^3** |
+| `blocks/` (`@kumite/blocks`) | Shared Blockly definitions: the "função com retorno" root block, the curated toolbox and the JS generators — consumed by the front editor and the back headless codegen | blockly |
 
 ## Front ↔ Back contract — typed RPC, zero codegen
 
@@ -42,6 +46,7 @@ own typing). The only cross-package artifact is a **type**.
   judge task with a spike if needed.
 - **Realtime**: SSE via Hono streaming (chosen direction); reevaluate WebSocket
   only if bidirectional needs appear.
-- **Blockly**: official `blockly` npm package with React wrapper — confirm in
-  the editor task.
+- **Blockly**: decided (2026-08-25, epic #1) — official `blockly` npm package
+  + our own thin React wrapper (#2); custom block definitions live only in
+  `@kumite/blocks` (#16).
 - **Deploy/hosting**: undecided; event is small (hundreds of users, one server).

@@ -61,13 +61,13 @@ function SandboxEditor() {
           Limpar
         </Button>
       </div>
-      <div className="flex min-h-0 flex-1 gap-4">
-        <div className="min-w-0 flex-1 overflow-hidden rounded-md border">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border">
           <BlocklyWorkspace ref={workspace} toolbox={demoToolbox} onChange={setState} />
         </div>
         <pre
           data-testid="sandbox-json"
-          className="w-80 shrink-0 overflow-auto rounded-md border p-2 text-xs"
+          className="h-40 shrink-0 overflow-auto rounded-md border p-2 text-xs md:h-auto md:w-80"
         >
           {state ? JSON.stringify(state, null, 2) : ''}
         </pre>

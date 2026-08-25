@@ -69,4 +69,26 @@ No evidence = the review is NOT done. Say exactly that rather than approving.
 - **Approve**: comment with the compliance table + evidence links, then merge
   only with the user's explicit go-ahead (`gh pr merge --squash --delete-branch`;
   the issue closes via `Fixes #N`).
-- **Request changes**: precise, file-level items back to `implementing-tasks`.
+- **Request changes**: precise, file-level items on the PR.
+
+## Handoff (MANDATORY)
+
+The next step runs in a **fresh chat**, so the very last thing you print is the
+command to paste there — alone in a fenced block, nothing after it.
+
+Approved and merged (the issue is closed; on to the next task):
+
+```
+/picking-next-task
+```
+
+Changes requested (the number is the **issue**, not the PR — the fix continues
+that task):
+
+```
+/implementing-tasks #12
+```
+
+Still blocked on the user's go-ahead to merge? Say that in one line, and print
+the `/picking-next-task` block anyway as the step after it. Never end with a
+prose suggestion — end with the command itself.

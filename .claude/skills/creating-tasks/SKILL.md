@@ -54,3 +54,23 @@ the task list (`- [ ] #N` per sub-issue).
 
 Show the user every created issue as `#N — title (labels)` with URLs. If
 anything is off, fix with `gh issue edit` — don't leave a wrong issue behind.
+
+## Step 4 — Handoff (MANDATORY)
+
+The next step runs in a **fresh chat**, so the very last thing you print is the
+command to paste there — alone in a fenced block, nothing after it.
+
+One issue created, and it is the thing to do now:
+
+```
+/planning-tasks #12
+```
+
+A backlog or an epic (several issues, no obvious next one):
+
+```
+/picking-next-task
+```
+
+Always substitute the real number. Never end with "agora é só planejar" or a
+prose suggestion — end with the command itself.

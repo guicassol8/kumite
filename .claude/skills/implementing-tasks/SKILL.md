@@ -60,8 +60,8 @@ gh pr create --title "<issue title>" --body-file -
 ```
 
 PR body: `Fixes #N`, a short what/how summary, the test plan, and an empty
-`## Evidence` section — `reviewing-tasks` fills it. Hand off to
-`reviewing-tasks`; the task is NOT done at PR creation.
+`## Evidence` section — `reviewing-tasks` fills it. The task is **NOT** done at
+PR creation.
 
 After the PR merges, clean up:
 
@@ -69,3 +69,16 @@ After the PR merges, clean up:
 git worktree remove .worktrees/task-<N>-<slug>
 git branch -d task/<N>-<slug>
 ```
+
+## Handoff (MANDATORY)
+
+The review runs in a **fresh chat**, so the very last thing you print is the
+command to paste there — alone in a fenced block, nothing after it:
+
+```
+/reviewing-tasks #34
+```
+
+That number is the **PR**, not the issue — print the PR number you just opened,
+and its URL in the line above. Never end with "agora é só revisar" or a prose
+suggestion — end with the command itself.

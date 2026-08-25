@@ -13,7 +13,8 @@ Task workflow: `docs/workflow.md`.
   the mandatory module layout — read it before touching back code.
 - `front/` — React SPA (Vite, TanStack, Tailwind v4 + shadcn). Own `AGENTS.md`.
 - `.claude/skills/` — the five task-workflow skills
-  (create → pick → plan → implement → review).
+  (create → pick → plan → implement → review). Each ends by printing the next
+  step's command for a fresh chat — chain in `docs/workflow.md`.
 - Tasks are GitHub Issues (`gh`); format and labels in `docs/workflow.md`.
 
 ## Verify your work (from the repo root)

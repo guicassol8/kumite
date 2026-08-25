@@ -20,6 +20,10 @@ explicitly preferred over one silent assumption.
 | implementing-tasks | coding an approved plan |
 | reviewing-tasks | reviewing a PR + producing mandatory evidence |
 
+Each step is its own chat: every skill ends by printing the next step's command,
+ready to paste into a new session. The full chain is in `docs/workflow.md`
+§ One step, one chat.
+
 ## Claude-specific notes
 
 - The `kata-docs` MCP server (`.mcp.json`) answers questions about the kata

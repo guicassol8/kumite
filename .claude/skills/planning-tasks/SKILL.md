@@ -58,3 +58,17 @@ gh issue comment <N> --body-file -
 
 Show it to the user. `implementing-tasks` may only start after the user
 explicitly approves; revisions edit the same comment (`gh issue comment --edit-last`).
+
+## Step 5 — Handoff (MANDATORY)
+
+The next step runs in a **fresh chat**, so the very last thing you print is the
+command to paste there — alone in a fenced block, nothing after it:
+
+```
+/implementing-tasks #12
+```
+
+Substitute the real number. Say in one line above the block that the plan must
+be approved first (a comment on the issue, or "aprovado" at the top of the new
+chat) — the fresh session cannot see this conversation's approval. Never end
+with a prose suggestion — end with the command itself.

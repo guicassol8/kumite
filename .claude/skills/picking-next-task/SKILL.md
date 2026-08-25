@@ -46,4 +46,14 @@ what it unblocks, and the runner-up in one line. Ask the user to confirm
 gh issue edit <N> --add-assignee @me
 ```
 
-Then suggest `planning-tasks` for it.
+## Step 4 — Handoff (MANDATORY)
+
+The next step runs in a **fresh chat**, so the very last thing you print is the
+command to paste there — alone in a fenced block, nothing after it:
+
+```
+/planning-tasks #12
+```
+
+Substitute the real number of the confirmed pick. Never end with a prose
+suggestion — end with the command itself.

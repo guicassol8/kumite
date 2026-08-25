@@ -4,6 +4,26 @@ Tasks are **GitHub Issues** in this repo, driven by the five skills in
 `.claude/skills/`: creating-tasks → picking-next-task → planning-tasks →
 implementing-tasks → reviewing-tasks.
 
+## One step, one chat — the handoff
+
+Each step is a fresh session: the state lives on the issue and the PR, not in
+the conversation. So **every skill ends by printing the command for the next
+step**, alone in a fenced block, ready to copy-paste into a new chat.
+
+| Finished | Next command |
+|---|---|
+| creating-tasks (one issue) | `/planning-tasks #N` |
+| creating-tasks (backlog/epic) | `/picking-next-task` |
+| picking-next-task | `/planning-tasks #N` |
+| planning-tasks | `/implementing-tasks #N` — only after the user approves the plan |
+| implementing-tasks | `/reviewing-tasks #PR` — the **PR** number |
+| reviewing-tasks (approved + merged) | `/picking-next-task` |
+| reviewing-tasks (changes requested) | `/implementing-tasks #N` — back to the **issue** number |
+
+Approval does not survive the chat boundary: a plan approved in one session must
+be approved on the issue (or restated in the new chat) before implementation
+starts.
+
 ## Labels
 
 | Group | Labels | Meaning |

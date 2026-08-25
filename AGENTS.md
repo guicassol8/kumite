@@ -32,7 +32,13 @@ Task workflow: `docs/workflow.md`.
   schema in `back/`, then run `pnpm -r typecheck` to surface front breakage.
   Never hand-write API types in `front/`.
 - zod stays on **^3** in both packages (kata peer constraint).
-- Conventional commits; branches `task/<issue>-<slug>`; PRs `Fixes #N` + Evidence.
+- Conventional commits (`feat:` `fix:` `chore:` `test:` `docs:` `refactor:`) —
+  always, on every commit, no exceptions.
+- Never commit directly on `main`: every change lives on a branch
+  `task/<issue>-<slug>` and lands via PR (`Fixes #N` + Evidence).
+- **Always work inside a dedicated git worktree, never in the main checkout** —
+  more than one agent may be working on this repo at the same time. See
+  `docs/workflow.md` § Worktrees for the commands and cleanup.
 - Every user-visible string exists in the three i18n catalogs (pt/es/en) —
   the parity test fails otherwise.
 - Every interactive element gets a `data-testid`.

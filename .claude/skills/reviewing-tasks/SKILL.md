@@ -11,6 +11,21 @@ A review is only done when compliance is checked, quality is checked, and
 **Not for:** implementing fixes beyond review findings (loop back to
 `implementing-tasks`).
 
+## Stage 0 — Check out the PR in its own worktree
+
+Reviews never run in the main checkout (other agents may be working there):
+
+```bash
+git fetch origin
+git worktree add .worktrees/review-<PR> task/<N>-<slug>
+cd .worktrees/review-<PR>
+pnpm install
+```
+
+Everything below — reading, running the app, committing evidence — happens
+inside this worktree. When the review ends (merged or handed back):
+`git worktree remove .worktrees/review-<PR>`.
+
 ## Stage 1 — Spec compliance
 
 - `gh pr view <PR> --comments` + `gh pr diff <PR>` + the linked issue.
@@ -31,9 +46,10 @@ Review the diff only (not the whole repo) for:
 
 ## Stage 3 — Evidence (MANDATORY, blocking)
 
-**Front-touching PRs — visual walkthrough:**
+**Front-touching PRs — visual walkthrough** (all inside the review worktree):
 1. Boot the stack (`docker compose up -d`; Playwright's webServer boots
-   back + front on its own).
+   back + front on its own). If another instance is already running, override
+   the ports in this worktree's `.env` files.
 2. Drive every changed flow via a Playwright spec in `front/e2e/`
    (extend or add one), asserting through `data-testid`.
 3. Screenshot each meaningful final state to

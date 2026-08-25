@@ -17,6 +17,9 @@ written here. Conventions in @docs/workflow.md.
 - Read `docs/product.md` and `docs/tech-stack.md` for context; the package
   `AGENTS.md` (back/ or front/) for local rules.
 - Explore the code the issue touches (routes, services, schemas, screens).
+  Reading is fine anywhere, but the moment you need to RUN the app or try
+  scratch code, do it in a worktree (`docs/workflow.md` § Worktrees) — the
+  main checkout must never accumulate changes, planned or exploratory.
 - kata questions (API shapes, middleware, DI, verify rules) → query the
   `kata-docs` MCP server before guessing.
 

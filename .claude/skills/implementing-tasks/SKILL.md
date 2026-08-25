@@ -15,11 +15,19 @@ package rules in `back/AGENTS.md` / `front/AGENTS.md`.
 
 - The issue has a `## Plan` comment the user approved. No plan → stop and run
   `planning-tasks`.
-- `git status` clean; branch off up-to-date `main`:
+- **All work happens in a dedicated worktree — never in the main checkout**
+  (other agents may be working here in parallel). In Claude Code prefer
+  EnterWorktree; manual flow:
 
 ```bash
-git switch main && git pull && git switch -c task/<N>-<slug>
+git fetch origin
+git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> origin/main
+cd .worktrees/task-<N>-<slug>
+pnpm install   # node_modules are per-worktree
 ```
+
+- Running the app from the worktree while another instance is up? Override the
+  ports (`PORT`, `--port`, `VITE_API_URL`) in this worktree's `.env` files.
 
 ## Loop — per plan step
 
@@ -54,3 +62,10 @@ gh pr create --title "<issue title>" --body-file -
 PR body: `Fixes #N`, a short what/how summary, the test plan, and an empty
 `## Evidence` section — `reviewing-tasks` fills it. Hand off to
 `reviewing-tasks`; the task is NOT done at PR creation.
+
+After the PR merges, clean up:
+
+```bash
+git worktree remove .worktrees/task-<N>-<slug>
+git branch -d task/<N>-<slug>
+```

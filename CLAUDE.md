@@ -26,3 +26,8 @@ explicitly preferred over one silent assumption.
   framework — query it before guessing any kata API.
 - Hooks: PostToolUse auto-formats and runs `kata verify` on back edits; Stop
   runs the full gate ladder (typecheck → verify → tests) and blocks until green.
+- Worktrees: prefer the harness's own isolation — `EnterWorktree` for this
+  session's task work, `isolation: "worktree"` when spawning subagents that
+  edit files. Manual fallback:
+  `git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> main`
+  then `pnpm install` inside it (node_modules are not shared).

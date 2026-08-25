@@ -48,10 +48,34 @@ whose scope (stack, modules, screens) overlaps least with other open issues and
 in-progress work. Among equally isolated issues, prefer the one that unblocks
 the most others.
 
+## Worktrees — one per task, always
+
+The main checkout stays clean: **all task work happens in a dedicated git
+worktree**, because more than one agent may be working on this repo at once.
+
+```bash
+git fetch origin
+git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> origin/main
+cd .worktrees/task-<N>-<slug>
+pnpm install        # node_modules are per-worktree, not shared
+```
+
+- `.worktrees/` is gitignored; never nest a worktree anywhere else.
+- Reviewing a PR? Same rule: `git worktree add .worktrees/review-<PR> <pr-branch>`.
+- Running the app in parallel worktrees: the default ports (3000 back,
+  5173 front) collide — override with `PORT` / `--port` and `VITE_API_URL`
+  in that worktree's `.env` files.
+- After the PR merges: `git worktree remove .worktrees/task-<N>-<slug>` and
+  delete the branch.
+- In Claude Code, prefer the harness's managed isolation (EnterWorktree /
+  subagent `isolation: "worktree"`) — it creates and cleans worktrees itself.
+
 ## Branches, commits, PRs
 
-- Branch `task/<issue>-<slug>` off up-to-date `main`.
-- Conventional commits: `feat:` `fix:` `chore:` `test:` `docs:` `refactor:`.
+- Branch `task/<issue>-<slug>` off up-to-date `main`, created with its
+  worktree (above). Never commit directly on `main`.
+- Conventional commits on **every** commit: `feat:` `fix:` `chore:` `test:`
+  `docs:` `refactor:`.
 - PR body starts with `Fixes #N` and ends with an `## Evidence` section.
 - **Evidence is mandatory** (reviewing-tasks):
   - front → Playwright walkthrough screenshots committed under

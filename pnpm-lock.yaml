@@ -63,6 +63,9 @@ importers:
       '@tanstack/react-router':
         specifier: ^1.95.0
         version: 1.170.32(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      blockly:
+        specifier: ^13.2.1
+        version: 13.2.1(jsdom@26.1.0)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1252,6 +1255,12 @@ packages:
     resolution: {integrity: sha512-Grytf1xOxOEMTGRwx6rLGKkTabd4vMg3VrKdj/7joCmV0qgh4QwMMO6xh34YEXQqirAuUdgQGa5orJQQ+69RBw==}
     engines: {node: '>=6.0.0'}
     hasBin: true
+
+  blockly@13.2.1:
+    resolution: {integrity: sha512-iOa37H0ks5Zup2G1zZyviLX9E5WzWh3h0Zs8Nta2cPKmnAGHjZ6wrp3VqLTaquTJReJKPwaJZ39K7AD24rT4lg==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      jsdom: '>=27.4.0 <30.0.0'
 
   browserslist@4.28.8:
     resolution: {integrity: sha512-V2NpofLblG64mfOtSgDhOJESZEGogzDMBv/q+W6oc4LXWP/q75eOXoOaaOu1EOadB9U4Bwx/e0yzbvwKH8zalA==}
@@ -2927,6 +2936,10 @@ snapshots:
       - supports-color
 
   baseline-browser-mapping@2.11.19: {}
+
+  blockly@13.2.1(jsdom@26.1.0):
+    dependencies:
+      jsdom: 26.1.0
 
   browserslist@4.28.8:
     dependencies:

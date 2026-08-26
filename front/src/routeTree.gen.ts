@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProblemRouteImport } from './routes/problem'
 import { Route as SandboxEditorRouteImport } from './routes/sandbox.editor'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProblemRoute = ProblemRouteImport.update({
+  id: '/problem',
+  path: '/problem',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SandboxEditorRoute = SandboxEditorRouteImport.update({
@@ -25,27 +31,31 @@ const SandboxEditorRoute = SandboxEditorRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/problem': typeof ProblemRoute
   '/sandbox/editor': typeof SandboxEditorRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/problem': typeof ProblemRoute
   '/sandbox/editor': typeof SandboxEditorRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/problem': typeof ProblemRoute
   '/sandbox/editor': typeof SandboxEditorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sandbox/editor'
+  fullPaths: '/' | '/problem' | '/sandbox/editor'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sandbox/editor'
-  id: '__root__' | '/' | '/sandbox/editor'
+  to: '/' | '/problem' | '/sandbox/editor'
+  id: '__root__' | '/' | '/problem' | '/sandbox/editor'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ProblemRoute: typeof ProblemRoute
   SandboxEditorRoute: typeof SandboxEditorRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/problem': {
+      id: '/problem'
+      path: '/problem'
+      fullPath: '/problem'
+      preLoaderRoute: typeof ProblemRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sandbox/editor': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ProblemRoute: ProblemRoute,
   SandboxEditorRoute: SandboxEditorRoute,
 }
 export const routeTree = rootRouteImport

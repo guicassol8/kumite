@@ -1,4 +1,5 @@
 // rota temporária de dev — removida na #3
+import { buildToolbox, defineKumiteBlocks, emptyWorkspaceState } from '@kumite/blocks'
 import { createFileRoute } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 
@@ -7,29 +8,46 @@ import {
   type BlocklyWorkspaceHandle,
   type WorkspaceState,
 } from '@/components/blockly/blockly-workspace'
-import { demoToolbox } from '@/components/blockly/demo-toolbox'
 import { Button } from '@/components/ui/button'
+
+// Os blocos precisam existir antes de qualquer workspace ser injetado — e o
+// registro é global no Blockly, então o topo do módulo é o lugar certo.
+defineKumiteBlocks('pt')
+
+const toolbox = buildToolbox('pt')
 
 export const Route = createFileRoute('/sandbox/editor')({
   component: SandboxEditor,
 })
 
+// Exemplo montado dentro do bloco-raiz: é assim que uma solução de verdade se
+// parece, com corpo e valor de retorno.
 const exampleState: WorkspaceState = {
   blocks: {
     languageVersion: 0,
     blocks: [
       {
-        type: 'controls_if',
-        id: 'exemploIf',
+        type: 'kumite_solve',
+        id: 'exemploRaiz',
         x: 40,
         y: 40,
         inputs: {
-          IF0: {
-            block: { type: 'logic_boolean', id: 'exemploBool', fields: { BOOL: 'TRUE' } },
+          BODY: {
+            block: {
+              type: 'controls_if',
+              id: 'exemploIf',
+              inputs: {
+                IF0: {
+                  block: { type: 'logic_boolean', id: 'exemploBool', fields: { BOOL: 'TRUE' } },
+                },
+              },
+            },
+          },
+          RETURN: {
+            block: { type: 'math_number', id: 'exemploNum', fields: { NUM: 42 } },
           },
         },
       },
-      { type: 'math_number', id: 'exemploNum', x: 40, y: 200, fields: { NUM: 42 } },
     ],
   },
 }
@@ -61,9 +79,14 @@ function SandboxEditor() {
           Limpar
         </Button>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 md:flex-row">
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border">
-          <BlocklyWorkspace ref={workspace} toolbox={demoToolbox} onChange={setState} />
+          <BlocklyWorkspace
+            ref={workspace}
+            toolbox={toolbox}
+            initialState={emptyWorkspaceState}
+            onChange={setState}
+          />
         </div>
         <pre
           data-testid="sandbox-json"

@@ -14,7 +14,7 @@ test('the Blockly wrapper mounts, round-trips and resizes in the browser', async
   await page.goto('/sandbox/editor')
   await expect(svg).toBeVisible()
   await expect(toolbox.getByText('Lógica')).toBeVisible()
-  await expect(toolbox.getByText('Números')).toBeVisible()
+  await expect(toolbox.getByText('Matemática')).toBeVisible()
   await page.screenshot({ path: evidence('01-workspace-montado') })
 
   // 02 — deserialize() paints the blocks and onChange reports the new state.
@@ -26,7 +26,7 @@ test('the Blockly wrapper mounts, round-trips and resizes in the browser', async
 
   // 03 — a real drag out of the flyout fires onChange the same way.
   const before = await json.textContent()
-  await toolbox.getByRole('treeitem', { name: 'Números' }).click()
+  await toolbox.getByRole('treeitem', { name: 'Matemática' }).click()
   const flyoutBlock = page.locator('.blocklyFlyout g.blocklyDraggable').first()
   await expect(flyoutBlock).toBeVisible()
   const source = await flyoutBlock.boundingBox()

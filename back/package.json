@@ -17,7 +17,8 @@
     "hurl": "hurl --test --color --variable host=${HURL_HOST:-http://localhost:3000} src/modules/*/*.hurl",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13",

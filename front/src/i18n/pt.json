@@ -18,6 +18,18 @@
     "submitButton": "Submeter",
     "submitHint": "Disponível na competição",
     "clearButton": "Limpar blocos",
-    "clearConfirm": "Isso vai apagar todos os blocos deste problema. Continuar?"
+    "clearConfirm": "Isso vai apagar todos os blocos deste problema. Continuar?",
+    "executeRunning": "Executando...",
+    "results": {
+      "title": "Resultados",
+      "summary": "{{passed}}/{{total}} casos",
+      "caseLabel": "Caso {{index}}",
+      "expected": "esperado",
+      "obtained": "obtido",
+      "pending": "executando...",
+      "timeout": "Tempo esgotado ({{seconds}}s)",
+      "runtimeError": "Erro: {{message}}",
+      "empty": "Monte a sua solução dentro do bloco “resolver” e clique em Executar."
+    }
   }
 }

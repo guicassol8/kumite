@@ -8,5 +8,14 @@
   },
   "editor": {
     "workspaceLabel": "Área de bloques"
+  },
+  "problem": {
+    "statementLabel": "Enunciado del problema",
+    "examplesHeading": "Casos de ejemplo",
+    "exampleInput": "Entrada",
+    "exampleOutput": "Salida esperada",
+    "executeButton": "Ejecutar",
+    "submitButton": "Enviar",
+    "submitHint": "Disponible en la competencia"
   }
 }

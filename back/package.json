@@ -23,7 +23,9 @@
   "dependencies": {
     "@hono/node-server": "^1.13",
     "@katajs-framework/core": "^0.3.2",
+    "@kumite/blocks": "workspace:*",
     "argon2": "^0.45.1",
+    "blockly": "^13.2.1",
     "drizzle-orm": "^0.44.0",
     "hono": "^4",
     "postgres": "^3.4",

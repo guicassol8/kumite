@@ -23,9 +23,15 @@ importers:
       '@katajs-framework/core':
         specifier: ^0.3.2
         version: 0.3.2(hono@4.13.4)(typescript@5.9.3)(zod@3.25.76)
+      '@kumite/blocks':
+        specifier: workspace:*
+        version: link:../blocks
       argon2:
         specifier: ^0.45.1
         version: 0.45.1
+      blockly:
+        specifier: ^13.2.1
+        version: 13.2.1(jsdom@26.1.0)
       drizzle-orm:
         specifier: ^0.44.0
         version: 0.44.7(postgres@3.4.9)
@@ -55,8 +61,23 @@ importers:
         specifier: ^4.1.7
         version: 4.1.11(@types/node@20.19.43)(jsdom@26.1.0)(vite@7.3.6(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
 
+  blocks:
+    devDependencies:
+      blockly:
+        specifier: ^13.2.1
+        version: 13.2.1(jsdom@26.1.0)
+      typescript:
+        specifier: ^5.6
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.7
+        version: 4.1.11(@types/node@20.19.43)(jsdom@26.1.0)(vite@7.3.6(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+
   front:
     dependencies:
+      '@kumite/blocks':
+        specifier: workspace:*
+        version: link:../blocks
       '@radix-ui/react-slot':
         specifier: ^1.2.0
         version: 1.3.3(@types/react@19.2.18)(react@19.2.8)

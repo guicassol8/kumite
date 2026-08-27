@@ -1,6 +1,7 @@
+import { buildToolbox, defineKumiteBlocks } from '@kumite/blocks'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { createRef, StrictMode } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import '@/i18n'
 import {
@@ -9,7 +10,10 @@ import {
   type BlocklyWorkspaceProps,
   type WorkspaceState,
 } from './blockly-workspace'
-import { demoToolbox } from './demo-toolbox'
+
+// The wrapper is toolbox-agnostic, but driving it with the real curated toolbox
+// is also the front's smoke test that @kumite/blocks loads under Vite.
+const toolbox = buildToolbox('pt')
 
 const fixture: WorkspaceState = {
   blocks: {
@@ -43,11 +47,15 @@ class RecordingResizeObserver {
 
 function renderWorkspace(props: Partial<BlocklyWorkspaceProps> = {}) {
   const ref = createRef<BlocklyWorkspaceHandle>()
-  const utils = render(<BlocklyWorkspace ref={ref} toolbox={demoToolbox} {...props} />)
+  const utils = render(<BlocklyWorkspace ref={ref} toolbox={toolbox} {...props} />)
   const handle = ref.current
   if (!handle) throw new Error('the imperative handle was not attached')
   return { handle, ...utils }
 }
+
+beforeAll(() => {
+  defineKumiteBlocks('pt')
+})
 
 afterEach(() => {
   cleanup()
@@ -61,7 +69,7 @@ describe('BlocklyWorkspace', () => {
 
     expect(screen.getByTestId('blockly-workspace').querySelector('svg')).not.toBeNull()
     expect(screen.getByText('Lógica')).toBeDefined()
-    expect(screen.getByText('Números')).toBeDefined()
+    expect(screen.getByText('Matemática')).toBeDefined()
   })
 
   it('labels the workspace for screen readers', () => {
@@ -73,7 +81,7 @@ describe('BlocklyWorkspace', () => {
   it('injects a single workspace even when StrictMode mounts it twice', () => {
     render(
       <StrictMode>
-        <BlocklyWorkspace toolbox={demoToolbox} />
+        <BlocklyWorkspace toolbox={toolbox} />
       </StrictMode>,
     )
 

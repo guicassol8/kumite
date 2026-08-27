@@ -24,6 +24,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "argon2",
       "esbuild",
       "lefthook"
     ]

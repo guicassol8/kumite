@@ -11,6 +11,15 @@ const frontPort = process.env.FRONT_PORT ?? '5173'
 
 export default defineConfig({
   testDir: './e2e',
+  // Injecting Blockly is the slowest thing every spec blocks on, and the 5s
+  // default only holds on an idle machine.
+  expect: { timeout: 30_000 },
+  // Every worker is a Chromium holding a Blockly workspace — hundreds of MB
+  // each. The default (half the cores) outgrows a small machine, and once it
+  // starts swapping the renderer stalls with the page still blank: the suite
+  // then fails on a different spec every run, with no error to show for it.
+  // Two is a floor that keeps the suite honest, not a cure for a full machine.
+  workers: 2,
   use: {
     baseURL: `http://localhost:${frontPort}`,
   },

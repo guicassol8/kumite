@@ -22,7 +22,7 @@ export default defineConfig({
       cwd: '..',
     },
     {
-      command: `pnpm --filter @kumite/front dev -- --port ${frontPort} --strictPort`,
+      command: `pnpm --filter @kumite/front dev --port ${frontPort} --strictPort`,
       url: `http://localhost:${frontPort}`,
       reuseExistingServer: true,
       cwd: '..',

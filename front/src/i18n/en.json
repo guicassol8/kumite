@@ -16,6 +16,8 @@
     "exampleOutput": "Expected output",
     "executeButton": "Run",
     "submitButton": "Submit",
-    "submitHint": "Available during the competition"
+    "submitHint": "Available during the competition",
+    "clearButton": "Clear blocks",
+    "clearConfirm": "This will erase all blocks for this problem. Continue?"
   }
 }

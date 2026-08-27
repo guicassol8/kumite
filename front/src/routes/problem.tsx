@@ -7,10 +7,12 @@ import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
 } from '@/components/blockly/blockly-workspace'
+import { ExampleResults, type ExampleResultsNotice } from '@/components/problem/example-results'
 import { somaDosParesProblem } from '@/components/problem/soma-dos-pares'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { type ExampleRunState, useExampleRun } from '@/hooks/use-example-run'
 import { useWorkspaceAutoSave } from '@/hooks/use-workspace-autosave'
 // Importing this registers the blocks and the pt-br locale, before any
 // workspace is injected.
@@ -20,10 +22,22 @@ export const Route = createFileRoute('/problem')({
   component: ProblemScreen,
 })
 
+function noticeFor(state: ExampleRunState): ExampleResultsNotice | undefined {
+  if (state.status === 'empty') return 'empty'
+  if (state.status === 'invalid') return { message: state.message }
+  return undefined
+}
+
+function outcomesOf(state: ExampleRunState) {
+  return state.status === 'running' || state.status === 'done' ? state.outcomes : []
+}
+
 function ProblemScreen() {
   const { t } = useTranslation()
   const workspaceRef = useRef<BlocklyWorkspaceHandle>(null)
   const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(somaDosParesProblem.id)
+  const { state: runState, run } = useExampleRun(somaDosParesProblem.examples)
+  const isRunning = runState.status === 'running'
 
   // The child injects the workspace in its own effect, which runs before this
   // one, and Blockly only resolves a `custom` category when it is clicked — so
@@ -84,7 +98,18 @@ function ProblemScreen() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button data-testid="problem-run-button">{t('problem.executeButton')}</Button>
+          <Button
+            type="button"
+            data-testid="problem-run-button"
+            disabled={isRunning}
+            onClick={() => {
+              // The run owns its own errors and settles into a state — nothing
+              // here has to await it.
+              void run(workspaceRef.current?.serialize() ?? {})
+            }}
+          >
+            {isRunning ? t('problem.executeRunning') : t('problem.executeButton')}
+          </Button>
           <Button
             type="button"
             variant="destructive"
@@ -117,6 +142,13 @@ function ProblemScreen() {
             </Tooltip>
           </TooltipProvider>
         </div>
+        {runState.status !== 'idle' && (
+          <ExampleResults
+            examples={somaDosParesProblem.examples}
+            outcomes={outcomesOf(runState)}
+            notice={noticeFor(runState)}
+          />
+        )}
       </div>
     </main>
   )

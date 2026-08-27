@@ -18,6 +18,18 @@
     "submitButton": "Submit",
     "submitHint": "Available during the competition",
     "clearButton": "Clear blocks",
-    "clearConfirm": "This will erase all blocks for this problem. Continue?"
+    "clearConfirm": "This will erase all blocks for this problem. Continue?",
+    "executeRunning": "Running...",
+    "results": {
+      "title": "Results",
+      "summary": "{{passed}}/{{total}} cases",
+      "caseLabel": "Case {{index}}",
+      "expected": "expected",
+      "obtained": "got",
+      "pending": "running...",
+      "timeout": "Timed out ({{seconds}}s)",
+      "runtimeError": "Error: {{message}}",
+      "empty": "Build your solution inside the “solve” block and click Run."
+    }
   }
 }

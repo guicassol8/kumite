@@ -4,14 +4,11 @@
 import * as Blockly from 'blockly'
 import { javascriptGenerator, Order } from 'blockly/javascript'
 
+import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
 import { type BlockLocale, DEFAULT_LOCALE, messagesFor } from './messages'
 
 export const ROOT_BLOCK_TYPE = 'kumite_solve'
 export const INPUT_BLOCK_TYPE = 'kumite_input'
-
-/** Contract with #4 and #20: the generated code is always `solve(input)`. */
-export const SOLUTION_FUNCTION_NAME = 'solve'
-export const SOLUTION_PARAM_NAME = 'input'
 
 /**
  * Registers the two kumite blocks and their JS generators. Idempotent by

@@ -1,4 +1,6 @@
-import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from '@kumite/blocks'
+// The `/contract` subpath, never the barrel: this module is what the worker
+// bundle is built from, and the barrel would pull all of Blockly into it.
+import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from '@kumite/blocks/contract'
 
 /**
  * Instantiates the generated source and calls `solve(input)` once.

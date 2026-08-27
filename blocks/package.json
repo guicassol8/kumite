@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./contract": {
+      "types": "./src/contract.ts",
+      "import": "./src/contract.ts"
     }
   },
   "scripts": {

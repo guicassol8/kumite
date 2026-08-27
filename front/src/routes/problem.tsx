@@ -1,12 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { BlocklyWorkspace } from '@/components/blockly/blockly-workspace'
+import {
+  BlocklyWorkspace,
+  type BlocklyWorkspaceHandle,
+} from '@/components/blockly/blockly-workspace'
 import { demoToolbox } from '@/components/blockly/demo-toolbox'
 import { somaDosParesProblem } from '@/components/problem/soma-dos-pares'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useWorkspaceAutoSave } from '@/hooks/use-workspace-autosave'
 
 export const Route = createFileRoute('/problem')({
   component: ProblemScreen,
@@ -14,6 +19,8 @@ export const Route = createFileRoute('/problem')({
 
 function ProblemScreen() {
   const { t } = useTranslation()
+  const workspaceRef = useRef<BlocklyWorkspaceHandle>(null)
+  const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(somaDosParesProblem.id)
 
   return (
     <main className="flex h-dvh flex-col gap-4 p-4 md:flex-row">
@@ -55,10 +62,27 @@ function ProblemScreen() {
         className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
       >
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border">
-          <BlocklyWorkspace toolbox={demoToolbox} />
+          <BlocklyWorkspace
+            ref={workspaceRef}
+            toolbox={demoToolbox}
+            initialState={initialState}
+            onChange={handleChange}
+          />
         </div>
         <div className="flex items-center gap-2">
           <Button data-testid="problem-run-button">{t('problem.executeButton')}</Button>
+          <Button
+            type="button"
+            variant="destructive"
+            data-testid="problem-clear-button"
+            onClick={() => {
+              if (!window.confirm(t('problem.clearConfirm'))) return
+              workspaceRef.current?.clear()
+              clearSaved()
+            }}
+          >
+            {t('problem.clearButton')}
+          </Button>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>

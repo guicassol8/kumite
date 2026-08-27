@@ -16,6 +16,8 @@
     "exampleOutput": "Salida esperada",
     "executeButton": "Ejecutar",
     "submitButton": "Enviar",
-    "submitHint": "Disponible en la competencia"
+    "submitHint": "Disponible en la competencia",
+    "clearButton": "Limpiar bloques",
+    "clearConfirm": "Esto borrará todos los bloques de este problema. ¿Continuar?"
   }
 }

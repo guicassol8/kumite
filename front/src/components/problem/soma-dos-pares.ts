@@ -5,12 +5,14 @@ export type ProblemExample = {
 }
 
 export type Problem = {
+  id: string
   title: string
   statement: string
   examples: ProblemExample[]
 }
 
 export const somaDosParesProblem: Problem = {
+  id: 'soma-dos-pares',
   title: 'Soma dos Pares',
   statement:
     'Dada uma lista de números inteiros, retorne a soma de todos os números pares da lista.',

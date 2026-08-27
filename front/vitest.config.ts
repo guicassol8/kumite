@@ -10,7 +10,11 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    setupFiles: ['./src/test/web-storage-jsdom.ts', './src/test/blockly-jsdom.ts'],
+    setupFiles: [
+      './src/test/i18n-jsdom.ts',
+      './src/test/web-storage-jsdom.ts',
+      './src/test/blockly-jsdom.ts',
+    ],
     include: ['src/**/*.test.{ts,tsx}'],
   },
 })

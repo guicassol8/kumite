@@ -76,4 +76,5 @@ jobs:
           node-version: "20"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @kumite/back db:migrate
       - run: pnpm -r test

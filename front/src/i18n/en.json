@@ -1,4 +1,10 @@
 {
+  "language": {
+    "selectorLabel": "Language",
+    "pt": "Português",
+    "es": "Español",
+    "en": "English"
+  },
   "home": {
     "tagline": "PUCRS × Mérida — block programming showdown",
     "apiStatus": "API status",

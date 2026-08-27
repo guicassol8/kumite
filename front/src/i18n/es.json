@@ -1,4 +1,10 @@
 {
+  "language": {
+    "selectorLabel": "Idioma",
+    "pt": "Português",
+    "es": "Español",
+    "en": "English"
+  },
   "home": {
     "tagline": "PUCRS × Mérida — programación con bloques",
     "apiStatus": "Estado de la API",

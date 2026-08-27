@@ -20,6 +20,8 @@ export type BlockMessages = {
   categoryText: string
   categoryLists: string
   categoryVariables: string
+  /** Label of the "new variable" button in the Variables flyout. */
+  categoryVariablesNew: string
   errorMalformedWorkspace: string
   errorMissingRoot: string
   errorDuplicateRoot: string
@@ -40,6 +42,7 @@ export const messages: Record<BlockLocale, BlockMessages> = {
     categoryText: 'Texto',
     categoryLists: 'Listas',
     categoryVariables: 'Variáveis',
+    categoryVariablesNew: 'Criar variável...',
     errorMalformedWorkspace: 'A área de blocos não pôde ser lida.',
     errorMissingRoot: 'A solução precisa do bloco "resolver".',
     errorDuplicateRoot: 'A solução só pode ter um bloco "resolver".',
@@ -58,6 +61,7 @@ export const messages: Record<BlockLocale, BlockMessages> = {
     categoryText: 'Texto',
     categoryLists: 'Listas',
     categoryVariables: 'Variables',
+    categoryVariablesNew: 'Crear variable...',
     errorMalformedWorkspace: 'El área de bloques no se pudo leer.',
     errorMissingRoot: 'La solución necesita el bloque "resolver".',
     errorDuplicateRoot: 'La solución solo puede tener un bloque "resolver".',
@@ -75,6 +79,7 @@ export const messages: Record<BlockLocale, BlockMessages> = {
     categoryText: 'Text',
     categoryLists: 'Lists',
     categoryVariables: 'Variables',
+    categoryVariablesNew: 'Create variable...',
     errorMalformedWorkspace: 'The block workspace could not be read.',
     errorMissingRoot: 'The solution needs the "solve" block.',
     errorDuplicateRoot: 'The solution can only have one "solve" block.',

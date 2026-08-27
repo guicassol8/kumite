@@ -17,7 +17,10 @@ export {
 export {
   allowedBlockTypes,
   buildToolbox,
+  CREATE_VARIABLE_BUTTON_KEY,
   emptyWorkspaceState,
+  VARIABLES_CATEGORY_KEY,
+  variablesFlyout,
   type WorkspaceState,
   withRootBlock,
 } from './toolbox'

@@ -9,7 +9,15 @@ type CuratedCategory = {
   label: keyof BlockMessages
   style: string
   blocks: readonly string[]
+  /** Set on the one category Blockly fills through a callback, not statically. */
+  custom?: string
 }
+
+/** Key the editor registers `variablesFlyout` under (T4, `front/`). */
+export const VARIABLES_CATEGORY_KEY = 'KUMITE_VARIABLES'
+
+/** Key the editor registers the "create variable" button handler under. */
+export const CREATE_VARIABLE_BUTTON_KEY = 'KUMITE_CREATE_VARIABLE'
 
 /**
  * The curated subset — hand-picked, not "everything Blockly ships". Adding a
@@ -46,6 +54,12 @@ const CURATED_CATEGORIES: readonly CuratedCategory[] = [
     label: 'categoryVariables',
     style: 'variable_category',
     blocks: [INPUT_BLOCK_TYPE, 'variables_set', 'variables_get'],
+    // Static contents would leave the solver with the single variable Blockly
+    // seeds, because "create variable" only exists in a flyout callback.
+    // Blockly's own `VARIABLE` callback is not an option: it injects
+    // `math_change`, which is outside `allowedBlockTypes` and the judge would
+    // refuse the solution. Hence our own flyout, below.
+    custom: VARIABLES_CATEGORY_KEY,
   },
 ]
 
@@ -59,9 +73,54 @@ export function buildToolbox(
       kind: 'category',
       name: messages[category.label],
       categorystyle: category.style,
-      contents: category.blocks.map((type) => ({ kind: 'block', type })),
+      ...(category.custom
+        ? { custom: category.custom }
+        : { contents: category.blocks.map((type) => ({ kind: 'block', type })) }),
     })),
   }
+}
+
+function variableField(variable: Blockly.IVariableModel<Blockly.IVariableState>) {
+  return { VAR: { name: variable.getName(), type: variable.getType() } }
+}
+
+/**
+ * Contents of the Variables flyout, rebuilt on every open so the variables the
+ * solver just created are there.
+ *
+ * Mirrors Blockly's own variable flyout minus `math_change`: the create button,
+ * our `kumite_input`, a setter for the newest variable and a getter per
+ * variable. Every type it emits is in `allowedBlockTypes` by construction — the
+ * curated Variables category is still the single list the judge agrees with.
+ *
+ * Takes a plain `Workspace` (only the variable map is read) so it stays
+ * testable headless, like everything else in this package.
+ */
+export function variablesFlyout(
+  workspace: Blockly.Workspace,
+  locale: BlockLocale = DEFAULT_LOCALE,
+): Blockly.utils.toolbox.FlyoutItemInfoArray {
+  const messages = messagesFor(locale)
+  const variables = workspace.getVariableMap().getVariablesOfType('')
+  const newest = variables[variables.length - 1]
+  const byName = [...variables].sort((a, b) =>
+    a.getName().toLowerCase().localeCompare(b.getName().toLowerCase()),
+  )
+
+  return [
+    {
+      kind: 'button',
+      text: messages.categoryVariablesNew,
+      callbackkey: CREATE_VARIABLE_BUTTON_KEY,
+    },
+    { kind: 'block', type: INPUT_BLOCK_TYPE },
+    ...(newest ? [{ kind: 'block', type: 'variables_set', fields: variableField(newest) }] : []),
+    ...byName.map((variable) => ({
+      kind: 'block',
+      type: 'variables_get',
+      fields: variableField(variable),
+    })),
+  ]
 }
 
 /**

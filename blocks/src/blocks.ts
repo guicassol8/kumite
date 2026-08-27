@@ -27,7 +27,13 @@ export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
       this.appendStatementInput('BODY')
       this.appendValueInput('RETURN').appendField(messages.solveReturn)
       // No previous/next connection: the block is the root by construction.
-      // Making it fixed, undeletable and unique in the editor is #4.
+      // `setDeletable(false)` is the whole protection: the `preconditionFn` of
+      // Blockly 13's `blockDelete` and `blockDuplicate` context-menu items, the
+      // Delete/Backspace and cut shortcuts and the trashcan all go through
+      // `isDeletable()`, so one call closes deleting, duplicating, cutting and
+      // dragging to the trash. The block stays movable on purpose.
+      // Uniqueness is the editor's side: `maxInstances` on `Blockly.inject`.
+      this.setDeletable(false)
       this.setColour(230)
       this.setTooltip(messages.solveTooltip)
     },

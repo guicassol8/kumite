@@ -20,6 +20,18 @@ function withBlock<T>(type: string, run: (block: Blockly.Block) => T): T {
   }
 }
 
+// The registry is Blockly's, not ours: the assertions run its own
+// `preconditionFn` so a change of heart upstream fails here instead of only in
+// the browser. Headless blocks are enough — the precondition only reads
+// `isInFlyout` and `isDeletable()`.
+function precondition(
+  item: ReturnType<typeof Blockly.ContextMenuRegistry.registry.getItem>,
+  block: Blockly.Block,
+): string | undefined {
+  const scope = { block } as unknown as Blockly.ContextMenuRegistry.Scope
+  return item?.preconditionFn?.(scope, new Event('contextmenu'))
+}
+
 afterEach(() => {
   defineKumiteBlocks()
 })
@@ -76,6 +88,34 @@ describe('defineKumiteBlocks', () => {
     withBlock(INPUT_BLOCK_TYPE, (block) => {
       expect(labelsOf(block)).toContain(messagesFor('en').inputTitle)
     })
+  })
+
+  it('marks the root block as undeletable and leaves the curated blocks alone', () => {
+    defineKumiteBlocks()
+
+    withBlock(ROOT_BLOCK_TYPE, (block) => {
+      expect(block.isOwnDeletable()).toBe(false)
+      expect(block.isDeletable()).toBe(false)
+    })
+    withBlock('math_number', (block) => {
+      expect(block.isOwnDeletable()).toBe(true)
+    })
+  })
+
+  it('hides "delete" and "duplicate" from the root block context menu', () => {
+    defineKumiteBlocks()
+
+    for (const id of ['blockDelete', 'blockDuplicate']) {
+      const item = Blockly.ContextMenuRegistry.registry.getItem(id)
+      expect(item?.preconditionFn, id).toBeTypeOf('function')
+
+      withBlock(ROOT_BLOCK_TYPE, (block) => {
+        expect(precondition(item, block), `${id} on the root`).toBe('hidden')
+      })
+      withBlock('math_number', (block) => {
+        expect(precondition(item, block), `${id} on a curated block`).toBe('enabled')
+      })
+    }
   })
 
   it('re-registers with another locale without throwing (#57 relabels at runtime)', () => {

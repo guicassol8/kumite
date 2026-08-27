@@ -1,6 +1,6 @@
-import { buildToolbox, defineKumiteBlocks, emptyWorkspaceState } from '@kumite/blocks'
+import { emptyWorkspaceState, withRootBlock } from '@kumite/blocks'
 import { createFileRoute } from '@tanstack/react-router'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -12,12 +12,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useWorkspaceAutoSave } from '@/hooks/use-workspace-autosave'
-
-// The blocks need to exist before any workspace is injected, and registration
-// is global to Blockly — module top is the right place.
-defineKumiteBlocks('pt')
-
-const toolbox = buildToolbox('pt')
+// Importing this registers the blocks and the pt-br locale, before any
+// workspace is injected.
+import { registerVariablesFlyout, toolbox, workspaceOptions } from '@/lib/blockly-setup'
 
 export const Route = createFileRoute('/problem')({
   component: ProblemScreen,
@@ -27,6 +24,13 @@ function ProblemScreen() {
   const { t } = useTranslation()
   const workspaceRef = useRef<BlocklyWorkspaceHandle>(null)
   const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(somaDosParesProblem.id)
+
+  // The child injects the workspace in its own effect, which runs before this
+  // one, and Blockly only resolves a `custom` category when it is clicked — so
+  // registering here is early enough.
+  useEffect(() => {
+    registerVariablesFlyout(workspaceRef.current?.getWorkspace())
+  }, [])
 
   return (
     <main className="flex h-dvh flex-col gap-4 p-4 md:flex-row">
@@ -71,7 +75,11 @@ function ProblemScreen() {
           <BlocklyWorkspace
             ref={workspaceRef}
             toolbox={toolbox}
-            initialState={initialState ?? emptyWorkspaceState}
+            options={workspaceOptions}
+            // A state saved before the root became undeletable may not have it,
+            // and the toolbox never offers it back — re-seed instead of losing
+            // the blocks.
+            initialState={withRootBlock(initialState)}
             onChange={handleChange}
           />
         </div>

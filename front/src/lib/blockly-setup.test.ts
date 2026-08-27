@@ -1,0 +1,90 @@
+import { messagesFor, ROOT_BLOCK_TYPE, VARIABLES_CATEGORY_KEY } from '@kumite/blocks'
+import * as Blockly from 'blockly'
+import { describe, expect, it, vi } from 'vitest'
+
+import { registerVariablesFlyout, toolbox, workspaceOptions } from '@/lib/blockly-setup'
+
+type Callbacks = {
+  registerToolboxCategoryCallback: ReturnType<typeof vi.fn>
+  registerButtonCallback: ReturnType<typeof vi.fn>
+}
+
+function spyWorkspace(): Callbacks {
+  return { registerToolboxCategoryCallback: vi.fn(), registerButtonCallback: vi.fn() }
+}
+
+describe('blockly-setup', () => {
+  it('translates the native Blockly blocks to pt-br', () => {
+    // These come from the official locale pack, not from @kumite/blocks —
+    // without `setLocale` they would still read "repeat %1 times" / "if".
+    expect(Blockly.Msg.CONTROLS_REPEAT_TITLE).toBe('repita %1 vezes')
+    expect(Blockly.Msg.CONTROLS_IF_MSG_IF).toBe('se')
+  })
+
+  it('keeps the kumite block labels, which are not Blockly.Msg entries', () => {
+    const workspace = new Blockly.Workspace()
+    try {
+      const labels = workspace
+        .newBlock(ROOT_BLOCK_TYPE)
+        .inputList.flatMap((input) => input.fieldRow)
+        .map((field) => field.getText())
+
+      expect(labels).toContain(messagesFor('pt').solveTitle)
+    } finally {
+      workspace.dispose()
+    }
+  })
+
+  it('exports the curated toolbox', () => {
+    const { contents } = toolbox as { contents: { name: string }[] }
+
+    expect(contents.map((category) => category.name)).toEqual([
+      'Lógica',
+      'Laços',
+      'Matemática',
+      'Texto',
+      'Listas',
+      'Variáveis',
+    ])
+  })
+
+  it('caps the root block at one instance per workspace', () => {
+    expect(workspaceOptions.maxInstances).toEqual({ [ROOT_BLOCK_TYPE]: 1 })
+  })
+
+  it('registers the variables flyout and the create-variable button', () => {
+    const workspace = spyWorkspace()
+
+    registerVariablesFlyout(workspace as unknown as Blockly.WorkspaceSvg)
+
+    expect(workspace.registerToolboxCategoryCallback).toHaveBeenCalledWith(
+      VARIABLES_CATEGORY_KEY,
+      expect.any(Function),
+    )
+    expect(workspace.registerButtonCallback).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Function),
+    )
+  })
+
+  it('registers a category callback that builds the pt flyout', () => {
+    const workspace = spyWorkspace()
+    registerVariablesFlyout(workspace as unknown as Blockly.WorkspaceSvg)
+    const callback = workspace.registerToolboxCategoryCallback.mock.calls[0]?.[1]
+
+    const target = new Blockly.Workspace()
+    try {
+      target.getVariableMap().createVariable('soma')
+      const flyout = callback(target) as { text?: string; type?: string }[]
+
+      expect(flyout[0]?.text).toBe(messagesFor('pt').categoryVariablesNew)
+      expect(flyout.map((item) => item.type)).toContain('variables_get')
+    } finally {
+      target.dispose()
+    }
+  })
+
+  it('does nothing when the workspace is not mounted yet', () => {
+    expect(() => registerVariablesFlyout(null)).not.toThrow()
+  })
+})

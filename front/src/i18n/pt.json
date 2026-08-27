@@ -8,5 +8,16 @@
   },
   "editor": {
     "workspaceLabel": "Área de blocos"
+  },
+  "problem": {
+    "statementLabel": "Enunciado do problema",
+    "examplesHeading": "Casos de exemplo",
+    "exampleInput": "Entrada",
+    "exampleOutput": "Saída esperada",
+    "executeButton": "Executar",
+    "submitButton": "Submeter",
+    "submitHint": "Disponível na competição",
+    "clearButton": "Limpar blocos",
+    "clearConfirm": "Isso vai apagar todos os blocos deste problema. Continuar?"
   }
 }

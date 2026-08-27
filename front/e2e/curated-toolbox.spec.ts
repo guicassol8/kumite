@@ -11,7 +11,7 @@ test('the curated toolbox and the root block come from @kumite/blocks', async ({
   const toolbox = page.locator('.blocklyToolbox')
 
   // 01 — the six curated categories, and only those.
-  await page.goto('/sandbox/editor')
+  await page.goto('/problem')
   await expect(host.locator('svg.blocklySvg')).toBeVisible()
   for (const category of categories) {
     await expect(toolbox.getByRole('treeitem', { name: category })).toBeVisible()

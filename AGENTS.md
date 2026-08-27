@@ -50,6 +50,18 @@ Task workflow: `docs/workflow.md`.
   the parity test fails otherwise.
 - Every interactive element gets a `data-testid`.
 
+## Kata framework feedback
+
+If, while working on any kumite task, you notice a bug, a missing
+capability, outdated/unclear docs, or a possible improvement in the
+**kata framework** itself (not kumite code) — write it up as a new file in
+`kata-feedback/` at the repo root (format in `kata-feedback/README.md`).
+Do this instead of silently ignoring it, and instead of expanding the
+current task's scope to fix kata itself. This is separate from "Discovered
+work" (`docs/workflow.md`): that flow opens a kumite GitHub issue for
+kumite-scoped work; kata feedback is not kumite-scoped, so it goes to this
+local folder for a human to triage against the kata repo.
+
 ## Prohibitions
 
 - Never bypass hooks: no `--no-verify`, no `-n`, no `SKIP=` (also denied in

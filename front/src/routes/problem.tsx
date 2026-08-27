@@ -83,7 +83,10 @@ function ProblemScreen() {
             data-testid="problem-clear-button"
             onClick={() => {
               if (!window.confirm(t('problem.clearConfirm'))) return
-              workspaceRef.current?.clear()
+              // The root block isn't offered by the toolbox (it's seeded, not
+              // dragged in), so "clear" resets to it rather than to nothing —
+              // an empty workspace would leave no way back in.
+              workspaceRef.current?.deserialize(emptyWorkspaceState)
               clearSaved()
             }}
           >

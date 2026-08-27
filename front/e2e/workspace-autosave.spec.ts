@@ -6,7 +6,7 @@ const evidence = (name: string) => `e2e/evidence/6/${name}.png`
 async function dragBlockFromFlyout(page: import('@playwright/test').Page) {
   const host = page.getByTestId('blockly-workspace')
   const toolbox = page.locator('.blocklyToolbox')
-  await toolbox.getByRole('treeitem', { name: 'Números' }).click()
+  await toolbox.getByRole('treeitem', { name: 'Matemática' }).click()
   const flyoutBlock = page.locator('.blocklyFlyout g.blocklyDraggable').first()
   await expect(flyoutBlock).toBeVisible()
   const source = await flyoutBlock.boundingBox()
@@ -42,13 +42,14 @@ test('the workspace auto-saves per problem, restores on reopen, and Limpar bloco
   await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
   await page.screenshot({ path: evidence('02-restored-on-reopen') })
 
-  // 03 — confirming "Limpar blocos" empties the workspace and removes the
-  // saved state, so it stays empty after a reload too.
+  // 03 — confirming "Limpar blocos" resets the workspace to just the root
+  // block (it isn't offered by the toolbox, so losing it would strand the
+  // user) and removes the saved state, so it stays that way after a reload.
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByTestId('problem-clear-button').click()
-  await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(0)
+  await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
   await page.reload()
-  await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(0)
+  await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
   await page.screenshot({ path: evidence('03-cleared-and-stays-empty') })
 })
 

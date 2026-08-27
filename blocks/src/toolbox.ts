@@ -73,10 +73,32 @@ export const allowedBlockTypes: readonly string[] = [
   ...CURATED_CATEGORIES.flatMap((category) => category.blocks),
 ]
 
+type SerializedBlock = { type?: string; [key: string]: unknown }
+type SerializedBlocks = { languageVersion?: number; blocks?: SerializedBlock[] }
+
+function rootBlockState(): SerializedBlock {
+  return { type: ROOT_BLOCK_TYPE, id: 'kumiteSolveRoot', x: 40, y: 40 }
+}
+
 /** The workspace a solver starts from: the root block and nothing else. */
 export const emptyWorkspaceState: WorkspaceState = {
-  blocks: {
-    languageVersion: 0,
-    blocks: [{ type: ROOT_BLOCK_TYPE, id: 'kumiteSolveRoot', x: 40, y: 40 }],
-  },
+  blocks: { languageVersion: 0, blocks: [rootBlockState()] },
+}
+
+/**
+ * Guarantees the root block is in a workspace state before it is loaded.
+ *
+ * The editor forbids deleting the root, but a state saved before that (or one
+ * hand-edited in localStorage) may not have it — and without the root there is
+ * no way back in, since the toolbox never offers it. Re-seeding preserves
+ * whatever else was saved, blocks and variables alike, instead of resetting.
+ */
+export function withRootBlock(state?: WorkspaceState): WorkspaceState {
+  const saved = (state?.blocks as SerializedBlocks | undefined)?.blocks ?? []
+  if (saved.some((block) => block.type === ROOT_BLOCK_TYPE)) return state as WorkspaceState
+
+  return {
+    ...state,
+    blocks: { languageVersion: 0, blocks: [rootBlockState(), ...saved] },
+  }
 }

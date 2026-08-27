@@ -19,4 +19,5 @@ export {
   buildToolbox,
   emptyWorkspaceState,
   type WorkspaceState,
+  withRootBlock,
 } from './toolbox'

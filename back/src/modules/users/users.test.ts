@@ -5,7 +5,7 @@ import { createDb } from '../../db/client'
 import { usersTable } from '../../db/schema'
 import type { NewUser } from './users.schema'
 import { UserClaimsSchema } from './users.schema'
-import { createUser } from './users.service'
+import { createUser, findUserByEmail, findUserById } from './users.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #24 migration must already be applied.
@@ -54,5 +54,32 @@ describe('users.service createUser', () => {
     await createUser(db, baseUser)
     const duplicate = await createUser(db, { ...baseUser, email: 'Ada@Example.com' })
     expect(duplicate).toBeNull()
+  })
+})
+
+describe('users.service findUserByEmail', () => {
+  it('finds a created user by email regardless of case', async () => {
+    await createUser(db, baseUser)
+    const found = await findUserByEmail(db, 'Ada@Example.com')
+    expect(found?.email).toBe(baseUser.email)
+  })
+
+  it('returns null when no user matches', async () => {
+    const found = await findUserByEmail(db, 'nobody@example.com')
+    expect(found).toBeNull()
+  })
+})
+
+describe('users.service findUserById', () => {
+  it('finds a created user by id', async () => {
+    const created = await createUser(db, baseUser)
+    if (!created) throw new Error('expected user')
+    const found = await findUserById(db, created.id)
+    expect(found?.email).toBe(baseUser.email)
+  })
+
+  it('returns null when no user matches', async () => {
+    const found = await findUserById(db, '00000000-0000-0000-0000-000000000000')
+    expect(found).toBeNull()
   })
 })

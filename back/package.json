@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
+    "pretest": "node scripts/build-sandbox-worker.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "verify": "kata verify",

@@ -84,8 +84,20 @@ Configuration to carry into #19 (the execution service):
   retry the failed case; that submission's case is done, it failed.
 - `JUDGE_CONCURRENCY` (default 4, per #15) bounds how many of these workers
   run at once — implemented in #19's internal queue, orthogonal to this ADR.
+- **The worker's entry point must be plain JS, not raw `.ts`.** `new
+  Worker(url)` loads its entry through Node's own module resolution, not
+  through whatever transform the parent process uses — on the pinned Node
+  20 (CI today, and `pnpm start`'s runtime), neither `execArgv: ['--import',
+  'tsx/esm']` nor tsx's own automatic worker-thread patching apply their
+  loader hooks to that entry-point resolution (both confirmed against a real
+  Node 20.19.5 binary, not just CI's log). `back/scripts/build-sandbox-worker.mjs`
+  pre-compiles `sandbox-engine.worker.ts` to `dist/sandbox-engine.worker.js`
+  (via `typescript`'s `transpileModule`, wired as this package's `pretest`)
+  and the Worker loads that. #19 needs the equivalent step wherever it
+  actually deploys the worker.
 - Working reference for all of the above: `back/src/sandbox-engine.worker.ts`
-  (worker body) and `back/src/sandbox-engine.test.ts` (spawns it,
+  (worker body), `back/scripts/build-sandbox-worker.mjs` (compiles it) and
+  `back/src/sandbox-engine.test.ts` (spawns the compiled worker,
   characterizes it) — #19 ports this logic into `src/modules/judge/` with
   the real submission-pool lifecycle around it.
 
@@ -172,8 +184,14 @@ actually measured, per the agreed tie-break order.
 - Full isolation from the Node API surface (`require`/`process`/`fetch` are
   `ReferenceError`s, not caught exceptions) — the strongest grade measured,
   tied with B and C, ahead of A.
-- No Node-version tax: `quickjs-emscripten` is pure WASM/JS, no `engines`
-  constraint tighter than what the repo already runs. CI stays on Node 20.
+- No Node-version tax on the *engine*: `quickjs-emscripten` is pure WASM/JS,
+  no `engines` constraint tighter than what the repo already runs, and CI
+  stays on Node 20 — unlike C. This does need one piece of plumbing C
+  doesn't: the worker's `.ts` entry has to be pre-compiled to plain JS first
+  (see Decision, `back/scripts/build-sandbox-worker.mjs`), because Node 20
+  can't load TypeScript directly inside a `worker_thread` even with tsx's
+  loader. That's a one-time build step, not a version floor — it doesn't
+  reopen the C comparison.
 - The main Node process — and every other in-flight submission — stays
   responsive even when one submission's sandbox is stuck fighting a
   memory-bomb-shaped payload for multiple seconds. This is the property that

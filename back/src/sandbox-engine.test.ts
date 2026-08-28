@@ -44,12 +44,14 @@ function runOneCaseInWorker(params: { source: string; input: unknown }): Promise
   }
 
   return new Promise<SandboxResult>((resolve) => {
-    const worker = new Worker(new URL('./sandbox-engine.worker.ts', import.meta.url), {
-      // Node itself (not vitest's transform) loads this worker file, so a
-      // bare .ts path only works on a Node new enough to strip types
-      // natively (>=23.6). The pinned CI runner is Node 20 — register tsx's
-      // ESM loader explicitly so the worker boots on any supported Node.
-      execArgv: ['--import', 'tsx/esm'],
+    // Node itself (not vitest's transform) loads this worker file, and a
+    // bare .ts path only boots on a Node new enough to strip types natively
+    // (>=23.6) — confirmed *not* fixable with a loader flag on Node 20 (the
+    // pinned CI runner): neither `execArgv: ['--import', 'tsx/esm']` nor
+    // tsx's own automatic worker-thread patching apply their hooks to a
+    // Worker's entry-point resolution on that Node version. `pretest`
+    // (package.json) pre-compiles the worker to plain JS instead.
+    const worker = new Worker(new URL('../dist/sandbox-engine.worker.js', import.meta.url), {
       resourceLimits: { maxOldGenerationSizeMb: MEMORY_MB * 2 },
     })
 
@@ -72,7 +74,6 @@ function runOneCaseInWorker(params: { source: string; input: unknown }): Promise
       finish(result)
     })
     worker.on('error', (err) => {
-      console.error('DEBUG worker error', err)
       finish({ outcome: 'error', detail: `worker crashed: ${err.message}`, ms: 0 })
     })
     worker.on('exit', (code) => {

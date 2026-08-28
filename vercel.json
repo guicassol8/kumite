@@ -1,6 +1,0 @@
-{
-  "installCommand": "pnpm install --frozen-lockfile --filter \"@kumite/front...\"",
-  "buildCommand": "pnpm --filter @kumite/front build",
-  "outputDirectory": "front/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
-}

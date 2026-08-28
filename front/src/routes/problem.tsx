@@ -1,6 +1,6 @@
 import { emptyWorkspaceState, withRootBlock } from '@kumite/blocks'
 import { createFileRoute } from '@tanstack/react-router'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -12,11 +12,10 @@ import { somaDosParesProblem } from '@/components/problem/soma-dos-pares'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useBlocklyLocale } from '@/hooks/use-blockly-locale'
 import { type ExampleRunState, useExampleRun } from '@/hooks/use-example-run'
 import { useWorkspaceAutoSave } from '@/hooks/use-workspace-autosave'
-// Importing this registers the blocks and the pt-br locale, before any
-// workspace is injected.
-import { registerVariablesFlyout, toolbox, workspaceOptions } from '@/lib/blockly-setup'
+import { workspaceOptions } from '@/lib/blockly-setup'
 
 export const Route = createFileRoute('/problem')({
   component: ProblemScreen,
@@ -38,13 +37,7 @@ function ProblemScreen() {
   const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(somaDosParesProblem.id)
   const { state: runState, run } = useExampleRun(somaDosParesProblem.examples)
   const isRunning = runState.status === 'running'
-
-  // The child injects the workspace in its own effect, which runs before this
-  // one, and Blockly only resolves a `custom` category when it is clicked — so
-  // registering here is early enough.
-  useEffect(() => {
-    registerVariablesFlyout(workspaceRef.current?.getWorkspace())
-  }, [])
+  const toolbox = useBlocklyLocale(workspaceRef)
 
   return (
     <main className="flex h-dvh flex-col gap-4 p-4 md:flex-row">

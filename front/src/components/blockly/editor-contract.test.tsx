@@ -1,4 +1,5 @@
 import {
+  buildToolbox,
   emptyWorkspaceState,
   generateSolution,
   ROOT_BLOCK_TYPE,
@@ -6,11 +7,18 @@ import {
 } from '@kumite/blocks'
 import { cleanup, render } from '@testing-library/react'
 import { createRef } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 import '@/i18n'
-import { toolbox, workspaceOptions } from '@/lib/blockly-setup'
+import { applyBlocklyLocale, workspaceOptions } from '@/lib/blockly-setup'
 import { BlocklyWorkspace, type BlocklyWorkspaceHandle } from './blockly-workspace'
+
+// The wrapper is toolbox-agnostic; 'pt' matches this contract's fixtures.
+const toolbox = buildToolbox('pt')
+
+beforeAll(() => {
+  applyBlocklyLocale('pt')
+})
 
 /**
  * The editor's end of the #4 contract, mounted with the same toolbox and

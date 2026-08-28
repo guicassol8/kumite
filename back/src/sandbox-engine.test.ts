@@ -72,6 +72,7 @@ function runOneCaseInWorker(params: { source: string; input: unknown }): Promise
       finish(result)
     })
     worker.on('error', (err) => {
+      console.error('DEBUG worker error', err)
       finish({ outcome: 'error', detail: `worker crashed: ${err.message}`, ms: 0 })
     })
     worker.on('exit', (code) => {

@@ -45,6 +45,11 @@ function runOneCaseInWorker(params: { source: string; input: unknown }): Promise
 
   return new Promise<SandboxResult>((resolve) => {
     const worker = new Worker(new URL('./sandbox-engine.worker.ts', import.meta.url), {
+      // Node itself (not vitest's transform) loads this worker file, so a
+      // bare .ts path only works on a Node new enough to strip types
+      // natively (>=23.6). The pinned CI runner is Node 20 — register tsx's
+      // ESM loader explicitly so the worker boots on any supported Node.
+      execArgv: ['--import', 'tsx/esm'],
       resourceLimits: { maxOldGenerationSizeMb: MEMORY_MB * 2 },
     })
 

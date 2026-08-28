@@ -2,6 +2,7 @@ import { cors } from '@katajs-framework/core'
 
 import { createApp } from './context'
 import { requestLogger } from './middlewares/request-logger'
+import * as auth from './modules/auth/auth.route'
 import * as greetings from './modules/greetings/greetings.route'
 import * as health from './modules/health/health.route'
 
@@ -10,7 +11,7 @@ import * as health from './modules/health/health.route'
 // app-level middleware chain (ADR-0012) runs before every route; add
 // cross-cutting concerns (cors(), secureHeaders(), bodyLimit() from 'kata') here.
 export const app = createApp({
-  modules: [health, greetings],
+  modules: [health, greetings, auth],
   middlewares: [cors(), requestLogger],
 })
 

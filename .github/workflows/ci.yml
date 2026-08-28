@@ -68,6 +68,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://kumite:kumite@localhost:5433/kumite
+      JWT_SECRET: kumite-ci-only-jwt-secret
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -97,6 +98,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://kumite:kumite@localhost:5433/kumite
+      JWT_SECRET: kumite-ci-only-jwt-secret
       ORGANIZER_EMAIL: organizer@ci.local
       ORGANIZER_PASSWORD: kumite-ci-only
       HURL_VERSION: "8.0.1"

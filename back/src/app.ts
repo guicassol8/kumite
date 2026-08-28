@@ -5,6 +5,7 @@ import { requestLogger } from './middlewares/request-logger'
 import * as auth from './modules/auth/auth.route'
 import * as greetings from './modules/greetings/greetings.route'
 import * as health from './modules/health/health.route'
+import * as problems from './modules/problems/problems.route'
 import * as users from './modules/users/users.route'
 
 // The application (AGENTS.md layout: app.ts === createApp). Modules are plain
@@ -12,7 +13,7 @@ import * as users from './modules/users/users.route'
 // app-level middleware chain (ADR-0012) runs before every route; add
 // cross-cutting concerns (cors(), secureHeaders(), bodyLimit() from 'kata') here.
 export const app = createApp({
-  modules: [health, greetings, auth, users],
+  modules: [health, greetings, auth, users, problems],
   middlewares: [cors(), requestLogger],
 })
 

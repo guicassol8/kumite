@@ -99,6 +99,8 @@ export const ProblemSummarySchema = z.object({
   translations: z.array(z.object({ locale: LocaleSchema, title: z.string() })),
 })
 
+export const ProblemSummaryListSchema = z.array(ProblemSummarySchema)
+
 export type CreateProblemBody = z.infer<typeof CreateProblemBodySchema>
 export type ProblemIdParams = z.infer<typeof ProblemIdParamsSchema>
 export type TranslationInput = z.infer<typeof TranslationInputSchema>

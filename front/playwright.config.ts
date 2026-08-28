@@ -22,6 +22,10 @@ export default defineConfig({
   workers: 2,
   use: {
     baseURL: `http://localhost:${frontPort}`,
+    // Browser-language detection (#56) reads navigator.language. Pin it to
+    // PT so every pre-existing spec keeps its PT-language assertions;
+    // language-selector.spec.ts overrides this per describe block.
+    locale: 'pt-BR',
   },
   webServer: [
     {

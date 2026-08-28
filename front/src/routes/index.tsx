@@ -23,7 +23,7 @@ function Home() {
   })
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-6 p-8">
+    <main className="mx-auto flex flex-1 max-w-xl flex-col items-center justify-center gap-6 p-8">
       <h1 className="font-bold text-4xl tracking-tight">kumite</h1>
       <p className="text-muted-foreground">{t('home.tagline')}</p>
       <Card className="w-full" data-testid="api-status">

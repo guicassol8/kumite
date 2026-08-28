@@ -28,6 +28,7 @@
     "blockly": "^13.2.1",
     "drizzle-orm": "^0.44.0",
     "hono": "^4",
+    "isolated-vm": "7.0.1",
     "postgres": "^3.4",
     "quickjs-emscripten": "^0.32.0",
     "zod": "^3"

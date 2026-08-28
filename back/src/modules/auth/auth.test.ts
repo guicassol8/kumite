@@ -4,7 +4,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../../db/client'
 import { eventCodesTable, usersTable } from '../../db/schema'
 
-import { SignupBodySchema } from './auth.schema'
+import { LoginBodySchema, SignupBodySchema } from './auth.schema'
 import { signup } from './auth.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
@@ -35,6 +35,13 @@ describe('SignupBodySchema', () => {
       password: 'short1',
       code: 'PUCRS2026',
     })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('LoginBodySchema', () => {
+  it('rejects an empty password', () => {
+    const result = LoginBodySchema.safeParse({ email: 'ada@pucrs.br', password: '' })
     expect(result.success).toBe(false)
   })
 })

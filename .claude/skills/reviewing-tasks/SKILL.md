@@ -73,6 +73,14 @@ No evidence = the review is NOT done. Say exactly that rather than approving.
   `gh issue close <N> --reason completed`.
 - **Request changes**: precise, file-level items on the PR.
 
+## Kata feedback (attempt every time)
+
+Stage 2 reads the diff for kata idioms — attempt a `kata-feedback/` entry
+before the handoff, not gated on finding a violation. A PR that used kata
+cleanly, or a lint rule that caught (or missed) something real, is still
+signal. See `AGENTS.md` § Kata framework feedback and
+`kata-feedback/README.md` for the format.
+
 ## Handoff (MANDATORY)
 
 The next step runs in a **fresh chat**, so the very last thing you print is the

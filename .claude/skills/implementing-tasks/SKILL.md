@@ -70,6 +70,17 @@ git worktree remove .worktrees/task-<N>-<slug>
 git branch -d task/<N>-<slug>
 ```
 
+## Kata feedback (attempt every time)
+
+This loop is the heaviest kata surface of the whole workflow — `kata verify`,
+hurl, the DI/JWT/error idioms, maybe `kata-docs` lookups mid-flight. Before
+the handoff, attempt a `kata-feedback/` entry: not gated on hitting a bug —
+a clean run with nothing to report is still worth a line. Where you have
+them, include metrics: turns or tokens spent chasing a kata-docs answer vs.
+the task's total, any `kata verify`/hook friction, whether the harness
+caught something real or just added ceremony. See `AGENTS.md` § Kata
+framework feedback and `kata-feedback/README.md` for the format.
+
 ## Handoff (MANDATORY)
 
 The review runs in a **fresh chat**, so the very last thing you print is the

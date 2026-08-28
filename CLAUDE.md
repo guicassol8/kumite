@@ -28,9 +28,12 @@ ready to paste into a new session. The full chain is in `docs/workflow.md`
 
 - The `kata-docs` MCP server (`.mcp.json`) answers questions about the kata
   framework — query it before guessing any kata API.
-- Found a kata bug, gap, or improvement idea while doing kumite work? Report
-  it in `kata-feedback/` at the repo root — see `AGENTS.md` § Kata framework
-  feedback. Never fix kata itself as a side effect of a kumite task.
+- Any task touching kata (kata-docs MCP, `kata verify`, hurl, DI/JWT/error
+  surfaces)? Attempt a report in `kata-feedback/` at the repo root — bugs,
+  gaps, improvement ideas, plain observations, and metrics (tokens/turns
+  spent on kata-docs lookups, whether they paid off) all count, no fix
+  required. See `AGENTS.md` § Kata framework feedback. Never fix kata itself
+  as a side effect of a kumite task.
 - Hooks: PostToolUse auto-formats and runs `kata verify` on back edits; Stop
   runs the full gate ladder (typecheck → verify → tests) and blocks until green.
 - Worktrees: prefer the harness's own isolation — `EnterWorktree` for this

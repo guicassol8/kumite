@@ -59,7 +59,16 @@ gh issue comment <N> --body-file -
 Show it to the user. `implementing-tasks` may only start after the user
 explicitly approves; revisions edit the same comment (`gh issue comment --edit-last`).
 
-## Step 5 — Handoff (MANDATORY)
+## Step 5 — Kata feedback (attempt every time)
+
+If Step 1 queried the `kata-docs` MCP server, attempt a `kata-feedback/`
+entry before moving on — not gated on finding a bug. Note whether the docs
+actually answered the question or you ended up guessing anyway, and the
+rough cost (queries made, docs read) versus the time it saved. See
+`AGENTS.md` § Kata framework feedback and `kata-feedback/README.md` for the
+format. Skip if this plan never touched kata.
+
+## Step 6 — Handoff (MANDATORY)
 
 The next step runs in a **fresh chat**, so the very last thing you print is the
 command to paste there — alone in a fenced block, nothing after it:

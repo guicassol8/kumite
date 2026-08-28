@@ -55,15 +55,27 @@ Task workflow: `docs/workflow.md`.
 
 ## Kata framework feedback
 
-If, while working on any kumite task, you notice a bug, a missing
-capability, outdated/unclear docs, or a possible improvement in the
-**kata framework** itself (not kumite code) — write it up as a new file in
+Whenever a kumite task touches the **kata framework** itself (not kumite
+code) — the `kata-docs` MCP server, `kata verify`, hurl, the DI/JWT/error
+surfaces, anything under `~/Projetos/kata` — attempt a report in
 `kata-feedback/` at the repo root (format in `kata-feedback/README.md`).
-Do this instead of silently ignoring it, and instead of expanding the
-current task's scope to fix kata itself. This is separate from "Discovered
-work" (`docs/workflow.md`): that flow opens a kumite GitHub issue for
-kumite-scoped work; kata feedback is not kumite-scoped, so it goes to this
-local folder for a human to triage against the kata repo.
+This is not gated on finding something wrong: a plain observation, a
+"this was smooth," or a metrics-only entry all count as useful signal — a
+suggested fix is optional, never required. Do this instead of silently
+moving on, and instead of expanding the current task's scope to fix kata
+itself.
+
+Where you have the numbers, include them: tokens/context spent on
+kata-docs round-trips (searches + doc reads) versus the task's total, and
+whether that lookup actually paid for itself versus guessing; turn-count or
+latency friction (a slow `kata verify`, a doc dead end, a lint rule that
+false-positived); and whether the kata-docs MCP or harness genuinely helped
+this task or just added overhead.
+
+This is separate from "Discovered work" (`docs/workflow.md`): that flow
+opens a kumite GitHub issue for kumite-scoped work; kata feedback is not
+kumite-scoped, so it goes to this local folder for a human to triage
+against the kata repo.
 
 ## Prohibitions
 

@@ -1,0 +1,59 @@
+import { expect, type Page, test } from '@playwright/test'
+
+// Visual walkthrough for #57, one screenshot per acceptance criterion.
+const evidence = (name: string) => `e2e/evidence/57/${name}.png`
+
+async function dragBlockFromFlyout(page: Page, category: string) {
+  const host = page.getByTestId('blockly-workspace')
+  const toolbox = page.locator('.blocklyToolbox')
+  await toolbox.getByRole('treeitem', { name: category }).click()
+  const flyoutBlock = page.locator('.blocklyFlyout g.blocklyDraggable').first()
+  await expect(flyoutBlock).toBeVisible()
+  const source = await flyoutBlock.boundingBox()
+  const canvas = await host.boundingBox()
+  if (!source || !canvas) throw new Error('the flyout block or the canvas has no box')
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(canvas.x + canvas.width * 0.6, canvas.y + canvas.height * 0.6, {
+    steps: 12,
+  })
+  await page.mouse.up()
+}
+
+test.describe('browser detected as Spanish (es-MX)', () => {
+  test.use({ locale: 'es-MX' })
+
+  test('the toolbox and blocks open in Spanish, and switching to English re-renders them without losing the workspace', async ({
+    page,
+  }) => {
+    const host = page.getByTestId('blockly-workspace')
+    const toolbox = page.locator('.blocklyToolbox')
+    const draggedBlock = host.locator('g.blocklyDraggable:visible').first()
+
+    // 01 — a Spanish-language visitor sees the toolbox and the root block in
+    // Spanish.
+    await page.goto('/problem')
+    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expect(toolbox.getByRole('treeitem', { name: 'Bucles' })).toBeVisible()
+    await expect(toolbox.getByRole('treeitem', { name: 'Matemáticas' })).toBeVisible()
+    await expect(host.getByText('resolver')).toBeVisible()
+    await expect(host.getByText('devolver')).toBeVisible()
+    await page.screenshot({ path: evidence('01-toolbox-y-bloque-raiz-en-espanol') })
+
+    // 02 — a block placed while in Spanish is on the canvas, ready to prove it
+    // survives the language switch below.
+    await dragBlockFromFlyout(page, 'Matemáticas')
+    await expect(draggedBlock).toBeVisible()
+    await page.screenshot({ path: evidence('02-bloque-agregado-en-espanol') })
+
+    // 03 — switching to English re-renders the toolbox and the root block in
+    // English, and the block placed in step 02 is still there.
+    await page.getByTestId('language-option-en').click()
+    await expect(toolbox.getByRole('treeitem', { name: 'Loops' })).toBeVisible()
+    await expect(toolbox.getByRole('treeitem', { name: 'Math' })).toBeVisible()
+    await expect(host.getByText('solve')).toBeVisible()
+    await expect(host.getByText('return')).toBeVisible()
+    await expect(draggedBlock).toBeVisible()
+    await page.screenshot({ path: evidence('03-cambiado-a-ingles-preserva-el-bloque') })
+  })
+})

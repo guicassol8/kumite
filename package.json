@@ -26,7 +26,6 @@
     "onlyBuiltDependencies": [
       "argon2",
       "esbuild",
-      "isolated-vm",
       "lefthook"
     ]
   }

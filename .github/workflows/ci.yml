@@ -78,3 +78,47 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @kumite/back db:migrate
       - run: pnpm -r test
+
+  hurl:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: kumite
+          POSTGRES_PASSWORD: kumite
+          POSTGRES_DB: kumite
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U kumite -d kumite"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://kumite:kumite@localhost:5433/kumite
+      ORGANIZER_EMAIL: organizer@ci.local
+      ORGANIZER_PASSWORD: kumite-ci-only
+      HURL_VERSION: "8.0.1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install hurl
+        run: |
+          curl -fsSL -o /tmp/hurl.deb \
+            "https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VERSION}/hurl_${HURL_VERSION}_amd64.deb"
+          sudo dpkg -i /tmp/hurl.deb
+      - run: pnpm --filter @kumite/back db:migrate
+      - run: pnpm --filter @kumite/back db:seed
+      - name: Run hurl E2E
+        run: |
+          pnpm --filter @kumite/back start &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          npx --yes wait-on tcp:3000 --timeout 30000
+          pnpm --filter @kumite/back hurl

@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
+    "pretest": "node scripts/build-sandbox-worker.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "verify": "kata verify",
@@ -29,6 +30,7 @@
     "drizzle-orm": "^0.44.0",
     "hono": "^4",
     "postgres": "^3.4",
+    "quickjs-emscripten": "^0.32.0",
     "zod": "^3"
   },
   "devDependencies": {

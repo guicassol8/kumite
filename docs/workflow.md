@@ -75,7 +75,7 @@ worktree**, because more than one agent may be working on this repo at once.
 
 ```bash
 git fetch origin
-git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> origin/main
+git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> origin/develop
 cd .worktrees/task-<N>-<slug>
 pnpm install        # node_modules are per-worktree, not shared
 ```
@@ -92,15 +92,44 @@ pnpm install        # node_modules are per-worktree, not shared
 
 ## Branches, commits, PRs
 
-- Branch `task/<issue>-<slug>` off up-to-date `main`, created with its
-  worktree (above). Never commit directly on `main`.
+- `develop` is the integration branch — all task work is based on it, and
+  every task PR targets it. `main` is the **release** branch: it only ever
+  moves when the user explicitly asks for a merge (see § Releases below).
+  Never commit directly on `main` or `develop`.
+- Branch `task/<issue>-<slug>` off up-to-date `develop`, created with its
+  worktree (above).
 - Conventional commits on **every** commit: `feat:` `fix:` `chore:` `test:`
   `docs:` `refactor:`.
+- Open the PR against `develop` explicitly: `gh pr create --base develop ...`.
 - PR body starts with `Fixes #N` and ends with an `## Evidence` section.
 - **Evidence is mandatory** (reviewing-tasks):
   - front → Playwright walkthrough screenshots committed under
     `front/e2e/evidence/<issue>/`, referenced step by step in the PR body;
   - back → trimmed `pnpm -r test` + `pnpm --filter @kumite/back hurl` output.
+- GitHub only auto-closes a `Fixes #N` issue when the PR merges into the
+  repo's **default branch**. Since PRs merge into `develop` (not default),
+  `reviewing-tasks` closes the issue explicitly on merge instead of relying
+  on that.
+
+## Releases — merging `develop` into `main`
+
+`main` is the release/production branch (it's also what Vercel deploys from).
+It only advances when the user explicitly asks for a merge to `main` —
+never as a side effect of a task PR landing on `develop`.
+
+Every merge into `main` produces a new version, no exceptions:
+
+1. `git fetch origin && git checkout main && git merge --ff-only origin/develop`
+   (fast-forward; if it's not a fast-forward, resolve on `develop` first —
+   `main` never gets its own merge commits).
+2. Push `main`.
+3. Tag the release: bump semver from the last tag (`git tag -l 'v*'`) —
+   **patch** if the batch since the last release is fixes/chores only,
+   **minor** if it includes any new feature. Pre-1.0, that's the whole
+   scale in play; ask the user only if a batch is ambiguous enough to
+   plausibly warrant more.
+4. `gh release create vX.Y.Z --title "..." --notes "..."` summarizing what
+   shipped since the previous tag (see the `v0.1.0` release for the shape).
 
 ## Discovered work
 

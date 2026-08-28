@@ -36,5 +36,5 @@ ready to paste into a new session. The full chain is in `docs/workflow.md`
 - Worktrees: prefer the harness's own isolation — `EnterWorktree` for this
   session's task work, `isolation: "worktree"` when spawning subagents that
   edit files. Manual fallback:
-  `git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> main`
+  `git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> develop`
   then `pnpm install` inside it (node_modules are not shared).

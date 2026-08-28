@@ -41,8 +41,11 @@ Task workflow: `docs/workflow.md`.
   custom block or the toolbox inside `front/` or `back/`.
 - Conventional commits (`feat:` `fix:` `chore:` `test:` `docs:` `refactor:`) —
   always, on every commit, no exceptions.
-- Never commit directly on `main`: every change lives on a branch
-  `task/<issue>-<slug>` and lands via PR (`Fixes #N` + Evidence).
+- `develop` is the integration branch: every task lives on a branch
+  `task/<issue>-<slug>` cut from `develop`, and lands via PR into `develop`
+  (`Fixes #N` + Evidence). Never commit directly on `main` or `develop`.
+  `main` only moves when the user explicitly asks for a release, which always
+  bumps the version — see `docs/workflow.md` § Releases.
 - **Always work inside a dedicated git worktree, never in the main checkout** —
   more than one agent may be working on this repo at the same time. See
   `docs/workflow.md` § Worktrees for the commands and cleanup.

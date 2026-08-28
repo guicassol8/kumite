@@ -21,7 +21,7 @@ package rules in `back/AGENTS.md` / `front/AGENTS.md`.
 
 ```bash
 git fetch origin
-git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> origin/main
+git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> origin/develop
 cd .worktrees/task-<N>-<slug>
 pnpm install   # node_modules are per-worktree
 ```
@@ -56,7 +56,7 @@ pnpm install   # node_modules are per-worktree
 
 ```bash
 git push -u origin task/<N>-<slug>
-gh pr create --title "<issue title>" --body-file -
+gh pr create --base develop --title "<issue title>" --body-file -
 ```
 
 PR body: `Fixes #N`, a short what/how summary, the test plan, and an empty

@@ -67,8 +67,10 @@ No evidence = the review is NOT done. Say exactly that rather than approving.
 ## Verdict
 
 - **Approve**: comment with the compliance table + evidence links, then merge
-  only with the user's explicit go-ahead (`gh pr merge --squash --delete-branch`;
-  the issue closes via `Fixes #N`).
+  only with the user's explicit go-ahead: `gh pr merge --squash --delete-branch`.
+  The PR targets `develop`, not the repo's default branch, so `Fixes #N`
+  does **not** auto-close the issue — close it explicitly:
+  `gh issue close <N> --reason completed`.
 - **Request changes**: precise, file-level items on the PR.
 
 ## Handoff (MANDATORY)

@@ -52,3 +52,28 @@ Content-Type: application/json
 HTTP 422
 [Asserts]
 jsonpath "$.error" == "validation_failed"
+
+# 6. Wrong password for the account created in step 1 -> generic 401.
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "signup-e2e@edu.pucrs.br", "password": "wrong-password" }
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "invalid_credentials"
+
+# 7. Unknown email -> byte-identical 401 body to step 6 (no oracle).
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "nobody@edu.pucrs.br", "password": "supersecret" }
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "invalid_credentials"
+
+# 8. Correct credentials -> 200 with a non-empty token.
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "signup-e2e@edu.pucrs.br", "password": "supersecret" }
+HTTP 200
+[Asserts]
+jsonpath "$.token" isString
+jsonpath "$.token" != ""

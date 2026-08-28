@@ -7,7 +7,8 @@ file natively; Claude Code imports it from `CLAUDE.md`.
 - `kata verify` — fast deterministic checks; use `--json` for hook output, and
   `--strict-coverage` (what pre-commit runs) to fail on checks a rule could
   not prove — an unresolvable middleware in a chain, for instance.
-- `pnpm test` — unit tests + Hurl E2E.
+- `pnpm test` — unit tests (Vitest).
+- `pnpm hurl` — API E2E via Hurl, now with a dedicated job in CI.
 - `pnpm typecheck` — `tsc --noEmit`.
 
 ## Architectural decisions

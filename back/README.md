@@ -30,6 +30,19 @@ curl -X POST localhost:3000/greetings -H 'content-type: application/json' -d '{"
 - `pnpm hurl`      — API E2E (needs [Hurl](https://hurl.dev) installed and the
   server running: `pnpm start` in another terminal).
 
+## Continuous integration
+
+The CI `hurl` job runs the same recipe as the local Hurl suite — start the
+server, wait for it to accept connections, run Hurl, tear the server down:
+
+```bash
+pnpm start &
+SERVER_PID=$!
+trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+npx --yes wait-on tcp:3000 --timeout 30000
+pnpm hurl
+```
+
 ## Add a module
 
 ```bash

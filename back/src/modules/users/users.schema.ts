@@ -19,8 +19,16 @@ export const UserSchema = z.object({
 // The signup response shape — never leaks passwordHash over the wire.
 export const PublicUserSchema = UserSchema.omit({ passwordHash: true })
 
+// The claims a login JWT carries — the shape `signJwt` mints and `jwtAuth` verifies.
+export const UserClaimsSchema = z.object({
+  sub: z.string().min(1),
+  role: RoleSchema,
+  university: UniversitySchema,
+})
+
 export type Role = z.infer<typeof RoleSchema>
 export type University = z.infer<typeof UniversitySchema>
 export type User = z.infer<typeof UserSchema>
 export type PublicUser = z.infer<typeof PublicUserSchema>
+export type UserClaims = z.infer<typeof UserClaimsSchema>
 export type NewUser = Omit<User, 'id' | 'createdAt' | 'updatedAt'>

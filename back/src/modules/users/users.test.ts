@@ -4,6 +4,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../../db/client'
 import { usersTable } from '../../db/schema'
 import type { NewUser } from './users.schema'
+import { UserClaimsSchema } from './users.schema'
 import { createUser } from './users.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
@@ -23,6 +24,22 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await db.$client.end()
+})
+
+describe('UserClaimsSchema', () => {
+  it('rejects claims missing sub', () => {
+    const result = UserClaimsSchema.safeParse({ role: 'participant', university: 'pucrs' })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts a full set of claims', () => {
+    const result = UserClaimsSchema.safeParse({
+      sub: 'user-1',
+      role: 'participant',
+      university: 'pucrs',
+    })
+    expect(result.success).toBe(true)
+  })
 })
 
 describe('users.service createUser', () => {

@@ -10,8 +10,10 @@ export const UserSchema = z.object({
   passwordHash: z.string(),
   role: RoleSchema,
   university: UniversitySchema,
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  // coerce, not date(): kata re-validates the output after JSON serialization,
+  // where a Date has already become an ISO string.
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 })
 
 // The signup response shape — never leaks passwordHash over the wire.

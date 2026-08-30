@@ -42,3 +42,21 @@ against the real files instead of a hypothetical.
 **Metrics**: zero kata-docs tokens spent in this phase (relied on the
 planning-phase doc read); `kata verify` itself is near-instant (<1s) as part
 of the gate ladder, so this cost nothing beyond running the ladder anyway.
+
+## Update — confirmed a fourth time during review (PR #83)
+
+**Found while**: reviewing-tasks for PR #83 (`modules/rounds/`, same
+schema-only shape as above).
+
+Re-ran `kata verify --strict-coverage` myself against the PR's worktree
+(clean checkout, `pnpm install` already done): "no problems found (33 files
+checked)" — no complaint about `rounds/` missing `.route.ts`/`.service.ts`/
+`.hurl`. Also re-ran the full migration from a throwaway clean Postgres
+container (not the shared dev DB) to independently verify the "migrations
+apply on a clean db" acceptance criterion — both migrations (schema +
+custom trigger) applied without error, and `\d round_problems` showed the
+trigger attached as expected.
+
+**Metrics**: zero kata-docs MCP queries needed for this review — the
+pass/fail signal from `kata verify` and a live migration run was
+unambiguous, no doc lookup added value here.

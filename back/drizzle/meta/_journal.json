@@ -22,6 +22,13 @@
       "when": 1788127579344,
       "tag": "0002_friendly_famine",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788129685482,
+      "tag": "0003_clammy_ogun",
+      "breakpoints": true
     }
   ]
 }

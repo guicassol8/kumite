@@ -77,6 +77,9 @@ export const teamsTable = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     name: text('name').notNull(),
+    // Owned by #31 until #18/#21 land a real `submissions` table and take
+    // over setting it; a set value freezes the team's membership (leave route).
+    firstSubmittedAt: timestamp('first_submitted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

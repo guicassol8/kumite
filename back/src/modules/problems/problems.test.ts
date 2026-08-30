@@ -3,7 +3,17 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
 import { problemsTable, problemTranslationsTable } from '../../db/schema'
-import { TestCaseSchema } from './problems.schema'
+import { TestCaseSchema, UpdateProblemBodySchema } from './problems.schema'
+import {
+  archiveProblem,
+  computeMissingLocales,
+  createProblem,
+  evaluateTestCaseCoverage,
+  getProblem,
+  listProblems,
+  publishProblem,
+  updateProblem,
+} from './problems.service'
 
 describe('TestCaseSchema', () => {
   it('accepts a valid test case', () => {
@@ -19,6 +29,62 @@ describe('TestCaseSchema', () => {
   it('rejects a missing input', () => {
     const result = TestCaseSchema.safeParse({ expected: 2, hidden: false })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('UpdateProblemBodySchema', () => {
+  it('rejects duplicate locales in the same translations array', () => {
+    const result = UpdateProblemBodySchema.safeParse({
+      translations: [
+        { locale: 'pt', title: 'Soma', statementMd: 'a' },
+        { locale: 'pt', title: 'Soma 2', statementMd: 'b' },
+      ],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts distinct locales in the same translations array', () => {
+    const result = UpdateProblemBodySchema.safeParse({
+      translations: [
+        { locale: 'pt', title: 'Soma', statementMd: 'a' },
+        { locale: 'es', title: 'Suma', statementMd: 'b' },
+      ],
+    })
+    expect(result.success).toBe(true)
+  })
+})
+
+describe('computeMissingLocales', () => {
+  it('returns every locale missing from the input', () => {
+    expect(computeMissingLocales(['pt'])).toEqual(['es', 'en'])
+  })
+
+  it('returns an empty array when all locales are present', () => {
+    expect(computeMissingLocales(['pt', 'es', 'en'])).toEqual([])
+  })
+})
+
+describe('evaluateTestCaseCoverage', () => {
+  it('returns ok when at least one visible and one hidden case exist', () => {
+    const result = evaluateTestCaseCoverage([
+      { input: 1, expected: 1, hidden: false },
+      { input: 2, expected: 2, hidden: true },
+    ])
+    expect(result).toBe('ok')
+  })
+
+  it('returns missing_hidden when only visible cases exist', () => {
+    const result = evaluateTestCaseCoverage([{ input: 1, expected: 1, hidden: false }])
+    expect(result).toBe('missing_hidden')
+  })
+
+  it('returns missing_visible when only hidden cases exist', () => {
+    const result = evaluateTestCaseCoverage([{ input: 1, expected: 1, hidden: true }])
+    expect(result).toBe('missing_visible')
+  })
+
+  it('returns missing_both when there are no test cases', () => {
+    expect(evaluateTestCaseCoverage([])).toBe('missing_both')
   })
 })
 
@@ -83,5 +149,158 @@ describe('problems and problem_translations tables', () => {
       .returning()
 
     expect(problem?.testCases).toEqual(testCases)
+  })
+})
+
+describe('problems.service', () => {
+  const db = createDb()
+
+  beforeEach(async () => {
+    await db.execute(
+      sql`truncate table ${problemTranslationsTable}, ${problemsTable} restart identity cascade`,
+    )
+  })
+
+  afterAll(async () => {
+    await db.$client.end()
+  })
+
+  const visibleCase = { input: 1, expected: 1, hidden: false }
+  const hiddenCase = { input: 2, expected: 2, hidden: true }
+
+  it('creates a problem as a draft, defaulting points to 100', async () => {
+    const problem = await createProblem(db, { difficulty: 'easy' })
+
+    expect(problem.status).toBe('draft')
+    expect(problem.points).toBe(100)
+    expect(problem.testCases).toEqual([])
+    expect(problem.translations).toEqual([])
+  })
+
+  it('creates a problem with an explicit points value', async () => {
+    const problem = await createProblem(db, { difficulty: 'hard', points: 250 })
+    expect(problem.points).toBe(250)
+  })
+
+  it('returns null from getProblem for an unknown id', async () => {
+    expect(await getProblem(db, '00000000-0000-0000-0000-000000000000')).toBeNull()
+  })
+
+  it('upserts a single locale via updateProblem without touching others already present', async () => {
+    const problem = await createProblem(db, { difficulty: 'easy' })
+    await updateProblem(db, problem.id, {
+      translations: [{ locale: 'pt', title: 'Soma', statementMd: 'Some dois números.' }],
+    })
+
+    const updated = await updateProblem(db, problem.id, {
+      translations: [{ locale: 'es', title: 'Suma', statementMd: 'Suma dos números.' }],
+    })
+
+    expect(updated?.translations).toHaveLength(2)
+    expect(updated?.translations.find((t) => t.locale === 'pt')?.title).toBe('Soma')
+    expect(updated?.translations.find((t) => t.locale === 'es')?.title).toBe('Suma')
+  })
+
+  it('returns null from updateProblem for an unknown id', async () => {
+    const result = await updateProblem(db, '00000000-0000-0000-0000-000000000000', {
+      difficulty: 'hard',
+    })
+    expect(result).toBeNull()
+  })
+
+  it('replaces testCases wholesale', async () => {
+    const problem = await createProblem(db, { difficulty: 'easy' })
+    await updateProblem(db, problem.id, { testCases: [visibleCase, hiddenCase] })
+
+    const updated = await updateProblem(db, problem.id, { testCases: [visibleCase] })
+
+    expect(updated?.testCases).toEqual([visibleCase])
+  })
+
+  const fullyTranslate = async (problemId: string) =>
+    updateProblem(db, problemId, {
+      translations: [
+        { locale: 'pt', title: 'Soma', statementMd: 'a' },
+        { locale: 'es', title: 'Suma', statementMd: 'b' },
+        { locale: 'en', title: 'Sum', statementMd: 'c' },
+      ],
+    })
+
+  it('publishProblem rejects with the missing locales when translations are incomplete', async () => {
+    const problem = await createProblem(db, { difficulty: 'easy' })
+    await updateProblem(db, problem.id, {
+      translations: [{ locale: 'pt', title: 'Soma', statementMd: 'a' }],
+    })
+
+    const result = await publishProblem(db, problem.id)
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'incomplete_translations',
+      missingLocales: ['es', 'en'],
+    })
+  })
+
+  it('publishProblem rejects with missing_hidden when no case is hidden', async () => {
+    const problem = await createProblem(db, { difficulty: 'easy' })
+    await fullyTranslate(problem.id)
+    await updateProblem(db, problem.id, { testCases: [visibleCase] })
+
+    const result = await publishProblem(db, problem.id)
+
+    expect(result).toEqual({ ok: false, error: 'missing_test_cases', reason: 'missing_hidden' })
+  })
+
+  it('publishProblem succeeds and is idempotent for a fully-qualified problem', async () => {
+    const problem = await createProblem(db, { difficulty: 'easy' })
+    await fullyTranslate(problem.id)
+    await updateProblem(db, problem.id, { testCases: [visibleCase, hiddenCase] })
+
+    const first = await publishProblem(db, problem.id)
+    const second = await publishProblem(db, problem.id)
+
+    expect(first.ok).toBe(true)
+    expect(second.ok).toBe(true)
+    if (first.ok) expect(first.problem.status).toBe('published')
+    if (second.ok) expect(second.problem.status).toBe('published')
+  })
+
+  it('publishProblem rejects an archived problem', async () => {
+    const problem = await createProblem(db, { difficulty: 'easy' })
+    await fullyTranslate(problem.id)
+    await updateProblem(db, problem.id, { testCases: [visibleCase, hiddenCase] })
+    await archiveProblem(db, problem.id)
+
+    const result = await publishProblem(db, problem.id)
+
+    expect(result).toEqual({ ok: false, error: 'archived_problem' })
+  })
+
+  it('publishProblem returns not_found for an unknown id', async () => {
+    const result = await publishProblem(db, '00000000-0000-0000-0000-000000000000')
+    expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  it('archiveProblem is idempotent and returns null for an unknown id', async () => {
+    const problem = await createProblem(db, { difficulty: 'easy' })
+
+    const first = await archiveProblem(db, problem.id)
+    const second = await archiveProblem(db, problem.id)
+
+    expect(first?.status).toBe('archived')
+    expect(second?.status).toBe('archived')
+    expect(await archiveProblem(db, '00000000-0000-0000-0000-000000000000')).toBeNull()
+  })
+
+  it('listProblems orders by createdAt desc with the right testCaseCount', async () => {
+    const first = await createProblem(db, { difficulty: 'easy' })
+    const second = await createProblem(db, { difficulty: 'hard' })
+    await updateProblem(db, second.id, { testCases: [visibleCase, hiddenCase] })
+
+    const summaries = await listProblems(db)
+
+    expect(summaries.map((p) => p.id)).toEqual([second.id, first.id])
+    expect(summaries.find((p) => p.id === second.id)?.testCaseCount).toBe(2)
+    expect(summaries.find((p) => p.id === first.id)?.testCaseCount).toBe(0)
   })
 })

@@ -14,7 +14,7 @@ file natively; Claude Code imports it from `CLAUDE.md`.
 ## Architectural decisions
 This app's own decisions live as ADRs under `docs/adr/`; read the relevant
 one before deviating. Kata's framework ADRs (why the framework itself works
-this way) are at https://github.com/VicenzoMF/kata/tree/v0.3.2/docs/adr.
+this way) are at https://github.com/VicenzoMF/kata/tree/katajs-v0.4.2/docs/adr.
 
 ## Mandatory folder layout
 ```

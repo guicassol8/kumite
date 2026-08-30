@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 import type { Db } from './client'
 import { createDb } from './client'
-import { eventCodesTable, usersTable } from './schema'
+import { eventCodesTable, eventConfigTable, usersTable } from './schema'
 
 // Validated only here, not in config.ts's global EnvSchema — `pnpm dev` and
 // `pnpm test` don't need an organizer account, only `pnpm db:seed` does.
@@ -43,6 +43,9 @@ export async function seed(db: Db): Promise<void> {
       },
     ])
     .onConflictDoNothing()
+
+  // mixingLocked/maxTeamSize stay on their table defaults (free mixing, 3).
+  await db.insert(eventConfigTable).values({ id: 1 }).onConflictDoNothing()
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

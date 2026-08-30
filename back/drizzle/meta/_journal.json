@@ -29,6 +29,20 @@
       "when": 1788129685482,
       "tag": "0003_clammy_ogun",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788131801900,
+      "tag": "0004_overconfident_rocket_racer",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788131845312,
+      "tag": "0005_round_problems_published_only",
+      "breakpoints": true
     }
   ]
 }

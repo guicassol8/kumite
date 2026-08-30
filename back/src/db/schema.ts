@@ -21,6 +21,7 @@ export const universityEnum = pgEnum('university', ['pucrs', 'merida'])
 export const difficultyEnum = pgEnum('difficulty', ['easy', 'medium', 'hard'])
 export const problemStatusEnum = pgEnum('problem_status', ['draft', 'published', 'archived'])
 export const localeEnum = pgEnum('locale', ['pt', 'es', 'en'])
+export const roundStatusEnum = pgEnum('round_status', ['draft', 'open', 'closed'])
 
 export type TestCase = { input: JsonValue; expected: JsonValue; hidden: boolean }
 
@@ -108,4 +109,41 @@ export const eventConfigTable = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [check('event_config_singleton', sql`${table.id} = 1`)],
+)
+
+export const roundsTable = pgTable(
+  'rounds',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    status: roundStatusEnum('status').notNull().default('draft'),
+    durationMinutes: integer('duration_minutes').notNull(),
+    openedAt: timestamp('opened_at', { withTimezone: true }),
+    closesAt: timestamp('closes_at', { withTimezone: true }),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // No máximo 1 rodada com status = 'open': todas as linhas "open" indexam
+    // a mesma chave constante, então uma segunda colide.
+    uniqueIndex('rounds_single_open_idx').on(sql`(true)`).where(sql`${table.status} = 'open'`),
+  ],
+)
+
+export const roundProblemsTable = pgTable(
+  'round_problems',
+  {
+    roundId: uuid('round_id')
+      .notNull()
+      .references(() => roundsTable.id, { onDelete: 'cascade' }),
+    problemId: uuid('problem_id')
+      .notNull()
+      .references(() => problemsTable.id, { onDelete: 'restrict' }),
+    position: integer('position').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.roundId, table.problemId] }),
+    uniqueIndex('round_problems_round_id_position_idx').on(table.roundId, table.position),
+  ],
 )

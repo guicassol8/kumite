@@ -1,11 +1,13 @@
 import { sql } from 'drizzle-orm'
 import {
   boolean,
+  check,
   integer,
   jsonb,
   pgEnum,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -68,4 +70,39 @@ export const problemTranslationsTable = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.problemId, table.locale] })],
+)
+
+export const teamsTable = pgTable(
+  'teams',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('teams_lower_name_idx').on(sql`lower(${table.name})`)],
+)
+
+export const teamMembersTable = pgTable('team_members', {
+  // PK on userId (not a composite/extra unique index) is what enforces
+  // "1 team per user" — a user simply can't have a second row here.
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => usersTable.id, { onDelete: 'cascade' }),
+  teamId: uuid('team_id')
+    .notNull()
+    .references(() => teamsTable.id, { onDelete: 'cascade' }),
+  joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const eventConfigTable = pgTable(
+  'event_config',
+  {
+    // Fixed to 1 — singleton row, enforced by the check constraint below.
+    id: smallint('id').primaryKey().default(1),
+    mixingLocked: boolean('mixing_locked').notNull().default(false),
+    maxTeamSize: integer('max_team_size').notNull().default(3),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [check('event_config_singleton', sql`${table.id} = 1`)],
 )

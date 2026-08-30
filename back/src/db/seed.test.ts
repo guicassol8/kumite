@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from './client'
-import { eventCodesTable, usersTable } from './schema'
+import { eventCodesTable, eventConfigTable, usersTable } from './schema'
 import { seed } from './seed'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
@@ -15,7 +15,9 @@ const ORGANIZER_PASSWORD = 'supersecret'
 beforeEach(async () => {
   process.env['ORGANIZER_EMAIL'] = ORGANIZER_EMAIL
   process.env['ORGANIZER_PASSWORD'] = ORGANIZER_PASSWORD
-  await db.execute(sql`truncate table ${usersTable}, ${eventCodesTable} restart identity cascade`)
+  await db.execute(
+    sql`truncate table ${usersTable}, ${eventCodesTable}, ${eventConfigTable} restart identity cascade`,
+  )
 })
 
 afterAll(async () => {
@@ -37,6 +39,11 @@ describe('seed', () => {
     expect(eventCodes).toHaveLength(2)
     expect(pucrs?.allowedEmailSuffixes).toEqual(['edu.pucrs.br', 'pucrs.br'])
     expect(merida?.allowedEmailSuffixes).toEqual(['merida.edu.mx'])
+
+    const eventConfig = await db.select().from(eventConfigTable)
+    expect(eventConfig).toHaveLength(1)
+    expect(eventConfig[0]?.mixingLocked).toBe(false)
+    expect(eventConfig[0]?.maxTeamSize).toBe(3)
   })
 
   it('rejects a second user whose email differs only by case', async () => {
@@ -63,5 +70,6 @@ describe('seed', () => {
 
     expect(await db.select().from(usersTable)).toHaveLength(1)
     expect(await db.select().from(eventCodesTable)).toHaveLength(2)
+    expect(await db.select().from(eventConfigTable)).toHaveLength(1)
   })
 })

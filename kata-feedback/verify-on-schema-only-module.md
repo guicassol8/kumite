@@ -25,6 +25,28 @@ No kata-docs MCP queries needed for this review — the pass/fail signal from
 `kata verify` itself was unambiguous and matched expectations from the prior
 `#76` precedent, so no lookup was attempted. Zero overhead either way.
 
+## Update — confirmed from the docs side, not just verify output (#35 planning)
+
+**Found while**: planning-tasks for issue #35 (rounds/round_problems data
+modeling, no route/service yet — same shape as #30/#76).
+
+Before writing the plan I queried `kata-docs` (`search_docs` for "kata verify
+rules module layout required files", then `read_doc` on
+`guide/project-layout.md`) to double-check whether a `modules/rounds/` with
+only `rounds.schema.ts` + `rounds.test.ts` is actually sanctioned, rather than
+just something `kata verify` happens not to flag. The doc says it outright:
+"The tree is normative, not exhaustive... `app.ts` is the only optional file
+in the tree" is stated for the app root, and separately the module section
+never claims all five files are mandatory per-domain — only that *if present*
+they must use the locked suffix. So this is documented behavior, not an
+accidental gap in the checker.
+
+**Cost/payoff**: one search + one doc read, small relative to the rest of the
+planning turn. Worth it here specifically because the plan was about to
+commit to a "modeling-only module, route/service later" shape for a second
+time (#30 was empirical/precedent-based; this one is doc-confirmed) — cheap
+insurance against a wrong assumption baked into a posted plan.
+
 ## Update — confirmed again during implementation (#35)
 
 **Found while**: implementing-tasks for issue #35 (`modules/rounds/` with

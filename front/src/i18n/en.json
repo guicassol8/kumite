@@ -19,6 +19,36 @@
     "passwordToggle": {
       "show": "Show password",
       "hide": "Hide password"
+    },
+    "signup": {
+      "title": "Sign up",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "confirmPasswordLabel": "Confirm password",
+      "codeLabel": "Event code",
+      "submitButton": "Sign up",
+      "errors": {
+        "emailInvalid": "Enter a valid email",
+        "passwordTooShort": "Password must be at least 8 characters",
+        "passwordMismatch": "Passwords don't match",
+        "codeRequired": "Enter the event code",
+        "invalidCode": "Invalid event code",
+        "invalidDomain": "This email doesn't belong to the code's university",
+        "emailInUse": "This email is already registered",
+        "invalidField": "Invalid value",
+        "unexpected": "Couldn't complete signup. Please try again."
+      }
+    },
+    "login": {
+      "title": "Log in",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "submitButton": "Log in",
+      "errors": {
+        "emailInvalid": "Enter a valid email",
+        "passwordRequired": "Enter your password",
+        "invalidCredentials": "Incorrect email or password"
+      }
     }
   },
   "problem": {

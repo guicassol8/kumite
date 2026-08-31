@@ -19,6 +19,36 @@
     "passwordToggle": {
       "show": "Mostrar senha",
       "hide": "Ocultar senha"
+    },
+    "signup": {
+      "title": "Cadastro",
+      "emailLabel": "E-mail",
+      "passwordLabel": "Senha",
+      "confirmPasswordLabel": "Confirmar senha",
+      "codeLabel": "Código do evento",
+      "submitButton": "Cadastrar",
+      "errors": {
+        "emailInvalid": "Informe um e-mail válido",
+        "passwordTooShort": "A senha precisa ter pelo menos 8 caracteres",
+        "passwordMismatch": "As senhas não coincidem",
+        "codeRequired": "Informe o código do evento",
+        "invalidCode": "Código do evento inválido",
+        "invalidDomain": "Esse e-mail não pertence à universidade do código informado",
+        "emailInUse": "Esse e-mail já está cadastrado",
+        "invalidField": "Valor inválido",
+        "unexpected": "Não foi possível concluir o cadastro. Tente novamente."
+      }
+    },
+    "login": {
+      "title": "Login",
+      "emailLabel": "E-mail",
+      "passwordLabel": "Senha",
+      "submitButton": "Entrar",
+      "errors": {
+        "emailInvalid": "Informe um e-mail válido",
+        "passwordRequired": "Informe a senha",
+        "invalidCredentials": "E-mail ou senha incorretos"
+      }
     }
   },
   "problem": {

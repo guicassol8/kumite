@@ -14,6 +14,7 @@ export default defineConfig({
       './src/test/i18n-jsdom.ts',
       './src/test/web-storage-jsdom.ts',
       './src/test/blockly-jsdom.ts',
+      './src/test/router-jsdom.ts',
     ],
     include: ['src/**/*.test.{ts,tsx}'],
   },

@@ -170,3 +170,25 @@ not kata.
 surprising output. The only nontrivial verification on this task was
 database-shaped (partial unique index behavior, `ON DELETE set null` vs.
 `restrict`), which kata neither helps nor hinders.
+
+### Review-stage confirmation (PR #89)
+
+`reviewing-tasks` re-ran the ladder on a clean worktree against a throwaway
+Postgres: `kata verify --strict-coverage` → "no problems found (37 files
+checked)", same as the implementation run. The schema+service-without-route
+shape needs no further evidence — consider this question settled.
+
+One thing `kata verify` does **not** see, and arguably shouldn't: the
+migration creates the Postgres enum type `submission_case_status`, but no
+column uses it (`case_results` is `jsonb`; the `pgEnum` exists only to
+derive the TS union). `select count(*) ... from pg_attribute` confirms 0
+columns reference it. That's a drizzle/Postgres modeling artifact, entirely
+outside kata's remit — noting it here only to record that the boundary
+felt right: kata checked module layout and stayed out of the data layer.
+
+**Metrics**: 0 kata-docs MCP queries this review — searches, doc reads,
+tokens: 0. Two consecutive stages (implement + review) on a data-modeling
+task with zero kata-docs traffic is the clearest signal yet that the MCP
+server's value is concentrated in route/DI/JWT-shaped work, not schema work.
+`kata verify` cost ~0.7s of a ~40s ladder; the wall-clock was vitest and
+`pnpm install`, never kata.

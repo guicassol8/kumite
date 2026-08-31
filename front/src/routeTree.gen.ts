@@ -14,6 +14,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as OrganizerRouteImport } from './routes/organizer'
 import { Route as ProblemRouteImport } from './routes/problem'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as OrganizerProblemsIndexRouteImport } from './routes/organizer.problems.index'
+import { Route as OrganizerProblemsNewRouteImport } from './routes/organizer.problems.new'
+import { Route as OrganizerProblemsIdEditRouteImport } from './routes/organizer.problems.$id.edit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,41 +43,90 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrganizerProblemsIndexRoute = OrganizerProblemsIndexRouteImport.update({
+  id: '/problems/',
+  path: '/problems/',
+  getParentRoute: () => OrganizerRoute,
+} as any)
+const OrganizerProblemsNewRoute = OrganizerProblemsNewRouteImport.update({
+  id: '/problems/new',
+  path: '/problems/new',
+  getParentRoute: () => OrganizerRoute,
+} as any)
+const OrganizerProblemsIdEditRoute = OrganizerProblemsIdEditRouteImport.update({
+  id: '/problems/$id/edit',
+  path: '/problems/$id/edit',
+  getParentRoute: () => OrganizerRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/organizer': typeof OrganizerRoute
+  '/organizer': typeof OrganizerRouteWithChildren
   '/problem': typeof ProblemRoute
   '/signup': typeof SignupRoute
+  '/organizer/problems/new': typeof OrganizerProblemsNewRoute
+  '/organizer/problems/': typeof OrganizerProblemsIndexRoute
+  '/organizer/problems/$id/edit': typeof OrganizerProblemsIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/organizer': typeof OrganizerRoute
+  '/organizer': typeof OrganizerRouteWithChildren
   '/problem': typeof ProblemRoute
   '/signup': typeof SignupRoute
+  '/organizer/problems/new': typeof OrganizerProblemsNewRoute
+  '/organizer/problems': typeof OrganizerProblemsIndexRoute
+  '/organizer/problems/$id/edit': typeof OrganizerProblemsIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/organizer': typeof OrganizerRoute
+  '/organizer': typeof OrganizerRouteWithChildren
   '/problem': typeof ProblemRoute
   '/signup': typeof SignupRoute
+  '/organizer/problems/new': typeof OrganizerProblemsNewRoute
+  '/organizer/problems/': typeof OrganizerProblemsIndexRoute
+  '/organizer/problems/$id/edit': typeof OrganizerProblemsIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/organizer' | '/problem' | '/signup'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/organizer'
+    | '/problem'
+    | '/signup'
+    | '/organizer/problems/new'
+    | '/organizer/problems/'
+    | '/organizer/problems/$id/edit'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/organizer' | '/problem' | '/signup'
-  id: '__root__' | '/' | '/login' | '/organizer' | '/problem' | '/signup'
+  to:
+    | '/'
+    | '/login'
+    | '/organizer'
+    | '/problem'
+    | '/signup'
+    | '/organizer/problems/new'
+    | '/organizer/problems'
+    | '/organizer/problems/$id/edit'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/organizer'
+    | '/problem'
+    | '/signup'
+    | '/organizer/problems/new'
+    | '/organizer/problems/'
+    | '/organizer/problems/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
-  OrganizerRoute: typeof OrganizerRoute
+  OrganizerRoute: typeof OrganizerRouteWithChildren
   ProblemRoute: typeof ProblemRoute
   SignupRoute: typeof SignupRoute
 }
@@ -116,13 +168,50 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/organizer/problems/': {
+      id: '/organizer/problems/'
+      path: '/problems'
+      fullPath: '/organizer/problems/'
+      preLoaderRoute: typeof OrganizerProblemsIndexRouteImport
+      parentRoute: typeof OrganizerRoute
+    }
+    '/organizer/problems/new': {
+      id: '/organizer/problems/new'
+      path: '/problems/new'
+      fullPath: '/organizer/problems/new'
+      preLoaderRoute: typeof OrganizerProblemsNewRouteImport
+      parentRoute: typeof OrganizerRoute
+    }
+    '/organizer/problems/$id/edit': {
+      id: '/organizer/problems/$id/edit'
+      path: '/problems/$id/edit'
+      fullPath: '/organizer/problems/$id/edit'
+      preLoaderRoute: typeof OrganizerProblemsIdEditRouteImport
+      parentRoute: typeof OrganizerRoute
+    }
   }
 }
+
+interface OrganizerRouteChildren {
+  OrganizerProblemsNewRoute: typeof OrganizerProblemsNewRoute
+  OrganizerProblemsIndexRoute: typeof OrganizerProblemsIndexRoute
+  OrganizerProblemsIdEditRoute: typeof OrganizerProblemsIdEditRoute
+}
+
+const OrganizerRouteChildren: OrganizerRouteChildren = {
+  OrganizerProblemsNewRoute: OrganizerProblemsNewRoute,
+  OrganizerProblemsIndexRoute: OrganizerProblemsIndexRoute,
+  OrganizerProblemsIdEditRoute: OrganizerProblemsIdEditRoute,
+}
+
+const OrganizerRouteWithChildren = OrganizerRoute._addFileChildren(
+  OrganizerRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
-  OrganizerRoute: OrganizerRoute,
+  OrganizerRoute: OrganizerRouteWithChildren,
   ProblemRoute: ProblemRoute,
   SignupRoute: SignupRoute,
 }

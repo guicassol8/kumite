@@ -1,7 +1,7 @@
-import { generateSolution, somaDosPares } from '@kumite/blocks'
+import { somaDosPares } from '@kumite/blocks'
 import { describe, expect, it } from 'vitest'
 
-import type { JudgeCase, JudgeConfig } from './judge.schema'
+import type { JudgeCase, JudgeConfig, Workspace } from './judge.schema'
 import { WorkspaceSchema } from './judge.schema'
 import { generateJudgeSource, runJudge, runJudgeAgainstWorker } from './judge.service'
 
@@ -15,11 +15,20 @@ const CRASH_WORKER_URL = new URL('../../judge-test-worker.mjs', import.meta.url)
 // route (#21) performs on the incoming body, never a cast.
 const somaDosParesWorkspace = WorkspaceSchema.parse(somaDosPares)
 
+/** Every test that needs runnable source goes through the judge's own codegen
+ * — one path, so the suite can never prove a source shape the judge does not
+ * actually produce. */
+function sourceOf(workspace: Workspace): string {
+  const result = generateJudgeSource(workspace)
+  if (!result.ok) throw new Error(`unexpected codegen refusal: ${result.error}`)
+  return result.source
+}
+
 describe('runJudge', () => {
   it(
     'passes a correct solve(input) result',
     async () => {
-      const source = generateSolution(somaDosPares)
+      const source = sourceOf(somaDosParesWorkspace)
       const cases: JudgeCase[] = [{ input: [1, 2, 3, 4], expected: 6 }]
       const [result] = await runJudge(source, cases, testConfig)
       expect(result).toEqual({ outcome: 'passed', ms: expect.any(Number) })
@@ -229,4 +238,29 @@ describe('generateJudgeSource', () => {
     expect(pt.ok === false && pt.message).toBe('A solução precisa do bloco "resolver".')
     expect(es.ok === false && es.message).toBe('La solución necesita el bloque "resolver".')
   })
+})
+
+describe('editor ↔ judge parity', () => {
+  it(
+    'runs the canonical fixture through codegen and the real sandbox',
+    async () => {
+      // The whole chain the submission route (#21) will walk: the workspace the
+      // editor saves -> generateJudgeSource -> QuickJS. If the headless
+      // generator and the editor's generator ever diverge, this is what fails.
+      const source = sourceOf(somaDosParesWorkspace)
+      const cases: JudgeCase[] = [
+        { input: [1, 2, 3, 4], expected: 6 },
+        { input: [], expected: 0 },
+        { input: [1, 3, 5], expected: 0 },
+      ]
+
+      const results = await runJudge(source, cases, testConfig)
+
+      // Three cases in one call also cover the generator's variable
+      // declarations sitting above solve(): the worker builds a fresh QuickJS
+      // runtime per case, so `soma` never leaks from one run into the next.
+      expect(results.map((result) => result.outcome)).toEqual(['passed', 'passed', 'passed'])
+    },
+    TEST_TIMEOUT_MS,
+  )
 })

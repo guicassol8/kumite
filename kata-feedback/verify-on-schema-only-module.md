@@ -138,3 +138,35 @@ question.
 **Metrics**: 0 kata-docs queries this session (review stage). All signal
 came from re-running the existing gate commands and reading the diff — no
 doc lookup would have added anything here.
+
+## Update — schema+service, no route, fifth clean run (issue #18)
+
+**Found while**: `implementing-tasks` for issue #18 (`modules/submissions/`
+= `submissions.schema.ts` + `submissions.service.ts` + `submissions.test.ts`,
+no `.route.ts`/`.hurl` — #21 owns the HTTP surface).
+
+**What**: `kata verify --strict-coverage` clean again — "no problems found
+(37 files checked)" — both standalone and inside the lefthook pre-commit
+ladder, twice. Nothing new or unexpected; this is now the fifth consecutive
+confirmation on this file. Worth recording that the shape #18's plan flagged
+as unprecedented ("the doc precedent so far only covered schema-only modules,
+not schema+service") was in fact already covered: `modules/judge/` from #19
+shipped exactly that shape, and `modules/event-codes/` has it too. The
+plan's caution was stale, not a real gap — the doc rule
+(`guide/project-layout.md`: per-module files are "if present, must use the
+locked suffix", not a mandatory five) has held for every combination this
+repo has thrown at it.
+
+**Metrics**: **zero** kata-docs MCP queries this task — searches, doc reads,
+tokens: 0, against a task that spent its budget on drizzle/Postgres/zod
+instead. That's the honest signal here: on a pure data-modeling task, kata's
+surface area is small enough that the MCP server adds nothing, and the prior
+entries on this file had already answered the one kata-shaped question
+(module layout) ahead of time. `kata verify` itself stayed sub-second
+(0.65s) inside a ~42s gate ladder — the ladder's cost is entirely vitest,
+not kata.
+
+**No kata friction to report**: no false positives, no dead ends, no
+surprising output. The only nontrivial verification on this task was
+database-shaped (partial unique index behavior, `ON DELETE set null` vs.
+`restrict`), which kata neither helps nor hinders.

@@ -67,6 +67,10 @@ export function clearSession(reason: 'manual' | 'expired'): void {
   setState({ status: 'anonymous', user: null, token: null, reason })
 }
 
+export function authHeader(): Record<string, string> {
+  return state.token ? { Authorization: `Bearer ${state.token}` } : {}
+}
+
 let hydration: Promise<void> | null = null
 
 // Idempotent: the first call kicks off `GET /me` and caches its promise, so

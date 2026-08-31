@@ -43,6 +43,13 @@
       "when": 1788131845312,
       "tag": "0005_round_problems_published_only",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788211517748,
+      "tag": "0006_nifty_devos",
+      "breakpoints": true
     }
   ]
 }

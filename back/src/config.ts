@@ -12,9 +12,15 @@ const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url().default('postgres://kumite:kumite@localhost:5433/kumite'),
   JWT_SECRET: z.string().min(1),
+  JUDGE_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
+  JUDGE_MEMORY_MB: z.coerce.number().int().positive().default(64),
+  JUDGE_CONCURRENCY: z.coerce.number().int().positive().default(4),
 })
 
 export const env = EnvSchema.parse(process.env)
 
 export const JWT_SECRET = env.JWT_SECRET
 export const TOKEN_TTL_SECONDS = 60 * 60 * 24
+export const JUDGE_TIMEOUT_MS = env.JUDGE_TIMEOUT_MS
+export const JUDGE_MEMORY_MB = env.JUDGE_MEMORY_MB
+export const JUDGE_CONCURRENCY = env.JUDGE_CONCURRENCY

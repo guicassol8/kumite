@@ -79,6 +79,13 @@ let hydration: Promise<void> | null = null
 export function ensureHydrated(): Promise<void> {
   if (hydration) return hydration
 
+  // Already resolved by setSession/clearSession (e.g. right after login) —
+  // nothing to hydrate, so skip straight to a cached no-op.
+  if (state.status === 'authenticated' || state.status === 'anonymous') {
+    hydration = Promise.resolve()
+    return hydration
+  }
+
   const token = state.token
   if (!token) {
     setState({ status: 'anonymous', user: null, token: null })

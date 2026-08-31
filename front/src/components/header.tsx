@@ -17,6 +17,15 @@ export function Header() {
       <div className="flex items-center gap-4">
         {status === 'authenticated' && user ? (
           <>
+            {user.role === 'organizer' && (
+              <Link
+                to="/organizer/problems"
+                data-testid="header-organizer-link"
+                className="text-sm"
+              >
+                {t('header.organizerLink')}
+              </Link>
+            )}
             <span data-testid="header-user-email" className="text-muted-foreground text-sm">
               {user.email}
             </span>

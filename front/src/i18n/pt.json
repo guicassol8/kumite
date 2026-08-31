@@ -8,7 +8,8 @@
   "header": {
     "login": "Entrar",
     "signup": "Cadastrar",
-    "logout": "Sair"
+    "logout": "Sair",
+    "organizerLink": "Organizador"
   },
   "home": {
     "tagline": "PUCRS × Mérida — programação em blocos",
@@ -27,6 +28,51 @@
   "organizer": {
     "stub": {
       "title": "Área do organizador"
+    },
+    "problems": {
+      "heading": "Problemas do catálogo",
+      "columns": {
+        "title": "Título",
+        "difficulty": "Dificuldade",
+        "points": "Pontos",
+        "status": "Estado",
+        "testCases": "Casos",
+        "actions": "Ações"
+      },
+      "difficulty": {
+        "easy": "Fácil",
+        "medium": "Médio",
+        "hard": "Difícil"
+      },
+      "status": {
+        "draft": "Rascunho",
+        "published": "Publicado",
+        "archived": "Arquivado"
+      },
+      "loading": "Carregando problemas...",
+      "missingTitle": "(sem título)",
+      "empty": {
+        "title": "Nenhum problema cadastrado ainda.",
+        "cta": "Criar o primeiro problema"
+      },
+      "error": {
+        "message": "Não foi possível carregar os problemas.",
+        "retry": "Tentar novamente"
+      },
+      "createAction": "Criar problema",
+      "editAction": "Editar",
+      "archiveAction": "Arquivar",
+      "archiveDialog": {
+        "title": "Arquivar problema?",
+        "description": "O problema deixa de ficar disponível para novas rodadas, mas continua salvo no catálogo.",
+        "confirm": "Arquivar",
+        "cancel": "Cancelar"
+      },
+      "placeholder": {
+        "title": "Em construção",
+        "description": "Esta tela ainda está em desenvolvimento.",
+        "back": "Voltar para a lista"
+      }
     }
   },
   "auth": {

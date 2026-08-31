@@ -2,6 +2,7 @@ import { generateSolution, somaDosPares } from '@kumite/blocks'
 import { describe, expect, it } from 'vitest'
 
 import type { JudgeCase, JudgeConfig } from './judge.schema'
+import { WorkspaceSchema } from './judge.schema'
 import { runJudge, runJudgeAgainstWorker } from './judge.service'
 
 const TEST_TIMEOUT_MS = 15_000
@@ -141,4 +142,21 @@ describe('runJudge', () => {
     },
     TEST_TIMEOUT_MS,
   )
+})
+
+describe('WorkspaceSchema', () => {
+  it('accepts a serialized workspace object', () => {
+    expect(WorkspaceSchema.safeParse(somaDosPares).success).toBe(true)
+  })
+
+  // Deliberately permissive: the schema only proves "this is a JSON object".
+  // The real shape belongs to Blockly's deserializer, and a second definition
+  // in zod would drift away from it.
+  it.each([
+    { name: 'a string', value: 'texto' },
+    { name: 'an array', value: [1, 2] },
+    { name: 'null', value: null },
+  ])('rejects $name', ({ value }) => {
+    expect(WorkspaceSchema.safeParse(value).success).toBe(false)
+  })
 })

@@ -21,8 +21,8 @@ importers:
         specifier: ^1.13
         version: 1.19.17(hono@4.13.4)
       '@katajs-framework/core':
-        specifier: ^0.3.2
-        version: 0.3.2(hono@4.13.4)(typescript@5.9.3)(zod@3.25.76)
+        specifier: ^0.4.2
+        version: 0.4.2(hono@4.13.4)(typescript@5.9.3)(zod@3.25.76)
       '@kumite/blocks':
         specifier: workspace:*
         version: link:../blocks
@@ -857,8 +857,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@katajs-framework/core@0.3.2':
-    resolution: {integrity: sha512-ugc9/jWlUKCXL2N5t0hq4no/Ve8UOuOIm1RYAO/Ft7rB6GAEtF0soZtRDhBBtbqZXP8q0tNHS2OR9XktgPjeLg==}
+  '@katajs-framework/core@0.4.2':
+    resolution: {integrity: sha512-frYkobAR0/qpHqCF5FVrsjfdCd1mqM1NNSh+BOk+1r+FqLbu53svn1S6fg+mAddvBQ4s4xUG14ApYDVtI+QPpQ==}
     engines: {node: '>=20'}
     hasBin: true
     peerDependencies:
@@ -3441,7 +3441,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@katajs-framework/core@0.3.2(hono@4.13.4)(typescript@5.9.3)(zod@3.25.76)':
+  '@katajs-framework/core@0.4.2(hono@4.13.4)(typescript@5.9.3)(zod@3.25.76)':
     dependencies:
       hono: 4.13.4
       zod: 3.25.76

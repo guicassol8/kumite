@@ -7,4 +7,4 @@ domain, your infrastructure, your APIs. Copy `_template.md` to `NNNN-slug.md`
 Kata's own framework ADRs — why the framework itself works the way it does —
 are not duplicated here. They live in the Kata repo, pinned to the version
 this app depends on:
-https://github.com/VicenzoMF/kata/tree/v0.3.2/docs/adr
+https://github.com/VicenzoMF/kata/tree/katajs-v0.4.2/docs/adr

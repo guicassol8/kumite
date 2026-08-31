@@ -1,10 +1,31 @@
 import { isDeepStrictEqual } from 'node:util'
 import { Worker } from 'node:worker_threads'
 
+import { DEFAULT_LOCALE, generateSolution } from '@kumite/blocks'
+
 import { JUDGE_CONCURRENCY, JUDGE_MEMORY_MB, JUDGE_TIMEOUT_MS } from '../../config'
 import type { JsonValue } from '../../lib/json'
+import type { Locale } from '../../lib/locale'
 import type { SandboxCaseRequest, SandboxResult } from '../../sandbox-engine.worker'
-import type { JudgeCase, JudgeCaseResult, JudgeConfig } from './judge.schema'
+import type {
+  GenerateSourceResult,
+  JudgeCase,
+  JudgeCaseResult,
+  JudgeConfig,
+  Workspace,
+} from './judge.schema'
+
+/**
+ * Turns a serialized workspace into the `solve(input)` source the sandbox
+ * runs — the same `generateSolution` the editor calls, so editor and judge
+ * can never disagree about what a set of blocks means.
+ */
+export function generateJudgeSource(
+  workspace: Workspace,
+  locale: Locale = DEFAULT_LOCALE,
+): GenerateSourceResult {
+  return { ok: true, source: generateSolution(workspace, locale) }
+}
 
 type WorkerMessage = { type: 'ready' } | ({ type: 'result'; id: number } & SandboxResult)
 

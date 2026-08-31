@@ -3,12 +3,17 @@ import { describe, expect, it } from 'vitest'
 
 import type { JudgeCase, JudgeConfig } from './judge.schema'
 import { WorkspaceSchema } from './judge.schema'
-import { runJudge, runJudgeAgainstWorker } from './judge.service'
+import { generateJudgeSource, runJudge, runJudgeAgainstWorker } from './judge.service'
 
 const TEST_TIMEOUT_MS = 15_000
 
 const testConfig: JudgeConfig = { timeoutMs: 2000, memoryMb: 64, concurrency: 4 }
 const CRASH_WORKER_URL = new URL('../../judge-test-worker.mjs', import.meta.url)
+
+// The fixture is typed WorkspaceState (Record<string, unknown>) by the blocks
+// package; parsing it is how it becomes a Workspace here — the same step the
+// route (#21) performs on the incoming body, never a cast.
+const somaDosParesWorkspace = WorkspaceSchema.parse(somaDosPares)
 
 describe('runJudge', () => {
   it(
@@ -158,5 +163,13 @@ describe('WorkspaceSchema', () => {
     { name: 'null', value: null },
   ])('rejects $name', ({ value }) => {
     expect(WorkspaceSchema.safeParse(value).success).toBe(false)
+  })
+})
+
+describe('generateJudgeSource', () => {
+  it('generates the solve(input) source of a valid workspace', () => {
+    const result = generateJudgeSource(somaDosParesWorkspace)
+    expect(result.ok).toBe(true)
+    expect(result.ok && result.source).toContain('function solve(input)')
   })
 })

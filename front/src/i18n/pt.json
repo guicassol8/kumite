@@ -5,6 +5,11 @@
     "es": "Español",
     "en": "English"
   },
+  "header": {
+    "login": "Entrar",
+    "signup": "Cadastrar",
+    "logout": "Sair"
+  },
   "home": {
     "tagline": "PUCRS × Mérida — programação em blocos",
     "apiStatus": "Status da API",

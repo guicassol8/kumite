@@ -5,6 +5,11 @@
     "es": "Español",
     "en": "English"
   },
+  "header": {
+    "login": "Log in",
+    "signup": "Sign up",
+    "logout": "Log out"
+  },
   "home": {
     "tagline": "PUCRS × Mérida — block programming showdown",
     "apiStatus": "API status",

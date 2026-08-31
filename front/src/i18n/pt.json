@@ -15,6 +15,12 @@
   "editor": {
     "workspaceLabel": "Área de blocos"
   },
+  "auth": {
+    "passwordToggle": {
+      "show": "Mostrar senha",
+      "hide": "Ocultar senha"
+    }
+  },
   "problem": {
     "statementLabel": "Enunciado do problema",
     "examplesHeading": "Casos de exemplo",

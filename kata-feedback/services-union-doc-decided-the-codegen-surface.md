@@ -99,3 +99,52 @@ pro boot do app na #21.
 **Custo total do turno de implementação**: nenhum token gasto em MCP do kata.
 O grosso foi ler o código existente (`@kumite/blocks`, o `judge` da #19) e
 esperar a escada de gates.
+
+## Review-side confirmation (PR #90)
+
+Gate ladder rerun from a clean detached checkout of `task/20-judge-codegen`
+com Postgres próprio (container `kumite-review90-db`, porta 5436) e
+`back/.env` do worktree:
+
+- `pnpm -r typecheck` — 3/3 pacotes verdes.
+- `pnpm verify` — `kata verify --strict-coverage`: **"no problems found
+  (37 files checked)"**, ~0,6 s. Terceira confirmação independente de que
+  módulo sem `.route.ts`/`.hurl` não é falso-positivo pro `--strict-coverage`
+  (as outras em `verify-on-schema-only-module.md` e no Update acima).
+- `pnpm -r test` — blocks 40 / back 128 / front 134, tudo verde.
+- `pnpm --filter @kumite/back hurl` — 54 requests, 6/6 arquivos. A #20 não
+  abre rota, mas rodar o suite completo prova que importar Blockly headless
+  no `judge.service.ts` não quebra o boot do app sob `tsx` — que é
+  exatamente o risco que o T5 do plano queria cobrir e o que a #21 vai
+  exercitar de verdade.
+- `pnpm format` — "No fixes applied", sem drift.
+
+**Zero lookups no `kata-docs` durante o review.** A superfície kata do diff
+é um serviço puro devolvendo união discriminada — o padrão que a própria
+`guide/services.md` prescreve — então não havia pergunta a fazer. Isso fecha
+o ciclo desta entrada: 3 lookups no planejamento, 0 na implementação, 0 no
+review. O custo de doc concentrou-se inteiramente na fase em que a decisão
+foi tomada, que é o comportamento desejável.
+
+**Mutation checks (o que o review acrescentou de fato).** Duas mutações
+manuais, ambas revertidas:
+
+1. `expected: 6` → `7` no teste de paridade → vermelho
+   (`['failed','passed','passed']`). O teste de contrato editor ↔ juiz não
+   é vacuoso, como o corpo do PR afirma.
+2. Trocar `if (!(cause instanceof BlocksError)) throw cause` por um cast
+   (`const err = cause as BlocksError`) → **os 21 testes continuam verdes.**
+   A guarda que separa "bug genuíno → 500" de "recusa de domínio → 400" é
+   a única linha do diff sem cobertura. Não bloqueia a #20 (o código está
+   correto e o `kata verify` não tem como ver isso), mas é o teste que a
+   #21 deve trazer junto com a rota, onde a diferença vira status HTTP.
+
+**Fricção não-kata, pra registro.** `pnpm exec tsx -e "<imports estáticos>"`
+falha com `ERR_PACKAGE_PATH_NOT_EXPORTED` em `@kumite/blocks`: o `-e` do tsx
+resolve pelo loader CJS, e o `exports` do pacote só declara a condição
+`import`. O smoke do T5 escapou disso por usar `import()` dinâmico dentro do
+`-e`. Reproduzir o smoke como arquivo `.ts` de verdade funciona e é o mais
+próximo do boot real — foi assim que confirmei o `solve(input)` gerado
+(`var soma, numero;` acima da função) e a recusa `missing_root` em espanhol.
+Nada pro kata; anotado porque o próximo agente que tentar o smoke via `-e`
+vai bater na mesma pedra.

@@ -15,7 +15,11 @@
     "apiStatus": "Estado de la API",
     "checking": "Verificando...",
     "apiOk": "API ok — {{status}}",
-    "apiDown": "API caída"
+    "apiDown": "API caída",
+    "notices": {
+      "forbiddenOrganizer": "Esa área está restringida a organizadores.",
+      "dismiss": "Descartar"
+    }
   },
   "editor": {
     "workspaceLabel": "Área de bloques"

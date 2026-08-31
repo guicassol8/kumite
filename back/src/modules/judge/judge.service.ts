@@ -17,6 +17,31 @@ function defaultConfig(): JudgeConfig {
   return { timeoutMs: JUDGE_TIMEOUT_MS, memoryMb: JUDGE_MEMORY_MB, concurrency: JUDGE_CONCURRENCY }
 }
 
+// Module-level counting semaphore: bounds how many runJudge() calls have a
+// worker spawned at once. Calls beyond the limit await their turn instead of
+// being rejected (Acceptance: "aguardam", never refuse).
+let inFlight = 0
+const waiting: Array<() => void> = []
+
+function acquireSlot(limit: number): Promise<void> {
+  if (inFlight < limit) {
+    inFlight++
+    return Promise.resolve()
+  }
+  return new Promise((resolve) => {
+    waiting.push(() => {
+      inFlight++
+      resolve()
+    })
+  })
+}
+
+function releaseSlot(): void {
+  inFlight--
+  const next = waiting.shift()
+  next?.()
+}
+
 function toJudgeResult(result: SandboxResult, expected: JsonValue): JudgeCaseResult {
   switch (result.outcome) {
     case 'ok':
@@ -79,6 +104,7 @@ export async function runJudge(
   config?: JudgeConfig,
 ): Promise<JudgeCaseResult[]> {
   const cfg = config ?? defaultConfig()
+  await acquireSlot(cfg.concurrency)
   const worker = new Worker(WORKER_URL, {
     resourceLimits: { maxOldGenerationSizeMb: cfg.memoryMb * 2 },
   })
@@ -108,6 +134,7 @@ export async function runJudge(
     }
   } finally {
     void worker.terminate()
+    releaseSlot()
   }
 
   return results

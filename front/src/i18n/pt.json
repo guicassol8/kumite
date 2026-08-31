@@ -15,6 +15,11 @@
   "editor": {
     "workspaceLabel": "Área de blocos"
   },
+  "organizer": {
+    "stub": {
+      "title": "Área do organizador"
+    }
+  },
   "auth": {
     "passwordToggle": {
       "show": "Mostrar senha",

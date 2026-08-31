@@ -118,3 +118,23 @@ locked-suffix rule really is scoped to `src/modules/<domain>/` and doesn't
 reach for files at `src/` root at all. Zero kata-docs queries needed in this
 implementation turn — the planning-phase lookup already settled the
 question, and reality matched it exactly.
+
+## Update — review confirmation (PR #88, issue #19)
+
+**Found while**: `reviewing-tasks` on PR #88. Re-ran `pnpm -r typecheck`,
+`pnpm verify` (`kata verify --strict-coverage`) and the back test suite
+against the merged worktree, independent of the implementer's own reported
+numbers.
+
+**What**: `kata verify --strict-coverage` stayed clean (35 files) with the
+service module (`judge.service.ts`, a genuinely side-effecting
+worker-thread orchestrator, not a thin CRUD wrapper) sitting alongside the
+schema-only modules this file already covers — same result as planning
+predicted, now confirmed from the reviewer's side too. No kata-docs MCP
+queries were needed for this review: `verify`/`typecheck`/`test` are
+already-documented gate commands, nothing about kata's own behavior was in
+question.
+
+**Metrics**: 0 kata-docs queries this session (review stage). All signal
+came from re-running the existing gate commands and reading the diff — no
+doc lookup would have added anything here.

@@ -82,3 +82,39 @@ trigger attached as expected.
 **Metrics**: zero kata-docs MCP queries needed for this review — the
 pass/fail signal from `kata verify` and a live migration run was
 unambiguous, no doc lookup added value here.
+
+## Update — the locked-suffix rule also blocks moving a worker script into a
+module dir (issue #19)
+
+**Found while**: planning-tasks for issue #19 (judge sandbox execution
+service). `sandbox-engine.worker.ts` — the low-level worker entry point
+characterized by an earlier spike — reads like ADR-0001 wants it to live
+inside `src/modules/judge/`, but the file-naming lock only permits the five
+conventional suffixes (`.route.ts`/`.service.ts`/`.schema.ts`/`.hurl`/
+`.test.ts`) inside `src/modules/<domain>/`; a bare `<name>.worker.ts` isn't
+one of them.
+
+Queried `kata-docs` (`search_docs`, then `read_doc` on both
+`guide/project-layout.md` and `adr/0018-file-naming-convention-enforcement.md`)
+to confirm this before committing the plan to a file layout. Confirmed: the
+lock is real and applies per the exact suffix, not "any file under the
+domain folder." The plan kept `sandbox-engine.worker.ts` at `src/` root
+(sibling to `app.ts`/`context.ts`), same place it already lived from the
+spike.
+
+**Cost/payoff**: 2 searches + 2 doc reads, small relative to the planning
+turn. Directly changed the plan's shape — the first draft of the file list
+would have tried to relocate the worker script into `modules/judge/` and
+failed `kata verify`'s suffix rule on the very first run. Cheap insurance.
+
+**Confirmed during implementation**: `modules/judge/` ended up with
+`judge.schema.ts` + `judge.service.ts` + `judge.test.ts` (no `.route.ts`/
+`.hurl` — this task has no HTTP surface) — `kata verify --strict-coverage`
+clean throughout. A *second* root-level non-module file was also added
+along the way (`src/judge-test-worker.mjs`, a plain-JS worker double used
+only by `judge.test.ts` — see this repo's own implementation notes for why),
+and `kata verify` accepted that too without complaint, confirming the
+locked-suffix rule really is scoped to `src/modules/<domain>/` and doesn't
+reach for files at `src/` root at all. Zero kata-docs queries needed in this
+implementation turn — the planning-phase lookup already settled the
+question, and reality matched it exactly.

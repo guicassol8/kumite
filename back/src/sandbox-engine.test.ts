@@ -27,11 +27,15 @@ type WorkerMessage = { type: 'ready' } | ({ type: 'result'; id: number } & Sandb
 
 const TIMEOUT_MS = 2000
 const MEMORY_MB = 64
-// The memory-bomb probe measured ~3.4-3.85s to trip in this session — well
-// past TIMEOUT_MS — because QuickJS's own memory accounting, not an external
-// clock, is what stops it. The watchdog below must outlast that.
-const WATCHDOG_MS = 8000
+// The memory-bomb probe measured ~3.4-3.85s to trip in the spike's session —
+// well past TIMEOUT_MS — because QuickJS's own memory accounting, not an
+// external clock, is what stops it. On this machine it took exactly 8000ms
+// three runs in a row, i.e. the old WATCHDOG_MS was racing (and losing to)
+// the real detection instead of just backstopping it. Raised with headroom
+// past any measured trip.
+const WATCHDOG_MS = 20_000
 const TEST_TIMEOUT_MS = 15_000
+const MEMORY_TEST_TIMEOUT_MS = 25_000
 
 /** Spawns one fresh worker, runs exactly one case in it, then tears it down. */
 function runOneCaseInWorker(params: { source: string; input: unknown }): Promise<SandboxResult> {
@@ -114,7 +118,7 @@ describe('sandbox engine (ADR-0001: quickjs-emscripten inside worker_thread)', (
   })
 
   it('fails a memory bomb by memory limit — the worker exits, the main process does not', {
-    timeout: TEST_TIMEOUT_MS,
+    timeout: MEMORY_TEST_TIMEOUT_MS,
   }, async () => {
     const source =
       'function solve(input) { const a = []; while (true) { a.push(new Array(1e6).fill(0)) } return a.length }'

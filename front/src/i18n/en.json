@@ -8,7 +8,8 @@
   "header": {
     "login": "Log in",
     "signup": "Sign up",
-    "logout": "Log out"
+    "logout": "Log out",
+    "organizerLink": "Organizer"
   },
   "home": {
     "tagline": "PUCRS × Mérida — block programming showdown",
@@ -27,6 +28,51 @@
   "organizer": {
     "stub": {
       "title": "Organizer area"
+    },
+    "problems": {
+      "heading": "Catalog problems",
+      "columns": {
+        "title": "Title",
+        "difficulty": "Difficulty",
+        "points": "Points",
+        "status": "Status",
+        "testCases": "Cases",
+        "actions": "Actions"
+      },
+      "difficulty": {
+        "easy": "Easy",
+        "medium": "Medium",
+        "hard": "Hard"
+      },
+      "status": {
+        "draft": "Draft",
+        "published": "Published",
+        "archived": "Archived"
+      },
+      "loading": "Loading problems...",
+      "missingTitle": "(untitled)",
+      "empty": {
+        "title": "No problems yet.",
+        "cta": "Create the first problem"
+      },
+      "error": {
+        "message": "Couldn't load the problems.",
+        "retry": "Try again"
+      },
+      "createAction": "Create problem",
+      "editAction": "Edit",
+      "archiveAction": "Archive",
+      "archiveDialog": {
+        "title": "Archive problem?",
+        "description": "The problem stops being available for new rounds, but stays saved in the catalog.",
+        "confirm": "Archive",
+        "cancel": "Cancel"
+      },
+      "placeholder": {
+        "title": "Under construction",
+        "description": "This screen is still being built.",
+        "back": "Back to the list"
+      }
     }
   },
   "auth": {

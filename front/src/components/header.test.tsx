@@ -60,6 +60,21 @@ describe('Header', () => {
     expect(screen.queryByTestId('header-signup-link')).toBeNull()
   })
 
+  it('does not show the organizer link for a participant', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    await waitFor(() => expect(screen.getByTestId('header-user-email')).toBeDefined())
+    expect(screen.queryByTestId('header-organizer-link')).toBeNull()
+  })
+
+  it('shows the organizer link for an organizer', async () => {
+    setSession({ ...fakeUser, role: 'organizer' }, 'tok-1')
+    renderHeader()
+
+    await waitFor(() => expect(screen.getByTestId('header-organizer-link')).toBeDefined())
+  })
+
   it('clears the session and navigates home on logout', async () => {
     setSession(fakeUser, 'tok-1')
     const router = renderHeader()

@@ -2,11 +2,12 @@ import { generateSolution, somaDosPares } from '@kumite/blocks'
 import { describe, expect, it } from 'vitest'
 
 import type { JudgeCase, JudgeConfig } from './judge.schema'
-import { runJudge } from './judge.service'
+import { runJudge, runJudgeAgainstWorker } from './judge.service'
 
 const TEST_TIMEOUT_MS = 15_000
 
 const testConfig: JudgeConfig = { timeoutMs: 2000, memoryMb: 64, concurrency: 4 }
+const CRASH_WORKER_URL = new URL('../../judge-test-worker.mjs', import.meta.url)
 
 describe('runJudge', () => {
   it(
@@ -116,6 +117,27 @@ describe('runJudge', () => {
       // Parallel: total wall time stays close to one call's duration,
       // not double — guards against a queue that always serializes.
       expect(elapsed).toBeLessThan(350)
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'marks every case after a worker crash as runtime_error, no respawn mid-submission',
+    async () => {
+      // The real QuickJS memory-bomb path could not be forced to crash the
+      // worker reliably (its own accounting always wins gracefully on this
+      // machine) — a worker double lets this test trigger a real 'exit'
+      // deterministically, which is the scenario the cascading logic below
+      // needs to prove: case 2 kills the worker, case 3 never gets sent.
+      const cases: JudgeCase[] = [
+        { input: 'a', expected: 'a' },
+        { input: '__crash__', expected: null },
+        { input: 'c', expected: 'c' },
+      ]
+      const results = await runJudgeAgainstWorker(CRASH_WORKER_URL, 'unused', cases, testConfig)
+      expect(results[0]).toEqual({ outcome: 'passed', ms: 0 })
+      expect(results[1]?.outcome).toBe('runtime_error')
+      expect(results[2]?.outcome).toBe('runtime_error')
     },
     TEST_TIMEOUT_MS,
   )

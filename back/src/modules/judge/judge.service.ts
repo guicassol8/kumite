@@ -103,15 +103,45 @@ export async function runJudge(
   cases: JudgeCase[],
   config?: JudgeConfig,
 ): Promise<JudgeCaseResult[]> {
+  return runJudgeAgainstWorker(WORKER_URL, source, cases, config)
+}
+
+/**
+ * Test seam: lets judge.test.ts point the same protocol/cascading logic at
+ * a worker double that can deterministically crash mid-submission — the
+ * real QuickJS engine's memory-limit path could not be forced to do that
+ * reliably on this machine (its own accounting always wins gracefully
+ * before the worker's resourceLimits do). Never used outside tests.
+ */
+export async function runJudgeAgainstWorker(
+  workerUrl: URL,
+  source: string,
+  cases: JudgeCase[],
+  config?: JudgeConfig,
+): Promise<JudgeCaseResult[]> {
   const cfg = config ?? defaultConfig()
   await acquireSlot(cfg.concurrency)
-  const worker = new Worker(WORKER_URL, {
+  const worker = new Worker(workerUrl, {
     resourceLimits: { maxOldGenerationSizeMb: cfg.memoryMb * 2 },
   })
 
   const results: JudgeCaseResult[] = []
   try {
+    // Once the worker dies, every remaining case (the one in flight, plus
+    // every case after it) is marked runtime_error without ever reaching the
+    // worker — no respawn/retry mid-submission (a new submission always
+    // gets its own fresh worker regardless).
+    let workerDied = false
     for (const [id, judgeCase] of cases.entries()) {
+      if (workerDied) {
+        results.push({
+          outcome: 'runtime_error',
+          detail: 'worker exited earlier in this submission',
+          ms: 0,
+        })
+        continue
+      }
+
       const request: SandboxCaseRequest = {
         id,
         source,
@@ -127,6 +157,7 @@ export async function runJudge(
           ms: cfg.timeoutMs + WATCHDOG_SLACK_MS,
         })
       } else if (outcome.kind === 'exit') {
+        workerDied = true
         results.push({ outcome: 'runtime_error', detail: 'worker exited without a result', ms: 0 })
       } else {
         results.push(toJudgeResult(outcome.result, judgeCase.expected))

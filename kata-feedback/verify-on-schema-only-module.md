@@ -138,3 +138,57 @@ question.
 **Metrics**: 0 kata-docs queries this session (review stage). All signal
 came from re-running the existing gate commands and reading the diff — no
 doc lookup would have added anything here.
+
+## Update — schema+service, no route, fifth clean run (issue #18)
+
+**Found while**: `implementing-tasks` for issue #18 (`modules/submissions/`
+= `submissions.schema.ts` + `submissions.service.ts` + `submissions.test.ts`,
+no `.route.ts`/`.hurl` — #21 owns the HTTP surface).
+
+**What**: `kata verify --strict-coverage` clean again — "no problems found
+(37 files checked)" — both standalone and inside the lefthook pre-commit
+ladder, twice. Nothing new or unexpected; this is now the fifth consecutive
+confirmation on this file. Worth recording that the shape #18's plan flagged
+as unprecedented ("the doc precedent so far only covered schema-only modules,
+not schema+service") was in fact already covered: `modules/judge/` from #19
+shipped exactly that shape, and `modules/event-codes/` has it too. The
+plan's caution was stale, not a real gap — the doc rule
+(`guide/project-layout.md`: per-module files are "if present, must use the
+locked suffix", not a mandatory five) has held for every combination this
+repo has thrown at it.
+
+**Metrics**: **zero** kata-docs MCP queries this task — searches, doc reads,
+tokens: 0, against a task that spent its budget on drizzle/Postgres/zod
+instead. That's the honest signal here: on a pure data-modeling task, kata's
+surface area is small enough that the MCP server adds nothing, and the prior
+entries on this file had already answered the one kata-shaped question
+(module layout) ahead of time. `kata verify` itself stayed sub-second
+(0.65s) inside a ~42s gate ladder — the ladder's cost is entirely vitest,
+not kata.
+
+**No kata friction to report**: no false positives, no dead ends, no
+surprising output. The only nontrivial verification on this task was
+database-shaped (partial unique index behavior, `ON DELETE set null` vs.
+`restrict`), which kata neither helps nor hinders.
+
+### Review-stage confirmation (PR #89)
+
+`reviewing-tasks` re-ran the ladder on a clean worktree against a throwaway
+Postgres: `kata verify --strict-coverage` → "no problems found (37 files
+checked)", same as the implementation run. The schema+service-without-route
+shape needs no further evidence — consider this question settled.
+
+One thing `kata verify` does **not** see, and arguably shouldn't: the
+migration creates the Postgres enum type `submission_case_status`, but no
+column uses it (`case_results` is `jsonb`; the `pgEnum` exists only to
+derive the TS union). `select count(*) ... from pg_attribute` confirms 0
+columns reference it. That's a drizzle/Postgres modeling artifact, entirely
+outside kata's remit — noting it here only to record that the boundary
+felt right: kata checked module layout and stayed out of the data layer.
+
+**Metrics**: 0 kata-docs MCP queries this review — searches, doc reads,
+tokens: 0. Two consecutive stages (implement + review) on a data-modeling
+task with zero kata-docs traffic is the clearest signal yet that the MCP
+server's value is concentrated in route/DI/JWT-shaped work, not schema work.
+`kata verify` cost ~0.7s of a ~40s ladder; the wall-clock was vitest and
+`pnpm install`, never kata.

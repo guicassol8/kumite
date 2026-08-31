@@ -5,15 +5,65 @@
     "es": "Español",
     "en": "English"
   },
+  "header": {
+    "login": "Entrar",
+    "signup": "Registrarse",
+    "logout": "Salir"
+  },
   "home": {
     "tagline": "PUCRS × Mérida — programación con bloques",
     "apiStatus": "Estado de la API",
     "checking": "Verificando...",
     "apiOk": "API ok — {{status}}",
-    "apiDown": "API caída"
+    "apiDown": "API caída",
+    "notices": {
+      "forbiddenOrganizer": "Esa área está restringida a organizadores.",
+      "dismiss": "Descartar"
+    }
   },
   "editor": {
     "workspaceLabel": "Área de bloques"
+  },
+  "organizer": {
+    "stub": {
+      "title": "Área del organizador"
+    }
+  },
+  "auth": {
+    "passwordToggle": {
+      "show": "Mostrar contraseña",
+      "hide": "Ocultar contraseña"
+    },
+    "signup": {
+      "title": "Registro",
+      "emailLabel": "Correo electrónico",
+      "passwordLabel": "Contraseña",
+      "confirmPasswordLabel": "Confirmar contraseña",
+      "codeLabel": "Código del evento",
+      "submitButton": "Registrarse",
+      "errors": {
+        "emailInvalid": "Ingresa un correo electrónico válido",
+        "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
+        "passwordMismatch": "Las contraseñas no coinciden",
+        "codeRequired": "Ingresa el código del evento",
+        "invalidCode": "Código del evento inválido",
+        "invalidDomain": "Ese correo no pertenece a la universidad del código ingresado",
+        "emailInUse": "Ese correo ya está registrado",
+        "invalidField": "Valor inválido",
+        "unexpected": "No se pudo completar el registro. Intenta de nuevo."
+      }
+    },
+    "login": {
+      "title": "Iniciar sesión",
+      "emailLabel": "Correo electrónico",
+      "passwordLabel": "Contraseña",
+      "submitButton": "Entrar",
+      "errors": {
+        "emailInvalid": "Ingresa un correo electrónico válido",
+        "passwordRequired": "Ingresa la contraseña",
+        "invalidCredentials": "Correo o contraseña incorrectos"
+      }
+    }
   },
   "problem": {
     "statementLabel": "Enunciado del problema",

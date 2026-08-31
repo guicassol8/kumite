@@ -14,7 +14,7 @@ task #16).
 | Package | What | Key deps |
 |---|---|---|
 | `back/` (`@kumite/back`) | API on **kata** (`@katajs-framework/core`, Hono-based) | hono ^4, zod **^3**, drizzle-orm + postgres, @hono/node-server |
-| `front/` (`@kumite/front`) | React SPA | Vite, React 19, Tailwind v4 + shadcn/ui, TanStack Router (file-based) + Query, i18next, zod **^3** |
+| `front/` (`@kumite/front`) | React SPA | Vite, React 19, Tailwind v4 + shadcn/ui, TanStack Router (file-based) + Query, i18next, zod **^3**, react-hook-form |
 | `blocks/` (`@kumite/blocks`) | Shared Blockly definitions: the "função com retorno" root block, the curated toolbox and the JS generators — consumed by the front editor and the back headless codegen | blockly |
 
 ## Front ↔ Back contract — typed RPC, zero codegen

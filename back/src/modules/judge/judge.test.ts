@@ -172,4 +172,61 @@ describe('generateJudgeSource', () => {
     expect(result.ok).toBe(true)
     expect(result.ok && result.source).toContain('function solve(input)')
   })
+
+  it('refuses a workspace without the root block', () => {
+    const result = generateJudgeSource({
+      blocks: {
+        languageVersion: 0,
+        blocks: [{ type: 'math_number', id: 'solto', fields: { NUM: 1 } }],
+      },
+    })
+    expect(result).toEqual({ ok: false, error: 'missing_root', message: expect.any(String) })
+  })
+
+  it('refuses a workspace with two root blocks', () => {
+    const result = generateJudgeSource({
+      blocks: {
+        languageVersion: 0,
+        blocks: [
+          { type: 'kumite_solve', id: 'raizA', x: 0, y: 0 },
+          { type: 'kumite_solve', id: 'raizB', x: 0, y: 200 },
+        ],
+      },
+    })
+    expect(result).toEqual({ ok: false, error: 'duplicate_root', message: expect.any(String) })
+  })
+
+  it('refuses a block outside the curated toolbox, naming it', () => {
+    const result = generateJudgeSource({
+      blocks: {
+        languageVersion: 0,
+        blocks: [
+          {
+            type: 'kumite_solve',
+            id: 'raiz',
+            inputs: { BODY: { block: { type: 'text_print', id: 'proibido' } } },
+          },
+        ],
+      },
+    })
+    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({ error: 'block_not_allowed', blockType: 'text_print' })
+    expect(result.ok === false && result.message).toContain('text_print')
+  })
+
+  it('refuses a workspace Blockly cannot read', () => {
+    const result = generateJudgeSource({
+      blocks: { languageVersion: 0, blocks: [{ semTipo: true }] },
+    })
+    expect(result).toEqual({ ok: false, error: 'malformed_workspace', message: expect.any(String) })
+  })
+
+  it('localizes the refusal message', () => {
+    const workspace = { blocks: { languageVersion: 0, blocks: [] } }
+    const pt = generateJudgeSource(workspace, 'pt')
+    const es = generateJudgeSource(workspace, 'es')
+
+    expect(pt.ok === false && pt.message).toBe('A solução precisa do bloco "resolver".')
+    expect(es.ok === false && es.message).toBe('La solución necesita el bloque "resolver".')
+  })
 })

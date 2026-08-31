@@ -1,19 +1,34 @@
-import { generateSolution, somaDosPares } from '@kumite/blocks'
+import { somaDosPares } from '@kumite/blocks'
 import { describe, expect, it } from 'vitest'
 
-import type { JudgeCase, JudgeConfig } from './judge.schema'
-import { runJudge, runJudgeAgainstWorker } from './judge.service'
+import type { JudgeCase, JudgeConfig, Workspace } from './judge.schema'
+import { WorkspaceSchema } from './judge.schema'
+import { generateJudgeSource, runJudge, runJudgeAgainstWorker } from './judge.service'
 
 const TEST_TIMEOUT_MS = 15_000
 
 const testConfig: JudgeConfig = { timeoutMs: 2000, memoryMb: 64, concurrency: 4 }
 const CRASH_WORKER_URL = new URL('../../judge-test-worker.mjs', import.meta.url)
 
+// The fixture is typed WorkspaceState (Record<string, unknown>) by the blocks
+// package; parsing it is how it becomes a Workspace here — the same step the
+// route (#21) performs on the incoming body, never a cast.
+const somaDosParesWorkspace = WorkspaceSchema.parse(somaDosPares)
+
+/** Every test that needs runnable source goes through the judge's own codegen
+ * — one path, so the suite can never prove a source shape the judge does not
+ * actually produce. */
+function sourceOf(workspace: Workspace): string {
+  const result = generateJudgeSource(workspace)
+  if (!result.ok) throw new Error(`unexpected codegen refusal: ${result.error}`)
+  return result.source
+}
+
 describe('runJudge', () => {
   it(
     'passes a correct solve(input) result',
     async () => {
-      const source = generateSolution(somaDosPares)
+      const source = sourceOf(somaDosParesWorkspace)
       const cases: JudgeCase[] = [{ input: [1, 2, 3, 4], expected: 6 }]
       const [result] = await runJudge(source, cases, testConfig)
       expect(result).toEqual({ outcome: 'passed', ms: expect.any(Number) })
@@ -138,6 +153,113 @@ describe('runJudge', () => {
       expect(results[0]).toEqual({ outcome: 'passed', ms: 0 })
       expect(results[1]?.outcome).toBe('runtime_error')
       expect(results[2]?.outcome).toBe('runtime_error')
+    },
+    TEST_TIMEOUT_MS,
+  )
+})
+
+describe('WorkspaceSchema', () => {
+  it('accepts a serialized workspace object', () => {
+    expect(WorkspaceSchema.safeParse(somaDosPares).success).toBe(true)
+  })
+
+  // Deliberately permissive: the schema only proves "this is a JSON object".
+  // The real shape belongs to Blockly's deserializer, and a second definition
+  // in zod would drift away from it.
+  it.each([
+    { name: 'a string', value: 'texto' },
+    { name: 'an array', value: [1, 2] },
+    { name: 'null', value: null },
+  ])('rejects $name', ({ value }) => {
+    expect(WorkspaceSchema.safeParse(value).success).toBe(false)
+  })
+})
+
+describe('generateJudgeSource', () => {
+  it('generates the solve(input) source of a valid workspace', () => {
+    const result = generateJudgeSource(somaDosParesWorkspace)
+    expect(result.ok).toBe(true)
+    expect(result.ok && result.source).toContain('function solve(input)')
+  })
+
+  it('refuses a workspace without the root block', () => {
+    const result = generateJudgeSource({
+      blocks: {
+        languageVersion: 0,
+        blocks: [{ type: 'math_number', id: 'solto', fields: { NUM: 1 } }],
+      },
+    })
+    expect(result).toEqual({ ok: false, error: 'missing_root', message: expect.any(String) })
+  })
+
+  it('refuses a workspace with two root blocks', () => {
+    const result = generateJudgeSource({
+      blocks: {
+        languageVersion: 0,
+        blocks: [
+          { type: 'kumite_solve', id: 'raizA', x: 0, y: 0 },
+          { type: 'kumite_solve', id: 'raizB', x: 0, y: 200 },
+        ],
+      },
+    })
+    expect(result).toEqual({ ok: false, error: 'duplicate_root', message: expect.any(String) })
+  })
+
+  it('refuses a block outside the curated toolbox, naming it', () => {
+    const result = generateJudgeSource({
+      blocks: {
+        languageVersion: 0,
+        blocks: [
+          {
+            type: 'kumite_solve',
+            id: 'raiz',
+            inputs: { BODY: { block: { type: 'text_print', id: 'proibido' } } },
+          },
+        ],
+      },
+    })
+    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({ error: 'block_not_allowed', blockType: 'text_print' })
+    expect(result.ok === false && result.message).toContain('text_print')
+  })
+
+  it('refuses a workspace Blockly cannot read', () => {
+    const result = generateJudgeSource({
+      blocks: { languageVersion: 0, blocks: [{ semTipo: true }] },
+    })
+    expect(result).toEqual({ ok: false, error: 'malformed_workspace', message: expect.any(String) })
+  })
+
+  it('localizes the refusal message', () => {
+    const workspace = { blocks: { languageVersion: 0, blocks: [] } }
+    const pt = generateJudgeSource(workspace, 'pt')
+    const es = generateJudgeSource(workspace, 'es')
+
+    expect(pt.ok === false && pt.message).toBe('A solução precisa do bloco "resolver".')
+    expect(es.ok === false && es.message).toBe('La solución necesita el bloque "resolver".')
+  })
+})
+
+describe('editor ↔ judge parity', () => {
+  it(
+    'runs the canonical fixture through codegen and the real sandbox',
+    async () => {
+      // The whole chain the submission route (#21) will walk: the workspace the
+      // editor saves -> generateJudgeSource -> QuickJS. If the headless
+      // generator and the editor's generator ever diverge, this is what fails.
+      const source = sourceOf(somaDosParesWorkspace)
+      const cases: JudgeCase[] = [
+        { input: [1, 2, 3, 4], expected: 6 },
+        { input: [], expected: 0 },
+        { input: [1, 3, 5], expected: 0 },
+      ]
+
+      const results = await runJudge(source, cases, testConfig)
+
+      // Three cases in one call also cover the generator's variable
+      // declarations sitting above solve(): the worker builds a fresh QuickJS
+      // runtime per case, so `soma` never leaks from one run into the next.
+      expect(results.map((result) => result.outcome)).toEqual(['passed', 'passed', 'passed'])
     },
     TEST_TIMEOUT_MS,
   )

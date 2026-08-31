@@ -1,10 +1,56 @@
 import { isDeepStrictEqual } from 'node:util'
 import { Worker } from 'node:worker_threads'
 
+import { BlocksError, type BlocksErrorCode, DEFAULT_LOCALE, generateSolution } from '@kumite/blocks'
+
 import { JUDGE_CONCURRENCY, JUDGE_MEMORY_MB, JUDGE_TIMEOUT_MS } from '../../config'
 import type { JsonValue } from '../../lib/json'
+import type { Locale } from '../../lib/locale'
 import type { SandboxCaseRequest, SandboxResult } from '../../sandbox-engine.worker'
-import type { JudgeCase, JudgeCaseResult, JudgeConfig } from './judge.schema'
+import type {
+  CodegenErrorCode,
+  GenerateSourceResult,
+  JudgeCase,
+  JudgeCaseResult,
+  JudgeConfig,
+  Workspace,
+} from './judge.schema'
+
+// Spelled out rather than derived by replacing dashes: a new code in
+// @kumite/blocks then breaks this table at typecheck instead of leaking a
+// kebab-case string the route and the client have never heard of.
+const CODEGEN_ERROR_CODES: Record<BlocksErrorCode, CodegenErrorCode> = {
+  'malformed-workspace': 'malformed_workspace',
+  'missing-root': 'missing_root',
+  'duplicate-root': 'duplicate_root',
+  'block-not-allowed': 'block_not_allowed',
+}
+
+/**
+ * Turns a serialized workspace into the `solve(input)` source the sandbox
+ * runs — the same `generateSolution` the editor calls, so editor and judge
+ * can never disagree about what a set of blocks means.
+ *
+ * The four refusals come back as data for the route to map to a 400. Anything
+ * else thrown is a genuine bug and propagates, becoming a 500 at kata's edge.
+ */
+export function generateJudgeSource(
+  workspace: Workspace,
+  locale: Locale = DEFAULT_LOCALE,
+): GenerateSourceResult {
+  try {
+    return { ok: true, source: generateSolution(workspace, locale) }
+  } catch (cause) {
+    if (!(cause instanceof BlocksError)) throw cause
+    return {
+      ok: false,
+      error: CODEGEN_ERROR_CODES[cause.code],
+      // Already localized by the blocks package — no string is coined here.
+      message: cause.message,
+      ...(cause.blockType === undefined ? {} : { blockType: cause.blockType }),
+    }
+  }
+}
 
 type WorkerMessage = { type: 'ready' } | ({ type: 'result'; id: number } & SandboxResult)
 

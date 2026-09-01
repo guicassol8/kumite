@@ -22,6 +22,7 @@ import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import { routeTree } from '@/routeTree.gen'
 
 const mockedList = vi.mocked(api.teams.$get)
+const mockedLeave = vi.mocked(api.teams.leave.$post)
 
 const participant: SessionUser = {
   id: 'u1',
@@ -93,6 +94,7 @@ function renderTeams() {
 
 beforeEach(() => {
   mockedList.mockReset()
+  mockedLeave.mockReset()
   setSession(participant, 'tok-1')
 })
 
@@ -201,5 +203,68 @@ describe('TeamsScreen — listing', () => {
     await waitFor(() => expect(screen.getByTestId('teams-table')).toBeDefined())
     expect(screen.queryByTestId('teams-join-t1')).toBeNull()
     expect(screen.queryByTestId('teams-create-open')).toBeNull()
+  })
+})
+
+describe('TeamsScreen — my team panel', () => {
+  const myTeam = () =>
+    envelope({
+      myTeamId: 't1',
+      teams: [
+        team({
+          members: [
+            { university: 'pucrs', email: participant.email },
+            { university: 'merida', email: 'grace@merida.edu.mx' },
+          ],
+          slotsAvailable: 1,
+        }),
+      ],
+    })
+
+  it('stays hidden while the viewer has no team', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope()))
+    renderTeams()
+
+    await waitFor(() => expect(screen.getByTestId('teams-table')).toBeDefined())
+    expect(screen.queryByTestId('my-team-panel')).toBeNull()
+  })
+
+  it('lists teammates with their emails and marks the viewer', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, myTeam()))
+    renderTeams()
+
+    await waitFor(() => expect(screen.getByTestId('my-team-panel')).toBeDefined())
+    expect(screen.getByTestId('my-team-name').textContent).toContain('Blockly Busters')
+    expect(screen.getByTestId('my-team-member-0').textContent).toContain(participant.email)
+    expect(screen.getByTestId('my-team-member-0').textContent).toContain('(você)')
+    expect(screen.getByTestId('my-team-member-1').textContent).toContain('grace@merida.edu.mx')
+    expect(screen.getByTestId('my-team-member-1').textContent).not.toContain('(você)')
+  })
+
+  it('leaves the team on confirm and refreshes the listing', async () => {
+    mockedList.mockResolvedValueOnce(jsonResponse(200, myTeam()))
+    mockedLeave.mockResolvedValue(jsonResponse(204, undefined))
+    renderTeams()
+
+    await waitFor(() => expect(screen.getByTestId('my-team-leave')).toBeDefined())
+    fireEvent.click(screen.getByTestId('my-team-leave'))
+
+    await waitFor(() => expect(screen.getByTestId('teams-leave-dialog')).toBeDefined())
+
+    mockedList.mockResolvedValueOnce(jsonResponse(200, envelope()))
+    fireEvent.click(screen.getByTestId('teams-leave-confirm'))
+
+    await waitFor(() => expect(mockedLeave).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(2))
+  })
+
+  it('keeps the roster frozen once the team has submitted', async () => {
+    const frozen = myTeam()
+    frozen.teams[0] = { ...frozen.teams[0], frozen: true } as Team
+    mockedList.mockResolvedValue(jsonResponse(200, frozen))
+    renderTeams()
+
+    await waitFor(() => expect(screen.getByTestId('my-team-frozen-notice')).toBeDefined())
+    expect(screen.getByTestId<HTMLButtonElement>('my-team-leave').disabled).toBe(true)
   })
 })

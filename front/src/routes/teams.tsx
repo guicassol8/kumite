@@ -1,11 +1,23 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { UniversityBadge } from '@/components/teams/university-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -42,20 +54,78 @@ const JOIN_BLOCKED_KEYS = {
 function TeamsScreen() {
   const { t } = useTranslation()
   const { user } = useSession()
+  const queryClient = useQueryClient()
   const isOrganizer = user?.role === 'organizer'
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
 
   const teams = useQuery({
     queryKey: TEAMS_QUERY_KEY,
     queryFn: fetchTeams,
   })
 
+  const leave = useMutation({
+    mutationFn: async () => {
+      await api.teams.leave.$post()
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY })
+    },
+  })
+
   const data = teams.data
+  const myTeam = data?.teams.find((team) => team.id === data.myTeamId) ?? null
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
         <h1 className="font-bold text-2xl">{t('teams.heading')}</h1>
       </div>
+
+      {myTeam && (
+        <Card data-testid="my-team-panel">
+          <CardHeader>
+            <CardTitle data-testid="my-team-name">
+              {t('teams.myTeam.title')} — {myTeam.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <ul className="flex flex-col gap-2">
+              {myTeam.members.map((member, index) => (
+                <li
+                  // Same reasoning as the listing: the roster has no stable
+                  // per-member id, only its position.
+                  key={`${myTeam.id}-${index}`}
+                  data-testid={`my-team-member-${index}`}
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <UniversityBadge university={member.university} />
+                  <span>{member.email}</span>
+                  {member.email === user?.email && (
+                    <span className="text-muted-foreground">{t('teams.myTeam.you')}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {myTeam.frozen && (
+              <p data-testid="my-team-frozen-notice" className="text-muted-foreground text-sm">
+                {t('teams.myTeam.frozenNotice')}
+              </p>
+            )}
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid="my-team-leave"
+                disabled={myTeam.frozen || leave.isPending}
+                onClick={() => setLeaveDialogOpen(true)}
+              >
+                {t('teams.myTeam.leaveAction')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {data?.mixingLocked && (
         <Alert data-testid="teams-mixing-locked-notice">
@@ -166,6 +236,29 @@ function TeamsScreen() {
           </TableBody>
         </Table>
       )}
+
+      <AlertDialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+        <AlertDialogContent data-testid="teams-leave-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('teams.leaveDialog.title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('teams.leaveDialog.description')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="teams-leave-cancel">
+              {t('teams.leaveDialog.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="teams-leave-confirm"
+              onClick={() => {
+                leave.mutate()
+                setLeaveDialogOpen(false)
+              }}
+            >
+              {t('teams.leaveDialog.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   )
 }

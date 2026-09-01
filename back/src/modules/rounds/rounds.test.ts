@@ -11,6 +11,7 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
+import { getRound, listRounds } from './rounds.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #35 migrations must already be applied.
@@ -105,5 +106,90 @@ describe('round_problems table', () => {
         .insert(roundProblemsTable)
         .values({ roundId: round.id, problemId: problemB.id, position: 0 }),
     ).rejects.toThrow()
+  })
+})
+
+describe('rounds.service', () => {
+  it('lazily closes an open round whose closesAt has passed, on getRound', async () => {
+    const closesAt = new Date(Date.now() - 60_000)
+    const [round] = await db
+      .insert(roundsTable)
+      .values({
+        name: 'Round 1',
+        durationMinutes: 30,
+        status: 'open',
+        openedAt: new Date(Date.now() - 120_000),
+        closesAt,
+      })
+      .returning()
+    if (!round) throw new Error('expected fixture')
+
+    const detail = await getRound(db, round.id)
+
+    expect(detail?.status).toBe('closed')
+    expect(detail?.closedAt?.getTime()).toBe(closesAt.getTime())
+  })
+
+  it('leaves an open round untouched while closesAt is still in the future', async () => {
+    const closesAt = new Date(Date.now() + 60_000)
+    const [round] = await db
+      .insert(roundsTable)
+      .values({
+        name: 'Round 1',
+        durationMinutes: 30,
+        status: 'open',
+        openedAt: new Date(),
+        closesAt,
+      })
+      .returning()
+    if (!round) throw new Error('expected fixture')
+
+    const detail = await getRound(db, round.id)
+
+    expect(detail?.status).toBe('open')
+  })
+
+  it('lazily closes an expired open round on listRounds too', async () => {
+    const closesAt = new Date(Date.now() - 60_000)
+    await db
+      .insert(roundsTable)
+      .values({ name: 'Round 1', durationMinutes: 30, status: 'open', closesAt })
+
+    const rounds = await listRounds(db)
+
+    expect(rounds[0]?.status).toBe('closed')
+  })
+
+  it('returns null from getRound for an unknown id', async () => {
+    expect(await getRound(db, '00000000-0000-0000-0000-000000000000')).toBeNull()
+  })
+
+  it('getRound includes associated problems ordered by position, with problemCount on the summary', async () => {
+    const [round] = await db
+      .insert(roundsTable)
+      .values({ name: 'Round 1', durationMinutes: 30 })
+      .returning()
+    const [problemA] = await db
+      .insert(problemsTable)
+      .values({ difficulty: 'easy', status: 'published' })
+      .returning()
+    const [problemB] = await db
+      .insert(problemsTable)
+      .values({ difficulty: 'medium', status: 'published' })
+      .returning()
+    if (!round || !problemA || !problemB) throw new Error('expected fixtures')
+    await db.insert(roundProblemsTable).values([
+      { roundId: round.id, problemId: problemB.id, position: 1 },
+      { roundId: round.id, problemId: problemA.id, position: 0 },
+    ])
+
+    const detail = await getRound(db, round.id)
+    const summaries = await listRounds(db)
+
+    expect(detail?.problems).toEqual([
+      { problemId: problemA.id, position: 0 },
+      { problemId: problemB.id, position: 1 },
+    ])
+    expect(summaries.find((r) => r.id === round.id)?.problemCount).toBe(2)
   })
 })

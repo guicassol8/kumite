@@ -3,7 +3,13 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
 import { problemsTable, problemTranslationsTable } from '../../db/schema'
-import { TestCaseSchema, UpdateProblemBodySchema } from './problems.schema'
+import {
+  ParticipantProblemParamsSchema,
+  ParticipantProblemQuerySchema,
+  ParticipantProblemSchema,
+  TestCaseSchema,
+  UpdateProblemBodySchema,
+} from './problems.schema'
 import {
   archiveProblem,
   computeMissingLocales,
@@ -51,6 +57,55 @@ describe('UpdateProblemBodySchema', () => {
       ],
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('ParticipantProblemQuerySchema', () => {
+  it('defaults the locale to pt when the query param is absent', () => {
+    expect(ParticipantProblemQuerySchema.parse({})).toEqual({ locale: 'pt' })
+  })
+
+  it('accepts a supported locale', () => {
+    expect(ParticipantProblemQuerySchema.parse({ locale: 'es' })).toEqual({ locale: 'es' })
+  })
+
+  it('rejects an unsupported locale, naming the supported ones', () => {
+    const result = ParticipantProblemQuerySchema.safeParse({ locale: 'de' })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain("'pt' | 'es' | 'en'")
+    }
+  })
+})
+
+describe('ParticipantProblemParamsSchema', () => {
+  it('accepts a uuid', () => {
+    const id = '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11'
+    expect(ParticipantProblemParamsSchema.parse({ id })).toEqual({ id })
+  })
+
+  it('rejects a malformed id', () => {
+    expect(ParticipantProblemParamsSchema.safeParse({ id: 'abc' }).success).toBe(false)
+  })
+})
+
+describe('ParticipantProblemSchema', () => {
+  // Second line of defence against leaking hidden cases: kata re-validates the
+  // handler's output against this schema, and zod strips what it does not declare.
+  it('strips a hidden flag smuggled into an example case', () => {
+    const parsed = ParticipantProblemSchema.parse({
+      id: '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+      points: 100,
+      difficulty: 'easy',
+      locale: 'pt',
+      title: 'Soma',
+      statementMd: 'Some dois números.',
+      examples: [{ input: [1, 2], expected: 3, hidden: true }],
+    })
+
+    expect(parsed.examples[0]).toEqual({ input: [1, 2], expected: 3 })
+    expect(JSON.stringify(parsed)).not.toContain('hidden')
   })
 })
 

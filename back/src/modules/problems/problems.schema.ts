@@ -107,3 +107,39 @@ export type TranslationInput = z.infer<typeof TranslationInputSchema>
 export type UpdateProblemBody = z.infer<typeof UpdateProblemBodySchema>
 export type ProblemDetail = z.infer<typeof ProblemDetailSchema>
 export type ProblemSummary = z.infer<typeof ProblemSummarySchema>
+
+// --- Participant read DTOs (#11) ---
+
+export const ParticipantProblemParamsSchema = z.object({
+  id: z.string().uuid(),
+})
+
+// Optional query param: no `?locale=` means pt. An unsupported value fails
+// input validation (kata's 422 envelope) with the supported ones in the message.
+export const ParticipantProblemQuerySchema = z.object({
+  locale: LocaleSchema.default('pt'),
+})
+
+// Deliberately without `hidden`: this is what a participant is allowed to see,
+// and kata re-validates the handler's output against it.
+export const ExampleCaseSchema = z.object({
+  input: JsonValueSchema,
+  expected: JsonValueSchema,
+})
+
+export const ParticipantProblemSchema = z.object({
+  id: z.string(),
+  points: z.number().int(),
+  difficulty: DifficultySchema,
+  // The locale actually served, which is not always the one requested (a
+  // missing translation falls back to pt).
+  locale: LocaleSchema,
+  title: z.string(),
+  statementMd: z.string(),
+  examples: z.array(ExampleCaseSchema),
+})
+
+export type ParticipantProblemParams = z.infer<typeof ParticipantProblemParamsSchema>
+export type ParticipantProblemQuery = z.infer<typeof ParticipantProblemQuerySchema>
+export type ExampleCase = z.infer<typeof ExampleCaseSchema>
+export type ParticipantProblem = z.infer<typeof ParticipantProblemSchema>

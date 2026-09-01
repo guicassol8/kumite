@@ -95,12 +95,31 @@ HTTP 409
 [Asserts]
 jsonpath "$.error" == "already_in_team"
 
-# 4. List -> the team appears with one open slot (creator only, max 3).
+# 4. List, as the creator -> event config in the envelope, the team is theirs
+#    (myTeamId), still has 2 open slots, is not frozen, and every member's
+#    email is visible because it is the viewer's own team. Joining is blocked
+#    with already_in_team since they already belong to one.
 GET {{host}}/teams
 Authorization: Bearer {{creator_token}}
 HTTP 200
 [Asserts]
-jsonpath "$[?(@.id=='{{team_id}}')].slotsAvailable" == 2
+jsonpath "$.maxTeamSize" == 3
+jsonpath "$.mixingLocked" == false
+jsonpath "$.myTeamId" == "{{team_id}}"
+jsonpath "$.teams[?(@.id=='{{team_id}}')].slotsAvailable" == 2
+jsonpath "$.teams[?(@.id=='{{team_id}}')].frozen" == false
+jsonpath "$.teams[?(@.id=='{{team_id}}')].joinBlockedReason" == "already_in_team"
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[0].email" == "teams-e2e-creator@edu.pucrs.br"
+
+# 4b. Same list, as an outsider -> no team of their own, the roster stays
+#     anonymous (no emails) and the team is joinable.
+GET {{host}}/teams
+Authorization: Bearer {{rival_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.myTeamId" == null
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[0].email" == null
+jsonpath "$.teams[?(@.id=='{{team_id}}')].joinBlockedReason" == null
 
 # 5. Cross-university join with mixing unlocked -> 200.
 POST {{host}}/teams/{{team_id}}/join
@@ -129,6 +148,15 @@ Authorization: Bearer {{fourth_token}}
 HTTP 409
 [Asserts]
 jsonpath "$.error" == "team_full"
+
+# 8b. The same refusal, precomputed for the 4th user's listing -> the UI can
+#     disable the button before they ever click it.
+GET {{host}}/teams
+Authorization: Bearer {{fourth_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.teams[?(@.id=='{{team_id}}')].slotsAvailable" == 0
+jsonpath "$.teams[?(@.id=='{{team_id}}')].joinBlockedReason" == "team_full"
 
 # 9. Leave -> 204, no body.
 POST {{host}}/teams/leave

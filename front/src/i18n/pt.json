@@ -74,11 +74,55 @@
         "description": "O problema deixa de ficar disponível para novas rodadas, mas continua salvo no catálogo.",
         "confirm": "Arquivar",
         "cancel": "Cancelar"
+      }
+    },
+    "problemForm": {
+      "createTitle": "Novo problema",
+      "editTitle": "Editar problema",
+      "loading": "Carregando problema...",
+      "difficultyLabel": "Dificuldade",
+      "pointsLabel": "Pontos",
+      "titleLabel": "Título",
+      "statementLabel": "Enunciado (markdown)",
+      "previewHeading": "Pré-visualização",
+      "testCases": {
+        "heading": "Casos de teste",
+        "empty": "Nenhum caso de teste ainda.",
+        "columns": {
+          "input": "Entrada",
+          "expected": "Esperado",
+          "hidden": "Oculto",
+          "actions": "Ações"
+        },
+        "addAction": "Adicionar caso",
+        "removeAction": "Remover caso",
+        "moveUpAction": "Mover para cima",
+        "moveDownAction": "Mover para baixo"
       },
-      "placeholder": {
-        "title": "Em construção",
-        "description": "Esta tela ainda está em desenvolvimento.",
-        "back": "Voltar para a lista"
+      "saveAction": "Salvar",
+      "publishAction": "Publicar",
+      "publishDisabled": {
+        "published": "Este problema já está publicado.",
+        "archived": "Não é possível publicar um problema arquivado."
+      },
+      "savedMessage": "Alterações salvas.",
+      "backToList": "Voltar para a lista",
+      "errors": {
+        "jsonEmpty": "Informe um valor JSON",
+        "jsonInvalid": "JSON inválido",
+        "pointsInvalid": "Informe uma pontuação inteira maior que zero.",
+        "translationIncomplete": "Preencha título e enunciado, ou deixe a aba inteira em branco.",
+        "translationCannotBeCleared": "Não é possível apagar uma tradução já salva.",
+        "publish": {
+          "missingLocales": "Para publicar, complete a tradução deste idioma.",
+          "missingVisibleCase": "Para publicar, inclua pelo menos um caso visível.",
+          "missingHiddenCase": "Para publicar, inclua pelo menos um caso oculto."
+        },
+        "saveFailed": "Não foi possível salvar o problema. Tente novamente.",
+        "publishFailed": "Não foi possível publicar o problema. Tente novamente.",
+        "loadFailed": "Não foi possível carregar o problema.",
+        "retry": "Tentar novamente",
+        "notFound": "Problema não encontrado."
       }
     }
   },

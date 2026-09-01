@@ -1,3 +1,4 @@
+import { somaDosPares } from '@kumite/blocks'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
@@ -15,14 +16,18 @@ import {
 } from '../../db/schema'
 
 import type { JudgeCaseResult } from '../judge/judge.schema'
+import { WorkspaceSchema } from '../judge/judge.schema'
 import type { TestCase } from '../problems/problems.schema'
 
 import {
   acquireSubmissionSlot,
+  findTeamIdForUser,
   getBestSubmission,
   releaseSubmissionSlot,
   resetSubmissionThrottle,
+  type SubmitOutcome,
   scoreSubmission,
+  submitSolution,
   toPersistedCaseResults,
   toResponseCases,
 } from './submissions.service'
@@ -514,5 +519,259 @@ describe('toResponseCases', () => {
       'ms',
       'outcome',
     ])
+  })
+})
+
+// --- The pipeline, against the real Postgres and the real sandbox ---
+
+const JUDGED_TEST_TIMEOUT_MS = 20_000
+
+// The canonical curated-toolbox solution: sums the even numbers of the input.
+const solutionWorkspace = WorkspaceSchema.parse(somaDosPares)
+// Only a root block is missing here, which is codegen refusal #2.
+const emptyWorkspace = WorkspaceSchema.parse({ blocks: { languageVersion: 0, blocks: [] } })
+
+const solvableCases: TestCase[] = [
+  { input: [1, 2, 3, 4], expected: 6, hidden: false },
+  { input: [], expected: 0, hidden: false },
+  { input: [2, 4], expected: 6, hidden: true },
+  { input: [1, 3, 5], expected: 0, hidden: true },
+]
+
+async function insertPublishedProblem(testCases: TestCase[], points = 100) {
+  const [problem] = await db
+    .insert(problemsTable)
+    .values({ difficulty: 'easy', status: 'published', points, testCases })
+    .returning()
+  if (!problem) throw new Error('expected a problem fixture')
+  return problem
+}
+
+async function insertTeamMember(teamName = 'Time A', email = 'participante@edu.pucrs.br') {
+  const [user, team] = await Promise.all([insertUser(email), insertTeam(teamName)])
+  await db.insert(teamMembersTable).values({ userId: user.id, teamId: team.id })
+  return { user, team }
+}
+
+function expectSubmitted(outcome: SubmitOutcome) {
+  if (!outcome.ok) throw new Error(`unexpected refusal: ${outcome.error}`)
+  return outcome.result
+}
+
+describe('submitSolution', () => {
+  beforeEach(() => {
+    resetSubmissionThrottle()
+  })
+
+  it(
+    'runs every case, scores the hidden ones and persists the attempt',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+
+      const result = expectSubmitted(
+        await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, workspace: solutionWorkspace },
+        ),
+      )
+
+      expect(result).toMatchObject({ score: 100, maxScore: 100, attemptNumber: 1 })
+      expect(result.cases.map((testCase) => testCase.index)).toEqual([0, 1, 2, 3])
+      expect(result.cases.map((testCase) => testCase.hidden)).toEqual([false, false, true, true])
+
+      const [row] = await db.select().from(submissionsTable)
+      expect(row).toMatchObject({
+        problemId: problem.id,
+        userId: user.id,
+        teamId: team.id,
+        score: 100,
+        attemptNumber: 1,
+      })
+      expect(row?.generatedCode).toContain('function solve(input)')
+      expect(row?.caseResults).toEqual([
+        { index: 0, status: 'passed' },
+        { index: 1, status: 'passed' },
+        { index: 2, status: 'passed' },
+        { index: 3, status: 'passed' },
+      ])
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it('refuses a draft problem without recording anything', async () => {
+    const [problem] = await db
+      .insert(problemsTable)
+      .values({ difficulty: 'easy', status: 'draft', testCases: solvableCases })
+      .returning()
+    const { user, team } = await insertTeamMember()
+
+    const outcome = await submitSolution(
+      db,
+      { userId: user.id, teamId: team.id },
+      { problemId: problem?.id ?? '', workspace: solutionWorkspace },
+    )
+
+    expect(outcome).toEqual({ ok: false, error: 'problem_not_found' })
+    expect(await db.select().from(submissionsTable)).toEqual([])
+  })
+
+  it('refuses a problem id that does not exist', async () => {
+    const { user, team } = await insertTeamMember()
+
+    const outcome = await submitSolution(
+      db,
+      { userId: user.id, teamId: team.id },
+      {
+        problemId: '00000000-0000-0000-0000-000000000000',
+        workspace: solutionWorkspace,
+      },
+    )
+
+    expect(outcome).toEqual({ ok: false, error: 'problem_not_found' })
+  })
+
+  it(
+    'refuses a workspace codegen rejects, runs nothing and burns no cooldown',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const identity = { userId: user.id, teamId: team.id }
+
+      const outcome = await submitSolution(db, identity, {
+        problemId: problem.id,
+        workspace: emptyWorkspace,
+      })
+
+      expect(outcome).toMatchObject({ ok: false, error: 'codegen_rejected', code: 'missing_root' })
+      expect(await db.select().from(submissionsTable)).toEqual([])
+
+      // The refusal never reached the sandbox, so the next attempt is free.
+      const retry = await submitSolution(db, identity, {
+        problemId: problem.id,
+        workspace: solutionWorkspace,
+      })
+      expect(expectSubmitted(retry).attemptNumber).toBe(1)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'scores partially when only some hidden cases pass',
+    async () => {
+      const problem = await insertPublishedProblem([
+        { input: [2, 4], expected: 6, hidden: true },
+        { input: [2, 4], expected: 999, hidden: true },
+      ])
+      const { user, team } = await insertTeamMember()
+
+      const result = expectSubmitted(
+        await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, workspace: solutionWorkspace },
+        ),
+      )
+
+      expect(result.score).toBe(50)
+      const [row] = await db.select().from(submissionsTable)
+      expect(row?.score).toBe(50)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'numbers the attempts of the same team on the same problem',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const identity = { userId: user.id, teamId: team.id }
+      const body = { problemId: problem.id, workspace: solutionWorkspace }
+
+      const first = expectSubmitted(await submitSolution(db, identity, body))
+      resetSubmissionThrottle()
+      const second = expectSubmitted(await submitSolution(db, identity, body))
+
+      expect([first.attemptNumber, second.attemptNumber]).toEqual([1, 2])
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'stamps the team first submission once, on the first attempt only',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const identity = { userId: user.id, teamId: team.id }
+      const body = { problemId: problem.id, workspace: solutionWorkspace }
+
+      expect(team.firstSubmittedAt).toBeNull()
+
+      await submitSolution(db, identity, body)
+      const [afterFirst] = await db.select().from(teamsTable).where(eq(teamsTable.id, team.id))
+      expect(afterFirst?.firstSubmittedAt).toBeInstanceOf(Date)
+
+      resetSubmissionThrottle()
+      await submitSolution(db, identity, body)
+      const [afterSecond] = await db.select().from(teamsTable).where(eq(teamsTable.id, team.id))
+      expect(afterSecond?.firstSubmittedAt).toEqual(afterFirst?.firstSubmittedAt)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'accepts a participant with no team, recording a teamless submission',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const user = await insertUser('sem-time@edu.pucrs.br')
+
+      const result = expectSubmitted(
+        await submitSolution(
+          db,
+          { userId: user.id, teamId: null },
+          { problemId: problem.id, workspace: solutionWorkspace },
+        ),
+      )
+
+      expect(result.attemptNumber).toBe(1)
+      const [row] = await db.select().from(submissionsTable)
+      expect(row).toMatchObject({ userId: user.id, teamId: null })
+      expect(await db.select().from(teamsTable)).toEqual([])
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'refuses a second submission while the first is still running',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const identity = { userId: user.id, teamId: team.id }
+      const body = { problemId: problem.id, workspace: solutionWorkspace }
+
+      const [first, second] = await Promise.all([
+        submitSolution(db, identity, body),
+        submitSolution(db, identity, body),
+      ])
+
+      expect(expectSubmitted(first).attemptNumber).toBe(1)
+      expect(second).toMatchObject({ ok: false, error: 'throttled', reason: 'in_flight' })
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+})
+
+describe('findTeamIdForUser', () => {
+  it('returns the team the user belongs to', async () => {
+    const { user, team } = await insertTeamMember()
+
+    expect(await findTeamIdForUser(db, user.id)).toBe(team.id)
+  })
+
+  it('returns null for a user with no team', async () => {
+    const user = await insertUser('sozinho@edu.pucrs.br')
+
+    expect(await findTeamIdForUser(db, user.id)).toBeNull()
   })
 })

@@ -1,17 +1,21 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm'
+import { DEFAULT_LOCALE } from '@kumite/blocks'
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
 
 import { SUBMISSION_COOLDOWN_MS } from '../../config'
 import type { Db } from '../../db/client'
-import { submissionsTable } from '../../db/schema'
+import { problemsTable, submissionsTable, teamMembersTable, teamsTable } from '../../db/schema'
 
-import type { JudgeCaseResult, JudgeOutcome } from '../judge/judge.schema'
+import type { CodegenErrorCode, JudgeCaseResult, JudgeOutcome } from '../judge/judge.schema'
+import { generateJudgeSource, runJudge } from '../judge/judge.service'
 import type { TestCase } from '../problems/problems.schema'
 
 import type {
   BestSubmission,
   SubmissionCaseResult,
   SubmissionCaseStatus,
+  SubmissionResult,
   SubmissionResultCase,
+  SubmitSolutionBody,
 } from './submissions.schema'
 
 // "Vale a melhor pontuação": the team's highest score on a problem, the moment
@@ -155,4 +159,144 @@ export function toResponseCases(
       ms: result.ms,
     }
   })
+}
+
+// --- The submission pipeline (#21) ---
+
+/** Who is submitting: the user always, the team whenever they have one. */
+export type SubmitIdentity = { userId: string; teamId: string | null }
+
+export type SubmitOutcome =
+  | { ok: true; result: SubmissionResult }
+  | { ok: false; error: 'problem_not_found' }
+  | {
+      ok: false
+      error: 'codegen_rejected'
+      code: CodegenErrorCode
+      message: string
+      blockType?: string
+    }
+  | { ok: false; error: 'throttled'; reason: 'in_flight' | 'cooldown'; retryAfterMs: number }
+
+export async function findTeamIdForUser(db: Db, userId: string): Promise<string | null> {
+  const [membership] = await db
+    .select({ teamId: teamMembersTable.teamId })
+    .from(teamMembersTable)
+    .where(eq(teamMembersTable.userId, userId))
+
+  return membership?.teamId ?? null
+}
+
+// Attempts belong to the team when there is one — the same grouping the
+// leaderboard and getBestSubmission use.
+async function countAttempts(db: Db, identity: SubmitIdentity, problemId: string): Promise<number> {
+  const [row] = await db
+    .select({ attempts: sql<number>`count(*)`.mapWith(Number) })
+    .from(submissionsTable)
+    .where(
+      and(
+        eq(submissionsTable.problemId, problemId),
+        identity.teamId === null
+          ? eq(submissionsTable.userId, identity.userId)
+          : eq(submissionsTable.teamId, identity.teamId),
+      ),
+    )
+
+  return row?.attempts ?? 0
+}
+
+/**
+ * The whole judging pipeline: throttle → problem → codegen → sandbox →
+ * score → persist → verdict.
+ *
+ * The identity's slot is claimed before anything else and released in a
+ * `finally`, so a crash can never leave a participant locked out. The 5s
+ * cooldown is armed only once the sandbox has actually run: a 404 or a
+ * codegen refusal is cheap and must not cost the participant a wait.
+ */
+export async function submitSolution(
+  db: Db,
+  identity: SubmitIdentity,
+  body: SubmitSolutionBody,
+): Promise<SubmitOutcome> {
+  const identityKey =
+    identity.teamId === null ? `user:${identity.userId}` : `team:${identity.teamId}`
+  const denial = acquireSubmissionSlot(identityKey)
+  if (denial) return { ok: false, error: 'throttled', ...denial }
+
+  let ranTheJudge = false
+  try {
+    // Straight at the table, not problems.service.getProblem: the translation
+    // join is irrelevant here and `status = 'published'` is part of the rule —
+    // an unpublished problem is a 404, never a hint that a draft exists.
+    const [problem] = await db
+      .select()
+      .from(problemsTable)
+      .where(and(eq(problemsTable.id, body.problemId), eq(problemsTable.status, 'published')))
+    if (!problem) return { ok: false, error: 'problem_not_found' }
+
+    const generated = generateJudgeSource(body.workspace, body.locale ?? DEFAULT_LOCALE)
+    if (!generated.ok) {
+      // Nothing runs: a workspace codegen refuses never reaches the sandbox.
+      return {
+        ok: false,
+        error: 'codegen_rejected',
+        code: generated.error,
+        message: generated.message,
+        ...(generated.blockType === undefined ? {} : { blockType: generated.blockType }),
+      }
+    }
+
+    ranTheJudge = true
+    const results = await runJudge(
+      generated.source,
+      problem.testCases.map(({ input, expected }) => ({ input, expected })),
+    )
+
+    const score = scoreSubmission(problem.testCases, results, problem.points)
+    // The in-flight lock is what serializes this read-then-insert; the partial
+    // unique index on (team, problem, attempt) is the backstop.
+    const attemptNumber = (await countAttempts(db, identity, problem.id)) + 1
+
+    const submission = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(submissionsTable)
+        .values({
+          problemId: problem.id,
+          userId: identity.userId,
+          teamId: identity.teamId,
+          workspace: body.workspace,
+          generatedCode: generated.source,
+          caseResults: toPersistedCaseResults(results),
+          score,
+          attemptNumber,
+        })
+        .returning()
+      if (!row) throw new Error('expected the submission insert to return a row')
+
+      if (identity.teamId !== null) {
+        // Conditional in SQL, so the "first" stamp can never be overwritten by
+        // a later attempt racing the read.
+        await tx
+          .update(teamsTable)
+          .set({ firstSubmittedAt: sql`now()` })
+          .where(and(eq(teamsTable.id, identity.teamId), isNull(teamsTable.firstSubmittedAt)))
+      }
+
+      return row
+    })
+
+    return {
+      ok: true,
+      result: {
+        submissionId: submission.id,
+        attemptNumber,
+        score,
+        maxScore: problem.points,
+        cases: toResponseCases(problem.testCases, results),
+      },
+    }
+  } finally {
+    releaseSubmissionSlot(identityKey, ranTheJudge)
+  }
 }

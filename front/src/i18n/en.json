@@ -74,11 +74,54 @@
         "description": "The problem stops being available for new rounds, but stays saved in the catalog.",
         "confirm": "Archive",
         "cancel": "Cancel"
+      }
+    },
+    "problemForm": {
+      "createTitle": "New problem",
+      "editTitle": "Edit problem",
+      "loading": "Loading problem...",
+      "difficultyLabel": "Difficulty",
+      "pointsLabel": "Points",
+      "titleLabel": "Title",
+      "statementLabel": "Statement (markdown)",
+      "previewHeading": "Preview",
+      "testCases": {
+        "heading": "Test cases",
+        "empty": "No test cases yet.",
+        "columns": {
+          "input": "Input",
+          "expected": "Expected",
+          "hidden": "Hidden",
+          "actions": "Actions"
+        },
+        "addAction": "Add case",
+        "removeAction": "Remove case",
+        "moveUpAction": "Move up",
+        "moveDownAction": "Move down"
       },
-      "placeholder": {
-        "title": "Under construction",
-        "description": "This screen is still being built.",
-        "back": "Back to the list"
+      "saveAction": "Save",
+      "publishAction": "Publish",
+      "publishDisabled": {
+        "published": "This problem is already published.",
+        "archived": "An archived problem can't be published."
+      },
+      "savedMessage": "Changes saved.",
+      "backToList": "Back to the list",
+      "errors": {
+        "jsonEmpty": "Enter a JSON value",
+        "jsonInvalid": "Invalid JSON",
+        "translationIncomplete": "Fill in both title and statement, or leave the whole tab empty.",
+        "translationCannotBeCleared": "A saved translation can't be cleared.",
+        "publish": {
+          "missingLocales": "To publish, complete this language's translation.",
+          "missingVisibleCase": "To publish, include at least one visible case.",
+          "missingHiddenCase": "To publish, include at least one hidden case."
+        },
+        "saveFailed": "Couldn't save the problem. Try again.",
+        "publishFailed": "Couldn't publish the problem. Try again.",
+        "loadFailed": "Couldn't load the problem.",
+        "retry": "Try again",
+        "notFound": "Problem not found."
       }
     }
   },

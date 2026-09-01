@@ -143,6 +143,19 @@ describe('validateForSave', () => {
     ])
   })
 
+  it('rejects a points value the API would refuse', () => {
+    for (const points of [Number.NaN, 0, -5, 1.5]) {
+      const values = { ...ptOnlyValues(), points }
+      expect(validateForSave(values, [])).toEqual([{ kind: 'pointsInvalid' }])
+    }
+  })
+
+  it('accepts any positive integer as the points value', () => {
+    for (const points of [1, 20, 1000]) {
+      expect(validateForSave({ ...ptOnlyValues(), points }, [])).toEqual([])
+    }
+  })
+
   it('rejects an empty and a malformed JSON field on the offending row only', () => {
     const values = ptOnlyValues()
     values.testCases = [

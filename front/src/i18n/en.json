@@ -110,6 +110,7 @@
       "errors": {
         "jsonEmpty": "Enter a JSON value",
         "jsonInvalid": "Invalid JSON",
+        "pointsInvalid": "Enter a whole score greater than zero.",
         "translationIncomplete": "Fill in both title and statement, or leave the whole tab empty.",
         "translationCannotBeCleared": "A saved translation can't be cleared.",
         "publish": {

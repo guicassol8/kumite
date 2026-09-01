@@ -110,6 +110,7 @@
       "errors": {
         "jsonEmpty": "Ingresa un valor JSON",
         "jsonInvalid": "JSON inválido",
+        "pointsInvalid": "Ingresa una puntuación entera mayor que cero.",
         "translationIncomplete": "Completa título y enunciado, o deja la pestaña entera vacía.",
         "translationCannotBeCleared": "No se puede borrar una traducción ya guardada.",
         "publish": {

@@ -7,7 +7,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -75,6 +82,8 @@ export function ProblemForm({
 
   function messageFor(error: ProblemFormError): string {
     switch (error.kind) {
+      case 'pointsInvalid':
+        return t('organizer.problemForm.errors.pointsInvalid')
       case 'translationIncomplete':
         return t('organizer.problemForm.errors.translationIncomplete')
       case 'translationCannotBeCleared':
@@ -104,6 +113,10 @@ export function ProblemForm({
     let firstErroredLocale: UiLocale | undefined
 
     for (const error of validationErrors) {
+      if (error.kind === 'pointsInvalid') {
+        form.setError('points', { message: messageFor(error) })
+        continue
+      }
       if (error.kind === 'publishMissingVisibleCase' || error.kind === 'publishMissingHiddenCase') {
         sectionMessages.push(messageFor(error))
         continue
@@ -211,6 +224,7 @@ export function ProblemForm({
                     ref={field.ref}
                   />
                 </FormControl>
+                <FormMessage data-testid="problem-form-points-error" />
               </FormItem>
             )}
           />
@@ -253,14 +267,7 @@ export function ProblemForm({
                     <FormControl>
                       <Input data-testid={`problem-form-title-${locale}`} {...field} />
                     </FormControl>
-                    {errors.translations?.[locale]?.title && (
-                      <p
-                        data-testid={`problem-form-title-${locale}-error`}
-                        className="text-destructive text-sm"
-                      >
-                        {errors.translations[locale]?.title?.message}
-                      </p>
-                    )}
+                    <FormMessage data-testid={`problem-form-title-${locale}-error`} />
                   </FormItem>
                 )}
               />
@@ -291,14 +298,7 @@ export function ProblemForm({
                         />
                       </div>
                     </div>
-                    {errors.translations?.[locale]?.statementMd && (
-                      <p
-                        data-testid={`problem-form-statement-${locale}-error`}
-                        className="text-destructive text-sm"
-                      >
-                        {errors.translations[locale]?.statementMd?.message}
-                      </p>
-                    )}
+                    <FormMessage data-testid={`problem-form-statement-${locale}-error`} />
                   </FormItem>
                 )}
               />
@@ -344,14 +344,7 @@ export function ProblemForm({
                           }}
                         />
                       </FormControl>
-                      {errors.testCases?.[index]?.[field] && (
-                        <p
-                          data-testid={`problem-form-case-${index}-${field}-error`}
-                          className="text-destructive text-sm"
-                        >
-                          {errors.testCases[index]?.[field]?.message}
-                        </p>
-                      )}
+                      <FormMessage data-testid={`problem-form-case-${index}-${field}-error`} />
                     </FormItem>
                   )}
                 />

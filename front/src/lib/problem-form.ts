@@ -48,6 +48,7 @@ export type PatchBody = {
 export type JsonFieldName = 'input' | 'expected'
 
 export type ProblemFormError =
+  | { kind: 'pointsInvalid' }
   | { kind: 'translationIncomplete'; locale: UiLocale; field: keyof TranslationEntry }
   | { kind: 'translationCannotBeCleared'; locale: UiLocale; field: keyof TranslationEntry }
   | { kind: 'json'; reason: 'empty' | 'invalid'; index: number; field: JsonFieldName }
@@ -128,6 +129,13 @@ export function validateForSave(
   savedLocales: UiLocale[],
 ): ProblemFormError[] {
   const errors: ProblemFormError[] = []
+
+  // An emptied number input hands back NaN; the API takes a positive integer
+  // (`z.number().int().positive()`), so it is caught here rather than as a
+  // form-level "could not save" with nothing pointing at the field.
+  if (!Number.isInteger(values.points) || values.points <= 0) {
+    errors.push({ kind: 'pointsInvalid' })
+  }
 
   for (const locale of FORM_LOCALES) {
     const entry = values.translations[locale]

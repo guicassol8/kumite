@@ -32,6 +32,15 @@ function selectTab(locale: 'pt' | 'es' | 'en') {
   fireEvent.mouseDown(screen.getByTestId(`problem-form-tab-${locale}`))
 }
 
+/** The error a screen reader would read out for a field, via aria-describedby. */
+function announcedError(testid: string): (string | undefined)[] {
+  const field = screen.getByTestId(testid)
+  expect(field.getAttribute('aria-invalid')).toBe('true')
+  return (field.getAttribute('aria-describedby') ?? '')
+    .split(' ')
+    .map((id) => document.getElementById(id)?.textContent)
+}
+
 function renderForm(props: Partial<React.ComponentProps<typeof ProblemForm>> = {}) {
   const onSave = vi.fn()
   const onPublish = vi.fn()
@@ -326,5 +335,42 @@ describe('ProblemForm', () => {
 
     expect((screen.getByTestId('problem-form-save') as HTMLButtonElement).disabled).toBe(true)
     expect((screen.getByTestId('problem-form-publish') as HTMLButtonElement).disabled).toBe(true)
+  })
+  // The errors are visible, but `FormControl` also points aria-describedby at
+  // the message id — so they have to be rendered where that id lands.
+  it('announces the field errors to assistive tech, not just visually', () => {
+    const incomplete = 'Preencha título e enunciado, ou deixe a aba inteira em branco.'
+    renderForm({
+      initialValues: valuesWith({
+        translations: {
+          pt: { title: '', statementMd: 'Some a e b.' },
+          es: { title: 'Suma', statementMd: '' },
+        },
+        testCases: [{ input: '[1,', expected: '3', hidden: false }],
+      }),
+    })
+
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    expect(announcedError('problem-form-title-pt')).toContain(incomplete)
+    expect(announcedError('problem-form-case-0-input')).toContain('JSON inválido')
+    selectTab('es')
+    expect(announcedError('problem-form-statement-es')).toContain(incomplete)
+  })
+  // An emptied number field hands back NaN, which used to serialize as
+  // `points: null` and come back as a generic "could not save" alert.
+  it('blocks the save when the points field is cleared', () => {
+    const { onSave } = renderForm()
+
+    fireEvent.change(screen.getByTestId('problem-form-points'), { target: { value: '' } })
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByTestId('problem-form-points-error').textContent).toBe(
+      'Informe uma pontuação inteira maior que zero.',
+    )
+    expect(announcedError('problem-form-points')).toContain(
+      'Informe uma pontuação inteira maior que zero.',
+    )
   })
 })

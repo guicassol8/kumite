@@ -110,6 +110,7 @@
       "errors": {
         "jsonEmpty": "Informe um valor JSON",
         "jsonInvalid": "JSON inválido",
+        "pointsInvalid": "Informe uma pontuação inteira maior que zero.",
         "translationIncomplete": "Preencha título e enunciado, ou deixe a aba inteira em branco.",
         "translationCannotBeCleared": "Não é possível apagar uma tradução já salva.",
         "publish": {

@@ -1,9 +1,9 @@
 # API E2E for the submission pipeline. Prereqs, in order:
 #   docker compose up -d
 #   pnpm db:migrate
-#   pnpm db:seed        # seeds the PUCRS2026 / MERIDA2026 event codes
+#   pnpm db:seed        # seeds the PUCRS2026 / MERIDA2026 event codes + the organizer
 #   pnpm start          # in another terminal (also builds the sandbox worker)
-#   pnpm hurl
+#   pnpm hurl           # reads ORGANIZER_EMAIL / ORGANIZER_PASSWORD from the environment
 #
 # Creates a unique user (`submissions-e2e@...`) — rerunning this file locally
 # without resetting the db fails the first signup on the second run. Reset
@@ -26,9 +26,18 @@ HTTP 200
 [Captures]
 token: jsonpath "$.token"
 
+# 0b. Log in the seeded organizer for the setup calls below (#27).
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "{{organizer_email}}", "password": "{{organizer_password}}" }
+HTTP 200
+[Captures]
+organizer_token: jsonpath "$.token"
+
 # 1. Organizer side: a problem worth 100 points, one visible case and one
 #    hidden case, both solved by `solve(input) { return input }`.
 POST {{host}}/organizer/problems
+Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
 { "difficulty": "easy" }
 HTTP 201
@@ -36,6 +45,7 @@ HTTP 201
 problem_id: jsonpath "$.id"
 
 PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
 {
   "translations": [
@@ -51,6 +61,7 @@ Content-Type: application/json
 HTTP 200
 
 POST {{host}}/organizer/problems/{{problem_id}}/publish
+Authorization: Bearer {{organizer_token}}
 HTTP 200
 [Asserts]
 jsonpath "$.status" == "published"

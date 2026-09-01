@@ -41,6 +41,9 @@ function EditProblemScreen() {
     queryKey: ['organizer-problem', id],
     queryFn: () => fetchProblem(id),
     retry: false,
+    // This is an authoring screen: a background refetch while the organizer
+    // is writing would overwrite the fetched detail under an unsaved form.
+    refetchOnWindowFocus: false,
   })
 
   async function patch(values: ProblemFormValues): Promise<boolean> {
@@ -132,9 +135,10 @@ function EditProblemScreen() {
 
       {problem.data && (
         <ProblemForm
-          // Remounts the form when the fetched detail changes, so the
-          // defaultValues are re-seeded instead of keeping the stale ones.
-          key={problem.dataUpdatedAt}
+          // Seeded once per problem: keyed on the fetched detail instead, a
+          // refetch that returns the very same body would still remount the
+          // form and throw away whatever the organizer had typed.
+          key={id}
           initialValues={problemDetailToFormValues(problem.data)}
           savedLocales={savedLocalesOf(problem.data)}
           status={problem.data.status}

@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -75,12 +75,13 @@ function selectTab(locale: 'pt' | 'es' | 'en') {
   fireEvent.mouseDown(screen.getByTestId(`problem-form-tab-${locale}`))
 }
 
-function renderEdit() {
+function renderEdit(
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: ['/organizer/problems/p1/edit'] }),
   })
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
@@ -102,6 +103,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   clearSession('manual')
+  // The focus state is global to the manager — leaving it set would leak
+  // into the next test in this file.
+  focusManager.setFocused(undefined)
 })
 
 describe('EditProblemScreen', () => {
@@ -254,5 +258,54 @@ describe('EditProblemScreen', () => {
       ),
     )
     expect(screen.queryByTestId('problem-form-success')).toBeNull()
+  })
+
+  // The screen must not throw away what the organizer is typing: alt-tabbing
+  // out and back used to refetch in the background and re-seed the form.
+  it('keeps the unsaved statement when the window regains focus', async () => {
+    mockedDetail.mockResolvedValue(jsonResponse(200, draftDetail))
+    // The production QueryClient, with none of the test-only defaults: this
+    // bug only shows up under `staleTime: 0` + `refetchOnWindowFocus: true`.
+    renderEdit(new QueryClient())
+
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+    const typed = 'Um enunciado longo que o organizador acabou de escrever.'
+    fireEvent.change(screen.getByTestId('problem-form-statement-pt'), { target: { value: typed } })
+
+    focusManager.setFocused(false)
+    focusManager.setFocused(true)
+    // Long enough for a focus refetch to resolve and remount the form.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect((screen.getByTestId('problem-form-statement-pt') as HTMLTextAreaElement).value).toBe(
+      typed,
+    )
+    expect(mockedDetail).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-seeds the form when the route moves to another problem', async () => {
+    const otherDetail = {
+      ...draftDetail,
+      id: 'p2',
+      points: 55,
+      translations: [{ locale: 'pt', title: 'Fatorial', statementMd: 'Calcule n!.' }],
+    }
+    mockedDetail.mockImplementation(async ({ param }: { param: { id: string } }) =>
+      jsonResponse(200, param.id === 'p2' ? otherDetail : draftDetail),
+    )
+    const router = renderEdit()
+
+    await waitFor(() =>
+      expect((screen.getByTestId('problem-form-title-pt') as HTMLInputElement).value).toBe('Soma'),
+    )
+
+    await router.navigate({ to: '/organizer/problems/$id/edit', params: { id: 'p2' } })
+
+    await waitFor(() =>
+      expect((screen.getByTestId('problem-form-title-pt') as HTMLInputElement).value).toBe(
+        'Fatorial',
+      ),
+    )
+    expect((screen.getByTestId('problem-form-points') as HTMLInputElement).value).toBe('55')
   })
 })

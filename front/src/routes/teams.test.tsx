@@ -23,6 +23,7 @@ import { routeTree } from '@/routeTree.gen'
 
 const mockedList = vi.mocked(api.teams.$get)
 const mockedLeave = vi.mocked(api.teams.leave.$post)
+const mockedCreate = vi.mocked(api.teams.$post)
 
 const participant: SessionUser = {
   id: 'u1',
@@ -95,6 +96,7 @@ function renderTeams() {
 beforeEach(() => {
   mockedList.mockReset()
   mockedLeave.mockReset()
+  mockedCreate.mockReset()
   setSession(participant, 'tok-1')
 })
 
@@ -266,5 +268,86 @@ describe('TeamsScreen — my team panel', () => {
 
     await waitFor(() => expect(screen.getByTestId('my-team-frozen-notice')).toBeDefined())
     expect(screen.getByTestId<HTMLButtonElement>('my-team-leave').disabled).toBe(true)
+  })
+})
+
+describe('TeamsScreen — creating a team', () => {
+  async function openCreateDialog() {
+    await waitFor(() => expect(screen.getByTestId('teams-create-open')).toBeDefined())
+    fireEvent.click(screen.getByTestId('teams-create-open'))
+    await waitFor(() => expect(screen.getByTestId('teams-create-dialog')).toBeDefined())
+  }
+
+  function fillAndSubmit(name: string) {
+    fireEvent.change(screen.getByTestId('teams-create-name-input'), { target: { value: name } })
+    fireEvent.click(screen.getByTestId('teams-create-submit'))
+  }
+
+  it('hides the create action from someone who already has a team', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope({ myTeamId: 't1' })))
+    renderTeams()
+
+    await waitFor(() => expect(screen.getByTestId('teams-table')).toBeDefined())
+    expect(screen.queryByTestId('teams-create-open')).toBeNull()
+  })
+
+  it('creates the team, closes the dialog and refreshes the listing', async () => {
+    mockedList.mockResolvedValueOnce(jsonResponse(200, envelope({ teams: [] })))
+    mockedCreate.mockResolvedValue(jsonResponse(201, { id: 't2', name: 'Novo Time' }))
+    renderTeams()
+    await openCreateDialog()
+
+    mockedList.mockResolvedValueOnce(jsonResponse(200, envelope({ myTeamId: 't2' })))
+    fillAndSubmit('Novo Time')
+
+    await waitFor(() => expect(mockedCreate).toHaveBeenCalledWith({ json: { name: 'Novo Time' } }))
+    await waitFor(() => expect(screen.queryByTestId('teams-create-dialog')).toBeNull())
+    await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows a duplicate name on the name field itself', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope({ teams: [] })))
+    mockedCreate.mockResolvedValue(jsonResponse(409, { error: 'name_taken', message: 'taken' }))
+    renderTeams()
+    await openCreateDialog()
+
+    fillAndSubmit('Blockly Busters')
+
+    const error = await screen.findByTestId('teams-create-name-error')
+    expect(error.textContent).toContain('Já existe um time com esse nome')
+    expect(screen.getByTestId('teams-create-dialog')).toBeDefined()
+  })
+
+  it('falls back to a form-level error on any other refusal', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope({ teams: [] })))
+    mockedCreate.mockResolvedValue(jsonResponse(409, { error: 'already_in_team', message: 'nope' }))
+    renderTeams()
+    await openCreateDialog()
+
+    fillAndSubmit('Outro Time')
+
+    expect(await screen.findByTestId('teams-create-form-error')).toBeDefined()
+  })
+
+  it('rejects an empty name before touching the API', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope({ teams: [] })))
+    renderTeams()
+    await openCreateDialog()
+
+    fireEvent.click(screen.getByTestId('teams-create-submit'))
+
+    const error = await screen.findByTestId('teams-create-name-error')
+    expect(error.textContent).toContain('Informe o nome do time')
+    expect(mockedCreate).not.toHaveBeenCalled()
+  })
+
+  it('opens the same dialog from the empty-state shortcut', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope({ teams: [] })))
+    renderTeams()
+
+    await waitFor(() => expect(screen.getByTestId('teams-empty-cta')).toBeDefined())
+    fireEvent.click(screen.getByTestId('teams-empty-cta'))
+
+    await waitFor(() => expect(screen.getByTestId('teams-create-dialog')).toBeDefined())
   })
 })

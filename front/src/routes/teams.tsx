@@ -1,7 +1,10 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { z } from 'zod'
 
 import { UniversityBadge } from '@/components/teams/university-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -18,6 +21,22 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -51,12 +70,36 @@ const JOIN_BLOCKED_KEYS = {
   already_in_team: 'teams.joinBlocked.alreadyInTeam',
 } as const
 
+type CreateTeamFormValues = { name: string }
+
+// Mirrors CreateTeamBodySchema in back/src/modules/teams/teams.schema.ts —
+// same bounds, so an obviously invalid name never costs a round trip.
+function useCreateTeamSchema() {
+  const { t, i18n } = useTranslation()
+  return useMemo(
+    () =>
+      z.object({
+        name: z
+          .string()
+          .min(1, t('teams.create.errors.nameRequired'))
+          .max(40, t('teams.create.errors.nameTooLong')),
+      }),
+    [t, i18n.language],
+  )
+}
+
 function TeamsScreen() {
   const { t } = useTranslation()
   const { user } = useSession()
   const queryClient = useQueryClient()
   const isOrganizer = user?.role === 'organizer'
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const createSchema = useCreateTeamSchema()
+  const createForm = useForm<CreateTeamFormValues>({
+    resolver: zodResolver(createSchema),
+    defaultValues: { name: '' },
+  })
 
   const teams = useQuery({
     queryKey: TEAMS_QUERY_KEY,
@@ -74,11 +117,46 @@ function TeamsScreen() {
 
   const data = teams.data
   const myTeam = data?.teams.find((team) => team.id === data.myTeamId) ?? null
+  const canCreate = !isOrganizer && data !== undefined && data.myTeamId === null
+
+  function openCreateDialog() {
+    createForm.reset({ name: '' })
+    setCreateDialogOpen(true)
+  }
+
+  async function onCreateSubmit(values: CreateTeamFormValues) {
+    const res = await api.teams.$post({ json: { name: values.name } })
+
+    if (res.status === 201) {
+      setCreateDialogOpen(false)
+      queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY })
+      return
+    }
+
+    if (res.status === 409) {
+      const body = await res.json()
+      if (body.error === 'name_taken') {
+        createForm.setError('name', { message: t('teams.create.errors.nameTaken') })
+        return
+      }
+    }
+
+    // already_in_team (someone raced us) or an undeclared status: nothing
+    // field-specific to say, so it lands on the form itself.
+    createForm.setError('root', { message: t('teams.create.errors.unexpected') })
+  }
+
+  const createRootError = createForm.formState.errors.root?.message
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
         <h1 className="font-bold text-2xl">{t('teams.heading')}</h1>
+        {canCreate && (
+          <Button type="button" data-testid="teams-create-open" onClick={openCreateDialog}>
+            {t('teams.createAction')}
+          </Button>
+        )}
       </div>
 
       {myTeam && (
@@ -152,8 +230,8 @@ function TeamsScreen() {
       {data && data.teams.length === 0 && (
         <div data-testid="teams-empty" className="flex flex-col items-center gap-4 p-8 text-center">
           <p className="text-muted-foreground">{t('teams.empty.title')}</p>
-          {!isOrganizer && (
-            <Button type="button" data-testid="teams-empty-cta">
+          {canCreate && (
+            <Button type="button" data-testid="teams-empty-cta" onClick={openCreateDialog}>
               {t('teams.empty.cta')}
             </Button>
           )}
@@ -236,6 +314,56 @@ function TeamsScreen() {
           </TableBody>
         </Table>
       )}
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent data-testid="teams-create-dialog">
+          <DialogHeader>
+            <DialogTitle>{t('teams.create.title')}</DialogTitle>
+          </DialogHeader>
+          <Form {...createForm}>
+            <form
+              onSubmit={createForm.handleSubmit(onCreateSubmit)}
+              className="flex flex-col gap-4"
+            >
+              <FormField
+                control={createForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('teams.create.nameLabel')}</FormLabel>
+                    <FormControl>
+                      <Input data-testid="teams-create-name-input" {...field} />
+                    </FormControl>
+                    <FormMessage data-testid="teams-create-name-error" />
+                  </FormItem>
+                )}
+              />
+              {createRootError && (
+                <Alert variant="destructive" data-testid="teams-create-form-error">
+                  <AlertDescription>{createRootError}</AlertDescription>
+                </Alert>
+              )}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid="teams-create-cancel"
+                  onClick={() => setCreateDialogOpen(false)}
+                >
+                  {t('teams.create.cancel')}
+                </Button>
+                <Button
+                  type="submit"
+                  data-testid="teams-create-submit"
+                  disabled={createForm.formState.isSubmitting}
+                >
+                  {t('teams.create.submit')}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
         <AlertDialogContent data-testid="teams-leave-dialog">

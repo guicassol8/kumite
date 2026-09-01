@@ -25,16 +25,33 @@ test.describe('organizer problems list', () => {
     await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
   }
 
+  // The seed calls below hit /organizer/problems* directly (no UI), so they
+  // need their own bearer token now that #27 guards those routes.
+  let organizerToken: string | undefined
+  async function organizerAuthHeader(): Promise<Record<string, string>> {
+    if (!organizerToken) {
+      const res = await fetch(`${BACK_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
+      })
+      const { token } = (await res.json()) as { token: string }
+      organizerToken = token
+    }
+    return { authorization: `Bearer ${organizerToken}` }
+  }
+
   async function seedDraftProblem(): Promise<string> {
+    const auth = await organizerAuthHeader()
     const created = await fetch(`${BACK_URL}/organizer/problems`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...auth },
       body: JSON.stringify({ difficulty: 'easy', points: 10 }),
     })
     const { id } = (await created.json()) as { id: string }
     await fetch(`${BACK_URL}/organizer/problems/${id}`, {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...auth },
       body: JSON.stringify({
         translations: [
           { locale: 'pt', title: 'Soma de dois números', statementMd: 'Some `a` e `b`.' },
@@ -45,15 +62,16 @@ test.describe('organizer problems list', () => {
   }
 
   async function seedPublishedProblem(): Promise<string> {
+    const auth = await organizerAuthHeader()
     const created = await fetch(`${BACK_URL}/organizer/problems`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...auth },
       body: JSON.stringify({ difficulty: 'hard', points: 50 }),
     })
     const { id } = (await created.json()) as { id: string }
     await fetch(`${BACK_URL}/organizer/problems/${id}`, {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...auth },
       body: JSON.stringify({
         testCases: [
           { input: [1, 2], expected: 3, hidden: false },
@@ -66,7 +84,7 @@ test.describe('organizer problems list', () => {
         ],
       }),
     })
-    await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST' })
+    await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST', headers: auth })
     return id
   }
 

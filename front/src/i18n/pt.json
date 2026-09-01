@@ -9,7 +9,8 @@
     "login": "Entrar",
     "signup": "Cadastrar",
     "logout": "Sair",
-    "organizerLink": "Organizador"
+    "organizerLink": "Organizador",
+    "teamsLink": "Times"
   },
   "home": {
     "tagline": "PUCRS × Mérida — programação em blocos",
@@ -20,6 +21,12 @@
     "notices": {
       "forbiddenOrganizer": "Essa área é restrita a organizadores.",
       "dismiss": "Dispensar"
+    },
+    "team": {
+      "title": "Seu time",
+      "none": "Você ainda não está em um time.",
+      "memberCount": "{{members}} de {{max}} integrantes",
+      "cta": "Ver times"
     }
   },
   "editor": {
@@ -73,6 +80,70 @@
         "description": "Esta tela ainda está em desenvolvimento.",
         "back": "Voltar para a lista"
       }
+    }
+  },
+  "teams": {
+    "heading": "Times",
+    "loading": "Carregando times...",
+    "error": {
+      "message": "Não foi possível carregar os times.",
+      "retry": "Tentar novamente"
+    },
+    "empty": {
+      "title": "Nenhum time criado ainda.",
+      "cta": "Criar o primeiro time"
+    },
+    "columns": {
+      "name": "Time",
+      "members": "Integrantes",
+      "slots": "Vagas",
+      "actions": "Ações"
+    },
+    "createAction": "Criar time",
+    "slots": "{{available}}/{{max}}",
+    "full": "Cheio",
+    "joinAction": "Entrar",
+    "yourTeamBadge": "Seu time",
+    "mixingLockedNotice": "A mistura entre universidades está travada: você só pode entrar em times da sua universidade.",
+    "university": {
+      "pucrs": "PUCRS",
+      "merida": "Mérida"
+    },
+    "joinBlocked": {
+      "teamFull": "Time cheio",
+      "mixedLock": "Time de outra universidade",
+      "alreadyInTeam": "Você já está em um time"
+    },
+    "myTeam": {
+      "title": "Meu time",
+      "you": "(você)",
+      "leaveAction": "Sair do time",
+      "frozenNotice": "Este time já submeteu uma solução — a formação está congelada e ninguém pode sair."
+    },
+    "leaveDialog": {
+      "title": "Sair do time?",
+      "description": "Você perde o lugar neste time e precisa entrar em outro para competir.",
+      "confirm": "Sair",
+      "cancel": "Cancelar"
+    },
+    "create": {
+      "title": "Criar time",
+      "nameLabel": "Nome do time",
+      "submit": "Criar",
+      "cancel": "Cancelar",
+      "errors": {
+        "nameRequired": "Informe o nome do time",
+        "nameTooLong": "O nome pode ter no máximo 40 caracteres",
+        "nameTaken": "Já existe um time com esse nome",
+        "unexpected": "Não foi possível criar o time. Tente novamente."
+      }
+    },
+    "actionError": {
+      "teamFull": "Esse time ficou cheio antes de você entrar.",
+      "mixedLock": "A mistura entre universidades está travada — esse time é de outra universidade.",
+      "alreadyInTeam": "Você já está em um time.",
+      "notFound": "Esse time não existe mais.",
+      "unexpected": "Não foi possível entrar no time. Tente novamente."
     }
   },
   "auth": {

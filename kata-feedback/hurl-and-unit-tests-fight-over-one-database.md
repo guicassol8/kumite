@@ -61,3 +61,58 @@ stops being a prose comment each consumer re-implements. Cheapest useful version
 documented `pnpm hurl` recipe that resets and re-seeds first (a `pretest`-style hook), or a
 per-file `# @requires-clean-db` marker that `kata` honours by running the project's
 configured reset command before the file.
+
+---
+
+## Confirmed independently during the #33 review (PR #91)
+
+Same finding, reached from the other side. Reviewing this PR meant running `pnpm hurl`
+and the Playwright walkthrough for real, and neither is runnable against the shared dev
+database while other agents' worktrees are live: `back`'s vitest truncates `users`,
+`teams`, `event_config` and `event_codes`, so any hurl or E2E run that follows it starts
+from a database that no longer contains what `db:seed` put there.
+
+What the review actually had to do before a single assert could run:
+
+1. `docker run` a throwaway Postgres on a free port (5437 — 5432 through 5436 were
+   already taken by five other worktrees' databases on this machine).
+2. Write `back/.env` + `front/.env` pointing at it, on non-default HTTP ports.
+3. `db:migrate` + `db:seed`.
+4. Run `pnpm -r test` — which truncates the tables again.
+5. `truncate ... cascade` + `db:seed` **a second time**, then boot the server, then hurl.
+6. Truncate + re-seed **a third time** so the walkthrough's "no teams exist yet"
+   screenshot had an empty `teams` table to photograph.
+
+Three manual resets for one review pass. Every one of them is a step a reviewer has to
+know about from prose (the `.hurl` header comments, plus the note the author left in the
+PR body) rather than from the tooling.
+
+## Why the review angle matters
+
+The author hits this once and works around it. The reviewer hits it *every time*, on a
+cold worktree, with no memory of the workarounds — and the failure still presents as a
+red assert pointing at the code under review. That is the worst possible place for this
+class of error: it costs reviewer trust in a diff that is actually correct.
+
+It also means "evidence" in this repo's workflow is only reproducible if the reviewer
+independently reinvents DB isolation. Nothing in `pnpm hurl` or the Playwright config
+hints that a shared database will silently invalidate the run.
+
+## Metrics (review pass)
+
+- **kata-docs calls: zero.** Reviewing the reshaped route (`output:` swapped from an array
+  schema to an object envelope, service gaining a viewer argument) needed no kata lookups —
+  the diff was self-explanatory against the repo's existing module pattern. Second
+  consecutive "smooth, nothing to ask" data point on this task.
+- **`kata verify --strict-coverage`: green, 37 files, ~1s.** No false positives on the
+  reshaped route or the new `JoinBlockedReasonSchema` enum.
+- **Environment setup vs. actual reviewing: roughly 8 tool round-trips on DB/port/env
+  plumbing, against ~12 spent reading and judging the diff.** Close to 40% of the review's
+  mechanical effort went to working around the shared-database problem, not to the review.
+
+## Strengthened suggestion
+
+The author's suggestion (a `@requires-clean-db` marker, or a documented reset recipe kata
+runs before hurl) would fix the reviewer case too, and is worth more than it looks: it is
+not just convenience, it is what makes a `pnpm hurl` result mean the same thing for the
+author and the reviewer.

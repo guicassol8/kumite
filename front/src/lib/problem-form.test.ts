@@ -1,0 +1,255 @@
+import { describe, expect, it } from 'vitest'
+
+import {
+  buildPatchBody,
+  emptyProblemFormValues,
+  localeState,
+  moveTestCase,
+  type ProblemFormValues,
+  parseJsonField,
+  problemDetailToFormValues,
+  savedLocalesOf,
+  validateForPublish,
+  validateForSave,
+} from './problem-form'
+
+const ptTranslation = { locale: 'pt' as const, title: 'Soma', statementMd: 'Some `a` e `b`.' }
+
+const detail = {
+  id: 'p1',
+  points: 20,
+  difficulty: 'hard' as const,
+  status: 'published' as const,
+  testCases: [
+    { input: [1, 2], expected: 3, hidden: false },
+    { input: [4, 5], expected: 9, hidden: true },
+  ],
+  translations: [
+    ptTranslation,
+    { locale: 'es' as const, title: 'Suma', statementMd: 'Suma `a` y `b`.' },
+    { locale: 'en' as const, title: 'Sum', statementMd: 'Sum `a` and `b`.' },
+  ],
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+}
+
+function ptOnlyValues(): ProblemFormValues {
+  const values = emptyProblemFormValues()
+  values.translations.pt = { title: 'Soma', statementMd: 'Some a e b.' }
+  return values
+}
+
+describe('emptyProblemFormValues', () => {
+  it('starts as an easy 100-point draft with no translations and no cases', () => {
+    const values = emptyProblemFormValues()
+
+    expect(values.difficulty).toBe('easy')
+    expect(values.points).toBe(100)
+    expect(values.testCases).toEqual([])
+    expect(values.translations).toEqual({
+      pt: { title: '', statementMd: '' },
+      es: { title: '', statementMd: '' },
+      en: { title: '', statementMd: '' },
+    })
+  })
+
+  it('returns a fresh object each call, so editing one form never leaks into the next', () => {
+    const first = emptyProblemFormValues()
+    first.translations.pt.title = 'mutated'
+
+    expect(emptyProblemFormValues().translations.pt.title).toBe('')
+  })
+})
+
+describe('problemDetailToFormValues', () => {
+  it('maps a detail onto form values with the JSON fields as text', () => {
+    const values = problemDetailToFormValues(detail)
+
+    expect(values.difficulty).toBe('hard')
+    expect(values.points).toBe(20)
+    expect(values.translations.es).toEqual({ title: 'Suma', statementMd: 'Suma `a` y `b`.' })
+    expect(values.testCases).toEqual([
+      { input: '[1,2]', expected: '3', hidden: false },
+      { input: '[4,5]', expected: '9', hidden: true },
+    ])
+  })
+
+  it('leaves the locales missing from the detail empty', () => {
+    const values = problemDetailToFormValues({ ...detail, translations: [ptTranslation] })
+
+    expect(values.translations.pt.title).toBe('Soma')
+    expect(values.translations.es).toEqual({ title: '', statementMd: '' })
+    expect(values.translations.en).toEqual({ title: '', statementMd: '' })
+  })
+})
+
+describe('savedLocalesOf', () => {
+  it('lists the locales the API already stores for the problem', () => {
+    expect(savedLocalesOf({ ...detail, translations: [ptTranslation] })).toEqual(['pt'])
+    expect(savedLocalesOf(detail)).toEqual(['pt', 'es', 'en'])
+  })
+})
+
+describe('parseJsonField', () => {
+  it('accepts any JSON value, not just arrays', () => {
+    expect(parseJsonField('[1,2]')).toEqual({ ok: true, value: [1, 2] })
+    expect(parseJsonField('3')).toEqual({ ok: true, value: 3 })
+    expect(parseJsonField('"texto"')).toEqual({ ok: true, value: 'texto' })
+    expect(parseJsonField('null')).toEqual({ ok: true, value: null })
+    expect(parseJsonField('{"a":1}')).toEqual({ ok: true, value: { a: 1 } })
+  })
+
+  it('trims surrounding whitespace before parsing', () => {
+    expect(parseJsonField('  [1, 2]  ')).toEqual({ ok: true, value: [1, 2] })
+  })
+
+  it('reports an empty field and a malformed one with distinct reasons', () => {
+    expect(parseJsonField('')).toEqual({ ok: false, reason: 'empty' })
+    expect(parseJsonField('   ')).toEqual({ ok: false, reason: 'empty' })
+    expect(parseJsonField('[1,')).toEqual({ ok: false, reason: 'invalid' })
+    expect(parseJsonField('undefined')).toEqual({ ok: false, reason: 'invalid' })
+  })
+})
+
+describe('localeState', () => {
+  it('classifies an entry as empty, complete or partial', () => {
+    expect(localeState({ title: '', statementMd: '' })).toBe('empty')
+    expect(localeState({ title: '  ', statementMd: '\n' })).toBe('empty')
+    expect(localeState({ title: 'Soma', statementMd: 'Some.' })).toBe('complete')
+    expect(localeState({ title: 'Soma', statementMd: '' })).toBe('partial')
+    expect(localeState({ title: '', statementMd: 'Some.' })).toBe('partial')
+  })
+})
+
+describe('validateForSave', () => {
+  it('accepts a pt-only draft untouched (acceptance #3)', () => {
+    expect(validateForSave(ptOnlyValues(), [])).toEqual([])
+  })
+
+  it('rejects a locale with a title but no statement, pointing at that tab and field', () => {
+    const values = ptOnlyValues()
+    values.translations.es = { title: 'Suma', statementMd: '' }
+
+    expect(validateForSave(values, [])).toEqual([
+      { kind: 'translationIncomplete', locale: 'es', field: 'statementMd' },
+    ])
+  })
+
+  it('rejects clearing a translation the API already stores', () => {
+    const values = ptOnlyValues()
+
+    expect(validateForSave(values, ['pt', 'es'])).toEqual([
+      { kind: 'translationCannotBeCleared', locale: 'es', field: 'title' },
+    ])
+  })
+
+  it('rejects an empty and a malformed JSON field on the offending row only', () => {
+    const values = ptOnlyValues()
+    values.testCases = [
+      { input: '[1,2]', expected: '3', hidden: false },
+      { input: '[4,', expected: '', hidden: true },
+    ]
+
+    expect(validateForSave(values, [])).toEqual([
+      { kind: 'json', reason: 'invalid', index: 1, field: 'input' },
+      { kind: 'json', reason: 'empty', index: 1, field: 'expected' },
+    ])
+  })
+})
+
+describe('validateForPublish', () => {
+  it('flags the locales still missing on a pt-only draft (acceptance #2)', () => {
+    const values = ptOnlyValues()
+    values.testCases = [
+      { input: '[1,2]', expected: '3', hidden: false },
+      { input: '[4,5]', expected: '9', hidden: true },
+    ]
+
+    expect(validateForPublish(values, [])).toEqual([
+      { kind: 'publishMissingLocale', locale: 'es', field: 'title' },
+      { kind: 'publishMissingLocale', locale: 'en', field: 'title' },
+    ])
+  })
+
+  it('flags a case set without a hidden case', () => {
+    const values = problemDetailToFormValues(detail)
+    values.testCases = [{ input: '[1,2]', expected: '3', hidden: false }]
+
+    expect(validateForPublish(values, [])).toEqual([{ kind: 'publishMissingHiddenCase' }])
+  })
+
+  it('flags a case set without a visible case, and an empty one on both counts', () => {
+    const values = problemDetailToFormValues(detail)
+    values.testCases = [{ input: '[1,2]', expected: '3', hidden: true }]
+    expect(validateForPublish(values, [])).toEqual([{ kind: 'publishMissingVisibleCase' }])
+
+    values.testCases = []
+    expect(validateForPublish(values, [])).toEqual([
+      { kind: 'publishMissingVisibleCase' },
+      { kind: 'publishMissingHiddenCase' },
+    ])
+  })
+
+  it('accepts a fully translated problem with a visible and a hidden case', () => {
+    expect(validateForPublish(problemDetailToFormValues(detail), ['pt', 'es', 'en'])).toEqual([])
+  })
+
+  it('still reports the save-level errors', () => {
+    const values = problemDetailToFormValues(detail)
+    values.testCases[0] = { input: '[1,', expected: '3', hidden: false }
+
+    expect(validateForPublish(values, [])).toEqual([
+      { kind: 'json', reason: 'invalid', index: 0, field: 'input' },
+    ])
+  })
+})
+
+describe('buildPatchBody', () => {
+  it('omits the empty locales and keeps the complete ones', () => {
+    const body = buildPatchBody(ptOnlyValues())
+
+    expect(body.translations).toEqual([{ locale: 'pt', title: 'Soma', statementMd: 'Some a e b.' }])
+  })
+
+  it('parses the test-case JSON text back into values', () => {
+    const values = ptOnlyValues()
+    values.testCases = [{ input: '  [1, 2] ', expected: '3', hidden: true }]
+
+    expect(buildPatchBody(values).testCases).toEqual([{ input: [1, 2], expected: 3, hidden: true }])
+  })
+
+  it('round-trips a detail back into an equivalent patch body', () => {
+    const body = buildPatchBody(problemDetailToFormValues(detail))
+
+    expect(body).toEqual({
+      difficulty: detail.difficulty,
+      points: detail.points,
+      testCases: detail.testCases,
+      translations: detail.translations,
+    })
+  })
+})
+
+describe('moveTestCase', () => {
+  const cases = [
+    { input: '1', expected: '1', hidden: false },
+    { input: '2', expected: '2', hidden: false },
+    { input: '3', expected: '3', hidden: true },
+  ]
+
+  it('swaps a row with its neighbour', () => {
+    expect(moveTestCase(cases, 1, 'up').map((c) => c.input)).toEqual(['2', '1', '3'])
+    expect(moveTestCase(cases, 1, 'down').map((c) => c.input)).toEqual(['1', '3', '2'])
+  })
+
+  it('is a no-op at the boundaries', () => {
+    expect(moveTestCase(cases, 0, 'up')).toEqual(cases)
+    expect(moveTestCase(cases, 2, 'down')).toEqual(cases)
+  })
+
+  it('never mutates the array it was given', () => {
+    moveTestCase(cases, 1, 'up')
+
+    expect(cases.map((c) => c.input)).toEqual(['1', '2', '3'])
+  })
+})

@@ -17,7 +17,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "verify": "kata verify",
-    "hurl": "hurl --test --color --error-format long --variable host=${HURL_HOST:-http://localhost:3000} src/modules/*/*.hurl",
+    "hurl": "hurl --test --color --error-format long --variable host=${HURL_HOST:-http://localhost:3000} --variable organizer_email=${ORGANIZER_EMAIL} --variable organizer_password=${ORGANIZER_PASSWORD} src/modules/*/*.hurl",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",

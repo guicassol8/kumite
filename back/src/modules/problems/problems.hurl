@@ -1,18 +1,15 @@
-# API E2E for the problems module — the organizer CRUD (#10) and the
-# participant read (#11). Prereqs, in order:
+# API E2E for the problems module — the organizer CRUD (#10), guarded by
+# requireUser + requireOrganizer (#27), and the participant read (#11).
+# Prereqs, in order:
 #   docker compose up -d
 #   pnpm db:migrate
-#   pnpm db:seed         # seeds the PUCRS2026 code the participant signs up with
+#   pnpm db:seed         # seeds the PUCRS2026 code + the ORGANIZER_EMAIL/PASSWORD organizer
 #   pnpm start           # in another terminal
-#   pnpm hurl
+#   pnpm hurl            # reads ORGANIZER_EMAIL / ORGANIZER_PASSWORD from the environment
 #
 # Creates a unique user (`problems-e2e-participant@...`) — rerunning this file
 # locally without resetting the db fails that signup on the second run. Reset
 # with: docker compose down -v && docker compose up -d && pnpm db:migrate && pnpm db:seed
-#
-# No auth guard on the /organizer routes yet (see #10's Contexto) — the epic
-# Auth protects them in a later, dedicated task. The participant read is
-# guarded by requireUser already.
 
 # 0. Sign up + log in the participant that reads the problem.
 POST {{host}}/auth/signup
@@ -27,8 +24,38 @@ HTTP 200
 [Captures]
 participant_token: jsonpath "$.token"
 
+# 0b. Log in the seeded organizer.
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "{{organizer_email}}", "password": "{{organizer_password}}" }
+HTTP 200
+[Captures]
+organizer_token: jsonpath "$.token"
+
+# 0c. No token -> 401, before any organizer logic runs.
+GET {{host}}/organizer/problems
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
+# 0d. Participant token -> 403, both on a read and on a write.
+GET {{host}}/organizer/problems
+Authorization: Bearer {{participant_token}}
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "forbidden"
+
+POST {{host}}/organizer/problems
+Authorization: Bearer {{participant_token}}
+Content-Type: application/json
+{ "difficulty": "easy" }
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "forbidden"
+
 # 1. Create -> draft, points defaults to 100.
 POST {{host}}/organizer/problems
+Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
 { "difficulty": "easy" }
 HTTP 201
@@ -49,6 +76,7 @@ jsonpath "$.error" == "not_found"
 
 # 2. Malformed difficulty -> kata's automatic validation envelope.
 POST {{host}}/organizer/problems
+Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
 { "difficulty": "impossible" }
 HTTP 422
@@ -57,6 +85,7 @@ jsonpath "$.error" == "validation_failed"
 
 # 3. Patch in only the pt translation.
 PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
 { "translations": [ { "locale": "pt", "title": "Soma", "statementMd": "Some dois números." } ] }
 HTTP 200
@@ -65,6 +94,7 @@ jsonpath "$.translations" count == 1
 
 # 4. Publish -> rejected, lists the missing locales.
 POST {{host}}/organizer/problems/{{problem_id}}/publish
+Authorization: Bearer {{organizer_token}}
 HTTP 400
 [Asserts]
 jsonpath "$.error" == "incomplete_translations"
@@ -72,6 +102,7 @@ jsonpath "$.message" == "Missing translations for locale(s): es, en"
 
 # 5. Patch in the remaining translations and a single visible test case.
 PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
 {
   "translations": [
@@ -87,12 +118,14 @@ jsonpath "$.testCases" count == 1
 
 # 6. Publish -> rejected, still missing a hidden test case.
 POST {{host}}/organizer/problems/{{problem_id}}/publish
+Authorization: Bearer {{organizer_token}}
 HTTP 400
 [Asserts]
 jsonpath "$.error" == "missing_test_cases"
 
 # 7. Patch in a hidden test case alongside the visible one.
 PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
 {
   "testCases": [
@@ -106,12 +139,14 @@ jsonpath "$.testCases" count == 2
 
 # 8. Publish -> succeeds now that translations and test case coverage are complete.
 POST {{host}}/organizer/problems/{{problem_id}}/publish
+Authorization: Bearer {{organizer_token}}
 HTTP 200
 [Asserts]
 jsonpath "$.status" == "published"
 
 # 9. GET the detail -> reflects the published state.
 GET {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
 HTTP 200
 [Asserts]
 jsonpath "$.status" == "published"
@@ -119,6 +154,7 @@ jsonpath "$.testCases" count == 2
 
 # 10. GET the list -> includes it with the right testCaseCount.
 GET {{host}}/organizer/problems
+Authorization: Bearer {{organizer_token}}
 HTTP 200
 [Asserts]
 jsonpath "$[?(@.id=='{{problem_id}}')].testCaseCount" == 2
@@ -184,6 +220,7 @@ jsonpath "$.error" == "unauthorized"
 
 # 11. Archive -> terminal state.
 POST {{host}}/organizer/problems/{{problem_id}}/archive
+Authorization: Bearer {{organizer_token}}
 HTTP 200
 [Asserts]
 jsonpath "$.status" == "archived"
@@ -197,17 +234,20 @@ jsonpath "$.error" == "not_found"
 
 # 12. Publish on an archived problem -> conflict.
 POST {{host}}/organizer/problems/{{problem_id}}/publish
+Authorization: Bearer {{organizer_token}}
 HTTP 409
 [Asserts]
 jsonpath "$.error" == "archived_problem"
 
 # 13-16. Every route on an unknown id -> 404.
 GET {{host}}/organizer/problems/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{organizer_token}}
 HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
 
 PATCH {{host}}/organizer/problems/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
 { "difficulty": "hard" }
 HTTP 404
@@ -215,11 +255,13 @@ HTTP 404
 jsonpath "$.error" == "not_found"
 
 POST {{host}}/organizer/problems/00000000-0000-0000-0000-000000000000/publish
+Authorization: Bearer {{organizer_token}}
 HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
 
 POST {{host}}/organizer/problems/00000000-0000-0000-0000-000000000000/archive
+Authorization: Bearer {{organizer_token}}
 HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"

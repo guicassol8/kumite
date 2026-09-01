@@ -70,6 +70,15 @@ const JOIN_BLOCKED_KEYS = {
   already_in_team: 'teams.joinBlocked.alreadyInTeam',
 } as const
 
+// The same refusals, worded for someone who already clicked: the listing was
+// stale and the API said no.
+const JOIN_ERROR_KEYS: Record<string, string> = {
+  team_full: 'teams.actionError.teamFull',
+  mixed_lock_violation: 'teams.actionError.mixedLock',
+  already_in_team: 'teams.actionError.alreadyInTeam',
+  not_found: 'teams.actionError.notFound',
+}
+
 type CreateTeamFormValues = { name: string }
 
 // Mirrors CreateTeamBodySchema in back/src/modules/teams/teams.schema.ts —
@@ -95,6 +104,7 @@ function TeamsScreen() {
   const isOrganizer = user?.role === 'organizer'
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [actionErrorKey, setActionErrorKey] = useState<string | null>(null)
   const createSchema = useCreateTeamSchema()
   const createForm = useForm<CreateTeamFormValues>({
     resolver: zodResolver(createSchema),
@@ -110,6 +120,23 @@ function TeamsScreen() {
     mutationFn: async () => {
       await api.teams.leave.$post()
     },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY })
+    },
+  })
+
+  const join = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.teams[':id'].join.$post({ param: { id } })
+      if (res.status === 200) return null
+
+      const body = (await res.json()) as { error?: string }
+      return JOIN_ERROR_KEYS[body.error ?? ''] ?? 'teams.actionError.unexpected'
+    },
+    onSuccess: (errorKey) => setActionErrorKey(errorKey),
+    onError: () => setActionErrorKey('teams.actionError.unexpected'),
+    // Whatever happened, the listing we based the click on is stale — the
+    // refetch is what puts the real state back on screen.
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY })
     },
@@ -211,6 +238,12 @@ function TeamsScreen() {
         </Alert>
       )}
 
+      {actionErrorKey && (
+        <Alert variant="destructive" data-testid="teams-action-error">
+          <AlertDescription>{t(actionErrorKey)}</AlertDescription>
+        </Alert>
+      )}
+
       {teams.isPending && <p data-testid="teams-loading">{t('teams.loading')}</p>}
 
       {teams.isError && (
@@ -296,7 +329,8 @@ function TeamsScreen() {
                           type="button"
                           size="sm"
                           data-testid={`teams-join-${team.id}`}
-                          disabled={team.joinBlockedReason !== null}
+                          disabled={team.joinBlockedReason !== null || join.isPending}
+                          onClick={() => join.mutate(team.id)}
                         >
                           {t('teams.joinAction')}
                         </Button>

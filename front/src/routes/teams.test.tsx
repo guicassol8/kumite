@@ -24,6 +24,7 @@ import { routeTree } from '@/routeTree.gen'
 const mockedList = vi.mocked(api.teams.$get)
 const mockedLeave = vi.mocked(api.teams.leave.$post)
 const mockedCreate = vi.mocked(api.teams.$post)
+const mockedJoin = vi.mocked(api.teams[':id'].join.$post)
 
 const participant: SessionUser = {
   id: 'u1',
@@ -97,6 +98,7 @@ beforeEach(() => {
   mockedList.mockReset()
   mockedLeave.mockReset()
   mockedCreate.mockReset()
+  mockedJoin.mockReset()
   setSession(participant, 'tok-1')
 })
 
@@ -349,5 +351,54 @@ describe('TeamsScreen — creating a team', () => {
     fireEvent.click(screen.getByTestId('teams-empty-cta'))
 
     await waitFor(() => expect(screen.getByTestId('teams-create-dialog')).toBeDefined())
+  })
+})
+
+describe('TeamsScreen — joining a team', () => {
+  it('joins and refreshes the listing', async () => {
+    mockedList.mockResolvedValueOnce(jsonResponse(200, envelope()))
+    mockedJoin.mockResolvedValue(jsonResponse(200, { id: 't1', name: 'Blockly Busters' }))
+    renderTeams()
+
+    await waitFor(() => expect(screen.getByTestId('teams-join-t1')).toBeDefined())
+    mockedList.mockResolvedValueOnce(jsonResponse(200, envelope({ myTeamId: 't1' })))
+    fireEvent.click(screen.getByTestId('teams-join-t1'))
+
+    await waitFor(() => expect(mockedJoin).toHaveBeenCalledWith({ param: { id: 't1' } }))
+    await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(2))
+    expect(screen.queryByTestId('teams-action-error')).toBeNull()
+  })
+
+  // The listing said the team was joinable; someone else took the last slot
+  // between the load and the click.
+  it('surfaces a 409 that only shows up on the click, and refetches', async () => {
+    mockedList.mockResolvedValueOnce(jsonResponse(200, envelope()))
+    mockedJoin.mockResolvedValue(jsonResponse(409, { error: 'team_full', message: 'full' }))
+    renderTeams()
+
+    await waitFor(() => expect(screen.getByTestId('teams-join-t1')).toBeDefined())
+    mockedList.mockResolvedValueOnce(
+      jsonResponse(
+        200,
+        envelope({ teams: [team({ slotsAvailable: 0, joinBlockedReason: 'team_full' })] }),
+      ),
+    )
+    fireEvent.click(screen.getByTestId('teams-join-t1'))
+
+    const alert = await screen.findByTestId('teams-action-error')
+    expect(alert.textContent).toContain('Esse time ficou cheio antes de você entrar.')
+    await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(2))
+  })
+
+  it('maps a vanished team to its own message', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope()))
+    mockedJoin.mockResolvedValue(jsonResponse(404, { error: 'not_found', message: 'gone' }))
+    renderTeams()
+
+    await waitFor(() => expect(screen.getByTestId('teams-join-t1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('teams-join-t1'))
+
+    const alert = await screen.findByTestId('teams-action-error')
+    expect(alert.textContent).toContain('Esse time não existe mais.')
   })
 })

@@ -45,3 +45,11 @@ reading kata's source directly>
 
 Nothing here is auto-filed into kata's own repo/issue tracker — a human
 reviews this folder and decides what to act on.
+
+## Archives
+
+`v1/` holds the first batch of reports (2026-08-28 to 2026-09-01) — already
+triaged (see the batch's `TRIAGE.md`) and consumed by a human. New reports
+go directly in this folder, not into `v1/` or any other archive; archives
+are read-only history and agents should not read them for context on new
+findings.

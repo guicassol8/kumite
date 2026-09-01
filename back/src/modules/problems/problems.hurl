@@ -1,11 +1,31 @@
-# API E2E for the organizer problems module. Prereqs, in order:
+# API E2E for the problems module — the organizer CRUD (#10) and the
+# participant read (#11). Prereqs, in order:
 #   docker compose up -d
 #   pnpm db:migrate
+#   pnpm db:seed         # seeds the PUCRS2026 code the participant signs up with
 #   pnpm start           # in another terminal
 #   pnpm hurl
 #
-# No auth guard yet on these routes (see #10's Contexto) — the epic Auth
-# protects them in a later, dedicated task.
+# Creates a unique user (`problems-e2e-participant@...`) — rerunning this file
+# locally without resetting the db fails that signup on the second run. Reset
+# with: docker compose down -v && docker compose up -d && pnpm db:migrate && pnpm db:seed
+#
+# No auth guard on the /organizer routes yet (see #10's Contexto) — the epic
+# Auth protects them in a later, dedicated task. The participant read is
+# guarded by requireUser already.
+
+# 0. Sign up + log in the participant that reads the problem.
+POST {{host}}/auth/signup
+Content-Type: application/json
+{ "email": "problems-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+HTTP 201
+
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "problems-e2e-participant@edu.pucrs.br", "password": "supersecret" }
+HTTP 200
+[Captures]
+participant_token: jsonpath "$.token"
 
 # 1. Create -> draft, points defaults to 100.
 POST {{host}}/organizer/problems
@@ -19,6 +39,13 @@ jsonpath "$.status" == "draft"
 jsonpath "$.points" == 100
 jsonpath "$.testCases" count == 0
 jsonpath "$.translations" count == 0
+
+# 1b. Still a draft -> invisible to the participant.
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "not_found"
 
 # 2. Malformed difficulty -> kata's automatic validation envelope.
 POST {{host}}/organizer/problems
@@ -97,11 +124,76 @@ HTTP 200
 jsonpath "$[?(@.id=='{{problem_id}}')].testCaseCount" == 2
 jsonpath "$[?(@.id=='{{problem_id}}')].status" == "published"
 
+# 10a. Participant read in es -> Spanish title and statement, and only the
+# visible case: no `hidden` key anywhere and no trace of the hidden expected (4).
+GET {{host}}/problems/{{problem_id}}?locale=es
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.id" == "{{problem_id}}"
+jsonpath "$.locale" == "es"
+jsonpath "$.title" == "Suma"
+jsonpath "$.statementMd" == "Suma dos números."
+jsonpath "$.points" == 100
+jsonpath "$.difficulty" == "easy"
+jsonpath "$.examples" count == 1
+jsonpath "$.examples[0].expected" == 3
+jsonpath "$..hidden" not exists
+jsonpath "$.examples[?(@.expected==4)]" not exists
+jsonpath "$.testCases" not exists
+jsonpath "$.status" not exists
+
+# 10b. No locale query param -> pt.
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.locale" == "pt"
+jsonpath "$.title" == "Soma"
+jsonpath "$.statementMd" == "Some dois números."
+
+# 10c. Unsupported locale -> kata's input validation envelope, naming the
+# supported locales under `issues.query`.
+GET {{host}}/problems/{{problem_id}}?locale=de
+Authorization: Bearer {{participant_token}}
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.query" exists
+jsonpath "$.issues.query[0].message" contains "'pt' | 'es' | 'en'"
+
+# 10d. Malformed id -> 422 from the params schema, never a db error.
+GET {{host}}/problems/nao-e-uuid
+Authorization: Bearer {{participant_token}}
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+
+# 10e. Unknown (but well-formed) id -> 404.
+GET {{host}}/problems/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{participant_token}}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "not_found"
+
+# 10f. No Authorization header -> 401, before any problem lookup.
+GET {{host}}/problems/{{problem_id}}
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
 # 11. Archive -> terminal state.
 POST {{host}}/organizer/problems/{{problem_id}}/archive
 HTTP 200
 [Asserts]
 jsonpath "$.status" == "archived"
+
+# 11a. Archived -> invisible to the participant again.
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "not_found"
 
 # 12. Publish on an archived problem -> conflict.
 POST {{host}}/organizer/problems/{{problem_id}}/publish

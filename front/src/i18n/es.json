@@ -9,7 +9,8 @@
     "login": "Entrar",
     "signup": "Registrarse",
     "logout": "Salir",
-    "organizerLink": "Organizador"
+    "organizerLink": "Organizador",
+    "teamsLink": "Equipos"
   },
   "home": {
     "tagline": "PUCRS × Mérida — programación con bloques",
@@ -20,6 +21,12 @@
     "notices": {
       "forbiddenOrganizer": "Esa área está restringida a organizadores.",
       "dismiss": "Descartar"
+    },
+    "team": {
+      "title": "Tu equipo",
+      "none": "Todavía no estás en un equipo.",
+      "memberCount": "{{members}} de {{max}} integrantes",
+      "cta": "Ver equipos"
     }
   },
   "editor": {
@@ -73,6 +80,70 @@
         "description": "Esta pantalla todavía está en desarrollo.",
         "back": "Volver a la lista"
       }
+    }
+  },
+  "teams": {
+    "heading": "Equipos",
+    "loading": "Cargando equipos...",
+    "error": {
+      "message": "No se pudieron cargar los equipos.",
+      "retry": "Reintentar"
+    },
+    "empty": {
+      "title": "Todavía no hay equipos creados.",
+      "cta": "Crear el primer equipo"
+    },
+    "columns": {
+      "name": "Equipo",
+      "members": "Integrantes",
+      "slots": "Cupos",
+      "actions": "Acciones"
+    },
+    "createAction": "Crear equipo",
+    "slots": "{{available}}/{{max}}",
+    "full": "Completo",
+    "joinAction": "Entrar",
+    "yourTeamBadge": "Tu equipo",
+    "mixingLockedNotice": "La mezcla entre universidades está bloqueada: solo puedes entrar en equipos de tu universidad.",
+    "university": {
+      "pucrs": "PUCRS",
+      "merida": "Mérida"
+    },
+    "joinBlocked": {
+      "teamFull": "Equipo completo",
+      "mixedLock": "Equipo de otra universidad",
+      "alreadyInTeam": "Ya estás en un equipo"
+    },
+    "myTeam": {
+      "title": "Mi equipo",
+      "you": "(tú)",
+      "leaveAction": "Salir del equipo",
+      "frozenNotice": "Este equipo ya envió una solución: la formación está congelada y nadie puede salir."
+    },
+    "leaveDialog": {
+      "title": "¿Salir del equipo?",
+      "description": "Pierdes tu lugar en este equipo y tendrás que entrar en otro para competir.",
+      "confirm": "Salir",
+      "cancel": "Cancelar"
+    },
+    "create": {
+      "title": "Crear equipo",
+      "nameLabel": "Nombre del equipo",
+      "submit": "Crear",
+      "cancel": "Cancelar",
+      "errors": {
+        "nameRequired": "Indica el nombre del equipo",
+        "nameTooLong": "El nombre puede tener como máximo 40 caracteres",
+        "nameTaken": "Ya existe un equipo con ese nombre",
+        "unexpected": "No se pudo crear el equipo. Inténtalo de nuevo."
+      }
+    },
+    "actionError": {
+      "teamFull": "Ese equipo se completó antes de que entraras.",
+      "mixedLock": "La mezcla entre universidades está bloqueada: ese equipo es de otra universidad.",
+      "alreadyInTeam": "Ya estás en un equipo.",
+      "notFound": "Ese equipo ya no existe.",
+      "unexpected": "No se pudo entrar en el equipo. Inténtalo de nuevo."
     }
   },
   "auth": {

@@ -47,21 +47,43 @@ export const JoinTeamParamsSchema = z.object({
 
 export const TeamMemberViewSchema = z.object({
   university: UniversitySchema,
+  // Only filled in for the members of the viewer's own team — the public
+  // listing stays anonymous (flag + university only).
+  email: z.string().email().nullable(),
 })
+
+// Why the reason is computed server-side: the composition rules (max size,
+// mixing lock) live in joinTeam, and duplicating them in the front would be
+// two sources of truth for the same decision.
+export const JoinBlockedReasonSchema = z.enum([
+  'already_in_team',
+  'team_full',
+  'mixed_lock_violation',
+])
 
 export const TeamSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   members: z.array(TeamMemberViewSchema),
-  maxTeamSize: z.number().int().positive(),
   slotsAvailable: z.number().int(),
+  frozen: z.boolean(),
+  joinBlockedReason: JoinBlockedReasonSchema.nullable(),
 })
 
-export const TeamSummaryListSchema = z.array(TeamSummarySchema)
+// The listing is viewer-scoped: the same teams look different depending on
+// who asks, so the event-wide facts ride along in the envelope.
+export const TeamsListSchema = z.object({
+  maxTeamSize: z.number().int().positive(),
+  mixingLocked: z.boolean(),
+  myTeamId: z.string().nullable(),
+  teams: z.array(TeamSummarySchema),
+})
 
 export const NoContentSchema = z.void()
 
 export type CreateTeamBody = z.infer<typeof CreateTeamBodySchema>
 export type JoinTeamParams = z.infer<typeof JoinTeamParamsSchema>
 export type TeamMemberView = z.infer<typeof TeamMemberViewSchema>
+export type JoinBlockedReason = z.infer<typeof JoinBlockedReasonSchema>
 export type TeamSummary = z.infer<typeof TeamSummarySchema>
+export type TeamsList = z.infer<typeof TeamsListSchema>

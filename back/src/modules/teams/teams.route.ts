@@ -8,7 +8,7 @@ import {
   JoinTeamParamsSchema,
   NoContentSchema,
   TeamSchema,
-  TeamSummaryListSchema,
+  TeamsListSchema,
 } from './teams.schema'
 import { createTeam, joinTeam, leaveTeam, listTeams } from './teams.service'
 
@@ -36,8 +36,8 @@ export const listTeamsRoute = defineRoute({
   path: '/teams',
   use: [requireUser],
   input: {},
-  output: TeamSummaryListSchema,
-  handler: async (c) => listTeams(c.get('db')),
+  output: TeamsListSchema,
+  handler: async (c) => listTeams(c.get('db'), c.get('currentUser').id),
 })
 
 export const joinTeamRoute = defineRoute({

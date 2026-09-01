@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useSession } from '@/hooks/use-session'
 import { api } from '@/lib/api'
+import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 
 export const Route = createFileRoute('/')({
   validateSearch: (search: Record<string, unknown>) =>
@@ -20,6 +22,8 @@ function Home() {
   const { t } = useTranslation()
   const navigate = Route.useNavigate()
   const { notice } = Route.useSearch()
+  const { status } = useSession()
+  const isAuthenticated = status === 'authenticated'
   const health = useQuery({
     queryKey: ['health'],
     queryFn: async () => {
@@ -28,6 +32,14 @@ function Home() {
       return res.json()
     },
   })
+  // Same cache entry the /teams screen fills, so arriving there is instant
+  // and leaving/joining refreshes this card too.
+  const teams = useQuery({
+    queryKey: TEAMS_QUERY_KEY,
+    queryFn: fetchTeams,
+    enabled: isAuthenticated,
+  })
+  const myTeam = teams.data?.teams.find((team) => team.id === teams.data?.myTeamId) ?? null
 
   return (
     <main className="mx-auto flex flex-1 max-w-xl flex-col items-center justify-center gap-6 p-8">
@@ -49,6 +61,35 @@ function Home() {
       )}
       <h1 className="font-bold text-4xl tracking-tight">kumite</h1>
       <p className="text-muted-foreground">{t('home.tagline')}</p>
+      {isAuthenticated && (
+        <Card className="w-full" data-testid="home-team-card">
+          <CardHeader>
+            <CardTitle>{t('home.team.title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-start gap-3">
+            {teams.isPending && (
+              <span className="text-muted-foreground text-sm">{t('teams.loading')}</span>
+            )}
+            {teams.data &&
+              (myTeam ? (
+                <>
+                  <span className="font-medium">{myTeam.name}</span>
+                  <span className="text-muted-foreground text-sm">
+                    {t('home.team.memberCount', {
+                      members: myTeam.members.length,
+                      max: teams.data.maxTeamSize,
+                    })}
+                  </span>
+                </>
+              ) : (
+                <span className="text-muted-foreground text-sm">{t('home.team.none')}</span>
+              ))}
+            <Button asChild size="sm" data-testid="home-team-cta">
+              <Link to="/teams">{t('home.team.cta')}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       <Card className="w-full" data-testid="api-status">
         <CardHeader>
           <CardTitle>{t('home.apiStatus')}</CardTitle>

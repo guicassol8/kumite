@@ -9,7 +9,8 @@
     "login": "Log in",
     "signup": "Sign up",
     "logout": "Log out",
-    "organizerLink": "Organizer"
+    "organizerLink": "Organizer",
+    "teamsLink": "Teams"
   },
   "home": {
     "tagline": "PUCRS × Mérida — block programming showdown",
@@ -20,6 +21,12 @@
     "notices": {
       "forbiddenOrganizer": "That area is restricted to organizers.",
       "dismiss": "Dismiss"
+    },
+    "team": {
+      "title": "Your team",
+      "none": "You are not on a team yet.",
+      "memberCount": "{{members}} of {{max}} members",
+      "cta": "View teams"
     }
   },
   "editor": {
@@ -73,6 +80,70 @@
         "description": "This screen is still being built.",
         "back": "Back to the list"
       }
+    }
+  },
+  "teams": {
+    "heading": "Teams",
+    "loading": "Loading teams...",
+    "error": {
+      "message": "Could not load the teams.",
+      "retry": "Try again"
+    },
+    "empty": {
+      "title": "No teams created yet.",
+      "cta": "Create the first team"
+    },
+    "columns": {
+      "name": "Team",
+      "members": "Members",
+      "slots": "Slots",
+      "actions": "Actions"
+    },
+    "createAction": "Create team",
+    "slots": "{{available}}/{{max}}",
+    "full": "Full",
+    "joinAction": "Join",
+    "yourTeamBadge": "Your team",
+    "mixingLockedNotice": "Mixing universities is locked: you can only join teams from your own university.",
+    "university": {
+      "pucrs": "PUCRS",
+      "merida": "Mérida"
+    },
+    "joinBlocked": {
+      "teamFull": "Team is full",
+      "mixedLock": "Team from another university",
+      "alreadyInTeam": "You are already on a team"
+    },
+    "myTeam": {
+      "title": "My team",
+      "you": "(you)",
+      "leaveAction": "Leave team",
+      "frozenNotice": "This team has already submitted a solution — the roster is frozen and nobody can leave."
+    },
+    "leaveDialog": {
+      "title": "Leave the team?",
+      "description": "You lose your spot on this team and will need to join another one to compete.",
+      "confirm": "Leave",
+      "cancel": "Cancel"
+    },
+    "create": {
+      "title": "Create team",
+      "nameLabel": "Team name",
+      "submit": "Create",
+      "cancel": "Cancel",
+      "errors": {
+        "nameRequired": "Enter the team name",
+        "nameTooLong": "The name can have at most 40 characters",
+        "nameTaken": "A team with this name already exists",
+        "unexpected": "Could not create the team. Please try again."
+      }
+    },
+    "actionError": {
+      "teamFull": "That team filled up before you joined.",
+      "mixedLock": "Mixing universities is locked — that team is from another university.",
+      "alreadyInTeam": "You are already on a team.",
+      "notFound": "That team no longer exists.",
+      "unexpected": "Could not join the team. Please try again."
     }
   },
   "auth": {

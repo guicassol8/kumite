@@ -1,4 +1,4 @@
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 
 import type { Db } from '../../db/client'
 import { problemsTable, problemTranslationsTable } from '../../db/schema'
@@ -7,6 +7,7 @@ import { LocaleSchema } from '../../lib/locale'
 
 import type {
   CreateProblemBody,
+  ParticipantProblem,
   ProblemDetail,
   ProblemSummary,
   TestCase,
@@ -71,6 +72,46 @@ export async function getProblem(db: Db, id: string): Promise<ProblemDetail | nu
     .from(problemTranslationsTable)
     .where(eq(problemTranslationsTable.problemId, id))
   return toDetail(problem, translations)
+}
+
+// The participant read (#11). Only published problems are visible: a draft, an
+// archived one and an unknown id are all the same `null` — the route turns it
+// into a single 404 so nothing about an unpublished problem can be inferred.
+export async function getPublishedProblem(
+  db: Db,
+  id: string,
+  locale: Locale,
+): Promise<ParticipantProblem | null> {
+  const [problem] = await db
+    .select()
+    .from(problemsTable)
+    .where(and(eq(problemsTable.id, id), eq(problemsTable.status, 'published')))
+  if (!problem) return null
+
+  const translations = await db
+    .select()
+    .from(problemTranslationsTable)
+    .where(eq(problemTranslationsTable.problemId, id))
+
+  // pt is the fallback when the requested locale has no translation yet; the
+  // response reports the locale actually served, not the one asked for.
+  const translation =
+    translations.find((t) => t.locale === locale) ?? translations.find((t) => t.locale === 'pt')
+  if (!translation) return null
+
+  return {
+    id: problem.id,
+    points: problem.points,
+    difficulty: problem.difficulty,
+    locale: translation.locale,
+    title: translation.title,
+    statementMd: translation.statementMd,
+    // Filter, then map field by field — never spread a test case, or a new
+    // column on it would leak into the participant payload by default.
+    examples: problem.testCases
+      .filter((testCase) => !testCase.hidden)
+      .map((testCase) => ({ input: testCase.input, expected: testCase.expected })),
+  }
 }
 
 export async function listProblems(db: Db): Promise<ProblemSummary[]> {

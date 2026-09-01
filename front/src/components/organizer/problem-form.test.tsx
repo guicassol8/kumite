@@ -27,6 +27,11 @@ function valuesWith(overrides: {
 const ptOnly = () =>
   valuesWith({ translations: { pt: { title: 'Soma', statementMd: 'Some `a` e `b`.' } } })
 
+// Radix's Tabs trigger switches on mousedown/focus, not on a bare click.
+function selectTab(locale: 'pt' | 'es' | 'en') {
+  fireEvent.mouseDown(screen.getByTestId(`problem-form-tab-${locale}`))
+}
+
 function renderForm(props: Partial<React.ComponentProps<typeof ProblemForm>> = {}) {
   const onSave = vi.fn()
   const onPublish = vi.fn()
@@ -129,7 +134,7 @@ describe('ProblemForm', () => {
 
     expect(onSave).not.toHaveBeenCalled()
     expect(screen.getByTestId('problem-form-tab-es').dataset.invalid).toBe('true')
-    fireEvent.click(screen.getByTestId('problem-form-tab-es'))
+    selectTab('es')
     expect(screen.getByTestId('problem-form-statement-es-error').textContent).toContain(
       'Preencha título e enunciado',
     )
@@ -141,7 +146,7 @@ describe('ProblemForm', () => {
     fireEvent.click(screen.getByTestId('problem-form-save'))
 
     expect(onSave).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByTestId('problem-form-tab-es'))
+    selectTab('es')
     expect(screen.getByTestId('problem-form-title-es-error').textContent).toContain(
       'Não é possível apagar uma tradução já salva',
     )
@@ -167,7 +172,7 @@ describe('ProblemForm', () => {
     expect(screen.getByTestId('problem-form-tab-en').dataset.invalid).toBe('true')
     expect(screen.getByTestId('problem-form-tab-pt').dataset.invalid).toBe('false')
 
-    fireEvent.click(screen.getByTestId('problem-form-tab-es'))
+    selectTab('es')
     expect(screen.getByTestId('problem-form-title-es-error').textContent).toContain(
       'complete a tradução deste idioma',
     )

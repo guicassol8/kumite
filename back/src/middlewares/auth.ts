@@ -1,6 +1,7 @@
-import { jwtAuth } from '@katajs-framework/core/jwt'
+import { jwtAuth, requireRole } from '@katajs-framework/core/jwt'
 
 import { JWT_SECRET } from '../config'
+import type { AppRegistry } from '../context'
 import { defineMiddleware } from '../context'
 import { UserClaimsSchema } from '../modules/users/users.schema'
 import { findUserById } from '../modules/users/users.service'
@@ -20,4 +21,11 @@ export const requireUser = defineMiddleware({
       return publicUser
     },
   }),
+})
+
+// Authorizes an already-authenticated request (requireUser must run first in
+// `use:`). Reads the `currentUser` slot; doesn't fill one, so `provides` is empty.
+export const requireOrganizer = defineMiddleware({
+  provides: [] as const,
+  handler: requireRole<AppRegistry>('organizer'),
 })

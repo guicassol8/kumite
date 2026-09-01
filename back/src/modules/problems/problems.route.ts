@@ -1,7 +1,7 @@
 import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
-import { requireUser } from '../../middlewares/auth'
+import { requireOrganizer, requireUser } from '../../middlewares/auth'
 
 import {
   CreateProblemBodySchema,
@@ -23,9 +23,15 @@ import {
   updateProblem,
 } from './problems.service'
 
+// 401 (requireUser) and 403 (requireOrganizer) are not declared on any route
+// below: both short-circuit from middleware, which kata lets through without
+// validating against `output` (framework ADR-0011) — same note as
+// submissions.route.ts.
+
 export const createProblemRoute = defineRoute({
   method: 'POST',
   path: '/organizer/problems',
+  use: [requireUser, requireOrganizer],
   input: { body: CreateProblemBodySchema },
   output: { 201: ProblemDetailSchema },
   handler: async (c) => {
@@ -37,6 +43,7 @@ export const createProblemRoute = defineRoute({
 export const listProblemsRoute = defineRoute({
   method: 'GET',
   path: '/organizer/problems',
+  use: [requireUser, requireOrganizer],
   input: {},
   output: ProblemSummaryListSchema,
   handler: async (c) => listProblems(c.get('db')),
@@ -45,6 +52,7 @@ export const listProblemsRoute = defineRoute({
 export const getProblemRoute = defineRoute({
   method: 'GET',
   path: '/organizer/problems/:id',
+  use: [requireUser, requireOrganizer],
   input: { params: ProblemIdParamsSchema },
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -57,6 +65,7 @@ export const getProblemRoute = defineRoute({
 export const updateProblemRoute = defineRoute({
   method: 'PATCH',
   path: '/organizer/problems/:id',
+  use: [requireUser, requireOrganizer],
   input: { params: ProblemIdParamsSchema, body: UpdateProblemBodySchema },
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -69,6 +78,7 @@ export const updateProblemRoute = defineRoute({
 export const publishProblemRoute = defineRoute({
   method: 'POST',
   path: '/organizer/problems/:id/publish',
+  use: [requireUser, requireOrganizer],
   input: { params: ProblemIdParamsSchema },
   output: {
     200: ProblemDetailSchema,
@@ -111,6 +121,7 @@ function reasonMessage(reason: 'missing_visible' | 'missing_hidden' | 'missing_b
 export const archiveProblemRoute = defineRoute({
   method: 'POST',
   path: '/organizer/problems/:id/archive',
+  use: [requireUser, requireOrganizer],
   input: { params: ProblemIdParamsSchema },
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {

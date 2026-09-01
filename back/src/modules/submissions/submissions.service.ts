@@ -4,7 +4,15 @@ import { SUBMISSION_COOLDOWN_MS } from '../../config'
 import type { Db } from '../../db/client'
 import { submissionsTable } from '../../db/schema'
 
-import type { BestSubmission } from './submissions.schema'
+import type { JudgeCaseResult, JudgeOutcome } from '../judge/judge.schema'
+import type { TestCase } from '../problems/problems.schema'
+
+import type {
+  BestSubmission,
+  SubmissionCaseResult,
+  SubmissionCaseStatus,
+  SubmissionResultCase,
+} from './submissions.schema'
 
 // "Vale a melhor pontuação": the team's highest score on a problem, the moment
 // it was reached (the tiebreaker) and how many attempts it took. Grouped by
@@ -78,4 +86,73 @@ export function releaseSubmissionSlot(
 export function resetSubmissionThrottle(): void {
   inFlightIdentities.clear()
   cooldownUntil.clear()
+}
+
+// --- Scoring and case mapping (#21) ---
+
+// Spelled out rather than derived, like the judge's CODEGEN_ERROR_CODES: a new
+// judge outcome then breaks this table at typecheck instead of being written
+// to a column whose enum has never heard of it.
+const PERSISTED_CASE_STATUS: Record<JudgeOutcome, SubmissionCaseStatus> = {
+  passed: 'passed',
+  failed: 'failed',
+  timeout: 'timeout',
+  runtime_error: 'error',
+}
+
+/**
+ * The problem's points, prorated over the hidden cases that passed.
+ *
+ * Only hidden cases score (epic #8): the visible ones exist so the participant
+ * can see what their blocks did. Publishing requires at least one hidden case,
+ * so the zero-hidden branch is unreachable through the route — the function
+ * simply does not depend on that being true.
+ */
+export function scoreSubmission(
+  testCases: TestCase[],
+  results: JudgeCaseResult[],
+  points: number,
+): number {
+  let hiddenCount = 0
+  let passedCount = 0
+  for (const [index, testCase] of testCases.entries()) {
+    if (!testCase.hidden) continue
+    hiddenCount++
+    if (results[index]?.outcome === 'passed') passedCount++
+  }
+
+  return hiddenCount === 0 ? 0 : Math.round((points * passedCount) / hiddenCount)
+}
+
+/** What goes in `submissions.case_results`: the full picture, hidden included. */
+export function toPersistedCaseResults(results: JudgeCaseResult[]): SubmissionCaseResult[] {
+  return results.map((result, index) => ({ index, status: PERSISTED_CASE_STATUS[result.outcome] }))
+}
+
+/**
+ * What the participant gets back. A visible case carries the expected value
+ * plus whatever its outcome produced; a hidden one is reduced to its number
+ * and a ✓/✗, so neither its input, its expected value nor a crash message can
+ * be mined out of the response.
+ */
+export function toResponseCases(
+  testCases: TestCase[],
+  results: JudgeCaseResult[],
+): SubmissionResultCase[] {
+  return results.map((result, index) => {
+    const testCase = testCases[index]
+    // A result with no matching case would mean the judge ran something this
+    // problem did not ask for — hide it rather than guess.
+    if (!testCase || testCase.hidden) return { hidden: true, index, outcome: result.outcome }
+
+    return {
+      hidden: false,
+      index,
+      outcome: result.outcome,
+      expected: testCase.expected,
+      ...(result.outcome === 'failed' ? { actual: result.actual } : {}),
+      ...(result.outcome === 'runtime_error' ? { detail: result.detail } : {}),
+      ms: result.ms,
+    }
+  })
 }

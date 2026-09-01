@@ -14,11 +14,17 @@ import {
   usersTable,
 } from '../../db/schema'
 
+import type { JudgeCaseResult } from '../judge/judge.schema'
+import type { TestCase } from '../problems/problems.schema'
+
 import {
   acquireSubmissionSlot,
   getBestSubmission,
   releaseSubmissionSlot,
   resetSubmissionThrottle,
+  scoreSubmission,
+  toPersistedCaseResults,
+  toResponseCases,
 } from './submissions.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
@@ -410,5 +416,103 @@ describe('submission throttle', () => {
     releaseSubmissionSlot('team:a', true, now)
 
     expect(acquireSubmissionSlot('user:b', now)).toBeNull()
+  })
+})
+
+// --- Scoring and case mapping (pure, no db) ---
+
+const visible = (): TestCase => ({ input: 1, expected: 1, hidden: false })
+const hidden = (): TestCase => ({ input: 2, expected: 2, hidden: true })
+
+const passed = (): JudgeCaseResult => ({ outcome: 'passed', ms: 1 })
+const failed = (): JudgeCaseResult => ({ outcome: 'failed', expected: 1, actual: 2, ms: 1 })
+const timedOut = (): JudgeCaseResult => ({ outcome: 'timeout', ms: 2000 })
+const crashed = (): JudgeCaseResult => ({ outcome: 'runtime_error', detail: 'boom', ms: 1 })
+
+describe('scoreSubmission', () => {
+  it('scores the share of hidden cases that passed', () => {
+    const cases = [hidden(), hidden(), hidden(), hidden()]
+    const results = [passed(), passed(), passed(), failed()]
+
+    expect(scoreSubmission(cases, results, 100)).toBe(75)
+  })
+
+  it('rounds the partial score', () => {
+    const cases = [hidden(), hidden(), hidden()]
+    const results = [passed(), failed(), failed()]
+
+    expect(scoreSubmission(cases, results, 100)).toBe(33)
+  })
+
+  // Visible cases are feedback only (epic #8): they never move the score.
+  it('ignores visible cases entirely', () => {
+    const cases = [visible(), visible(), hidden()]
+    const results = [failed(), failed(), passed()]
+
+    expect(scoreSubmission(cases, results, 100)).toBe(100)
+  })
+
+  it.each([
+    { name: 'a timeout', result: timedOut() },
+    { name: 'a runtime error', result: crashed() },
+  ])('counts $name as not passed', ({ result }) => {
+    expect(scoreSubmission([hidden(), hidden()], [passed(), result], 100)).toBe(50)
+  })
+
+  it('scores zero when the problem has no hidden case', () => {
+    expect(scoreSubmission([visible()], [passed()], 100)).toBe(0)
+  })
+})
+
+describe('toPersistedCaseResults', () => {
+  it('keeps the index and translates runtime_error to the stored status', () => {
+    expect(toPersistedCaseResults([passed(), crashed(), timedOut(), failed()])).toEqual([
+      { index: 0, status: 'passed' },
+      { index: 1, status: 'error' },
+      { index: 2, status: 'timeout' },
+      { index: 3, status: 'failed' },
+    ])
+  })
+})
+
+describe('toResponseCases', () => {
+  it('reduces a hidden case to its index and outcome', () => {
+    const [hiddenCase] = toResponseCases([hidden()], [failed()])
+
+    expect(hiddenCase).toEqual({ hidden: true, index: 0, outcome: 'failed' })
+    // Object.keys, not toBeUndefined: the field must be absent, so nothing
+    // about a hidden case can be read off the payload.
+    expect(Object.keys(hiddenCase ?? {}).sort()).toEqual(['hidden', 'index', 'outcome'])
+  })
+
+  it('gives a failed visible case both the expected and the obtained value', () => {
+    const [visibleCase] = toResponseCases([visible()], [failed()])
+
+    expect(visibleCase).toEqual({
+      hidden: false,
+      index: 0,
+      outcome: 'failed',
+      expected: 1,
+      actual: 2,
+      ms: 1,
+    })
+  })
+
+  it('gives a crashed visible case its detail', () => {
+    const [visibleCase] = toResponseCases([visible()], [crashed()])
+
+    expect(visibleCase).toMatchObject({ outcome: 'runtime_error', detail: 'boom' })
+  })
+
+  it('omits actual on a passing visible case', () => {
+    const [visibleCase] = toResponseCases([visible()], [passed()])
+
+    expect(Object.keys(visibleCase ?? {}).sort()).toEqual([
+      'expected',
+      'hidden',
+      'index',
+      'ms',
+      'outcome',
+    ])
   })
 })

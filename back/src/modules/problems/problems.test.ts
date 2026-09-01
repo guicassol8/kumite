@@ -1,15 +1,22 @@
-import { sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
 import { problemsTable, problemTranslationsTable } from '../../db/schema'
-import { TestCaseSchema, UpdateProblemBodySchema } from './problems.schema'
+import {
+  ParticipantProblemParamsSchema,
+  ParticipantProblemQuerySchema,
+  ParticipantProblemSchema,
+  TestCaseSchema,
+  UpdateProblemBodySchema,
+} from './problems.schema'
 import {
   archiveProblem,
   computeMissingLocales,
   createProblem,
   evaluateTestCaseCoverage,
   getProblem,
+  getPublishedProblem,
   listProblems,
   publishProblem,
   updateProblem,
@@ -51,6 +58,55 @@ describe('UpdateProblemBodySchema', () => {
       ],
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('ParticipantProblemQuerySchema', () => {
+  it('defaults the locale to pt when the query param is absent', () => {
+    expect(ParticipantProblemQuerySchema.parse({})).toEqual({ locale: 'pt' })
+  })
+
+  it('accepts a supported locale', () => {
+    expect(ParticipantProblemQuerySchema.parse({ locale: 'es' })).toEqual({ locale: 'es' })
+  })
+
+  it('rejects an unsupported locale, naming the supported ones', () => {
+    const result = ParticipantProblemQuerySchema.safeParse({ locale: 'de' })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain("'pt' | 'es' | 'en'")
+    }
+  })
+})
+
+describe('ParticipantProblemParamsSchema', () => {
+  it('accepts a uuid', () => {
+    const id = '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11'
+    expect(ParticipantProblemParamsSchema.parse({ id })).toEqual({ id })
+  })
+
+  it('rejects a malformed id', () => {
+    expect(ParticipantProblemParamsSchema.safeParse({ id: 'abc' }).success).toBe(false)
+  })
+})
+
+describe('ParticipantProblemSchema', () => {
+  // Second line of defence against leaking hidden cases: kata re-validates the
+  // handler's output against this schema, and zod strips what it does not declare.
+  it('strips a hidden flag smuggled into an example case', () => {
+    const parsed = ParticipantProblemSchema.parse({
+      id: '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+      points: 100,
+      difficulty: 'easy',
+      locale: 'pt',
+      title: 'Soma',
+      statementMd: 'Some dois números.',
+      examples: [{ input: [1, 2], expected: 3, hidden: true }],
+    })
+
+    expect(parsed.examples[0]).toEqual({ input: [1, 2], expected: 3 })
+    expect(JSON.stringify(parsed)).not.toContain('hidden')
   })
 })
 
@@ -302,5 +358,99 @@ describe('problems.service', () => {
     expect(summaries.map((p) => p.id)).toEqual([second.id, first.id])
     expect(summaries.find((p) => p.id === second.id)?.testCaseCount).toBe(2)
     expect(summaries.find((p) => p.id === first.id)?.testCaseCount).toBe(0)
+  })
+
+  describe('getPublishedProblem', () => {
+    // A hidden expected value distinctive enough that a leak cannot hide in a
+    // uuid or a points value.
+    const secretExpected = 'RESPOSTA-OCULTA'
+
+    const publishSample = async () => {
+      const problem = await createProblem(db, { difficulty: 'medium', points: 150 })
+      await updateProblem(db, problem.id, {
+        translations: [
+          { locale: 'pt', title: 'Soma', statementMd: 'Some dois números.' },
+          { locale: 'es', title: 'Suma', statementMd: 'Suma dos números.' },
+          { locale: 'en', title: 'Sum', statementMd: 'Sum two numbers.' },
+        ],
+        testCases: [
+          { input: [1, 2], expected: 3, hidden: false },
+          { input: [40, 2], expected: secretExpected, hidden: true },
+        ],
+      })
+      const published = await publishProblem(db, problem.id)
+      if (!published.ok) throw new Error('expected the sample problem to publish')
+      return problem.id
+    }
+
+    it('serves the requested locale', async () => {
+      const id = await publishSample()
+
+      const problem = await getPublishedProblem(db, id, 'es')
+
+      expect(problem).toMatchObject({
+        id,
+        points: 150,
+        difficulty: 'medium',
+        locale: 'es',
+        title: 'Suma',
+        statementMd: 'Suma dos números.',
+      })
+    })
+
+    it('returns only the visible cases, with no trace of the hidden one', async () => {
+      const id = await publishSample()
+
+      const problem = await getPublishedProblem(db, id, 'pt')
+
+      expect(problem?.examples).toEqual([{ input: [1, 2], expected: 3 }])
+      expect(JSON.stringify(problem)).not.toContain(secretExpected)
+      expect(JSON.stringify(problem)).not.toContain('hidden')
+    })
+
+    it('falls back to pt and reports the locale actually served', async () => {
+      const id = await publishSample()
+      await db
+        .delete(problemTranslationsTable)
+        .where(
+          and(
+            eq(problemTranslationsTable.problemId, id),
+            eq(problemTranslationsTable.locale, 'es'),
+          ),
+        )
+
+      const problem = await getPublishedProblem(db, id, 'es')
+
+      expect(problem?.locale).toBe('pt')
+      expect(problem?.title).toBe('Soma')
+    })
+
+    it('returns null when not even the pt translation exists', async () => {
+      const id = await publishSample()
+      await db.delete(problemTranslationsTable).where(eq(problemTranslationsTable.problemId, id))
+
+      expect(await getPublishedProblem(db, id, 'pt')).toBeNull()
+    })
+
+    it('returns null for a draft problem', async () => {
+      const problem = await createProblem(db, { difficulty: 'easy' })
+      await updateProblem(db, problem.id, {
+        translations: [{ locale: 'pt', title: 'Soma', statementMd: 'a' }],
+      })
+
+      expect(await getPublishedProblem(db, problem.id, 'pt')).toBeNull()
+    })
+
+    it('returns null for an archived problem', async () => {
+      const id = await publishSample()
+      await archiveProblem(db, id)
+
+      expect(await getPublishedProblem(db, id, 'pt')).toBeNull()
+    })
+
+    it('returns null for an unknown id', async () => {
+      const unknown = '00000000-0000-0000-0000-000000000000'
+      expect(await getPublishedProblem(db, unknown, 'pt')).toBeNull()
+    })
   })
 })

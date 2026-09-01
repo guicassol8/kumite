@@ -1,9 +1,13 @@
 import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
+import { requireUser } from '../../middlewares/auth'
 
 import {
   CreateProblemBodySchema,
+  ParticipantProblemParamsSchema,
+  ParticipantProblemQuerySchema,
+  ParticipantProblemSchema,
   ProblemDetailSchema,
   ProblemIdParamsSchema,
   ProblemSummaryListSchema,
@@ -13,6 +17,7 @@ import {
   archiveProblem,
   createProblem,
   getProblem,
+  getPublishedProblem,
   listProblems,
   publishProblem,
   updateProblem,
@@ -110,6 +115,23 @@ export const archiveProblemRoute = defineRoute({
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
     const problem = await archiveProblem(c.get('db'), c.input.params.id)
+    if (!problem) return c.error('not_found', 'Problem not found', { status: 404 })
+    return problem
+  },
+})
+
+// The participant read (#11). No /organizer prefix: the participant is the
+// default audience of this API. Anything not published — draft, archived,
+// unknown id — is a plain 404, so an unpublished problem is indistinguishable
+// from one that does not exist.
+export const getParticipantProblemRoute = defineRoute({
+  method: 'GET',
+  path: '/problems/:id',
+  use: [requireUser],
+  input: { params: ParticipantProblemParamsSchema, query: ParticipantProblemQuerySchema },
+  output: { 200: ParticipantProblemSchema, 404: ErrorBodySchema },
+  handler: async (c) => {
+    const problem = await getPublishedProblem(c.get('db'), c.input.params.id, c.input.query.locale)
     if (!problem) return c.error('not_found', 'Problem not found', { status: 404 })
     return problem
   },

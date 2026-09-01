@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
+import { SUBMISSION_COOLDOWN_MS } from '../../config'
 import { createDb } from '../../db/client'
 import {
   problemsTable,
@@ -13,7 +14,12 @@ import {
   usersTable,
 } from '../../db/schema'
 
-import { getBestSubmission } from './submissions.service'
+import {
+  acquireSubmissionSlot,
+  getBestSubmission,
+  releaseSubmissionSlot,
+  resetSubmissionThrottle,
+} from './submissions.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #35 migrations must already be applied.
@@ -352,5 +358,57 @@ describe('getBestSubmission', () => {
       achievedAt: own,
       attempts: 1,
     })
+  })
+})
+
+describe('submission throttle', () => {
+  beforeEach(() => {
+    resetSubmissionThrottle()
+  })
+
+  it('grants the first slot for an identity', () => {
+    expect(acquireSubmissionSlot('team:a')).toBeNull()
+  })
+
+  it('refuses a second slot while the first is still in flight', () => {
+    acquireSubmissionSlot('team:a')
+
+    expect(acquireSubmissionSlot('team:a')).toEqual({ reason: 'in_flight', retryAfterMs: 0 })
+  })
+
+  // A 404 or a codegen refusal never ran the sandbox, so it must not burn the
+  // participant's 5s: releasing without arming leaves the identity free.
+  it('grants the next slot immediately when the cooldown is not armed', () => {
+    acquireSubmissionSlot('team:a')
+    releaseSubmissionSlot('team:a', false)
+
+    expect(acquireSubmissionSlot('team:a')).toBeNull()
+  })
+
+  it('refuses the next slot during the cooldown, counting the time left', () => {
+    const now = 1_000_000
+    acquireSubmissionSlot('team:a', now)
+    releaseSubmissionSlot('team:a', true, now)
+
+    expect(acquireSubmissionSlot('team:a', now + 1500)).toEqual({
+      reason: 'cooldown',
+      retryAfterMs: SUBMISSION_COOLDOWN_MS - 1500,
+    })
+  })
+
+  it('grants the slot again once the cooldown has elapsed', () => {
+    const now = 1_000_000
+    acquireSubmissionSlot('team:a', now)
+    releaseSubmissionSlot('team:a', true, now)
+
+    expect(acquireSubmissionSlot('team:a', now + SUBMISSION_COOLDOWN_MS)).toBeNull()
+  })
+
+  it('keeps identities independent', () => {
+    const now = 1_000_000
+    acquireSubmissionSlot('team:a', now)
+    releaseSubmissionSlot('team:a', true, now)
+
+    expect(acquireSubmissionSlot('user:b', now)).toBeNull()
   })
 })

@@ -122,17 +122,18 @@ test.describe('organizer problems list', () => {
     await page.getByTestId('organizer-problems-error-retry').click()
     await expect(page.getByTestId('organizer-problems-table')).toBeVisible()
 
-    // 06 — create/edit links land on their (still placeholder) routes.
+    // 06 — create/edit links land on the problem form (#13 replaced the
+    // placeholders these two steps used to assert).
     await page.getByTestId('organizer-problems-create').click()
-    await expect(page.getByTestId('organizer-problems-placeholder')).toBeVisible()
+    await expect(page.getByTestId('problem-form')).toBeVisible()
     await expect(page).toHaveURL(/\/organizer\/problems\/new$/)
-    await page.screenshot({ path: evidence('06a-create-placeholder'), fullPage: true })
+    await page.screenshot({ path: evidence('06a-create-form'), fullPage: true })
 
     await page.goBack()
     await expect(page.getByTestId('organizer-problems-table')).toBeVisible()
     await page.getByTestId(`organizer-problems-edit-${publishedId}`).click()
-    await expect(page.getByTestId('organizer-problems-placeholder')).toBeVisible()
+    await expect(page.getByTestId('problem-form')).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`/organizer/problems/${publishedId}/edit$`))
-    await page.screenshot({ path: evidence('06b-edit-placeholder'), fullPage: true })
+    await page.screenshot({ path: evidence('06b-edit-form'), fullPage: true })
   })
 })

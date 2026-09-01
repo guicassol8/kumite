@@ -1,20 +1,150 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ProblemForm } from '@/components/organizer/problem-form'
+import { Button } from '@/components/ui/button'
+import { api } from '@/lib/api'
+import {
+  buildPatchBody,
+  type ProblemFormValues,
+  problemDetailToFormValues,
+  savedLocalesOf,
+} from '@/lib/problem-form'
+
 export const Route = createFileRoute('/organizer/problems/$id/edit')({
-  component: EditProblemPlaceholder,
+  component: EditProblemScreen,
 })
 
-function EditProblemPlaceholder() {
+const PROBLEMS_QUERY_KEY = ['organizer-problems']
+
+class ProblemNotFoundError extends Error {}
+
+async function fetchProblem(id: string) {
+  const res = await api.organizer.problems[':id'].$get({ param: { id } })
+  if (res.status === 404) throw new ProblemNotFoundError()
+  if (res.status !== 200) throw new Error('failed to load problem')
+  return res.json()
+}
+
+function EditProblemScreen() {
   const { t } = useTranslation()
+  const { id } = Route.useParams()
+  const navigate = Route.useNavigate()
+  const queryClient = useQueryClient()
+  const [rootError, setRootError] = useState<string | undefined>(undefined)
+  const [successMessage, setSuccessMessage] = useState<string | undefined>(undefined)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const problem = useQuery({
+    queryKey: ['organizer-problem', id],
+    queryFn: () => fetchProblem(id),
+    retry: false,
+  })
+
+  async function patch(values: ProblemFormValues): Promise<boolean> {
+    const res = await api.organizer.problems[':id'].$patch({
+      param: { id },
+      json: buildPatchBody(values),
+    })
+    return res.status === 200
+  }
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ['organizer-problem', id] })
+    queryClient.invalidateQueries({ queryKey: PROBLEMS_QUERY_KEY })
+  }
+
+  async function handleSave(values: ProblemFormValues) {
+    setIsSubmitting(true)
+    setRootError(undefined)
+    setSuccessMessage(undefined)
+    try {
+      if (!(await patch(values))) {
+        setRootError(t('organizer.problemForm.errors.saveFailed'))
+        return
+      }
+      // PATCH never touches `status`, so a published problem stays published;
+      // the screen stays put so the organizer can keep editing.
+      invalidate()
+      setSuccessMessage(t('organizer.problemForm.savedMessage'))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handlePublish(values: ProblemFormValues) {
+    setIsSubmitting(true)
+    setRootError(undefined)
+    setSuccessMessage(undefined)
+    try {
+      if (!(await patch(values))) {
+        setRootError(t('organizer.problemForm.errors.saveFailed'))
+        return
+      }
+
+      const published = await api.organizer.problems[':id'].publish.$post({ param: { id } })
+      if (published.status !== 200) {
+        // The 400/409 bodies name what is missing only in `message`; the
+        // client-side pre-validation is what points at a tab or a field.
+        const body = await published.json().catch(() => null)
+        setRootError(body?.message ?? t('organizer.problemForm.errors.publishFailed'))
+        return
+      }
+
+      invalidate()
+      navigate({ to: '/organizer/problems' })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
-    <div data-testid="organizer-problems-placeholder" className="flex flex-col gap-4">
-      <h2 className="font-semibold text-xl">{t('organizer.problems.placeholder.title')}</h2>
-      <p className="text-muted-foreground">{t('organizer.problems.placeholder.description')}</p>
-      <Link to="/organizer/problems" className="text-primary text-sm underline">
-        {t('organizer.problems.placeholder.back')}
-      </Link>
+    <div className="flex flex-col gap-4">
+      <h2 className="font-semibold text-xl">{t('organizer.problemForm.editTitle')}</h2>
+
+      {problem.isPending && (
+        <p data-testid="problem-form-loading">{t('organizer.problemForm.loading')}</p>
+      )}
+
+      {problem.isError &&
+        (problem.error instanceof ProblemNotFoundError ? (
+          <div data-testid="problem-form-not-found" className="flex flex-col items-start gap-2">
+            <p>{t('organizer.problemForm.errors.notFound')}</p>
+            <Link to="/organizer/problems" className="text-primary text-sm underline">
+              {t('organizer.problemForm.backToList')}
+            </Link>
+          </div>
+        ) : (
+          <div data-testid="problem-form-load-error" className="flex flex-col items-start gap-2">
+            <p>{t('organizer.problemForm.errors.loadFailed')}</p>
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="problem-form-load-retry"
+              onClick={() => problem.refetch()}
+            >
+              {t('organizer.problemForm.errors.retry')}
+            </Button>
+          </div>
+        ))}
+
+      {problem.data && (
+        <ProblemForm
+          // Remounts the form when the fetched detail changes, so the
+          // defaultValues are re-seeded instead of keeping the stale ones.
+          key={problem.dataUpdatedAt}
+          initialValues={problemDetailToFormValues(problem.data)}
+          savedLocales={savedLocalesOf(problem.data)}
+          status={problem.data.status}
+          isSubmitting={isSubmitting}
+          rootError={rootError}
+          successMessage={successMessage}
+          onSave={handleSave}
+          onPublish={handlePublish}
+        />
+      )}
     </div>
   )
 }

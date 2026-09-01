@@ -48,19 +48,12 @@ import {
 import { useSession } from '@/hooks/use-session'
 import { api } from '@/lib/api'
 import { requireAuth } from '@/lib/route-guards'
+import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 
 export const Route = createFileRoute('/teams')({
   beforeLoad: requireAuth,
   component: TeamsScreen,
 })
-
-export const TEAMS_QUERY_KEY = ['teams']
-
-async function fetchTeams() {
-  const res = await api.teams.$get()
-  if (!res.ok) throw new Error('failed to load teams')
-  return res.json()
-}
 
 // The back already decided *why* a join would be refused (teams.service.ts);
 // the front only turns that reason into a sentence.

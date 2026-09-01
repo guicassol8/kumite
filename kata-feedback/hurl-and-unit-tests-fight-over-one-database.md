@@ -116,3 +116,51 @@ The author's suggestion (a `@requires-clean-db` marker, or a documented reset re
 runs before hurl) would fix the reviewer case too, and is worth more than it looks: it is
 not just convenience, it is what makes a `pnpm hurl` result mean the same thing for the
 author and the reviewer.
+
+---
+
+## Third occurrence, implementing #27 (organizer role guard)
+
+Same shape again, this time entirely self-inflicted by following this task's own gate
+ladder in the documented order (`pnpm format` → `typecheck` → `verify` → `pnpm -r test`,
+*then* the hurl/e2e obligations). `back`'s `pnpm -r test` truncates `users` (among other
+tables) as part of the new `auth-guards.test.ts` suite's own `beforeEach` — so every time
+the gate ladder ran to completion, the seeded organizer account it had just created via
+`pnpm db:seed` was gone again, and the next hurl or Playwright run needed a fresh
+`db:seed` first. This happened three separate times in one implementation session: once
+before the first hurl run, once before the front e2e spec run, and once more for the
+final gate-ladder pass before opening the PR — caught each time only because `curl
+.../health` plus a manual `select email, role from users` habit was already in place from
+reading this very file's earlier entries.
+
+One new wrinkle worth recording: the *front* Playwright evidence (`organizer-problems.spec.ts`)
+is not just order-sensitive but content-sensitive to leftover rows. Running the hurl suite
+(which creates several throwaway problems) before the e2e walkthrough left extra rows in
+`problems`, and the list-screenshot evidence PNGs came back 25–30% larger with visibly
+different content (more table rows) than the previously committed evidence — silently,
+with no failing assertion, since the spec only checks for specific testids, not an exact
+row count. A truncate-and-reseed immediately before the Playwright run fixed it. This is a
+sharper version of the same root cause: shared-database order-dependence doesn't only
+produce red asserts, it can also produce **green but wrong** evidence that a reviewer
+would have no reason to distrust.
+
+## Metrics (this occurrence)
+
+- **kata-docs calls this task: 2** (`search_docs` + one `read_doc` on `guide/jwt.md` for
+  `requireRole`/`guard` — see `jwt-docs-worth-the-tokens.md`). Both aimed at the guard API
+  itself, not at this DB-sharing problem — kata-docs has no content on cross-suite DB
+  isolation, so there was nothing to look up here even if I'd thought to try.
+- **Extra `db:seed` invocations caused purely by this issue: 3**, plus one full
+  `truncate ... cascade` to force a clean slate before the final evidence-quality e2e run.
+  Rough cost: 4-5 tool round-trips and a few minutes, small relative to the ~40-tool-call
+  implementation but entirely avoidable overhead, and the kind of thing a first-time
+  implementer would very plausibly miss (silently wrong evidence, not a loud failure).
+
+## Reinforced suggestion
+
+Both prior entries' suggestion stands. Adding to it from this occurrence specifically: if
+kata (or this repo's own tooling) can't own DB isolation between hurl/e2e and vitest, even
+a documented "reset + reseed immediately before capturing evidence, every time, no
+exceptions" checklist step in `implementing-tasks`/`reviewing-tasks` would have caught the
+oversized-screenshot case before it reached a commit, rather than relying on the
+implementer noticing a `git diff --stat` byte-count anomaly.

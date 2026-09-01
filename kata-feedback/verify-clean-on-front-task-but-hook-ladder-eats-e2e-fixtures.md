@@ -1,6 +1,7 @@
 # kata verify stayed free; the hook ladder around it destroyed the E2E fixtures twice
 
-**Found while**: #13 (organizer problem form — front only, `back/` untouched)
+**Found while**: #13 (organizer problem form — front only, `back/` untouched),
+implementation and the review-fix round on PR #92
 **Where in kata**: `kata verify --strict-coverage` (clean); the pre-commit /
 Stop hook ladder that wraps it (the actual friction)
 
@@ -75,3 +76,28 @@ per-suite schema/transaction so truncation never escapes the suite. A
 one-line warning from the truncating helper ("truncated `users`; re-run
 `pnpm db:seed` before the browser suite") would be a cheap 80% of the
 value.
+
+## Update — the review-fix round (PR #92, 3 findings)
+
+Third occurrence, and the first one that cost nothing: the fix round for
+the review's three findings is again 100% `front/`, and both points above
+held.
+
+- `kata verify`: 4 more runs (3 commits' pre-commit ladder + one manual
+  `pnpm verify`), all green, `no problems found (37 files checked)`,
+  **0.6s of a 43s ladder** — same ~1.4% share.
+- `kata-docs` MCP queries: **0** again. Three sessions on this task
+  (planning, implementing, fixing) have now needed exactly one kata-docs
+  answer, all the way back in planning.
+- Observation 2 did not bite this time **only because it was already
+  written down**: the ladder truncated `users` again (three commits, three
+  `pnpm -r test` runs, plus one standalone), and re-seeding *before* the browser suite was a
+  deliberate step taken on the strength of this file and the warning it
+  put in the PR body. Cost of the workaround: one `db:seed` command.
+  Cost without it, measured twice in the previous session: ~3 minutes of
+  Playwright timeouts pointing at the wrong package.
+
+That's the shape of the problem worth recording: the trap is now fully
+documented on the kumite side and still fires on every single commit —
+each session pays a small tax forever, and any session that forgets pays
+the full ~3 minutes. It is a fixture-lifecycle gap, not a knowledge gap.

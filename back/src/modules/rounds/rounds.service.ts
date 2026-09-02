@@ -184,3 +184,38 @@ export async function updateRound(
   if (!detail) throw new Error('expected round to still exist right after update')
   return { ok: true, round: detail }
 }
+
+export type OpenRoundResult =
+  | { ok: true; round: RoundDetail }
+  | { ok: false; error: 'not_found' }
+  | { ok: false; error: 'another_round_open' }
+  | { ok: false; error: 'round_not_draft' }
+  | { ok: false; error: 'no_problems' }
+
+export async function openRound(db: Db, id: string): Promise<OpenRoundResult> {
+  await reapExpiredRound(db)
+
+  const [existing] = await db.select().from(roundsTable).where(eq(roundsTable.id, id))
+  if (!existing) return { ok: false, error: 'not_found' }
+
+  const openRoundRow = await findOpenRound(db)
+  if (openRoundRow) return { ok: false, error: 'another_round_open' }
+  if (existing.status !== 'draft') return { ok: false, error: 'round_not_draft' }
+
+  const problemCount = await db
+    .select({ id: roundProblemsTable.problemId })
+    .from(roundProblemsTable)
+    .where(eq(roundProblemsTable.roundId, id))
+  if (problemCount.length === 0) return { ok: false, error: 'no_problems' }
+
+  const openedAt = new Date()
+  const closesAt = new Date(openedAt.getTime() + existing.durationMinutes * 60_000)
+  await db
+    .update(roundsTable)
+    .set({ status: 'open', openedAt, closesAt, updatedAt: new Date() })
+    .where(eq(roundsTable.id, id))
+
+  const detail = await getRound(db, id)
+  if (!detail) throw new Error('expected round to still exist right after open')
+  return { ok: true, round: detail }
+}

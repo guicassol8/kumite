@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
@@ -11,7 +11,7 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
-import { createRound, getRound, listRounds, updateRound } from './rounds.service'
+import { createRound, getRound, listRounds, openRound, updateRound } from './rounds.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #35 migrations must already be applied.
@@ -341,6 +341,76 @@ describe('rounds.service', () => {
       expect(result).toEqual({ ok: false, error: 'invalid_problem_ids' })
       const detail = await getRound(db, created.round.id)
       expect(detail?.problems).toEqual([{ problemId: problemA.id, position: 0 }])
+    })
+  })
+
+  describe('openRound', () => {
+    const createWithOnePublishedProblem = async () => {
+      const [problem] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published' })
+        .returning()
+      if (!problem) throw new Error('expected fixture')
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      return created.round
+    }
+
+    it('returns not_found for an unknown id', async () => {
+      const result = await openRound(db, '00000000-0000-0000-0000-000000000000')
+      expect(result).toEqual({ ok: false, error: 'not_found' })
+    })
+
+    it('rejects with no_problems for a draft round with no problems', async () => {
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+
+      const result = await openRound(db, created.round.id)
+
+      expect(result).toEqual({ ok: false, error: 'no_problems' })
+    })
+
+    it('rejects with another_round_open when a different round is already open', async () => {
+      const alreadyOpen = await createWithOnePublishedProblem()
+      const firstOpen = await openRound(db, alreadyOpen.id)
+      expect(firstOpen.ok).toBe(true)
+
+      const other = await createWithOnePublishedProblem()
+      const result = await openRound(db, other.id)
+
+      expect(result).toEqual({ ok: false, error: 'another_round_open' })
+    })
+
+    it('rejects with round_not_draft when the round is already closed', async () => {
+      const round = await createWithOnePublishedProblem()
+      await db.update(roundsTable).set({ status: 'closed' }).where(eq(roundsTable.id, round.id))
+
+      const result = await openRound(db, round.id)
+
+      expect(result).toEqual({ ok: false, error: 'round_not_draft' })
+    })
+
+    it('opens a draft round, setting openedAt and closesAt = openedAt + durationMinutes', async () => {
+      const round = await createWithOnePublishedProblem()
+      const before = Date.now()
+
+      const result = await openRound(db, round.id)
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.round.status).toBe('open')
+      const openedAt = result.round.openedAt?.getTime() ?? 0
+      const closesAt = result.round.closesAt?.getTime() ?? 0
+      expect(openedAt).toBeGreaterThanOrEqual(before)
+      expect(closesAt - openedAt).toBe(30 * 60_000)
     })
   })
 })

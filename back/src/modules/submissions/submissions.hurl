@@ -13,7 +13,8 @@
 # actually reached the sandbox, so the 404 and the codegen refusal run first
 # and cost nothing. The happy path arms it, and the next attempt proves the 429.
 
-# 0. Sign up + log in the participant (no team: teamId stays null).
+# 0. Sign up + log in the participant, then give them a team — submitting
+#    now requires one (#32).
 POST {{host}}/auth/signup
 Content-Type: application/json
 { "email": "submissions-e2e@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
@@ -25,6 +26,25 @@ Content-Type: application/json
 HTTP 200
 [Captures]
 token: jsonpath "$.token"
+
+POST {{host}}/teams
+Authorization: Bearer {{token}}
+Content-Type: application/json
+{ "name": "Submissions E2E" }
+HTTP 201
+
+# 0a. A second, teamless participant (asserted at step 2 below).
+POST {{host}}/auth/signup
+Content-Type: application/json
+{ "email": "submissions-e2e-noteam@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+HTTP 201
+
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "submissions-e2e-noteam@edu.pucrs.br", "password": "supersecret" }
+HTTP 200
+[Captures]
+noteam_token: jsonpath "$.token"
 
 # 0b. Log in the seeded organizer for the setup calls below (#27).
 POST {{host}}/auth/login
@@ -66,7 +86,20 @@ HTTP 200
 [Asserts]
 jsonpath "$.status" == "published"
 
-# 2. Unknown problem -> 404, and no cooldown is armed (nothing ran).
+# 2. A teamless participant submits -> 404 not_in_team, guided to join a team
+#    first (#32). Nothing runs, no cooldown armed.
+POST {{host}}/submissions
+Authorization: Bearer {{noteam_token}}
+Content-Type: application/json
+{
+  "problemId": "{{problem_id}}",
+  "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
+}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "not_in_team"
+
+# 3. Unknown problem -> 404, and no cooldown is armed (nothing ran).
 POST {{host}}/submissions
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -78,7 +111,7 @@ HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
 
-# 3. A workspace with no root block -> 400 from codegen, message already
+# 4. A workspace with no root block -> 400 from codegen, message already
 #    localized by @kumite/blocks. Still nothing executed, still no cooldown.
 POST {{host}}/submissions
 Authorization: Bearer {{token}}
@@ -91,7 +124,7 @@ HTTP 400
 [Asserts]
 jsonpath "$.error" == "missing_root"
 
-# 4. The happy path -> 201, full score, and the hidden case comes back as a
+# 5. The happy path -> 201, full score, and the hidden case comes back as a
 #    bare ✓/✗: no expected, no actual, no ms.
 POST {{host}}/submissions
 Authorization: Bearer {{token}}
@@ -114,7 +147,7 @@ jsonpath "$.cases[1].outcome" == "passed"
 jsonpath "$.cases[1].expected" not exists
 jsonpath "$.cases[1].ms" not exists
 
-# 5. The same submission again, immediately -> 429 while the cooldown holds.
+# 6. The same submission again, immediately -> 429 while the cooldown holds.
 POST {{host}}/submissions
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -126,7 +159,7 @@ HTTP 429
 [Asserts]
 jsonpath "$.error" == "submission_throttled"
 
-# 6. No token -> 401 from the auth middleware, before anything else runs.
+# 7. No token -> 401 from the auth middleware, before anything else runs.
 POST {{host}}/submissions
 Content-Type: application/json
 {

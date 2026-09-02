@@ -50,6 +50,13 @@
       "when": 1788211517748,
       "tag": "0006_nifty_devos",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788371940493,
+      "tag": "0007_icy_vindicator",
+      "breakpoints": true
     }
   ]
 }

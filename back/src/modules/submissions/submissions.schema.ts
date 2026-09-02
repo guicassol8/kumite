@@ -18,8 +18,8 @@ export const SubmissionCaseResultSchema = z.object({
 export const SubmissionSchema = z.object({
   id: z.string(),
   problemId: z.string(),
-  userId: z.string().nullable(),
-  teamId: z.string().nullable(),
+  userId: z.string(),
+  teamId: z.string(),
   workspace: JsonValueSchema,
   generatedCode: z.string(),
   caseResults: z.array(SubmissionCaseResultSchema),

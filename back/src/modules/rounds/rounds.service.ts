@@ -1,4 +1,5 @@
 import { and, eq, inArray, lte } from 'drizzle-orm'
+import postgres from 'postgres'
 
 import type { Db } from '../../db/client'
 import { problemsTable, roundProblemsTable, roundsTable } from '../../db/schema'
@@ -210,10 +211,30 @@ export async function openRound(db: Db, id: string): Promise<OpenRoundResult> {
 
   const openedAt = new Date()
   const closesAt = new Date(openedAt.getTime() + existing.durationMinutes * 60_000)
-  await db
-    .update(roundsTable)
-    .set({ status: 'open', openedAt, closesAt, updatedAt: new Date() })
-    .where(eq(roundsTable.id, id))
+  try {
+    await db
+      .update(roundsTable)
+      .set({ status: 'open', openedAt, closesAt, updatedAt: new Date() })
+      .where(eq(roundsTable.id, id))
+  } catch (error) {
+    // The findOpenRound check above is a friendly pre-flight, not the actual
+    // invariant: two concurrent opens on two different draft rounds can both
+    // pass it before either commits. rounds_single_open_idx (db/schema.ts) is
+    // the real source of truth, so a race loses here instead of at the read —
+    // caught and reported the same as the friendly path, not left to bubble
+    // to the generic onError envelope.
+    // drizzle-orm wraps every driver error in its own DrizzleQueryError, with
+    // the raw postgres-js error as `.cause` (see queryWithCache in
+    // pg-core/session.ts) — the check has to look one level down.
+    const cause = error instanceof Error ? error.cause : undefined
+    if (
+      cause instanceof postgres.PostgresError &&
+      cause.constraint_name === 'rounds_single_open_idx'
+    ) {
+      return { ok: false, error: 'another_round_open' }
+    }
+    throw error
+  }
 
   const detail = await getRound(db, id)
   if (!detail) throw new Error('expected round to still exist right after open')

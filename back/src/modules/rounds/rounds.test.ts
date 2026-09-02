@@ -420,6 +420,18 @@ describe('rounds.service', () => {
       expect(openedAt).toBeGreaterThanOrEqual(before)
       expect(closesAt - openedAt).toBe(30 * 60_000)
     })
+
+    it('under a concurrent open on two different draft rounds, one wins and the other gets another_round_open (not a thrown error)', async () => {
+      const first = await createWithOnePublishedProblem()
+      const second = await createWithOnePublishedProblem()
+
+      const results = await Promise.all([openRound(db, first.id), openRound(db, second.id)])
+
+      const opened = results.filter((r) => r.ok)
+      const rejected = results.filter((r) => !r.ok)
+      expect(opened).toHaveLength(1)
+      expect(rejected).toEqual([{ ok: false, error: 'another_round_open' }])
+    })
   })
 
   describe('extendRound', () => {

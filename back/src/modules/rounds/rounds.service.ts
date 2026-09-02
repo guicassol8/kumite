@@ -243,3 +243,27 @@ export async function extendRound(db: Db, id: string, minutes: number): Promise<
   if (!detail) throw new Error('expected round to still exist right after extend')
   return { ok: true, round: detail }
 }
+
+export type CloseRoundResult =
+  | { ok: true; round: RoundDetail }
+  | { ok: false; error: 'not_found' }
+  | { ok: false; error: 'round_not_open' }
+
+export async function closeRound(db: Db, id: string): Promise<CloseRoundResult> {
+  await reapExpiredRound(db)
+
+  const [existing] = await db.select().from(roundsTable).where(eq(roundsTable.id, id))
+  if (!existing) return { ok: false, error: 'not_found' }
+  if (existing.status !== 'open') return { ok: false, error: 'round_not_open' }
+
+  // closesAt is left untouched: the originally-promised deadline stays as
+  // history, distinct from closedAt (the moment it actually ended early).
+  await db
+    .update(roundsTable)
+    .set({ status: 'closed', closedAt: new Date(), updatedAt: new Date() })
+    .where(eq(roundsTable.id, id))
+
+  const detail = await getRound(db, id)
+  if (!detail) throw new Error('expected round to still exist right after close')
+  return { ok: true, round: detail }
+}

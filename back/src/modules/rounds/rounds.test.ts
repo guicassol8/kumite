@@ -12,6 +12,7 @@ import {
   usersTable,
 } from '../../db/schema'
 import {
+  closeRound,
   createRound,
   extendRound,
   getRound,
@@ -475,6 +476,67 @@ describe('rounds.service', () => {
       expect(result.ok).toBe(true)
       if (!result.ok) return
       expect(result.round.closesAt?.getTime()).toBe(originalClosesAt + 15 * 60_000)
+    })
+  })
+
+  describe('closeRound', () => {
+    const createOpenRound = async () => {
+      const [problem] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published' })
+        .returning()
+      if (!problem) throw new Error('expected fixture')
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      return opened.round
+    }
+
+    it('returns not_found for an unknown id', async () => {
+      const result = await closeRound(db, '00000000-0000-0000-0000-000000000000')
+      expect(result).toEqual({ ok: false, error: 'not_found' })
+    })
+
+    it('rejects with round_not_open for a draft round', async () => {
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+
+      const result = await closeRound(db, created.round.id)
+
+      expect(result).toEqual({ ok: false, error: 'round_not_open' })
+    })
+
+    it('closes an open round immediately, leaving closesAt untouched', async () => {
+      const round = await createOpenRound()
+      const originalClosesAt = round.closesAt?.getTime() ?? 0
+      const before = Date.now()
+
+      const result = await closeRound(db, round.id)
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.round.status).toBe('closed')
+      expect(result.round.closedAt?.getTime()).toBeGreaterThanOrEqual(before)
+      expect(result.round.closesAt?.getTime()).toBe(originalClosesAt)
+    })
+
+    it('rejects with round_not_open on an already-closed round', async () => {
+      const round = await createOpenRound()
+      const first = await closeRound(db, round.id)
+      expect(first.ok).toBe(true)
+
+      const result = await closeRound(db, round.id)
+
+      expect(result).toEqual({ ok: false, error: 'round_not_open' })
     })
   })
 })

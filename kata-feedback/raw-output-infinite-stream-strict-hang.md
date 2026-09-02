@@ -91,3 +91,17 @@ plan's decision carried through unchanged.
   `outputValidation` override — it would let a route declare `raw()` for
   documentation/typing purposes while opting only its own body-check into
   `log`/`off`, without touching the app-wide default.
+
+## Confirmed independently during review (PR #101)
+
+Reviewing this PR from a fresh worktree reproduced the finding exactly:
+`pnpm verify` (`kata verify --strict-coverage`) passed clean against the
+undeclared-`200` route (43 files checked, no problems found), and a manual
+`curl -N` against `GET /sse` with a valid token streamed `state.sync`
+immediately followed by ~1/s heartbeats with no hang anywhere in the
+gate ladder (typecheck → verify → `pnpm -r test`, 249/227/40 passed →
+`hurl`, 9/9 files green). `sse.hurl` itself, as documented, only exercises
+the 401 guard — the 200/streaming path has no hurl coverage, which checks
+out against the "hurl can't complete a request against a body that never
+ends" reasoning in this same file. No new gap found; this is a second data
+point that the workaround is safe and the framework gap is real.

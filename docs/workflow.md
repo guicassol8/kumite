@@ -63,10 +63,11 @@ of their own.
 An issue is **READY** when: open · not `epic` · not `blocked` · every "Blocked
 by" reference is closed · not already linked to an open PR.
 
-Pick = READY ∩ highest priority, tie-broken by **isolation**: prefer the issue
-whose scope (stack, modules, screens) overlaps least with other open issues and
-in-progress work. Among equally isolated issues, prefer the one that unblocks
-the most others.
+Pick = READY ∩ highest priority, tie-broken by **unblocking value**: prefer
+the issue that more open issues list under "Blocked by" — it clears the most
+follow-on work. Among issues that unblock the same number of others, tie-break
+by **isolation**: prefer the one whose scope (stack, modules, screens)
+overlaps least with other open issues and in-progress work.
 
 ## Worktrees — one per task, always
 

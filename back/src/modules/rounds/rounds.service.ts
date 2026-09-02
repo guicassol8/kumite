@@ -1,9 +1,9 @@
-import { and, eq, lte } from 'drizzle-orm'
+import { and, eq, inArray, lte } from 'drizzle-orm'
 
 import type { Db } from '../../db/client'
-import { roundProblemsTable, roundsTable } from '../../db/schema'
+import { problemsTable, roundProblemsTable, roundsTable } from '../../db/schema'
 
-import type { RoundDetail, RoundSummary } from './rounds.schema'
+import type { CreateRoundBody, RoundDetail, RoundSummary } from './rounds.schema'
 
 type RoundRow = typeof roundsTable.$inferSelect
 type RoundProblemRow = typeof roundProblemsTable.$inferSelect
@@ -86,4 +86,50 @@ export async function listRounds(db: Db): Promise<RoundSummary[]> {
 export async function findOpenRound(db: Db): Promise<RoundRow | null> {
   const [round] = await db.select().from(roundsTable).where(eq(roundsTable.status, 'open'))
   return round ?? null
+}
+
+// A missing id and a not-published one are reported identically: a draft
+// problem never announces itself to the round-building flow (same rule as
+// the participant read in problems.service.ts).
+async function hasOnlyPublishedProblems(db: Db, problemIds: string[]): Promise<boolean> {
+  if (problemIds.length === 0) return true
+  const rows = await db
+    .select({ id: problemsTable.id })
+    .from(problemsTable)
+    .where(and(inArray(problemsTable.id, problemIds), eq(problemsTable.status, 'published')))
+  return rows.length === problemIds.length
+}
+
+export type CreateRoundResult =
+  | { ok: true; round: RoundDetail }
+  | { ok: false; error: 'invalid_problem_ids' }
+
+export async function createRound(db: Db, input: CreateRoundBody): Promise<CreateRoundResult> {
+  if (!(await hasOnlyPublishedProblems(db, input.problemIds))) {
+    return { ok: false, error: 'invalid_problem_ids' }
+  }
+
+  const created = await db.transaction(async (tx) => {
+    const [round] = await tx
+      .insert(roundsTable)
+      .values({ name: input.name, durationMinutes: input.durationMinutes })
+      .returning()
+    if (!round) throw new Error('expected round to be inserted')
+
+    if (input.problemIds.length > 0) {
+      await tx.insert(roundProblemsTable).values(
+        input.problemIds.map((problemId, position) => ({
+          roundId: round.id,
+          problemId,
+          position,
+        })),
+      )
+    }
+
+    return round
+  })
+
+  const detail = await getRound(db, created.id)
+  if (!detail) throw new Error('expected round to still exist right after create')
+  return { ok: true, round: detail }
 }

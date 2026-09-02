@@ -11,7 +11,7 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
-import { getRound, listRounds } from './rounds.service'
+import { createRound, getRound, listRounds } from './rounds.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #35 migrations must already be applied.
@@ -191,5 +191,67 @@ describe('rounds.service', () => {
       { problemId: problemB.id, position: 1 },
     ])
     expect(summaries.find((r) => r.id === round.id)?.problemCount).toBe(2)
+  })
+
+  describe('createRound', () => {
+    it('creates a draft round with problems positioned by input order', async () => {
+      const [problemA] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published' })
+        .returning()
+      const [problemB] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'medium', status: 'published' })
+        .returning()
+      if (!problemA || !problemB) throw new Error('expected fixtures')
+
+      const result = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problemB.id, problemA.id],
+      })
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.round.status).toBe('draft')
+      expect(result.round.problems).toEqual([
+        { problemId: problemB.id, position: 0 },
+        { problemId: problemA.id, position: 1 },
+      ])
+    })
+
+    it('rejects with invalid_problem_ids and inserts nothing when an id is missing', async () => {
+      const [problemA] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published' })
+        .returning()
+      if (!problemA) throw new Error('expected fixture')
+
+      const result = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problemA.id, '00000000-0000-0000-0000-000000000000'],
+      })
+
+      expect(result).toEqual({ ok: false, error: 'invalid_problem_ids' })
+      expect(await listRounds(db)).toEqual([])
+    })
+
+    it('rejects with invalid_problem_ids and inserts nothing when an id is not published', async () => {
+      const [draftProblem] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'draft' })
+        .returning()
+      if (!draftProblem) throw new Error('expected fixture')
+
+      const result = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [draftProblem.id],
+      })
+
+      expect(result).toEqual({ ok: false, error: 'invalid_problem_ids' })
+      expect(await listRounds(db)).toEqual([])
+    })
   })
 })

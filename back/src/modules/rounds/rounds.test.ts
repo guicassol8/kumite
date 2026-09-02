@@ -11,7 +11,14 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
-import { createRound, getRound, listRounds, openRound, updateRound } from './rounds.service'
+import {
+  createRound,
+  extendRound,
+  getRound,
+  listRounds,
+  openRound,
+  updateRound,
+} from './rounds.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #35 migrations must already be applied.
@@ -411,6 +418,63 @@ describe('rounds.service', () => {
       const closesAt = result.round.closesAt?.getTime() ?? 0
       expect(openedAt).toBeGreaterThanOrEqual(before)
       expect(closesAt - openedAt).toBe(30 * 60_000)
+    })
+  })
+
+  describe('extendRound', () => {
+    const createOpenRound = async () => {
+      const [problem] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published' })
+        .returning()
+      if (!problem) throw new Error('expected fixture')
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      return opened.round
+    }
+
+    it('returns not_found for an unknown id', async () => {
+      const result = await extendRound(db, '00000000-0000-0000-0000-000000000000', 10)
+      expect(result).toEqual({ ok: false, error: 'not_found' })
+    })
+
+    it('rejects with round_not_open for a draft round', async () => {
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+
+      const result = await extendRound(db, created.round.id, 10)
+
+      expect(result).toEqual({ ok: false, error: 'round_not_open' })
+    })
+
+    it('rejects with round_not_open for a closed round', async () => {
+      const round = await createOpenRound()
+      await db.update(roundsTable).set({ status: 'closed' }).where(eq(roundsTable.id, round.id))
+
+      const result = await extendRound(db, round.id, 10)
+
+      expect(result).toEqual({ ok: false, error: 'round_not_open' })
+    })
+
+    it('adds the given minutes to closesAt on an open round', async () => {
+      const round = await createOpenRound()
+      const originalClosesAt = round.closesAt?.getTime() ?? 0
+
+      const result = await extendRound(db, round.id, 15)
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.round.closesAt?.getTime()).toBe(originalClosesAt + 15 * 60_000)
     })
   })
 })

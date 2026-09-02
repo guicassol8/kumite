@@ -18,6 +18,7 @@ import {
   getRound,
   listRounds,
   openRound,
+  reapExpiredRound,
   updateRound,
 } from './rounds.service'
 
@@ -170,6 +171,35 @@ describe('rounds.service', () => {
 
   it('returns null from getRound for an unknown id', async () => {
     expect(await getRound(db, '00000000-0000-0000-0000-000000000000')).toBeNull()
+  })
+
+  describe('reapExpiredRound', () => {
+    it('returns the closed round on the first call, and nothing on an immediate second call', async () => {
+      const closesAt = new Date(Date.now() - 60_000)
+      const [round] = await db
+        .insert(roundsTable)
+        .values({
+          name: 'Round 1',
+          durationMinutes: 30,
+          status: 'open',
+          openedAt: new Date(Date.now() - 120_000),
+          closesAt,
+        })
+        .returning()
+      if (!round) throw new Error('expected fixture')
+
+      const first = await reapExpiredRound(db)
+      const second = await reapExpiredRound(db)
+
+      expect(first).toEqual([{ id: round.id, closesAt }])
+      expect(second).toEqual([])
+      const detail = await getRound(db, round.id)
+      expect(detail?.status).toBe('closed')
+    })
+
+    it('returns nothing when there is no expired open round', async () => {
+      expect(await reapExpiredRound(db)).toEqual([])
+    })
   })
 
   it('getRound includes associated problems ordered by position, with problemCount on the summary', async () => {

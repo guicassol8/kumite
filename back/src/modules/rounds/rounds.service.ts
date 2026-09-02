@@ -9,15 +9,20 @@ import type { CreateRoundBody, RoundDetail, RoundSummary, UpdateRoundBody } from
 type RoundRow = typeof roundsTable.$inferSelect
 type RoundProblemRow = typeof roundProblemsTable.$inferSelect
 
+export type ReapedRound = { id: string; closesAt: Date | null }
+
 // Lazy expiry: a round past its own closesAt is closed here, on the read
 // path, so nothing depends on a scheduler ever running. closedAt is set to
 // the round's own closesAt (deterministic "closed exactly on schedule"), not
-// to whenever this happened to run.
-export async function reapExpiredRound(db: Db): Promise<void> {
-  await db
+// to whenever this happened to run. Returns the round(s) this call actually
+// closed (empty when nothing was expired) so callers — the SSE tick — know
+// what to announce without a second query.
+export async function reapExpiredRound(db: Db): Promise<ReapedRound[]> {
+  return db
     .update(roundsTable)
     .set({ status: 'closed', closedAt: roundsTable.closesAt, updatedAt: new Date() })
     .where(and(eq(roundsTable.status, 'open'), lte(roundsTable.closesAt, new Date())))
+    .returning({ id: roundsTable.id, closesAt: roundsTable.closesAt })
 }
 
 function toDetail(round: RoundRow, problems: RoundProblemRow[]): RoundDetail {

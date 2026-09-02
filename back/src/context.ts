@@ -1,6 +1,7 @@
 import { defineContext, scoped, singleton } from '@katajs-framework/core'
 
 import { createDb } from './db/client'
+import { createSseBus } from './modules/sse/sse.service'
 import type { PublicUser } from './modules/users/users.schema'
 
 // The typed dependency-injection surface for this app (ADR-0004). Register
@@ -9,6 +10,7 @@ import type { PublicUser } from './modules/users/users.schema'
 export const k = defineContext({
   db: singleton(createDb()),
   currentUser: scoped<PublicUser>(),
+  sseBus: singleton(createSseBus()),
 })
 
 // Re-export the bound factory so every module inherits this app's exact types:

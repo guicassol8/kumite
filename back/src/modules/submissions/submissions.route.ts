@@ -31,6 +31,9 @@ export const createSubmissionRoute = defineRoute({
     const db = c.get('db')
     const userId = c.get('currentUser').id
     const teamId = await findTeamIdForUser(db, userId)
+    if (teamId === null) {
+      return c.error('not_in_team', 'Join a team before submitting', { status: 404 })
+    }
 
     const outcome = await submitSolution(db, { userId, teamId }, c.input.body)
     if (outcome.ok) return c.json(outcome.result, 201)

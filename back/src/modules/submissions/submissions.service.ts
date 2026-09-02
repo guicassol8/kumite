@@ -163,8 +163,8 @@ export function toResponseCases(
 
 // --- The submission pipeline (#21) ---
 
-/** Who is submitting: the user always, the team whenever they have one. */
-export type SubmitIdentity = { userId: string; teamId: string | null }
+/** Who is submitting: an authenticated user with a team, both mandatory. */
+export type SubmitIdentity = { userId: string; teamId: string }
 
 export type SubmitOutcome =
   | { ok: true; result: SubmissionResult }
@@ -187,19 +187,14 @@ export async function findTeamIdForUser(db: Db, userId: string): Promise<string 
   return membership?.teamId ?? null
 }
 
-// Attempts belong to the team when there is one — the same grouping the
-// leaderboard and getBestSubmission use.
+// Attempts belong to the team — the same grouping the leaderboard and
+// getBestSubmission use.
 async function countAttempts(db: Db, identity: SubmitIdentity, problemId: string): Promise<number> {
   const [row] = await db
     .select({ attempts: sql<number>`count(*)`.mapWith(Number) })
     .from(submissionsTable)
     .where(
-      and(
-        eq(submissionsTable.problemId, problemId),
-        identity.teamId === null
-          ? eq(submissionsTable.userId, identity.userId)
-          : eq(submissionsTable.teamId, identity.teamId),
-      ),
+      and(eq(submissionsTable.problemId, problemId), eq(submissionsTable.teamId, identity.teamId)),
     )
 
   return row?.attempts ?? 0
@@ -219,8 +214,7 @@ export async function submitSolution(
   identity: SubmitIdentity,
   body: SubmitSolutionBody,
 ): Promise<SubmitOutcome> {
-  const identityKey =
-    identity.teamId === null ? `user:${identity.userId}` : `team:${identity.teamId}`
+  const identityKey = `team:${identity.teamId}`
   const denial = acquireSubmissionSlot(identityKey)
   if (denial) return { ok: false, error: 'throttled', ...denial }
 
@@ -274,14 +268,12 @@ export async function submitSolution(
         .returning()
       if (!row) throw new Error('expected the submission insert to return a row')
 
-      if (identity.teamId !== null) {
-        // Conditional in SQL, so the "first" stamp can never be overwritten by
-        // a later attempt racing the read.
-        await tx
-          .update(teamsTable)
-          .set({ firstSubmittedAt: sql`now()` })
-          .where(and(eq(teamsTable.id, identity.teamId), isNull(teamsTable.firstSubmittedAt)))
-      }
+      // Conditional in SQL, so the "first" stamp can never be overwritten by a
+      // later attempt racing the read.
+      await tx
+        .update(teamsTable)
+        .set({ firstSubmittedAt: sql`now()` })
+        .where(and(eq(teamsTable.id, identity.teamId), isNull(teamsTable.firstSubmittedAt)))
 
       return row
     })

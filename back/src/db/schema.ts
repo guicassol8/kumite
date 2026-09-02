@@ -171,11 +171,15 @@ export const submissionsTable = pgTable(
       // restrict: a problem with submission history can't be deleted — the
       // scores would lose their meaning (same rule as round_problems).
       .references(() => problemsTable.id, { onDelete: 'restrict' }),
-    // Both nullable while auth/times aren't wired in (#21 owns what's valid
-    // once they are). userId is an audit field ("who on the team submitted");
-    // teamId is the identity that scoring and the leaderboard group by.
-    userId: uuid('user_id').references(() => usersTable.id, { onDelete: 'set null' }),
-    teamId: uuid('team_id').references(() => teamsTable.id, { onDelete: 'set null' }),
+    // userId is an audit field ("who on the team submitted"); teamId is the
+    // identity that scoring and the leaderboard group by. Both mandatory:
+    // every submission belongs to an authenticated participant with a team.
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => usersTable.id, { onDelete: 'restrict' }),
+    teamId: uuid('team_id')
+      .notNull()
+      .references(() => teamsTable.id, { onDelete: 'restrict' }),
     workspace: jsonb('workspace').notNull().$type<JsonValue>(),
     generatedCode: text('generated_code').notNull(),
     caseResults: jsonb('case_results').notNull().default([]).$type<SubmissionCaseResult[]>(),
@@ -185,15 +189,19 @@ export const submissionsTable = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    // Partial (teamId is not null): guards the attempt-numbering race #21's
-    // insert would otherwise have to own alone. Teamless submissions from the
-    // pre-auth phase are not constrained.
-    uniqueIndex('submissions_team_problem_attempt_idx')
-      .on(table.teamId, table.problemId, table.attemptNumber)
-      .where(sql`${table.teamId} is not null`),
+    // Guards the attempt-numbering race #21's insert would otherwise have to
+    // own alone.
+    uniqueIndex('submissions_team_problem_attempt_idx').on(
+      table.teamId,
+      table.problemId,
+      table.attemptNumber,
+    ),
     // Serves getBestSubmission: highest score first, earliest wins a tie.
-    index('submissions_team_problem_score_idx')
-      .on(table.teamId, table.problemId, desc(table.score), asc(table.createdAt))
-      .where(sql`${table.teamId} is not null`),
+    index('submissions_team_problem_score_idx').on(
+      table.teamId,
+      table.problemId,
+      desc(table.score),
+      asc(table.createdAt),
+    ),
   ],
 )

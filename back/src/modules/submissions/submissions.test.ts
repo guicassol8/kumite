@@ -73,11 +73,14 @@ async function insertUser(email = 'participante@edu.pucrs.br') {
 describe('submissions table', () => {
   it('records the problem, workspace, per-case results, score and timestamp', async () => {
     const problem = await insertProblem()
+    const { user, team } = await insertTeamMember()
 
     const [submission] = await db
       .insert(submissionsTable)
       .values({
         problemId: problem.id,
+        userId: user.id,
+        teamId: team.id,
         workspace: { blocks: { languageVersion: 0, blocks: [] } },
         generatedCode: 'return 42',
         caseResults: [
@@ -93,6 +96,8 @@ describe('submissions table', () => {
 
     expect(submission).toMatchObject({
       problemId: problem.id,
+      userId: user.id,
+      teamId: team.id,
       workspace: { blocks: { languageVersion: 0, blocks: [] } },
       generatedCode: 'return 42',
       caseResults: [
@@ -107,29 +112,12 @@ describe('submissions table', () => {
     expect(submission?.createdAt).toBeInstanceOf(Date)
   })
 
-  it('accepts a submission with no user and no team (pre-auth phase)', async () => {
-    const problem = await insertProblem()
-
-    const [submission] = await db
-      .insert(submissionsTable)
-      .values({
-        problemId: problem.id,
-        workspace: {},
-        generatedCode: '',
-        caseResults: [],
-        score: 0,
-        attemptNumber: 1,
-      })
-      .returning()
-
-    expect(submission).toMatchObject({ userId: null, teamId: null })
-  })
-
   it('rejects a second submission reusing the same team, problem and attempt number', async () => {
     const problem = await insertProblem()
-    const team = await insertTeam()
+    const { user, team } = await insertTeamMember()
     await db.insert(submissionsTable).values({
       problemId: problem.id,
+      userId: user.id,
       teamId: team.id,
       workspace: {},
       generatedCode: '',
@@ -141,6 +129,7 @@ describe('submissions table', () => {
     await expect(
       db.insert(submissionsTable).values({
         problemId: problem.id,
+        userId: user.id,
         teamId: team.id,
         workspace: {},
         generatedCode: '',
@@ -151,33 +140,13 @@ describe('submissions table', () => {
     ).rejects.toThrow()
   })
 
-  it('allows two teamless submissions sharing the same problem and attempt number', async () => {
-    const problem = await insertProblem()
-    await db.insert(submissionsTable).values({
-      problemId: problem.id,
-      workspace: {},
-      generatedCode: '',
-      caseResults: [],
-      score: 0,
-      attemptNumber: 1,
-    })
-
-    await expect(
-      db.insert(submissionsTable).values({
-        problemId: problem.id,
-        workspace: {},
-        generatedCode: '',
-        caseResults: [],
-        score: 10,
-        attemptNumber: 1,
-      }),
-    ).resolves.not.toThrow()
-  })
-
   it('rejects deleting a problem that already has submissions', async () => {
     const problem = await insertProblem()
+    const { user, team } = await insertTeamMember()
     await db.insert(submissionsTable).values({
       problemId: problem.id,
+      userId: user.id,
+      teamId: team.id,
       workspace: {},
       generatedCode: '',
       caseResults: [],
@@ -188,56 +157,38 @@ describe('submissions table', () => {
     await expect(db.delete(problemsTable).where(eq(problemsTable.id, problem.id))).rejects.toThrow()
   })
 
-  it('keeps the submission when its team is deleted, clearing the team', async () => {
+  it('rejects deleting a team that already has submissions', async () => {
     const problem = await insertProblem()
-    const team = await insertTeam()
-    const [submission] = await db
-      .insert(submissionsTable)
-      .values({
-        problemId: problem.id,
-        teamId: team.id,
-        workspace: {},
-        generatedCode: '',
-        caseResults: [],
-        score: 30,
-        attemptNumber: 1,
-      })
-      .returning()
-    if (!submission) throw new Error('expected a submission fixture')
+    const { user, team } = await insertTeamMember()
+    await db.insert(submissionsTable).values({
+      problemId: problem.id,
+      userId: user.id,
+      teamId: team.id,
+      workspace: {},
+      generatedCode: '',
+      caseResults: [],
+      score: 30,
+      attemptNumber: 1,
+    })
 
-    await db.delete(teamsTable).where(eq(teamsTable.id, team.id))
-
-    const [kept] = await db
-      .select()
-      .from(submissionsTable)
-      .where(eq(submissionsTable.id, submission.id))
-    expect(kept).toMatchObject({ teamId: null, score: 30 })
+    await expect(db.delete(teamsTable).where(eq(teamsTable.id, team.id))).rejects.toThrow()
   })
 
-  it('keeps the submission when its user is deleted, clearing the user', async () => {
+  it('rejects deleting a user that already has submissions', async () => {
     const problem = await insertProblem()
-    const user = await insertUser()
-    const [submission] = await db
-      .insert(submissionsTable)
-      .values({
-        problemId: problem.id,
-        userId: user.id,
-        workspace: {},
-        generatedCode: '',
-        caseResults: [],
-        score: 30,
-        attemptNumber: 1,
-      })
-      .returning()
-    if (!submission) throw new Error('expected a submission fixture')
+    const { user, team } = await insertTeamMember()
+    await db.insert(submissionsTable).values({
+      problemId: problem.id,
+      userId: user.id,
+      teamId: team.id,
+      workspace: {},
+      generatedCode: '',
+      caseResults: [],
+      score: 30,
+      attemptNumber: 1,
+    })
 
-    await db.delete(usersTable).where(eq(usersTable.id, user.id))
-
-    const [kept] = await db
-      .select()
-      .from(submissionsTable)
-      .where(eq(submissionsTable.id, submission.id))
-    expect(kept).toMatchObject({ userId: null, score: 30 })
+    await expect(db.delete(usersTable).where(eq(usersTable.id, user.id))).rejects.toThrow()
   })
 })
 
@@ -251,11 +202,12 @@ describe('getBestSubmission', () => {
 
   it('returns the highest score, when it was reached and the attempt count', async () => {
     const problem = await insertProblem()
-    const team = await insertTeam()
+    const { user, team } = await insertTeamMember()
     const best = new Date('2026-08-31T12:00:00.000Z')
     await db.insert(submissionsTable).values([
       {
         problemId: problem.id,
+        userId: user.id,
         teamId: team.id,
         workspace: {},
         generatedCode: '',
@@ -266,6 +218,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: problem.id,
+        userId: user.id,
         teamId: team.id,
         workspace: {},
         generatedCode: '',
@@ -276,6 +229,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: problem.id,
+        userId: user.id,
         teamId: team.id,
         workspace: {},
         generatedCode: '',
@@ -295,11 +249,12 @@ describe('getBestSubmission', () => {
 
   it('returns the earliest timestamp when the best score is tied', async () => {
     const problem = await insertProblem()
-    const team = await insertTeam()
+    const { user, team } = await insertTeamMember()
     const earliest = new Date('2026-08-31T11:00:00.000Z')
     await db.insert(submissionsTable).values([
       {
         problemId: problem.id,
+        userId: user.id,
         teamId: team.id,
         workspace: {},
         generatedCode: '',
@@ -310,6 +265,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: problem.id,
+        userId: user.id,
         teamId: team.id,
         workspace: {},
         generatedCode: '',
@@ -330,12 +286,16 @@ describe('getBestSubmission', () => {
   it('ignores submissions from other teams and other problems', async () => {
     const problem = await insertProblem()
     const otherProblem = await insertProblem()
-    const team = await insertTeam('Time A')
-    const otherTeam = await insertTeam('Time B')
+    const { user, team } = await insertTeamMember('Time A', 'time-a@edu.pucrs.br')
+    const { user: otherUser, team: otherTeam } = await insertTeamMember(
+      'Time B',
+      'time-b@edu.pucrs.br',
+    )
     const own = new Date('2026-08-31T11:00:00.000Z')
     await db.insert(submissionsTable).values([
       {
         problemId: problem.id,
+        userId: user.id,
         teamId: team.id,
         workspace: {},
         generatedCode: '',
@@ -346,6 +306,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: problem.id,
+        userId: otherUser.id,
         teamId: otherTeam.id,
         workspace: {},
         generatedCode: '',
@@ -355,6 +316,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: otherProblem.id,
+        userId: user.id,
         teamId: team.id,
         workspace: {},
         generatedCode: '',
@@ -716,28 +678,6 @@ describe('submitSolution', () => {
       await submitSolution(db, identity, body)
       const [afterSecond] = await db.select().from(teamsTable).where(eq(teamsTable.id, team.id))
       expect(afterSecond?.firstSubmittedAt).toEqual(afterFirst?.firstSubmittedAt)
-    },
-    JUDGED_TEST_TIMEOUT_MS,
-  )
-
-  it(
-    'accepts a participant with no team, recording a teamless submission',
-    async () => {
-      const problem = await insertPublishedProblem(solvableCases)
-      const user = await insertUser('sem-time@edu.pucrs.br')
-
-      const result = expectSubmitted(
-        await submitSolution(
-          db,
-          { userId: user.id, teamId: null },
-          { problemId: problem.id, workspace: solutionWorkspace },
-        ),
-      )
-
-      expect(result.attemptNumber).toBe(1)
-      const [row] = await db.select().from(submissionsTable)
-      expect(row).toMatchObject({ userId: user.id, teamId: null })
-      expect(await db.select().from(teamsTable)).toEqual([])
     },
     JUDGED_TEST_TIMEOUT_MS,
   )

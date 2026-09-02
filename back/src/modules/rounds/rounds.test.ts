@@ -11,7 +11,7 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
-import { createRound, getRound, listRounds } from './rounds.service'
+import { createRound, getRound, listRounds, updateRound } from './rounds.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #35 migrations must already be applied.
@@ -252,6 +252,95 @@ describe('rounds.service', () => {
 
       expect(result).toEqual({ ok: false, error: 'invalid_problem_ids' })
       expect(await listRounds(db)).toEqual([])
+    })
+  })
+
+  describe('updateRound', () => {
+    it('returns not_found for an unknown id', async () => {
+      const result = await updateRound(db, '00000000-0000-0000-0000-000000000000', { name: 'X' })
+      expect(result).toEqual({ ok: false, error: 'not_found' })
+    })
+
+    it('rejects with round_not_draft when the round is not a draft', async () => {
+      const [round] = await db
+        .insert(roundsTable)
+        .values({
+          name: 'Round 1',
+          durationMinutes: 30,
+          status: 'open',
+          closesAt: new Date(Date.now() + 60_000),
+        })
+        .returning()
+      if (!round) throw new Error('expected fixture')
+
+      const result = await updateRound(db, round.id, { name: 'New name' })
+
+      expect(result).toEqual({ ok: false, error: 'round_not_draft' })
+    })
+
+    it('patches name and durationMinutes on a draft round', async () => {
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+
+      const result = await updateRound(db, created.round.id, {
+        name: 'Round 1 (renamed)',
+        durationMinutes: 45,
+      })
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.round.name).toBe('Round 1 (renamed)')
+      expect(result.round.durationMinutes).toBe(45)
+    })
+
+    it('replaces the problem list wholesale when problemIds is provided', async () => {
+      const [problemA] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published' })
+        .returning()
+      const [problemB] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'medium', status: 'published' })
+        .returning()
+      if (!problemA || !problemB) throw new Error('expected fixtures')
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problemA.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+
+      const result = await updateRound(db, created.round.id, { problemIds: [problemB.id] })
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.round.problems).toEqual([{ problemId: problemB.id, position: 0 }])
+    })
+
+    it('rejects with invalid_problem_ids and leaves the existing list untouched', async () => {
+      const [problemA] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published' })
+        .returning()
+      if (!problemA) throw new Error('expected fixture')
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problemA.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+
+      const result = await updateRound(db, created.round.id, {
+        problemIds: ['00000000-0000-0000-0000-000000000000'],
+      })
+
+      expect(result).toEqual({ ok: false, error: 'invalid_problem_ids' })
+      const detail = await getRound(db, created.round.id)
+      expect(detail?.problems).toEqual([{ problemId: problemA.id, position: 0 }])
     })
   })
 })

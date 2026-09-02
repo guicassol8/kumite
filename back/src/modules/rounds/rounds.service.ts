@@ -3,7 +3,7 @@ import { and, eq, inArray, lte } from 'drizzle-orm'
 import type { Db } from '../../db/client'
 import { problemsTable, roundProblemsTable, roundsTable } from '../../db/schema'
 
-import type { CreateRoundBody, RoundDetail, RoundSummary } from './rounds.schema'
+import type { CreateRoundBody, RoundDetail, RoundSummary, UpdateRoundBody } from './rounds.schema'
 
 type RoundRow = typeof roundsTable.$inferSelect
 type RoundProblemRow = typeof roundProblemsTable.$inferSelect
@@ -131,5 +131,56 @@ export async function createRound(db: Db, input: CreateRoundBody): Promise<Creat
 
   const detail = await getRound(db, created.id)
   if (!detail) throw new Error('expected round to still exist right after create')
+  return { ok: true, round: detail }
+}
+
+export type UpdateRoundResult =
+  | { ok: true; round: RoundDetail }
+  | { ok: false; error: 'not_found' }
+  | { ok: false; error: 'round_not_draft' }
+  | { ok: false; error: 'invalid_problem_ids' }
+
+export async function updateRound(
+  db: Db,
+  id: string,
+  input: UpdateRoundBody,
+): Promise<UpdateRoundResult> {
+  await reapExpiredRound(db)
+
+  const [existing] = await db.select().from(roundsTable).where(eq(roundsTable.id, id))
+  if (!existing) return { ok: false, error: 'not_found' }
+  if (existing.status !== 'draft') return { ok: false, error: 'round_not_draft' }
+
+  if (input.problemIds !== undefined && !(await hasOnlyPublishedProblems(db, input.problemIds))) {
+    return { ok: false, error: 'invalid_problem_ids' }
+  }
+
+  await db.transaction(async (tx) => {
+    const patch: Partial<typeof roundsTable.$inferInsert> = {}
+    if (input.name !== undefined) patch.name = input.name
+    if (input.durationMinutes !== undefined) patch.durationMinutes = input.durationMinutes
+    if (Object.keys(patch).length > 0) {
+      await tx
+        .update(roundsTable)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(eq(roundsTable.id, id))
+    }
+
+    if (input.problemIds !== undefined) {
+      await tx.delete(roundProblemsTable).where(eq(roundProblemsTable.roundId, id))
+      if (input.problemIds.length > 0) {
+        await tx.insert(roundProblemsTable).values(
+          input.problemIds.map((problemId, position) => ({
+            roundId: id,
+            problemId,
+            position,
+          })),
+        )
+      }
+    }
+  })
+
+  const detail = await getRound(db, id)
+  if (!detail) throw new Error('expected round to still exist right after update')
   return { ok: true, round: detail }
 }

@@ -1,6 +1,10 @@
+import { signJwt } from '@katajs-framework/core/jwt'
 import { eq, sql } from 'drizzle-orm'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { app } from '../../app'
+import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
+import { k } from '../../context'
 import { createDb } from '../../db/client'
 import {
   problemsTable,
@@ -580,5 +584,116 @@ describe('rounds.service', () => {
 
       expect(result).toEqual({ ok: false, error: 'round_not_open' })
     })
+  })
+})
+
+describe('rounds.route — publishes to the sse bus on lifecycle transitions (#38)', () => {
+  async function tokenForOrganizer() {
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email: `organizer-${crypto.randomUUID()}@example.com`,
+        passwordHash: 'hash',
+        role: 'organizer',
+        university: 'pucrs',
+      })
+      .returning()
+    if (!user) throw new Error('expected fixture')
+    return signJwt(
+      { role: user.role, university: user.university },
+      { secret: JWT_SECRET, subject: user.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+    )
+  }
+
+  async function createDraftRoundWithProblem() {
+    const [problem] = await db
+      .insert(problemsTable)
+      .values({ difficulty: 'easy', status: 'published' })
+      .returning()
+    if (!problem) throw new Error('expected fixture')
+    const created = await createRound(db, {
+      name: 'Round 1',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!created.ok) throw new Error('expected create to succeed')
+    return created.round
+  }
+
+  it('publishes round.opened synchronously when open succeeds', async () => {
+    const token = await tokenForOrganizer()
+    const round = await createDraftRoundWithProblem()
+    const fn = vi.fn()
+    const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+    const res = await app.request(`/organizer/rounds/${round.id}/open`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(200)
+    expect(fn).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'round.opened', roundId: round.id }),
+    )
+    unsubscribe()
+  })
+
+  it('publishes round.extended synchronously when extend succeeds', async () => {
+    const token = await tokenForOrganizer()
+    const round = await createDraftRoundWithProblem()
+    const opened = await openRound(db, round.id)
+    if (!opened.ok) throw new Error('expected open to succeed')
+    const fn = vi.fn()
+    const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+    const res = await app.request(`/organizer/rounds/${round.id}/extend`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ minutes: 5 }),
+    })
+
+    expect(res.status).toBe(200)
+    expect(fn).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'round.extended', roundId: round.id }),
+    )
+    unsubscribe()
+  })
+
+  it('publishes round.closed synchronously when close succeeds', async () => {
+    const token = await tokenForOrganizer()
+    const round = await createDraftRoundWithProblem()
+    const opened = await openRound(db, round.id)
+    if (!opened.ok) throw new Error('expected open to succeed')
+    const fn = vi.fn()
+    const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+    const res = await app.request(`/organizer/rounds/${round.id}/close`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(200)
+    expect(fn).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'round.closed', roundId: round.id }),
+    )
+    unsubscribe()
+  })
+
+  it('does not publish when open fails (round not draft)', async () => {
+    const token = await tokenForOrganizer()
+    const round = await createDraftRoundWithProblem()
+    const opened = await openRound(db, round.id)
+    if (!opened.ok) throw new Error('expected open to succeed')
+    const fn = vi.fn()
+    const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+    const res = await app.request(`/organizer/rounds/${round.id}/open`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(409)
+    expect(fn).not.toHaveBeenCalled()
+    unsubscribe()
   })
 })

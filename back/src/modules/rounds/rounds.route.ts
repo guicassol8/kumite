@@ -2,6 +2,7 @@ import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
 import { requireOrganizer, requireUser } from '../../middlewares/auth'
+import { publishRoundClosed, publishRoundExtended, publishRoundOpened } from '../sse/sse.service'
 
 import {
   CreateRoundBodySchema,
@@ -104,7 +105,11 @@ export const openRoundRoute = defineRoute({
   },
   handler: async (c) => {
     const result = await openRound(c.get('db'), c.input.params.id)
-    if (result.ok) return c.json(result.round, 200)
+    if (result.ok) {
+      if (!result.round.closesAt) throw new Error('expected an opened round to have closesAt')
+      publishRoundOpened(c.get('sseBus'), { id: result.round.id, closesAt: result.round.closesAt })
+      return c.json(result.round, 200)
+    }
 
     switch (result.error) {
       case 'not_found':
@@ -127,7 +132,14 @@ export const extendRoundRoute = defineRoute({
   output: { 200: RoundDetailSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
   handler: async (c) => {
     const result = await extendRound(c.get('db'), c.input.params.id, c.input.body.minutes)
-    if (result.ok) return c.json(result.round, 200)
+    if (result.ok) {
+      if (!result.round.closesAt) throw new Error('expected an extended round to have closesAt')
+      publishRoundExtended(c.get('sseBus'), {
+        id: result.round.id,
+        closesAt: result.round.closesAt,
+      })
+      return c.json(result.round, 200)
+    }
 
     switch (result.error) {
       case 'not_found':
@@ -146,7 +158,10 @@ export const closeRoundRoute = defineRoute({
   output: { 200: RoundDetailSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
   handler: async (c) => {
     const result = await closeRound(c.get('db'), c.input.params.id)
-    if (result.ok) return c.json(result.round, 200)
+    if (result.ok) {
+      publishRoundClosed(c.get('sseBus'), { id: result.round.id })
+      return c.json(result.round, 200)
+    }
 
     switch (result.error) {
       case 'not_found':

@@ -27,6 +27,19 @@
       "none": "You are not on a team yet.",
       "memberCount": "{{members}} of {{max}} members",
       "cta": "View teams"
+    },
+    "round": {
+      "waiting": "Waiting for the next round.",
+      "timeRemaining": "Ends in {{time}}"
+    },
+    "closedRounds": {
+      "title": "Closed rounds",
+      "empty": "No closed rounds yet.",
+      "closedAt": "Closed at {{date}}"
+    },
+    "organizerShortcuts": {
+      "title": "Organizer area",
+      "problems": "Problems"
     }
   },
   "editor": {

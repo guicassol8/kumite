@@ -27,6 +27,19 @@
       "none": "Você ainda não está em um time.",
       "memberCount": "{{members}} de {{max}} integrantes",
       "cta": "Ver times"
+    },
+    "round": {
+      "waiting": "Aguardando a próxima rodada.",
+      "timeRemaining": "Termina em {{time}}"
+    },
+    "closedRounds": {
+      "title": "Rodadas encerradas",
+      "empty": "Nenhuma rodada encerrada ainda.",
+      "closedAt": "Encerrada em {{date}}"
+    },
+    "organizerShortcuts": {
+      "title": "Área do organizador",
+      "problems": "Problemas"
     }
   },
   "editor": {

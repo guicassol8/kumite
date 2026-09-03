@@ -20,6 +20,7 @@ import {
   createRound,
   extendRound,
   getRound,
+  listParticipantRounds,
   listRounds,
   openRound,
   reapExpiredRound,
@@ -525,6 +526,45 @@ describe('rounds.service', () => {
     })
   })
 
+  describe('listParticipantRounds', () => {
+    it('excludes draft rounds and sorts open-first, then closed newest-first', async () => {
+      await db.insert(roundsTable).values({ name: 'Draft', durationMinutes: 30 })
+      const [olderClosed] = await db
+        .insert(roundsTable)
+        .values({
+          name: 'Older closed',
+          durationMinutes: 30,
+          status: 'closed',
+          closedAt: new Date(Date.now() - 120_000),
+        })
+        .returning()
+      const [newerClosed] = await db
+        .insert(roundsTable)
+        .values({
+          name: 'Newer closed',
+          durationMinutes: 30,
+          status: 'closed',
+          closedAt: new Date(Date.now() - 60_000),
+        })
+        .returning()
+      const [open] = await db
+        .insert(roundsTable)
+        .values({
+          name: 'Open',
+          durationMinutes: 30,
+          status: 'open',
+          openedAt: new Date(),
+          closesAt: new Date(Date.now() + 60_000),
+        })
+        .returning()
+      if (!olderClosed || !newerClosed || !open) throw new Error('expected fixtures')
+
+      const result = await listParticipantRounds(db)
+
+      expect(result.map((r) => r.id)).toEqual([open.id, newerClosed.id, olderClosed.id])
+    })
+  })
+
   describe('closeRound', () => {
     const createOpenRound = async () => {
       const [problem] = await db
@@ -584,6 +624,48 @@ describe('rounds.service', () => {
 
       expect(result).toEqual({ ok: false, error: 'round_not_open' })
     })
+  })
+})
+
+describe('rounds.route — GET /rounds (participant, #40)', () => {
+  async function tokenForParticipant() {
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email: `participant-${crypto.randomUUID()}@example.com`,
+        passwordHash: 'hash',
+        role: 'participant',
+        university: 'pucrs',
+      })
+      .returning()
+    if (!user) throw new Error('expected fixture')
+    return signJwt(
+      { role: user.role, university: user.university },
+      { secret: JWT_SECRET, subject: user.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+    )
+  }
+
+  it('returns open and closed rounds, excluding drafts, for an authenticated participant', async () => {
+    const token = await tokenForParticipant()
+    await db.insert(roundsTable).values({ name: 'Draft', durationMinutes: 30 })
+    const [closed] = await db
+      .insert(roundsTable)
+      .values({ name: 'Closed', durationMinutes: 30, status: 'closed', closedAt: new Date() })
+      .returning()
+    if (!closed) throw new Error('expected fixture')
+
+    const res = await app.request('/rounds', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { id: string }[]
+    expect(body.map((r) => r.id)).toEqual([closed.id])
+  })
+
+  it('returns 401 without a token', async () => {
+    const res = await app.request('/rounds')
+    expect(res.status).toBe(401)
   })
 })
 

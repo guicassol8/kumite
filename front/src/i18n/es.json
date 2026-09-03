@@ -27,6 +27,19 @@
       "none": "Todavía no estás en un equipo.",
       "memberCount": "{{members}} de {{max}} integrantes",
       "cta": "Ver equipos"
+    },
+    "round": {
+      "waiting": "Esperando la próxima ronda.",
+      "timeRemaining": "Termina en {{time}}"
+    },
+    "closedRounds": {
+      "title": "Rondas cerradas",
+      "empty": "Todavía no hay rondas cerradas.",
+      "closedAt": "Cerrada el {{date}}"
+    },
+    "organizerShortcuts": {
+      "title": "Área del organizador",
+      "problems": "Problemas"
     }
   },
   "editor": {

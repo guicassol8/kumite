@@ -5,6 +5,9 @@ import { problemsTable, problemTranslationsTable } from '../../db/schema'
 import type { Locale } from '../../lib/locale'
 import { LocaleSchema } from '../../lib/locale'
 
+import { getProblemRoundAccess } from '../rounds/rounds.service'
+import { findTeamIdForUser, getBestSubmission } from '../submissions/submissions.service'
+
 import type {
   CreateProblemBody,
   ParticipantProblem,
@@ -81,6 +84,7 @@ export async function getPublishedProblem(
   db: Db,
   id: string,
   locale: Locale,
+  userId: string,
 ): Promise<ParticipantProblem | null> {
   const [problem] = await db
     .select()
@@ -99,6 +103,34 @@ export async function getPublishedProblem(
     translations.find((t) => t.locale === locale) ?? translations.find((t) => t.locale === 'pt')
   if (!translation) return null
 
+  // Round access (#37): never in a round, or only in a draft one, is the same
+  // 404 as an unpublished problem — neither announces itself.
+  const access = await getProblemRoundAccess(db, id)
+  if (access.status === 'none') return null
+
+  const examples = problem.testCases
+    .filter((testCase) => !testCase.hidden)
+    .map((testCase) => ({ input: testCase.input, expected: testCase.expected }))
+
+  if (access.status === 'open') {
+    return {
+      id: problem.id,
+      points: problem.points,
+      difficulty: problem.difficulty,
+      locale: translation.locale,
+      title: translation.title,
+      statementMd: translation.statementMd,
+      examples,
+      roundId: access.roundId,
+      roundStatus: 'open',
+      // Mid-round, the participant doesn't need their best score yet.
+      bestSubmission: null,
+    }
+  }
+
+  const teamId = await findTeamIdForUser(db, userId)
+  const bestSubmission = teamId === null ? null : await getBestSubmission(db, teamId, id)
+
   return {
     id: problem.id,
     points: problem.points,
@@ -106,11 +138,10 @@ export async function getPublishedProblem(
     locale: translation.locale,
     title: translation.title,
     statementMd: translation.statementMd,
-    // Filter, then map field by field — never spread a test case, or a new
-    // column on it would leak into the participant payload by default.
-    examples: problem.testCases
-      .filter((testCase) => !testCase.hidden)
-      .map((testCase) => ({ input: testCase.input, expected: testCase.expected })),
+    examples,
+    roundId: null,
+    roundStatus: 'closed',
+    bestSubmission,
   }
 }
 

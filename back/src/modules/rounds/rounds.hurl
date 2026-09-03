@@ -258,6 +258,20 @@ HTTP 409
 [Asserts]
 jsonpath "$.error" == "round_not_open"
 
+# 9d. Participant-facing GET /rounds (#40): the closed round shows, the
+# still-draft second round doesn't. No token -> 401.
+GET {{host}}/rounds
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
+GET {{host}}/rounds
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$[?(@.id=='{{round_id}}')].status" == "closed"
+jsonpath "$[?(@.id=='{{second_round_id}}')]" not exists
+
 # 10. Now that the first round is closed, the second (a draft) can open.
 POST {{host}}/organizer/rounds/{{second_round_id}}/open
 Authorization: Bearer {{organizer_token}}

@@ -87,6 +87,20 @@ export async function listRounds(db: Db): Promise<RoundSummary[]> {
   return rounds.map((round) => toSummary(round, countByRound.get(round.id) ?? 0))
 }
 
+// Participant-facing view of listRounds: a draft round is undisclosed by
+// definition (the organizer hasn't opened it yet), so it's filtered out
+// rather than reused as-is. Open-first, then closed rounds newest-first,
+// matches the home screen's round card followed by a closed-rounds list.
+export async function listParticipantRounds(db: Db): Promise<RoundSummary[]> {
+  const rounds = await listRounds(db)
+  return rounds
+    .filter((round) => round.status !== 'draft')
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === 'open' ? -1 : 1
+      return (b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0)
+    })
+}
+
 // Any round currently open, used by openRound to enforce "only one at a time"
 // with a friendly error before the DB's own partial unique index would.
 export async function findOpenRound(db: Db): Promise<RoundRow | null> {

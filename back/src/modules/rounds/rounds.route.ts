@@ -17,6 +17,7 @@ import {
   createRound,
   extendRound,
   getRound,
+  listParticipantRounds,
   listRounds,
   openRound,
   updateRound,
@@ -49,6 +50,15 @@ export const listRoundsRoute = defineRoute({
   input: {},
   output: RoundSummaryListSchema,
   handler: async (c) => listRounds(c.get('db')),
+})
+
+export const listParticipantRoundsRoute = defineRoute({
+  method: 'GET',
+  path: '/rounds',
+  use: [requireUser],
+  input: {},
+  output: RoundSummaryListSchema,
+  handler: async (c) => listParticipantRounds(c.get('db')),
 })
 
 export const getRoundRoute = defineRoute({

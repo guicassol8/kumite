@@ -8,6 +8,7 @@ import { problemsTable, submissionsTable, teamMembersTable, teamsTable } from '.
 import type { CodegenErrorCode, JudgeCaseResult, JudgeOutcome } from '../judge/judge.schema'
 import { generateJudgeSource, runJudge } from '../judge/judge.service'
 import type { TestCase } from '../problems/problems.schema'
+import { isProblemInOpenRound } from '../rounds/rounds.service'
 
 import type {
   BestSubmission,
@@ -169,6 +170,7 @@ export type SubmitIdentity = { userId: string; teamId: string }
 export type SubmitOutcome =
   | { ok: true; result: SubmissionResult }
   | { ok: false; error: 'problem_not_found' }
+  | { ok: false; error: 'no_active_round' }
   | {
       ok: false
       error: 'codegen_rejected'
@@ -228,6 +230,12 @@ export async function submitSolution(
       .from(problemsTable)
       .where(and(eq(problemsTable.id, body.problemId), eq(problemsTable.status, 'published')))
     if (!problem) return { ok: false, error: 'problem_not_found' }
+
+    // The client's timer is never the authority (#37): re-checked here,
+    // against the round actually open right now, on every submission.
+    if (!(await isProblemInOpenRound(db, body.roundId, problem.id))) {
+      return { ok: false, error: 'no_active_round' }
+    }
 
     const generated = generateJudgeSource(body.workspace, body.locale ?? DEFAULT_LOCALE)
     if (!generated.ok) {

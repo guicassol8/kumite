@@ -43,6 +43,8 @@ export const createSubmissionRoute = defineRoute({
         // Same answer for "does not exist" and "not published": a draft never
         // announces itself.
         return c.error('not_found', 'Problem not found', { status: 404 })
+      case 'no_active_round':
+        return c.error('no_active_round', 'No active round with this problem', { status: 404 })
       case 'codegen_rejected':
         // The code and the message come straight from @kumite/blocks, already
         // localized — the route coins neither.

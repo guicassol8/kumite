@@ -18,7 +18,9 @@ import {
 import type { JudgeCaseResult } from '../judge/judge.schema'
 import { WorkspaceSchema } from '../judge/judge.schema'
 import type { TestCase } from '../problems/problems.schema'
+import { closeRound, createRound, openRound } from '../rounds/rounds.service'
 
+import { SubmitSolutionBodySchema } from './submissions.schema'
 import {
   acquireSubmissionSlot,
   findTeamIdForUser,
@@ -69,6 +71,35 @@ async function insertUser(email = 'participante@edu.pucrs.br') {
   if (!user) throw new Error('expected a user fixture')
   return user
 }
+
+describe('SubmitSolutionBodySchema', () => {
+  const validWorkspace = { blocks: { languageVersion: 0, blocks: [] } }
+
+  it('rejects a body without roundId', () => {
+    const result = SubmitSolutionBodySchema.safeParse({
+      problemId: '00000000-0000-0000-0000-000000000000',
+      workspace: validWorkspace,
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a body without problemId', () => {
+    const result = SubmitSolutionBodySchema.safeParse({
+      roundId: '00000000-0000-0000-0000-000000000000',
+      workspace: validWorkspace,
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts a body with problemId, roundId and workspace', () => {
+    const result = SubmitSolutionBodySchema.safeParse({
+      problemId: '00000000-0000-0000-0000-000000000000',
+      roundId: '00000000-0000-0000-0000-000000000000',
+      workspace: validWorkspace,
+    })
+    expect(result.success).toBe(true)
+  })
+})
 
 describe('submissions table', () => {
   it('records the problem, workspace, per-case results, score and timestamp', async () => {
@@ -500,13 +531,25 @@ const solvableCases: TestCase[] = [
   { input: [1, 3, 5], expected: 0, hidden: true },
 ]
 
+// Published and dropped into an open round in one step: the submission
+// pipeline now requires an open round containing the problem (#37), and
+// every test below except the round-lock tests themselves just wants a
+// problem it can submit against.
 async function insertPublishedProblem(testCases: TestCase[], points = 100) {
   const [problem] = await db
     .insert(problemsTable)
     .values({ difficulty: 'easy', status: 'published', points, testCases })
     .returning()
   if (!problem) throw new Error('expected a problem fixture')
-  return problem
+  const created = await createRound(db, {
+    name: 'Round 1',
+    durationMinutes: 30,
+    problemIds: [problem.id],
+  })
+  if (!created.ok) throw new Error('expected create to succeed')
+  const opened = await openRound(db, created.round.id)
+  if (!opened.ok) throw new Error('expected open to succeed')
+  return { ...problem, roundId: opened.round.id }
 }
 
 async function insertTeamMember(teamName = 'Time A', email = 'participante@edu.pucrs.br') {
@@ -535,7 +578,7 @@ describe('submitSolution', () => {
         await submitSolution(
           db,
           { userId: user.id, teamId: team.id },
-          { problemId: problem.id, workspace: solutionWorkspace },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
         ),
       )
 
@@ -572,7 +615,11 @@ describe('submitSolution', () => {
     const outcome = await submitSolution(
       db,
       { userId: user.id, teamId: team.id },
-      { problemId: problem?.id ?? '', workspace: solutionWorkspace },
+      {
+        problemId: problem?.id ?? '',
+        roundId: '00000000-0000-0000-0000-000000000000',
+        workspace: solutionWorkspace,
+      },
     )
 
     expect(outcome).toEqual({ ok: false, error: 'problem_not_found' })
@@ -587,6 +634,7 @@ describe('submitSolution', () => {
       { userId: user.id, teamId: team.id },
       {
         problemId: '00000000-0000-0000-0000-000000000000',
+        roundId: '00000000-0000-0000-0000-000000000000',
         workspace: solutionWorkspace,
       },
     )
@@ -603,6 +651,7 @@ describe('submitSolution', () => {
 
       const outcome = await submitSolution(db, identity, {
         problemId: problem.id,
+        roundId: problem.roundId,
         workspace: emptyWorkspace,
       })
 
@@ -612,6 +661,7 @@ describe('submitSolution', () => {
       // The refusal never reached the sandbox, so the next attempt is free.
       const retry = await submitSolution(db, identity, {
         problemId: problem.id,
+        roundId: problem.roundId,
         workspace: solutionWorkspace,
       })
       expect(expectSubmitted(retry).attemptNumber).toBe(1)
@@ -632,7 +682,7 @@ describe('submitSolution', () => {
         await submitSolution(
           db,
           { userId: user.id, teamId: team.id },
-          { problemId: problem.id, workspace: solutionWorkspace },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
         ),
       )
 
@@ -649,7 +699,7 @@ describe('submitSolution', () => {
       const problem = await insertPublishedProblem(solvableCases)
       const { user, team } = await insertTeamMember()
       const identity = { userId: user.id, teamId: team.id }
-      const body = { problemId: problem.id, workspace: solutionWorkspace }
+      const body = { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace }
 
       const first = expectSubmitted(await submitSolution(db, identity, body))
       resetSubmissionThrottle()
@@ -666,7 +716,7 @@ describe('submitSolution', () => {
       const problem = await insertPublishedProblem(solvableCases)
       const { user, team } = await insertTeamMember()
       const identity = { userId: user.id, teamId: team.id }
-      const body = { problemId: problem.id, workspace: solutionWorkspace }
+      const body = { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace }
 
       expect(team.firstSubmittedAt).toBeNull()
 
@@ -688,7 +738,7 @@ describe('submitSolution', () => {
       const problem = await insertPublishedProblem(solvableCases)
       const { user, team } = await insertTeamMember()
       const identity = { userId: user.id, teamId: team.id }
-      const body = { problemId: problem.id, workspace: solutionWorkspace }
+      const body = { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace }
 
       const [first, second] = await Promise.all([
         submitSolution(db, identity, body),
@@ -700,6 +750,148 @@ describe('submitSolution', () => {
     },
     JUDGED_TEST_TIMEOUT_MS,
   )
+
+  describe('round lock (#37)', () => {
+    it('refuses a published problem with no round at all, arming no cooldown', async () => {
+      const [problem] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published', testCases: solvableCases })
+        .returning()
+      if (!problem) throw new Error('expected a problem fixture')
+      const { user, team } = await insertTeamMember()
+
+      const outcome = await submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        {
+          problemId: problem.id,
+          roundId: '00000000-0000-0000-0000-000000000000',
+          workspace: solutionWorkspace,
+        },
+      )
+
+      expect(outcome).toEqual({ ok: false, error: 'no_active_round' })
+      // The refusal never reached the sandbox: the next attempt is free.
+      expect(acquireSubmissionSlot(`team:${team.id}`)).toBeNull()
+    })
+
+    it('refuses when the round containing the problem is still a draft', async () => {
+      const [problem] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published', testCases: solvableCases })
+        .returning()
+      if (!problem) throw new Error('expected a problem fixture')
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const { user, team } = await insertTeamMember()
+
+      const outcome = await submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        { problemId: problem.id, roundId: created.round.id, workspace: solutionWorkspace },
+      )
+
+      expect(outcome).toEqual({ ok: false, error: 'no_active_round' })
+    })
+
+    it('refuses when the open round does not contain this problem', async () => {
+      const problemInOtherRound = await insertPublishedProblem(solvableCases)
+      const [problem] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published', testCases: solvableCases })
+        .returning()
+      if (!problem) throw new Error('expected a problem fixture')
+      const { user, team } = await insertTeamMember()
+
+      const outcome = await submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        {
+          problemId: problem.id,
+          roundId: problemInOtherRound.roundId,
+          workspace: solutionWorkspace,
+        },
+      )
+
+      expect(outcome).toEqual({ ok: false, error: 'no_active_round' })
+    })
+
+    it('refuses a stale roundId even though the problem sits in a different open round', async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const staleCreated = await createRound(db, {
+        name: 'Stale round',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!staleCreated.ok) throw new Error('expected create to succeed')
+      const { user, team } = await insertTeamMember()
+
+      const outcome = await submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        { problemId: problem.id, roundId: staleCreated.round.id, workspace: solutionWorkspace },
+      )
+
+      expect(outcome).toEqual({ ok: false, error: 'no_active_round' })
+    })
+
+    it(
+      'refuses once closesAt has passed even before any other read reaped the round',
+      async () => {
+        const problem = await insertPublishedProblem(solvableCases)
+        await db
+          .update(roundsTable)
+          .set({ closesAt: new Date(Date.now() - 1000) })
+          .where(eq(roundsTable.id, problem.roundId))
+        const { user, team } = await insertTeamMember()
+
+        const outcome = await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        )
+
+        expect(outcome).toEqual({ ok: false, error: 'no_active_round' })
+      },
+      JUDGED_TEST_TIMEOUT_MS,
+    )
+
+    it(
+      'lets the pipeline proceed when the roundId names the actual open round for this problem',
+      async () => {
+        const problem = await insertPublishedProblem(solvableCases)
+        const { user, team } = await insertTeamMember()
+
+        const outcome = await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        )
+
+        expect(expectSubmitted(outcome).score).toBe(100)
+      },
+      JUDGED_TEST_TIMEOUT_MS,
+    )
+
+    it('refuses a submission after the round has been explicitly closed', async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const closed = await closeRound(db, problem.roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+      const { user, team } = await insertTeamMember()
+
+      const outcome = await submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+      )
+
+      expect(outcome).toEqual({ ok: false, error: 'no_active_round' })
+    })
+  })
 })
 
 describe('findTeamIdForUser', () => {

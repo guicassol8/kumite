@@ -142,7 +142,12 @@ export const getParticipantProblemRoute = defineRoute({
   input: { params: ParticipantProblemParamsSchema, query: ParticipantProblemQuerySchema },
   output: { 200: ParticipantProblemSchema, 404: ErrorBodySchema },
   handler: async (c) => {
-    const problem = await getPublishedProblem(c.get('db'), c.input.params.id, c.input.query.locale)
+    const problem = await getPublishedProblem(
+      c.get('db'),
+      c.input.params.id,
+      c.input.query.locale,
+      c.get('currentUser').id,
+    )
     if (!problem) return c.error('not_found', 'Problem not found', { status: 404 })
     return problem
   },

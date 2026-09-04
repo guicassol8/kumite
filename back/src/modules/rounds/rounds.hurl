@@ -313,3 +313,13 @@ Authorization: Bearer {{organizer_token}}
 HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
+
+# 12. Close the still-open second round: `pnpm hurl` runs every module file
+# against one shared server/db, and "only one round open at a time" is a
+# global invariant — leaving one open here would break any other file's own
+# open-a-round setup (problems.hurl, submissions.hurl, #37).
+POST {{host}}/organizer/rounds/{{second_round_id}}/close
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "closed"

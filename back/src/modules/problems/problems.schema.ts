@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { JsonValueSchema } from '../../lib/json'
 import { LocaleSchema } from '../../lib/locale'
 
+import { BestSubmissionSchema } from '../submissions/submissions.schema'
+
 // Mirrors the `problems`/`problem_translations` drizzle tables (db/schema.ts).
 export const DifficultySchema = z.enum(['easy', 'medium', 'hard'])
 export const ProblemStatusSchema = z.enum(['draft', 'published', 'archived'])
@@ -137,6 +139,13 @@ export const ParticipantProblemSchema = z.object({
   title: z.string(),
   statementMd: z.string(),
   examples: z.array(ExampleCaseSchema),
+  // Round access (#37): null/'closed' when the problem's round has ended (read
+  // only, no more submissions); populated when it's the currently open round.
+  roundId: z.string().nullable(),
+  roundStatus: z.enum(['open', 'closed']),
+  // The team's best submission once the round is closed, null if it never
+  // submitted; always null while the round is open (no query performed then).
+  bestSubmission: BestSubmissionSchema.nullable(),
 })
 
 export type ParticipantProblemParams = z.infer<typeof ParticipantProblemParamsSchema>

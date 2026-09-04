@@ -19,7 +19,9 @@ import {
   closeRound,
   createRound,
   extendRound,
+  getProblemRoundAccess,
   getRound,
+  isProblemInOpenRound,
   listParticipantRounds,
   listRounds,
   openRound,
@@ -562,6 +564,134 @@ describe('rounds.service', () => {
       const result = await listParticipantRounds(db)
 
       expect(result.map((r) => r.id)).toEqual([open.id, newerClosed.id, olderClosed.id])
+    })
+  })
+
+  describe('getProblemRoundAccess', () => {
+    const insertPublishedProblem = async () => {
+      const [problem] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published' })
+        .returning()
+      if (!problem) throw new Error('expected fixture')
+      return problem
+    }
+
+    it("returns 'none' for a problem in no round", async () => {
+      const problem = await insertPublishedProblem()
+
+      expect(await getProblemRoundAccess(db, problem.id)).toEqual({ status: 'none' })
+    })
+
+    it("returns 'none' for a problem only in a draft round", async () => {
+      const problem = await insertPublishedProblem()
+      await createRound(db, { name: 'Round 1', durationMinutes: 30, problemIds: [problem.id] })
+
+      expect(await getProblemRoundAccess(db, problem.id)).toEqual({ status: 'none' })
+    })
+
+    it("returns 'closed' for a problem only in a closed round", async () => {
+      const problem = await insertPublishedProblem()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      const closed = await closeRound(db, created.round.id)
+      if (!closed.ok) throw new Error('expected close to succeed')
+
+      expect(await getProblemRoundAccess(db, problem.id)).toEqual({ status: 'closed' })
+    })
+
+    it("returns 'open' with the roundId for a problem in an open round", async () => {
+      const problem = await insertPublishedProblem()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+
+      expect(await getProblemRoundAccess(db, problem.id)).toEqual({
+        status: 'open',
+        roundId: created.round.id,
+      })
+    })
+
+    it('prefers the open round when the problem is also in a separate closed round', async () => {
+      const problem = await insertPublishedProblem()
+      const closedCreated = await createRound(db, {
+        name: 'Closed round',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!closedCreated.ok) throw new Error('expected create to succeed')
+      const closedOpened = await openRound(db, closedCreated.round.id)
+      if (!closedOpened.ok) throw new Error('expected open to succeed')
+      const closedClosed = await closeRound(db, closedCreated.round.id)
+      if (!closedClosed.ok) throw new Error('expected close to succeed')
+
+      const openCreated = await createRound(db, {
+        name: 'Open round',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!openCreated.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, openCreated.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+
+      expect(await getProblemRoundAccess(db, problem.id)).toEqual({
+        status: 'open',
+        roundId: openCreated.round.id,
+      })
+    })
+  })
+
+  describe('isProblemInOpenRound', () => {
+    const createOpenRoundWithProblem = async () => {
+      const [problem] = await db
+        .insert(problemsTable)
+        .values({ difficulty: 'easy', status: 'published' })
+        .returning()
+      if (!problem) throw new Error('expected fixture')
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      return { round: opened.round, problem }
+    }
+
+    it('is true for the exact open round and problem pair', async () => {
+      const { round, problem } = await createOpenRoundWithProblem()
+
+      expect(await isProblemInOpenRound(db, round.id, problem.id)).toBe(true)
+    })
+
+    it('is false for a mismatched roundId', async () => {
+      const { problem } = await createOpenRoundWithProblem()
+
+      expect(
+        await isProblemInOpenRound(db, '00000000-0000-0000-0000-000000000000', problem.id),
+      ).toBe(false)
+    })
+
+    it('is false once the round has passed closesAt, even before any other read reaped it', async () => {
+      const { round, problem } = await createOpenRoundWithProblem()
+      await db
+        .update(roundsTable)
+        .set({ closesAt: new Date(Date.now() - 1000) })
+        .where(eq(roundsTable.id, round.id))
+
+      expect(await isProblemInOpenRound(db, round.id, problem.id)).toBe(false)
     })
   })
 

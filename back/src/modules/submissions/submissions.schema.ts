@@ -46,6 +46,10 @@ export type BestSubmission = z.infer<typeof BestSubmissionSchema>
 
 export const SubmitSolutionBodySchema = z.object({
   problemId: z.string().uuid(),
+  // The round the participant believes is open and contains this problem
+  // (#37) — a stale or mismatched id is rejected server-side, the client's
+  // timer is never the authority.
+  roundId: z.string().uuid(),
   // Reused from the judge module so the route validates exactly what codegen
   // will accept — never a second definition of the workspace shape.
   workspace: WorkspaceSchema,

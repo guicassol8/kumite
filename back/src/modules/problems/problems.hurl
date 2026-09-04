@@ -160,8 +160,40 @@ HTTP 200
 jsonpath "$[?(@.id=='{{problem_id}}')].testCaseCount" == 2
 jsonpath "$[?(@.id=='{{problem_id}}')].status" == "published"
 
-# 10a. Participant read in es -> Spanish title and statement, and only the
-# visible case: no `hidden` key anywhere and no trace of the hidden expected (4).
+# 10a. Published, but never placed in a round -> 404, same as an unknown id
+# (#37 closes the access gap left by #11: publishing alone isn't enough).
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "not_found"
+
+# 10b. Placed in a round the organizer hasn't opened yet -> still 404: a
+# draft round is as undisclosed as never being in one at all.
+POST {{host}}/organizer/rounds
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "name": "Problems E2E Round", "durationMinutes": 30, "problemIds": ["{{problem_id}}"] }
+HTTP 201
+[Captures]
+round_id: jsonpath "$.id"
+
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "not_found"
+
+# 10c. The organizer opens the round -> the problem becomes readable again.
+POST {{host}}/organizer/rounds/{{round_id}}/open
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "open"
+
+# 10d. Participant read in es -> Spanish title and statement, only the
+# visible case (no `hidden` key anywhere, no trace of the hidden expected (4)),
+# and the round now reported as open with no bestSubmission query performed.
 GET {{host}}/problems/{{problem_id}}?locale=es
 Authorization: Bearer {{participant_token}}
 HTTP 200
@@ -178,8 +210,11 @@ jsonpath "$..hidden" not exists
 jsonpath "$.examples[?(@.expected==4)]" not exists
 jsonpath "$.testCases" not exists
 jsonpath "$.status" not exists
+jsonpath "$.roundStatus" == "open"
+jsonpath "$.roundId" == "{{round_id}}"
+jsonpath "$.bestSubmission" == null
 
-# 10b. No locale query param -> pt.
+# 10e. No locale query param -> pt.
 GET {{host}}/problems/{{problem_id}}
 Authorization: Bearer {{participant_token}}
 HTTP 200
@@ -188,7 +223,7 @@ jsonpath "$.locale" == "pt"
 jsonpath "$.title" == "Soma"
 jsonpath "$.statementMd" == "Some dois números."
 
-# 10c. Unsupported locale -> kata's input validation envelope, naming the
+# 10f. Unsupported locale -> kata's input validation envelope, naming the
 # supported locales under `issues.query`.
 GET {{host}}/problems/{{problem_id}}?locale=de
 Authorization: Bearer {{participant_token}}
@@ -198,25 +233,42 @@ jsonpath "$.error" == "validation_failed"
 jsonpath "$.issues.query" exists
 jsonpath "$.issues.query[0].message" contains "'pt' | 'es' | 'en'"
 
-# 10d. Malformed id -> 422 from the params schema, never a db error.
+# 10g. Malformed id -> 422 from the params schema, never a db error.
 GET {{host}}/problems/nao-e-uuid
 Authorization: Bearer {{participant_token}}
 HTTP 422
 [Asserts]
 jsonpath "$.error" == "validation_failed"
 
-# 10e. Unknown (but well-formed) id -> 404.
+# 10h. Unknown (but well-formed) id -> 404.
 GET {{host}}/problems/00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{participant_token}}
 HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
 
-# 10f. No Authorization header -> 401, before any problem lookup.
+# 10i. No Authorization header -> 401, before any problem lookup.
 GET {{host}}/problems/{{problem_id}}
 HTTP 401
 [Asserts]
 jsonpath "$.error" == "unauthorized"
+
+# 10j. The organizer closes the round -> the problem is still readable, now
+# read-only: no roundId, and a bestSubmission of null (this participant never
+# submitted in this file).
+POST {{host}}/organizer/rounds/{{round_id}}/close
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "closed"
+
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.roundStatus" == "closed"
+jsonpath "$.roundId" == null
+jsonpath "$.bestSubmission" == null
 
 # 11. Archive -> terminal state.
 POST {{host}}/organizer/problems/{{problem_id}}/archive

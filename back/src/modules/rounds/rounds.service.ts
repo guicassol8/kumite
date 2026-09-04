@@ -1,4 +1,4 @@
-import { and, eq, inArray, lte } from 'drizzle-orm'
+import { and, eq, inArray, lte, ne } from 'drizzle-orm'
 import postgres from 'postgres'
 
 import type { Db } from '../../db/client'
@@ -282,6 +282,57 @@ export async function extendRound(db: Db, id: string, minutes: number): Promise<
   const detail = await getRound(db, id)
   if (!detail) throw new Error('expected round to still exist right after extend')
   return { ok: true, round: detail }
+}
+
+// --- Participant access to a problem via its round (#37) ---
+
+export type ProblemRoundAccess =
+  | { status: 'open'; roundId: string }
+  | { status: 'closed' }
+  | { status: 'none' }
+
+// A problem never in a round, or only in a draft one, is 'none' — the same
+// "never announces itself" rule the participant read already applies to a
+// draft problem. Open beats closed when a problem sits in both.
+export async function getProblemRoundAccess(
+  db: Db,
+  problemId: string,
+): Promise<ProblemRoundAccess> {
+  await reapExpiredRound(db)
+
+  const rows = await db
+    .select({ roundId: roundsTable.id, status: roundsTable.status })
+    .from(roundProblemsTable)
+    .innerJoin(roundsTable, eq(roundProblemsTable.roundId, roundsTable.id))
+    .where(and(eq(roundProblemsTable.problemId, problemId), ne(roundsTable.status, 'draft')))
+
+  const open = rows.find((row) => row.status === 'open')
+  if (open) return { status: 'open', roundId: open.roundId }
+  if (rows.length > 0) return { status: 'closed' }
+  return { status: 'none' }
+}
+
+// Reaps first so a round whose closesAt just passed is never seen as open —
+// the client's timer is never the authority on whether a submission lands.
+export async function isProblemInOpenRound(
+  db: Db,
+  roundId: string,
+  problemId: string,
+): Promise<boolean> {
+  await reapExpiredRound(db)
+
+  const [row] = await db
+    .select({ id: roundsTable.id })
+    .from(roundsTable)
+    .innerJoin(roundProblemsTable, eq(roundProblemsTable.roundId, roundsTable.id))
+    .where(
+      and(
+        eq(roundsTable.id, roundId),
+        eq(roundsTable.status, 'open'),
+        eq(roundProblemsTable.problemId, problemId),
+      ),
+    )
+  return row !== undefined
 }
 
 export type CloseRoundResult =

@@ -27,3 +27,86 @@ export const RoundProblemSchema = z.object({
 })
 
 export type RoundProblem = z.infer<typeof RoundProblemSchema>
+
+// --- Organizer CRUD DTOs (#36) ---
+
+function rejectDuplicateProblemIds(problemIds: string[], ctx: z.RefinementCtx) {
+  const duplicates = problemIds.filter((id, index) => problemIds.indexOf(id) !== index)
+  if (duplicates.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Duplicate problem id(s): ${[...new Set(duplicates)].join(', ')}`,
+      path: ['problemIds'],
+    })
+  }
+}
+
+export const CreateRoundBodySchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    durationMinutes: z.number().int().positive(),
+    problemIds: z.array(z.string()),
+  })
+  .superRefine((body, ctx) => rejectDuplicateProblemIds(body.problemIds, ctx))
+
+export const UpdateRoundBodySchema = z
+  .object({
+    name: z.string().min(1).max(120).optional(),
+    durationMinutes: z.number().int().positive().optional(),
+    problemIds: z.array(z.string()).optional(),
+  })
+  .superRefine((body, ctx) => {
+    if (!body.problemIds) return
+    rejectDuplicateProblemIds(body.problemIds, ctx)
+  })
+
+export const RoundIdParamsSchema = z.object({
+  id: z.string(),
+})
+
+export const ExtendRoundBodySchema = z.object({
+  minutes: z.number().int().positive(),
+})
+
+export const RoundProblemDetailSchema = z.object({
+  problemId: z.string(),
+  position: z.number().int().nonnegative(),
+})
+
+// coerce, not date(): kata re-validates the output after JSON serialization,
+// where a Date has already become an ISO string (see problems.schema.ts).
+export const RoundDetailSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: RoundStatusSchema,
+  durationMinutes: z.number().int().positive(),
+  openedAt: z.coerce.date().nullable(),
+  closesAt: z.coerce.date().nullable(),
+  closedAt: z.coerce.date().nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+  problems: z.array(RoundProblemDetailSchema),
+})
+
+export const RoundSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: RoundStatusSchema,
+  durationMinutes: z.number().int().positive(),
+  openedAt: z.coerce.date().nullable(),
+  closesAt: z.coerce.date().nullable(),
+  closedAt: z.coerce.date().nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+  problemCount: z.number().int().nonnegative(),
+})
+
+export const RoundSummaryListSchema = z.array(RoundSummarySchema)
+
+export type CreateRoundBody = z.infer<typeof CreateRoundBodySchema>
+export type UpdateRoundBody = z.infer<typeof UpdateRoundBodySchema>
+export type RoundIdParams = z.infer<typeof RoundIdParamsSchema>
+export type ExtendRoundBody = z.infer<typeof ExtendRoundBodySchema>
+export type RoundProblemDetail = z.infer<typeof RoundProblemDetailSchema>
+export type RoundDetail = z.infer<typeof RoundDetailSchema>
+export type RoundSummary = z.infer<typeof RoundSummarySchema>

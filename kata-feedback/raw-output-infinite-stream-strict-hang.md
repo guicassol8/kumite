@@ -1,6 +1,6 @@
 # `raw()`'s strict-mode body validation hangs forever against a never-ending stream
 
-**Found while**: planning #38 (SSE event channel for kumite's live rounds)
+**Found while**: planning and implementing #38 (SSE event channel for kumite's live rounds)
 **Where in kata**: `raw()` output contracts / output validation (ADR-0009, ADR-0024)
 
 ## What
@@ -50,19 +50,34 @@ that silently deadlocks the first time anything in `strict` mode touches
 it — a bad failure mode to discover via a hung CI job or a frozen `kata
 verify` run rather than a doc warning at the point of use.
 
+## Confirmed during implementation
+
+Building the actual `GET /sse` route (`back/src/modules/sse/sse.route.ts`)
+bore out the plan exactly: `output: {}` (200 left undeclared) plus a bare
+`streamSSE(c.raw, ...)` `Response` sailed through `kata verify
+--strict-coverage`, the Vitest `app.request('/sse', ...)` suite, and a
+manual `pnpm dev` + `curl -N` smoke test (heartbeats arriving ~1/s,
+connection staying open) with zero friction — the workaround has no
+runtime cost, it's purely a static-typing/RPC-contract loss (the front
+can't get this endpoint through `hc<AppType>`, confirmed as expected and
+already scoped into #39: a plain fetch-based SSE client). No new gap
+surfaced beyond what planning had already found.
+
 ## Metrics
 
 Two `search_docs` calls (`raw output-validation`-flavored queries) plus
 three `read_doc` calls (`guide/routes-schemas.md`'s raw() section,
-ADR-0024 in full, ADR-0009 in full) settled this — maybe 15-20% of this
-planning session's total tool calls, but it fully paid for itself: without
-reading ADR-0024 §3-4 closely, the natural first attempt would have been
-`output: raw('text/event-stream', z.string())`, which compiles and looks
-correct, and only reveals the hang empirically (a stuck test run) rather
-than up front. The docs *do* contain the answer (the unified
+ADR-0024 in full, ADR-0009 in full) settled this during planning — maybe
+15-20% of that session's total tool calls, but it fully paid for itself:
+without reading ADR-0024 §3-4 closely, the natural first attempt would
+have been `output: raw('text/event-stream', z.string())`, which compiles
+and looks correct, and only reveals the hang empirically (a stuck test
+run) rather than up front. The docs *do* contain the answer (the unified
 `entryForStatus`/undeclared-status behavior is documented, just not
 cross-referenced from the `raw()` section itself) — this is a
 "the docs don't connect two true facts for you" gap, not a missing fact.
+Implementation itself needed zero additional `kata-docs` lookups — the
+plan's decision carried through unchanged.
 
 ## Suggested fix
 
@@ -76,3 +91,17 @@ cross-referenced from the `raw()` section itself) — this is a
   `outputValidation` override — it would let a route declare `raw()` for
   documentation/typing purposes while opting only its own body-check into
   `log`/`off`, without touching the app-wide default.
+
+## Confirmed independently during review (PR #101)
+
+Reviewing this PR from a fresh worktree reproduced the finding exactly:
+`pnpm verify` (`kata verify --strict-coverage`) passed clean against the
+undeclared-`200` route (43 files checked, no problems found), and a manual
+`curl -N` against `GET /sse` with a valid token streamed `state.sync`
+immediately followed by ~1/s heartbeats with no hang anywhere in the
+gate ladder (typecheck → verify → `pnpm -r test`, 249/227/40 passed →
+`hurl`, 9/9 files green). `sse.hurl` itself, as documented, only exercises
+the 401 guard — the 200/streaming path has no hurl coverage, which checks
+out against the "hurl can't complete a request against a body that never
+ends" reasoning in this same file. No new gap found; this is a second data
+point that the workaround is safe and the framework gap is real.

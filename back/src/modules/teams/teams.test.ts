@@ -258,22 +258,141 @@ describe('listTeams', () => {
     if (!created.ok) throw new Error('expected success')
     await joinTeam(db, joiner.id, created.team.id)
 
-    const teams = await listTeams(db)
+    const result = await listTeams(db, creator.id)
 
-    expect(teams).toEqual([
-      {
-        id: created.team.id,
-        name: 'Team A',
-        members: expect.arrayContaining([{ university: 'pucrs' }, { university: 'merida' }]),
-        maxTeamSize: 3,
-        slotsAvailable: 1,
-      },
-    ])
+    expect(result).toEqual({
+      maxTeamSize: 3,
+      mixingLocked: false,
+      myTeamId: created.team.id,
+      teams: [
+        {
+          id: created.team.id,
+          name: 'Team A',
+          members: expect.arrayContaining([
+            { university: 'pucrs', email: creator.email },
+            { university: 'merida', email: joiner.email },
+          ]),
+          slotsAvailable: 1,
+          frozen: false,
+          joinBlockedReason: 'already_in_team',
+        },
+      ],
+    })
   })
 
-  it('returns an empty list when no teams exist', async () => {
-    const teams = await listTeams(db)
+  it('returns an empty envelope when no teams exist', async () => {
+    const viewer = await insertUser()
 
-    expect(teams).toEqual([])
+    const result = await listTeams(db, viewer.id)
+
+    expect(result).toEqual({
+      maxTeamSize: 3,
+      mixingLocked: false,
+      myTeamId: null,
+      teams: [],
+    })
+  })
+
+  it('exposes member emails only for the team the viewer belongs to', async () => {
+    const viewer = await insertUser('pucrs')
+    const stranger = await insertUser('pucrs')
+    const mine = await createTeam(db, viewer.id, 'Mine')
+    const theirs = await createTeam(db, stranger.id, 'Theirs')
+    if (!mine.ok || !theirs.ok) throw new Error('expected success')
+
+    const result = await listTeams(db, viewer.id)
+
+    const myTeam = result.teams.find((team) => team.id === mine.team.id)
+    const otherTeam = result.teams.find((team) => team.id === theirs.team.id)
+    expect(myTeam?.members).toEqual([{ university: 'pucrs', email: viewer.email }])
+    expect(otherTeam?.members).toEqual([{ university: 'pucrs', email: null }])
+  })
+
+  it('reports myTeamId as null and no email at all for a viewer with no team', async () => {
+    const viewer = await insertUser()
+    const stranger = await insertUser()
+    const created = await createTeam(db, stranger.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await listTeams(db, viewer.id)
+
+    expect(result.myTeamId).toBeNull()
+    expect(result.teams[0]?.members).toEqual([{ university: 'pucrs', email: null }])
+  })
+
+  it('marks a team that has already submitted as frozen', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, created.team.id))
+
+    const result = await listTeams(db, creator.id)
+
+    expect(result.teams[0]?.frozen).toBe(true)
+  })
+
+  it('blocks joining with already_in_team, ahead of every other reason', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 1 })
+    const viewer = await insertUser()
+    const stranger = await insertUser()
+    await createTeam(db, viewer.id, 'Mine')
+    const full = await createTeam(db, stranger.id, 'Full')
+    if (!full.ok) throw new Error('expected success')
+
+    const result = await listTeams(db, viewer.id)
+
+    const fullTeam = result.teams.find((team) => team.id === full.team.id)
+    expect(fullTeam?.joinBlockedReason).toBe('already_in_team')
+  })
+
+  it('blocks joining a team with no open slots', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 1 })
+    const viewer = await insertUser()
+    const stranger = await insertUser()
+    const created = await createTeam(db, stranger.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await listTeams(db, viewer.id)
+
+    expect(result.maxTeamSize).toBe(1)
+    expect(result.teams[0]?.slotsAvailable).toBe(0)
+    expect(result.teams[0]?.joinBlockedReason).toBe('team_full')
+  })
+
+  it('blocks joining another university team when mixing is locked', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, mixingLocked: true })
+    const viewer = await insertUser('merida')
+    const stranger = await insertUser('pucrs')
+    const created = await createTeam(db, stranger.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await listTeams(db, viewer.id)
+
+    expect(result.mixingLocked).toBe(true)
+    expect(result.teams[0]?.joinBlockedReason).toBe('mixed_lock_violation')
+  })
+
+  it('leaves joinBlockedReason null on a joinable team', async () => {
+    const viewer = await insertUser('merida')
+    const stranger = await insertUser('pucrs')
+    const created = await createTeam(db, stranger.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await listTeams(db, viewer.id)
+
+    expect(result.teams[0]?.joinBlockedReason).toBeNull()
+  })
+
+  it('leaves a memberless team joinable when mixing is locked', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, mixingLocked: true })
+    const viewer = await insertUser('merida')
+    await db.insert(teamsTable).values({ name: 'Orphan' })
+
+    const result = await listTeams(db, viewer.id)
+
+    expect(result.teams[0]?.joinBlockedReason).toBeNull()
   })
 })

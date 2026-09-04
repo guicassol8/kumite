@@ -1,7 +1,20 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
 import { cleanup, render, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// The home route queries the API for the viewer's team; without this the
+// bootstrap under test would depend on a real server answering (a 401 from
+// one would itself drop the session and defeat the test).
+vi.mock('@/lib/api', () => ({
+  api: {
+    health: { $get: vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })) },
+    teams: Object.assign(vi.fn(), {
+      $get: vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })),
+    }),
+    me: { $get: vi.fn() },
+  },
+}))
 
 import '@/i18n'
 

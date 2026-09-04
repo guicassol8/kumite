@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { JsonValueSchema } from '../../lib/json'
 import { LocaleSchema } from '../../lib/locale'
 
+import { BestSubmissionSchema } from '../submissions/submissions.schema'
+
 // Mirrors the `problems`/`problem_translations` drizzle tables (db/schema.ts).
 export const DifficultySchema = z.enum(['easy', 'medium', 'hard'])
 export const ProblemStatusSchema = z.enum(['draft', 'published', 'archived'])
@@ -107,3 +109,46 @@ export type TranslationInput = z.infer<typeof TranslationInputSchema>
 export type UpdateProblemBody = z.infer<typeof UpdateProblemBodySchema>
 export type ProblemDetail = z.infer<typeof ProblemDetailSchema>
 export type ProblemSummary = z.infer<typeof ProblemSummarySchema>
+
+// --- Participant read DTOs (#11) ---
+
+export const ParticipantProblemParamsSchema = z.object({
+  id: z.string().uuid(),
+})
+
+// Optional query param: no `?locale=` means pt. An unsupported value fails
+// input validation (kata's 422 envelope) with the supported ones in the message.
+export const ParticipantProblemQuerySchema = z.object({
+  locale: LocaleSchema.default('pt'),
+})
+
+// Deliberately without `hidden`: this is what a participant is allowed to see,
+// and kata re-validates the handler's output against it.
+export const ExampleCaseSchema = z.object({
+  input: JsonValueSchema,
+  expected: JsonValueSchema,
+})
+
+export const ParticipantProblemSchema = z.object({
+  id: z.string(),
+  points: z.number().int(),
+  difficulty: DifficultySchema,
+  // The locale actually served, which is not always the one requested (a
+  // missing translation falls back to pt).
+  locale: LocaleSchema,
+  title: z.string(),
+  statementMd: z.string(),
+  examples: z.array(ExampleCaseSchema),
+  // Round access (#37): null/'closed' when the problem's round has ended (read
+  // only, no more submissions); populated when it's the currently open round.
+  roundId: z.string().nullable(),
+  roundStatus: z.enum(['open', 'closed']),
+  // The team's best submission once the round is closed, null if it never
+  // submitted; always null while the round is open (no query performed then).
+  bestSubmission: BestSubmissionSchema.nullable(),
+})
+
+export type ParticipantProblemParams = z.infer<typeof ParticipantProblemParamsSchema>
+export type ParticipantProblemQuery = z.infer<typeof ParticipantProblemQuerySchema>
+export type ExampleCase = z.infer<typeof ExampleCaseSchema>
+export type ParticipantProblem = z.infer<typeof ParticipantProblemSchema>

@@ -57,3 +57,32 @@ pages (not passing `heading`) was the right call here specifically because
 the exploration was "what does this whole surface look like," not "what
 does this one function do" — `read_doc`'s `heading` filter is there for the
 narrower case and would've meant more round trips if used prematurely.
+
+---
+
+## Confirmed during #27's implementation (the sibling issue this plan scoped against)
+
+The #26 plan above says it didn't need to re-look-up `requireRole`/`guard`
+when scoping #27's boundary — this is that payoff landing for real, one
+session later with no shared memory of the planning session.
+
+Implementing #27 (`requireOrganizer` guard on the 6 organizer routes) did
+one fresh `search_docs("requireRole guard middleware")` plus one full
+`read_doc("guide/jwt.md")` — the same page the #26 planning session read —
+to confirm the exact generic signature
+(`requireRole<R, S>(role, options?)`, `R` explicit, `S` inferred) and the
+403 envelope shape (`{ error: 'forbidden', message: 'Insufficient
+permissions' }`) before writing any code. Both matched the approved plan's
+text verbatim; `requireOrganizer = defineMiddleware({ provides: [] as
+const, handler: requireRole<AppRegistry>('organizer') })` compiled and
+passed `pnpm verify` on the first attempt, no guessing, no `tsc` round-trip
+to fix a wrong type argument.
+
+**Metrics**: 1 `search_docs` + 1 `read_doc` call for the whole guard
+surface, against ~14 tool calls for the rest of the implementation
+(reading existing routes/schemas, writing the test suite, running gates).
+That single doc read is what let a guard with a slightly unusual generic
+shape (`R` explicit, no second type argument) go in correct on the first
+try — the warning box in the doc about the old `guard<R, C>` breaking
+change would have been very easy to trip over by pattern-matching on
+`requireUser`'s call site alone.

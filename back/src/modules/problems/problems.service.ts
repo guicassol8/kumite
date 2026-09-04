@@ -1,12 +1,16 @@
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 
 import type { Db } from '../../db/client'
 import { problemsTable, problemTranslationsTable } from '../../db/schema'
 import type { Locale } from '../../lib/locale'
 import { LocaleSchema } from '../../lib/locale'
 
+import { getProblemRoundAccess } from '../rounds/rounds.service'
+import { findTeamIdForUser, getBestSubmission } from '../submissions/submissions.service'
+
 import type {
   CreateProblemBody,
+  ParticipantProblem,
   ProblemDetail,
   ProblemSummary,
   TestCase,
@@ -71,6 +75,74 @@ export async function getProblem(db: Db, id: string): Promise<ProblemDetail | nu
     .from(problemTranslationsTable)
     .where(eq(problemTranslationsTable.problemId, id))
   return toDetail(problem, translations)
+}
+
+// The participant read (#11). Only published problems are visible: a draft, an
+// archived one and an unknown id are all the same `null` — the route turns it
+// into a single 404 so nothing about an unpublished problem can be inferred.
+export async function getPublishedProblem(
+  db: Db,
+  id: string,
+  locale: Locale,
+  userId: string,
+): Promise<ParticipantProblem | null> {
+  const [problem] = await db
+    .select()
+    .from(problemsTable)
+    .where(and(eq(problemsTable.id, id), eq(problemsTable.status, 'published')))
+  if (!problem) return null
+
+  const translations = await db
+    .select()
+    .from(problemTranslationsTable)
+    .where(eq(problemTranslationsTable.problemId, id))
+
+  // pt is the fallback when the requested locale has no translation yet; the
+  // response reports the locale actually served, not the one asked for.
+  const translation =
+    translations.find((t) => t.locale === locale) ?? translations.find((t) => t.locale === 'pt')
+  if (!translation) return null
+
+  // Round access (#37): never in a round, or only in a draft one, is the same
+  // 404 as an unpublished problem — neither announces itself.
+  const access = await getProblemRoundAccess(db, id)
+  if (access.status === 'none') return null
+
+  const examples = problem.testCases
+    .filter((testCase) => !testCase.hidden)
+    .map((testCase) => ({ input: testCase.input, expected: testCase.expected }))
+
+  if (access.status === 'open') {
+    return {
+      id: problem.id,
+      points: problem.points,
+      difficulty: problem.difficulty,
+      locale: translation.locale,
+      title: translation.title,
+      statementMd: translation.statementMd,
+      examples,
+      roundId: access.roundId,
+      roundStatus: 'open',
+      // Mid-round, the participant doesn't need their best score yet.
+      bestSubmission: null,
+    }
+  }
+
+  const teamId = await findTeamIdForUser(db, userId)
+  const bestSubmission = teamId === null ? null : await getBestSubmission(db, teamId, id)
+
+  return {
+    id: problem.id,
+    points: problem.points,
+    difficulty: problem.difficulty,
+    locale: translation.locale,
+    title: translation.title,
+    statementMd: translation.statementMd,
+    examples,
+    roundId: null,
+    roundStatus: 'closed',
+    bestSubmission,
+  }
 }
 
 export async function listProblems(db: Db): Promise<ProblemSummary[]> {

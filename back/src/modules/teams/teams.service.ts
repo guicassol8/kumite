@@ -3,7 +3,9 @@ import { eq } from 'drizzle-orm'
 import type { Db } from '../../db/client'
 import { eventConfigTable, teamMembersTable, teamsTable, usersTable } from '../../db/schema'
 
-import type { Team, TeamSummary } from './teams.schema'
+import type { University } from '../users/users.schema'
+
+import type { JoinBlockedReason, Team, TeamSummary, TeamsList } from './teams.schema'
 
 // Table defaults (mixingLocked: false, maxTeamSize: 3) apply even before
 // db:seed has inserted the singleton event_config row.
@@ -14,15 +16,37 @@ async function getEventConfig(db: Db): Promise<{ mixingLocked: boolean; maxTeamS
     : { mixingLocked: false, maxTeamSize: 3 }
 }
 
-export async function listTeams(db: Db): Promise<TeamSummary[]> {
-  const { maxTeamSize } = await getEventConfig(db)
+// Mirrors joinTeam's guards, in the same order, so a disabled button in the
+// UI and a 409 from the API always agree on the reason.
+function resolveJoinBlockedReason(
+  members: { university: University }[],
+  viewer: { university: University; hasTeam: boolean },
+  config: { mixingLocked: boolean; maxTeamSize: number },
+): JoinBlockedReason | null {
+  if (viewer.hasTeam) return 'already_in_team'
+  if (members.length >= config.maxTeamSize) return 'team_full'
+  if (config.mixingLocked && members.some((member) => member.university !== viewer.university)) {
+    return 'mixed_lock_violation'
+  }
+  return null
+}
+
+export async function listTeams(db: Db, viewerId: string): Promise<TeamsList> {
+  const [config, [viewer], [viewerMembership]] = await Promise.all([
+    getEventConfig(db),
+    db.select().from(usersTable).where(eq(usersTable.id, viewerId)),
+    db.select().from(teamMembersTable).where(eq(teamMembersTable.userId, viewerId)),
+  ])
+  if (!viewer) throw new Error('expected viewer to exist')
+  const myTeamId = viewerMembership?.teamId ?? null
 
   const rows = await db
     .select({
       teamId: teamsTable.id,
       teamName: teamsTable.name,
-      teamCreatedAt: teamsTable.createdAt,
+      teamFirstSubmittedAt: teamsTable.firstSubmittedAt,
       university: usersTable.university,
+      email: usersTable.email,
     })
     .from(teamsTable)
     .leftJoin(teamMembersTable, eq(teamMembersTable.teamId, teamsTable.id))
@@ -37,16 +61,35 @@ export async function listTeams(db: Db): Promise<TeamSummary[]> {
         id: row.teamId,
         name: row.teamName,
         members: [],
-        maxTeamSize,
-        slotsAvailable: maxTeamSize,
+        slotsAvailable: config.maxTeamSize,
+        frozen: row.teamFirstSubmittedAt !== null,
+        joinBlockedReason: null,
       }
       teams.set(row.teamId, team)
     }
-    if (row.university) team.members.push({ university: row.university })
+    if (row.university) {
+      team.members.push({
+        university: row.university,
+        email: row.teamId === myTeamId ? row.email : null,
+      })
+    }
   }
-  for (const team of teams.values()) team.slotsAvailable = maxTeamSize - team.members.length
 
-  return [...teams.values()]
+  for (const team of teams.values()) {
+    team.slotsAvailable = config.maxTeamSize - team.members.length
+    team.joinBlockedReason = resolveJoinBlockedReason(
+      team.members,
+      { university: viewer.university, hasTeam: myTeamId !== null },
+      config,
+    )
+  }
+
+  return {
+    maxTeamSize: config.maxTeamSize,
+    mixingLocked: config.mixingLocked,
+    myTeamId,
+    teams: [...teams.values()],
+  }
 }
 
 export type CreateTeamResult =

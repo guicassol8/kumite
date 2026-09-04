@@ -1,9 +1,13 @@
 import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
+import { requireOrganizer, requireUser } from '../../middlewares/auth'
 
 import {
   CreateProblemBodySchema,
+  ParticipantProblemParamsSchema,
+  ParticipantProblemQuerySchema,
+  ParticipantProblemSchema,
   ProblemDetailSchema,
   ProblemIdParamsSchema,
   ProblemSummaryListSchema,
@@ -13,14 +17,21 @@ import {
   archiveProblem,
   createProblem,
   getProblem,
+  getPublishedProblem,
   listProblems,
   publishProblem,
   updateProblem,
 } from './problems.service'
 
+// 401 (requireUser) and 403 (requireOrganizer) are not declared on any route
+// below: both short-circuit from middleware, which kata lets through without
+// validating against `output` (framework ADR-0011) — same note as
+// submissions.route.ts.
+
 export const createProblemRoute = defineRoute({
   method: 'POST',
   path: '/organizer/problems',
+  use: [requireUser, requireOrganizer],
   input: { body: CreateProblemBodySchema },
   output: { 201: ProblemDetailSchema },
   handler: async (c) => {
@@ -32,6 +43,7 @@ export const createProblemRoute = defineRoute({
 export const listProblemsRoute = defineRoute({
   method: 'GET',
   path: '/organizer/problems',
+  use: [requireUser, requireOrganizer],
   input: {},
   output: ProblemSummaryListSchema,
   handler: async (c) => listProblems(c.get('db')),
@@ -40,6 +52,7 @@ export const listProblemsRoute = defineRoute({
 export const getProblemRoute = defineRoute({
   method: 'GET',
   path: '/organizer/problems/:id',
+  use: [requireUser, requireOrganizer],
   input: { params: ProblemIdParamsSchema },
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -52,6 +65,7 @@ export const getProblemRoute = defineRoute({
 export const updateProblemRoute = defineRoute({
   method: 'PATCH',
   path: '/organizer/problems/:id',
+  use: [requireUser, requireOrganizer],
   input: { params: ProblemIdParamsSchema, body: UpdateProblemBodySchema },
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -64,6 +78,7 @@ export const updateProblemRoute = defineRoute({
 export const publishProblemRoute = defineRoute({
   method: 'POST',
   path: '/organizer/problems/:id/publish',
+  use: [requireUser, requireOrganizer],
   input: { params: ProblemIdParamsSchema },
   output: {
     200: ProblemDetailSchema,
@@ -106,10 +121,33 @@ function reasonMessage(reason: 'missing_visible' | 'missing_hidden' | 'missing_b
 export const archiveProblemRoute = defineRoute({
   method: 'POST',
   path: '/organizer/problems/:id/archive',
+  use: [requireUser, requireOrganizer],
   input: { params: ProblemIdParamsSchema },
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
     const problem = await archiveProblem(c.get('db'), c.input.params.id)
+    if (!problem) return c.error('not_found', 'Problem not found', { status: 404 })
+    return problem
+  },
+})
+
+// The participant read (#11). No /organizer prefix: the participant is the
+// default audience of this API. Anything not published — draft, archived,
+// unknown id — is a plain 404, so an unpublished problem is indistinguishable
+// from one that does not exist.
+export const getParticipantProblemRoute = defineRoute({
+  method: 'GET',
+  path: '/problems/:id',
+  use: [requireUser],
+  input: { params: ParticipantProblemParamsSchema, query: ParticipantProblemQuerySchema },
+  output: { 200: ParticipantProblemSchema, 404: ErrorBodySchema },
+  handler: async (c) => {
+    const problem = await getPublishedProblem(
+      c.get('db'),
+      c.input.params.id,
+      c.input.query.locale,
+      c.get('currentUser').id,
+    )
     if (!problem) return c.error('not_found', 'Problem not found', { status: 404 })
     return problem
   },

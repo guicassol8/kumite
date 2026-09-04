@@ -6,6 +6,9 @@ import * as auth from './modules/auth/auth.route'
 import * as greetings from './modules/greetings/greetings.route'
 import * as health from './modules/health/health.route'
 import * as problems from './modules/problems/problems.route'
+import * as rounds from './modules/rounds/rounds.route'
+import * as sse from './modules/sse/sse.route'
+import * as submissions from './modules/submissions/submissions.route'
 import * as teams from './modules/teams/teams.route'
 import * as users from './modules/users/users.route'
 
@@ -14,7 +17,7 @@ import * as users from './modules/users/users.route'
 // app-level middleware chain (ADR-0012) runs before every route; add
 // cross-cutting concerns (cors(), secureHeaders(), bodyLimit() from 'kata') here.
 export const app = createApp({
-  modules: [health, greetings, auth, users, problems, teams],
+  modules: [health, greetings, auth, users, problems, teams, submissions, rounds, sse],
   middlewares: [cors(), requestLogger],
 })
 

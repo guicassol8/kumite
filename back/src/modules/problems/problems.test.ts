@@ -1,15 +1,32 @@
-import { sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
-import { problemsTable, problemTranslationsTable } from '../../db/schema'
-import { TestCaseSchema, UpdateProblemBodySchema } from './problems.schema'
+import {
+  problemsTable,
+  problemTranslationsTable,
+  roundProblemsTable,
+  roundsTable,
+  submissionsTable,
+  teamMembersTable,
+  teamsTable,
+  usersTable,
+} from '../../db/schema'
+import { closeRound, createRound, openRound } from '../rounds/rounds.service'
+import {
+  ParticipantProblemParamsSchema,
+  ParticipantProblemQuerySchema,
+  ParticipantProblemSchema,
+  TestCaseSchema,
+  UpdateProblemBodySchema,
+} from './problems.schema'
 import {
   archiveProblem,
   computeMissingLocales,
   createProblem,
   evaluateTestCaseCoverage,
   getProblem,
+  getPublishedProblem,
   listProblems,
   publishProblem,
   updateProblem,
@@ -51,6 +68,76 @@ describe('UpdateProblemBodySchema', () => {
       ],
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('ParticipantProblemQuerySchema', () => {
+  it('defaults the locale to pt when the query param is absent', () => {
+    expect(ParticipantProblemQuerySchema.parse({})).toEqual({ locale: 'pt' })
+  })
+
+  it('accepts a supported locale', () => {
+    expect(ParticipantProblemQuerySchema.parse({ locale: 'es' })).toEqual({ locale: 'es' })
+  })
+
+  it('rejects an unsupported locale, naming the supported ones', () => {
+    const result = ParticipantProblemQuerySchema.safeParse({ locale: 'de' })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain("'pt' | 'es' | 'en'")
+    }
+  })
+})
+
+describe('ParticipantProblemParamsSchema', () => {
+  it('accepts a uuid', () => {
+    const id = '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11'
+    expect(ParticipantProblemParamsSchema.parse({ id })).toEqual({ id })
+  })
+
+  it('rejects a malformed id', () => {
+    expect(ParticipantProblemParamsSchema.safeParse({ id: 'abc' }).success).toBe(false)
+  })
+})
+
+describe('ParticipantProblemSchema', () => {
+  // Second line of defence against leaking hidden cases: kata re-validates the
+  // handler's output against this schema, and zod strips what it does not declare.
+  it('strips a hidden flag smuggled into an example case', () => {
+    const parsed = ParticipantProblemSchema.parse({
+      id: '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+      points: 100,
+      difficulty: 'easy',
+      locale: 'pt',
+      title: 'Soma',
+      statementMd: 'Some dois números.',
+      examples: [{ input: [1, 2], expected: 3, hidden: true }],
+      roundId: null,
+      roundStatus: 'closed',
+      bestSubmission: null,
+    })
+
+    expect(parsed.examples[0]).toEqual({ input: [1, 2], expected: 3 })
+    expect(JSON.stringify(parsed)).not.toContain('hidden')
+  })
+
+  it('accepts an open round with a bestSubmission', () => {
+    const parsed = ParticipantProblemSchema.parse({
+      id: '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+      points: 100,
+      difficulty: 'easy',
+      locale: 'pt',
+      title: 'Soma',
+      statementMd: 'Some dois números.',
+      examples: [],
+      roundId: '9f3f1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+      roundStatus: 'open',
+      bestSubmission: { score: 80, achievedAt: new Date().toISOString(), attempts: 2 },
+    })
+
+    expect(parsed.roundStatus).toBe('open')
+    expect(parsed.bestSubmission).toMatchObject({ score: 80, attempts: 2 })
   })
 })
 
@@ -157,7 +244,7 @@ describe('problems.service', () => {
 
   beforeEach(async () => {
     await db.execute(
-      sql`truncate table ${problemTranslationsTable}, ${problemsTable} restart identity cascade`,
+      sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemTranslationsTable}, ${problemsTable}, ${teamMembersTable}, ${teamsTable}, ${usersTable} restart identity cascade`,
     )
   })
 
@@ -302,5 +389,220 @@ describe('problems.service', () => {
     expect(summaries.map((p) => p.id)).toEqual([second.id, first.id])
     expect(summaries.find((p) => p.id === second.id)?.testCaseCount).toBe(2)
     expect(summaries.find((p) => p.id === first.id)?.testCaseCount).toBe(0)
+  })
+
+  describe('getPublishedProblem', () => {
+    // A hidden expected value distinctive enough that a leak cannot hide in a
+    // uuid or a points value.
+    const secretExpected = 'RESPOSTA-OCULTA'
+
+    const createSampleProblem = async () => {
+      const problem = await createProblem(db, { difficulty: 'medium', points: 150 })
+      await updateProblem(db, problem.id, {
+        translations: [
+          { locale: 'pt', title: 'Soma', statementMd: 'Some dois números.' },
+          { locale: 'es', title: 'Suma', statementMd: 'Suma dos números.' },
+          { locale: 'en', title: 'Sum', statementMd: 'Sum two numbers.' },
+        ],
+        testCases: [
+          { input: [1, 2], expected: 3, hidden: false },
+          { input: [40, 2], expected: secretExpected, hidden: true },
+        ],
+      })
+      const published = await publishProblem(db, problem.id)
+      if (!published.ok) throw new Error('expected the sample problem to publish')
+      return problem.id
+    }
+
+    // Most tests below care about the problem/translation/examples shape, not
+    // round access — so this default puts the sample in an open round, the
+    // one state that lets getPublishedProblem return non-null.
+    const publishSample = async () => {
+      const id = await createSampleProblem()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      return { id, roundId: created.round.id }
+    }
+
+    const insertUser = async (email = `participant-${crypto.randomUUID()}@edu.pucrs.br`) => {
+      const [user] = await db
+        .insert(usersTable)
+        .values({ email, passwordHash: 'hash', role: 'participant', university: 'pucrs' })
+        .returning()
+      if (!user) throw new Error('expected a user fixture')
+      return user
+    }
+
+    const insertTeamMember = async (userId: string, teamName = 'Time A') => {
+      const [team] = await db.insert(teamsTable).values({ name: teamName }).returning()
+      if (!team) throw new Error('expected a team fixture')
+      await db.insert(teamMembersTable).values({ userId, teamId: team.id })
+      return team
+    }
+
+    it('serves the requested locale', async () => {
+      const { id } = await publishSample()
+      const user = await insertUser()
+
+      const problem = await getPublishedProblem(db, id, 'es', user.id)
+
+      expect(problem).toMatchObject({
+        id,
+        points: 150,
+        difficulty: 'medium',
+        locale: 'es',
+        title: 'Suma',
+        statementMd: 'Suma dos números.',
+      })
+    })
+
+    it('returns only the visible cases, with no trace of the hidden one', async () => {
+      const { id } = await publishSample()
+      const user = await insertUser()
+
+      const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+      expect(problem?.examples).toEqual([{ input: [1, 2], expected: 3 }])
+      expect(JSON.stringify(problem)).not.toContain(secretExpected)
+      expect(JSON.stringify(problem)).not.toContain('hidden')
+    })
+
+    it('falls back to pt and reports the locale actually served', async () => {
+      const { id } = await publishSample()
+      const user = await insertUser()
+      await db
+        .delete(problemTranslationsTable)
+        .where(
+          and(
+            eq(problemTranslationsTable.problemId, id),
+            eq(problemTranslationsTable.locale, 'es'),
+          ),
+        )
+
+      const problem = await getPublishedProblem(db, id, 'es', user.id)
+
+      expect(problem?.locale).toBe('pt')
+      expect(problem?.title).toBe('Soma')
+    })
+
+    it('returns null when not even the pt translation exists', async () => {
+      const { id } = await publishSample()
+      const user = await insertUser()
+      await db.delete(problemTranslationsTable).where(eq(problemTranslationsTable.problemId, id))
+
+      expect(await getPublishedProblem(db, id, 'pt', user.id)).toBeNull()
+    })
+
+    it('returns null for a draft problem', async () => {
+      const problem = await createProblem(db, { difficulty: 'easy' })
+      await updateProblem(db, problem.id, {
+        translations: [{ locale: 'pt', title: 'Soma', statementMd: 'a' }],
+      })
+      const user = await insertUser()
+
+      expect(await getPublishedProblem(db, problem.id, 'pt', user.id)).toBeNull()
+    })
+
+    it('returns null for an archived problem', async () => {
+      const { id } = await publishSample()
+      const user = await insertUser()
+      await archiveProblem(db, id)
+
+      expect(await getPublishedProblem(db, id, 'pt', user.id)).toBeNull()
+    })
+
+    it('returns null for an unknown id', async () => {
+      const unknown = '00000000-0000-0000-0000-000000000000'
+      const user = await insertUser()
+      expect(await getPublishedProblem(db, unknown, 'pt', user.id)).toBeNull()
+    })
+
+    it('returns null for a published problem never added to a round', async () => {
+      const id = await createSampleProblem()
+      const user = await insertUser()
+
+      expect(await getPublishedProblem(db, id, 'pt', user.id)).toBeNull()
+    })
+
+    it('returns null while the problem only sits in a draft round', async () => {
+      const id = await createSampleProblem()
+      const user = await insertUser()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+
+      expect(await getPublishedProblem(db, id, 'pt', user.id)).toBeNull()
+    })
+
+    it('reports the open round with no bestSubmission query', async () => {
+      const { id, roundId } = await publishSample()
+      const user = await insertUser()
+
+      const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+      expect(problem?.roundStatus).toBe('open')
+      expect(problem?.roundId).toBe(roundId)
+      expect(problem?.bestSubmission).toBeNull()
+    })
+
+    it('reports a closed round with the team best submission', async () => {
+      const { id, roundId } = await publishSample()
+      const user = await insertUser()
+      const team = await insertTeamMember(user.id)
+      const closed = await closeRound(db, roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+      const achievedAt = new Date('2026-08-31T12:00:00.000Z')
+      await db.insert(submissionsTable).values({
+        problemId: id,
+        userId: user.id,
+        teamId: team.id,
+        workspace: {},
+        generatedCode: '',
+        caseResults: [],
+        score: 80,
+        attemptNumber: 1,
+        createdAt: achievedAt,
+      })
+
+      const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+      expect(problem?.roundStatus).toBe('closed')
+      expect(problem?.roundId).toBeNull()
+      expect(problem?.bestSubmission).toEqual({ score: 80, achievedAt, attempts: 1 })
+    })
+
+    it('reports bestSubmission null on a closed round when the team never submitted', async () => {
+      const { id, roundId } = await publishSample()
+      const user = await insertUser()
+      await insertTeamMember(user.id)
+      const closed = await closeRound(db, roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+
+      const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+      expect(problem?.roundStatus).toBe('closed')
+      expect(problem?.bestSubmission).toBeNull()
+    })
+
+    it('reports bestSubmission null on a closed round when the user has no team', async () => {
+      const { id, roundId } = await publishSample()
+      const user = await insertUser()
+      const closed = await closeRound(db, roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+
+      const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+      expect(problem?.roundStatus).toBe('closed')
+      expect(problem?.bestSubmission).toBeNull()
+    })
   })
 })

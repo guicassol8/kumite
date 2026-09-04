@@ -3,9 +3,11 @@ import { expect, type Page, test } from '@playwright/test'
 // Visual walkthrough for #12. Prereqs (like auth.hurl / auth.spec.ts):
 //   docker compose up -d && pnpm db:migrate
 // Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD in the environment (used to run
-// `pnpm db:seed` beforehand and read here to log in as that account), and an
-// empty `problems` table for the 01 screenshot — this suite doesn't truncate
-// it itself since the dev DB is shared across worktrees.
+// `pnpm db:seed` beforehand and read here to log in as that account).
+// The 01 empty state is shot against a stubbed empty list instead of an empty
+// table: the dev DB is shared across worktrees, `pnpm db:seed` itself inserts
+// sample problems, and organizer-problem-form.spec.ts (#13) creates one of its
+// own in parallel — so global emptiness is not something this suite can rely on.
 const evidence = (name: string) => `e2e/evidence/12/${name}.png`
 
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
@@ -23,16 +25,33 @@ test.describe('organizer problems list', () => {
     await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
   }
 
+  // The seed calls below hit /organizer/problems* directly (no UI), so they
+  // need their own bearer token now that #27 guards those routes.
+  let organizerToken: string | undefined
+  async function organizerAuthHeader(): Promise<Record<string, string>> {
+    if (!organizerToken) {
+      const res = await fetch(`${BACK_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
+      })
+      const { token } = (await res.json()) as { token: string }
+      organizerToken = token
+    }
+    return { authorization: `Bearer ${organizerToken}` }
+  }
+
   async function seedDraftProblem(): Promise<string> {
+    const auth = await organizerAuthHeader()
     const created = await fetch(`${BACK_URL}/organizer/problems`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...auth },
       body: JSON.stringify({ difficulty: 'easy', points: 10 }),
     })
     const { id } = (await created.json()) as { id: string }
     await fetch(`${BACK_URL}/organizer/problems/${id}`, {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...auth },
       body: JSON.stringify({
         translations: [
           { locale: 'pt', title: 'Soma de dois números', statementMd: 'Some `a` e `b`.' },
@@ -43,15 +62,16 @@ test.describe('organizer problems list', () => {
   }
 
   async function seedPublishedProblem(): Promise<string> {
+    const auth = await organizerAuthHeader()
     const created = await fetch(`${BACK_URL}/organizer/problems`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...auth },
       body: JSON.stringify({ difficulty: 'hard', points: 50 }),
     })
     const { id } = (await created.json()) as { id: string }
     await fetch(`${BACK_URL}/organizer/problems/${id}`, {
       method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...auth },
       body: JSON.stringify({
         testCases: [
           { input: [1, 2], expected: 3, hidden: false },
@@ -64,7 +84,7 @@ test.describe('organizer problems list', () => {
         ],
       }),
     })
-    await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST' })
+    await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST', headers: auth })
     return id
   }
 
@@ -73,10 +93,21 @@ test.describe('organizer problems list', () => {
   }) => {
     await loginAsOrganizer(page)
 
-    // 01 — empty state with a shortcut to create the first problem.
+    // 01 — empty state with a shortcut to create the first problem. Scoped to
+    // the back's origin, like the 05 stub below, so the front's own navigation
+    // to that path is not intercepted.
+    const listApiUrl = `${BACK_URL}/organizer/problems`
+    await page.route(listApiUrl, (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      } else {
+        route.continue()
+      }
+    })
     await page.goto('/organizer/problems')
     await expect(page.getByTestId('organizer-problems-empty')).toBeVisible()
     await page.screenshot({ path: evidence('01-empty-state'), fullPage: true })
+    await page.unroute(listApiUrl)
 
     // 02 — a draft (pt-only) and a published (pt/es/en, 1 visible + 1 hidden
     // case) problem, seeded directly against the back, show up with their
@@ -106,7 +137,6 @@ test.describe('organizer problems list', () => {
     // 05 — a forced 500 shows the recoverable error state; retry refetches.
     // Scoped to the back's origin: an unscoped "**/organizer/problems" glob
     // also matches the front's own page navigation to that path.
-    const listApiUrl = `${BACK_URL}/organizer/problems`
     await page.route(listApiUrl, (route) => {
       if (route.request().method() === 'GET') {
         route.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
@@ -122,17 +152,18 @@ test.describe('organizer problems list', () => {
     await page.getByTestId('organizer-problems-error-retry').click()
     await expect(page.getByTestId('organizer-problems-table')).toBeVisible()
 
-    // 06 — create/edit links land on their (still placeholder) routes.
+    // 06 — create/edit links land on the problem form (#13 replaced the
+    // placeholders these two steps used to assert).
     await page.getByTestId('organizer-problems-create').click()
-    await expect(page.getByTestId('organizer-problems-placeholder')).toBeVisible()
+    await expect(page.getByTestId('problem-form')).toBeVisible()
     await expect(page).toHaveURL(/\/organizer\/problems\/new$/)
-    await page.screenshot({ path: evidence('06a-create-placeholder'), fullPage: true })
+    await page.screenshot({ path: evidence('06a-create-form'), fullPage: true })
 
     await page.goBack()
     await expect(page.getByTestId('organizer-problems-table')).toBeVisible()
     await page.getByTestId(`organizer-problems-edit-${publishedId}`).click()
-    await expect(page.getByTestId('organizer-problems-placeholder')).toBeVisible()
+    await expect(page.getByTestId('problem-form')).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`/organizer/problems/${publishedId}/edit$`))
-    await page.screenshot({ path: evidence('06b-edit-placeholder'), fullPage: true })
+    await page.screenshot({ path: evidence('06b-edit-form'), fullPage: true })
   })
 })

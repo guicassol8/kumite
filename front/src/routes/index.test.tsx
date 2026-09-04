@@ -1,18 +1,82 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/lib/api', () => ({
+  api: {
+    health: { $get: vi.fn() },
+    teams: Object.assign(vi.fn(), { $get: vi.fn() }),
+    rounds: Object.assign(vi.fn(), { $get: vi.fn() }),
+    me: { $get: vi.fn() },
+  },
+}))
+
+const connectEventStream = vi.fn()
+vi.mock('@/lib/sse-client', () => ({
+  connectEventStream: (...args: unknown[]) => connectEventStream(...args),
+}))
 
 import '@/i18n'
 
+import { api } from '@/lib/api'
+import { clearSession, type SessionUser, setSession } from '@/lib/session'
+import type { SseEvent } from '@/lib/sse-schema'
 import { routeTree } from '@/routeTree.gen'
+
+const mockedHealth = vi.mocked(api.health.$get)
+const mockedTeams = vi.mocked(api.teams.$get)
+const mockedRounds = vi.mocked(api.rounds.$get)
+const sseUnsubscribe = vi.fn()
+
+function emitSse(event: SseEvent) {
+  const onEvent = connectEventStream.mock.calls.at(-1)?.[0] as (e: SseEvent) => void
+  act(() => onEvent(event))
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stubs
+function jsonResponse(status: number, body: unknown): any {
+  return { ok: status >= 200 && status < 300, status, json: async () => body }
+}
+
+const fakeUser: SessionUser = {
+  id: 'u1',
+  email: 'ada@edu.pucrs.br',
+  role: 'participant',
+  university: 'pucrs',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+}
+
+const fakeOrganizer: SessionUser = {
+  ...fakeUser,
+  id: 'u2',
+  email: 'organizer@edu.pucrs.br',
+  role: 'organizer',
+}
+
+function roundSummary(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'r1',
+    name: 'Rodada 1',
+    status: 'draft',
+    durationMinutes: 30,
+    openedAt: null,
+    closesAt: null,
+    closedAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    problemCount: 2,
+    ...overrides,
+  }
+}
 
 function renderHome(initialEntry = '/') {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [initialEntry] }),
   })
-  const queryClient = new QueryClient()
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
@@ -21,8 +85,21 @@ function renderHome(initialEntry = '/') {
   return router
 }
 
+beforeEach(() => {
+  mockedHealth.mockReset()
+  mockedTeams.mockReset()
+  mockedRounds.mockReset()
+  connectEventStream.mockReset()
+  sseUnsubscribe.mockReset()
+  connectEventStream.mockReturnValue(sseUnsubscribe)
+  mockedHealth.mockResolvedValue(jsonResponse(200, { status: 'ok' }))
+  mockedRounds.mockResolvedValue(jsonResponse(200, []))
+  clearSession('manual')
+})
+
 afterEach(() => {
   cleanup()
+  clearSession('manual')
 })
 
 describe('Home', () => {
@@ -42,5 +119,195 @@ describe('Home', () => {
 
     await waitFor(() => expect(screen.queryByTestId('home-notice-banner')).toBeNull())
     expect(router.state.location.search).toEqual({})
+  })
+})
+
+describe('Home — team card', () => {
+  it('stays hidden while anonymous, and asks for no team data', async () => {
+    renderHome()
+
+    await waitFor(() => expect(screen.getByTestId('api-status')).toBeDefined())
+    expect(screen.queryByTestId('home-team-card')).toBeNull()
+    expect(mockedTeams).not.toHaveBeenCalled()
+  })
+
+  it('names the team and counts its members', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedTeams.mockResolvedValue(
+      jsonResponse(200, {
+        maxTeamSize: 3,
+        mixingLocked: false,
+        myTeamId: 't1',
+        teams: [
+          {
+            id: 't1',
+            name: 'Blockly Busters',
+            members: [
+              { university: 'pucrs', email: 'ada@edu.pucrs.br' },
+              { university: 'merida', email: 'grace@merida.edu.mx' },
+            ],
+            slotsAvailable: 1,
+            frozen: false,
+            joinBlockedReason: 'already_in_team',
+          },
+        ],
+      }),
+    )
+    renderHome()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-team-card').textContent).toContain('Blockly Busters'),
+    )
+    expect(screen.getByTestId('home-team-card').textContent).toContain('2 de 3 integrantes')
+  })
+
+  it('says the user has no team yet and links to the listing', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedTeams.mockResolvedValue(
+      jsonResponse(200, { maxTeamSize: 3, mixingLocked: false, myTeamId: null, teams: [] }),
+    )
+    const router = renderHome()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-team-card').textContent).toContain(
+        'Você ainda não está em um time.',
+      ),
+    )
+
+    fireEvent.click(screen.getByTestId('home-team-cta'))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/teams'))
+  })
+})
+
+describe('Home — round card (#40)', () => {
+  it('shows the waiting copy when no round is open', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedRounds.mockResolvedValue(jsonResponse(200, [roundSummary({ status: 'draft' })]))
+    renderHome()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-round-card').textContent).toContain(
+        'Aguardando a próxima rodada.',
+      ),
+    )
+  })
+
+  it('shows the open round name and a countdown once the stream reports it', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({
+          id: 'r1',
+          name: 'Rodada Abertura',
+          status: 'open',
+          openedAt: '2026-09-02T12:00:00.000Z',
+          closesAt: '2026-09-02T12:30:00.000Z',
+        }),
+      ]),
+    )
+    renderHome()
+    await waitFor(() => expect(connectEventStream).toHaveBeenCalledTimes(1))
+
+    emitSse({
+      type: 'state.sync',
+      serverTime: new Date('2026-09-02T12:00:00.000Z'),
+      round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-round-card').textContent).toContain('Rodada Abertura'),
+    )
+    expect(screen.getByTestId('round-countdown')).toBeDefined()
+  })
+
+  it('reflects a round opening live, via SSE-triggered query invalidation, without a page reload', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedRounds.mockResolvedValueOnce(jsonResponse(200, []))
+    renderHome()
+    await waitFor(() =>
+      expect(screen.getByTestId('home-round-card').textContent).toContain(
+        'Aguardando a próxima rodada.',
+      ),
+    )
+    await waitFor(() => expect(connectEventStream).toHaveBeenCalledTimes(1))
+
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({
+          id: 'r2',
+          name: 'Rodada Ao Vivo',
+          status: 'open',
+          openedAt: '2026-09-02T12:00:00.000Z',
+          closesAt: '2026-09-02T12:20:00.000Z',
+        }),
+      ]),
+    )
+    emitSse({
+      type: 'round.opened',
+      serverTime: new Date('2026-09-02T12:00:00.000Z'),
+      roundId: 'r2',
+      closesAt: new Date('2026-09-02T12:20:00.000Z'),
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-round-card').textContent).toContain('Rodada Ao Vivo'),
+    )
+    expect(mockedRounds).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('Home — closed rounds card (#40)', () => {
+  it('shows nothing but the empty copy when there are no closed rounds', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedRounds.mockResolvedValue(jsonResponse(200, []))
+    renderHome()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-closed-rounds').textContent).toContain(
+        'Nenhuma rodada encerrada ainda.',
+      ),
+    )
+  })
+
+  it('lists closed rounds by name and closing date, without a score', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({
+          id: 'r9',
+          name: 'Rodada Encerrada',
+          status: 'closed',
+          closedAt: '2026-09-01T18:30:00.000Z',
+        }),
+      ]),
+    )
+    renderHome()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-closed-rounds').textContent).toContain('Rodada Encerrada'),
+    )
+    const cardText = screen.getByTestId('home-closed-rounds').textContent ?? ''
+    expect(cardText).not.toMatch(/\d+\s*(pts|pontos|points)/i)
+  })
+})
+
+describe('Home — organizer shortcuts card (#40)', () => {
+  it('stays hidden for a participant', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHome()
+
+    await waitFor(() => expect(screen.getByTestId('api-status')).toBeDefined())
+    expect(screen.queryByTestId('home-organizer-shortcuts')).toBeNull()
+  })
+
+  it('shows a shortcut to the problems screen for an organizer', async () => {
+    setSession(fakeOrganizer, 'tok-2')
+    renderHome()
+
+    await waitFor(() => expect(screen.getByTestId('home-organizer-shortcuts')).toBeDefined())
+    expect(screen.getByTestId('home-organizer-shortcuts-problems').getAttribute('href')).toBe(
+      '/organizer/problems',
+    )
   })
 })

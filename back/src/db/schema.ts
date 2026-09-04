@@ -1,7 +1,8 @@
-import { sql } from 'drizzle-orm'
+import { asc, desc, sql } from 'drizzle-orm'
 import {
   boolean,
   check,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -22,8 +23,21 @@ export const difficultyEnum = pgEnum('difficulty', ['easy', 'medium', 'hard'])
 export const problemStatusEnum = pgEnum('problem_status', ['draft', 'published', 'archived'])
 export const localeEnum = pgEnum('locale', ['pt', 'es', 'en'])
 export const roundStatusEnum = pgEnum('round_status', ['draft', 'open', 'closed'])
+export const submissionCaseStatusEnum = pgEnum('submission_case_status', [
+  'passed',
+  'failed',
+  'timeout',
+  'error',
+])
 
 export type TestCase = { input: JsonValue; expected: JsonValue; hidden: boolean }
+
+// Explicit `index`, not a positional array: a submission's results stay
+// readable even if a problem's test cases are reordered later.
+export type SubmissionCaseResult = {
+  index: number
+  status: (typeof submissionCaseStatusEnum.enumValues)[number]
+}
 
 export const usersTable = pgTable(
   'users',
@@ -145,5 +159,49 @@ export const roundProblemsTable = pgTable(
   (table) => [
     primaryKey({ columns: [table.roundId, table.problemId] }),
     uniqueIndex('round_problems_round_id_position_idx').on(table.roundId, table.position),
+  ],
+)
+
+export const submissionsTable = pgTable(
+  'submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    problemId: uuid('problem_id')
+      .notNull()
+      // restrict: a problem with submission history can't be deleted — the
+      // scores would lose their meaning (same rule as round_problems).
+      .references(() => problemsTable.id, { onDelete: 'restrict' }),
+    // userId is an audit field ("who on the team submitted"); teamId is the
+    // identity that scoring and the leaderboard group by. Both mandatory:
+    // every submission belongs to an authenticated participant with a team.
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => usersTable.id, { onDelete: 'restrict' }),
+    teamId: uuid('team_id')
+      .notNull()
+      .references(() => teamsTable.id, { onDelete: 'restrict' }),
+    workspace: jsonb('workspace').notNull().$type<JsonValue>(),
+    generatedCode: text('generated_code').notNull(),
+    caseResults: jsonb('case_results').notNull().default([]).$type<SubmissionCaseResult[]>(),
+    score: integer('score').notNull(),
+    attemptNumber: integer('attempt_number').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Guards the attempt-numbering race #21's insert would otherwise have to
+    // own alone.
+    uniqueIndex('submissions_team_problem_attempt_idx').on(
+      table.teamId,
+      table.problemId,
+      table.attemptNumber,
+    ),
+    // Serves getBestSubmission: highest score first, earliest wins a tie.
+    index('submissions_team_problem_score_idx').on(
+      table.teamId,
+      table.problemId,
+      desc(table.score),
+      asc(table.createdAt),
+    ),
   ],
 )

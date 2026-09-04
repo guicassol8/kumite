@@ -9,7 +9,8 @@
     "login": "Entrar",
     "signup": "Cadastrar",
     "logout": "Sair",
-    "organizerLink": "Organizador"
+    "organizerLink": "Organizador",
+    "teamsLink": "Times"
   },
   "home": {
     "tagline": "PUCRS × Mérida — programação em blocos",
@@ -20,6 +21,25 @@
     "notices": {
       "forbiddenOrganizer": "Essa área é restrita a organizadores.",
       "dismiss": "Dispensar"
+    },
+    "team": {
+      "title": "Seu time",
+      "none": "Você ainda não está em um time.",
+      "memberCount": "{{members}} de {{max}} integrantes",
+      "cta": "Ver times"
+    },
+    "round": {
+      "waiting": "Aguardando a próxima rodada.",
+      "timeRemaining": "Termina em {{time}}"
+    },
+    "closedRounds": {
+      "title": "Rodadas encerradas",
+      "empty": "Nenhuma rodada encerrada ainda.",
+      "closedAt": "Encerrada em {{date}}"
+    },
+    "organizerShortcuts": {
+      "title": "Área do organizador",
+      "problems": "Problemas"
     }
   },
   "editor": {
@@ -67,12 +87,120 @@
         "description": "O problema deixa de ficar disponível para novas rodadas, mas continua salvo no catálogo.",
         "confirm": "Arquivar",
         "cancel": "Cancelar"
-      },
-      "placeholder": {
-        "title": "Em construção",
-        "description": "Esta tela ainda está em desenvolvimento.",
-        "back": "Voltar para a lista"
       }
+    },
+    "problemForm": {
+      "createTitle": "Novo problema",
+      "editTitle": "Editar problema",
+      "loading": "Carregando problema...",
+      "difficultyLabel": "Dificuldade",
+      "pointsLabel": "Pontos",
+      "titleLabel": "Título",
+      "statementLabel": "Enunciado (markdown)",
+      "previewHeading": "Pré-visualização",
+      "testCases": {
+        "heading": "Casos de teste",
+        "empty": "Nenhum caso de teste ainda.",
+        "columns": {
+          "input": "Entrada",
+          "expected": "Esperado",
+          "hidden": "Oculto",
+          "actions": "Ações"
+        },
+        "addAction": "Adicionar caso",
+        "removeAction": "Remover caso",
+        "moveUpAction": "Mover para cima",
+        "moveDownAction": "Mover para baixo"
+      },
+      "saveAction": "Salvar",
+      "publishAction": "Publicar",
+      "publishDisabled": {
+        "published": "Este problema já está publicado.",
+        "archived": "Não é possível publicar um problema arquivado."
+      },
+      "savedMessage": "Alterações salvas.",
+      "backToList": "Voltar para a lista",
+      "errors": {
+        "jsonEmpty": "Informe um valor JSON",
+        "jsonInvalid": "JSON inválido",
+        "pointsInvalid": "Informe uma pontuação inteira maior que zero.",
+        "translationIncomplete": "Preencha título e enunciado, ou deixe a aba inteira em branco.",
+        "translationCannotBeCleared": "Não é possível apagar uma tradução já salva.",
+        "publish": {
+          "missingLocales": "Para publicar, complete a tradução deste idioma.",
+          "missingVisibleCase": "Para publicar, inclua pelo menos um caso visível.",
+          "missingHiddenCase": "Para publicar, inclua pelo menos um caso oculto."
+        },
+        "saveFailed": "Não foi possível salvar o problema. Tente novamente.",
+        "publishFailed": "Não foi possível publicar o problema. Tente novamente.",
+        "loadFailed": "Não foi possível carregar o problema.",
+        "retry": "Tentar novamente",
+        "notFound": "Problema não encontrado."
+      }
+    }
+  },
+  "teams": {
+    "heading": "Times",
+    "loading": "Carregando times...",
+    "error": {
+      "message": "Não foi possível carregar os times.",
+      "retry": "Tentar novamente"
+    },
+    "empty": {
+      "title": "Nenhum time criado ainda.",
+      "cta": "Criar o primeiro time"
+    },
+    "columns": {
+      "name": "Time",
+      "members": "Integrantes",
+      "slots": "Vagas",
+      "actions": "Ações"
+    },
+    "createAction": "Criar time",
+    "slots": "{{available}}/{{max}}",
+    "full": "Cheio",
+    "joinAction": "Entrar",
+    "yourTeamBadge": "Seu time",
+    "mixingLockedNotice": "A mistura entre universidades está travada: você só pode entrar em times da sua universidade.",
+    "university": {
+      "pucrs": "PUCRS",
+      "merida": "Mérida"
+    },
+    "joinBlocked": {
+      "teamFull": "Time cheio",
+      "mixedLock": "Time de outra universidade",
+      "alreadyInTeam": "Você já está em um time"
+    },
+    "myTeam": {
+      "title": "Meu time",
+      "you": "(você)",
+      "leaveAction": "Sair do time",
+      "frozenNotice": "Este time já submeteu uma solução — a formação está congelada e ninguém pode sair."
+    },
+    "leaveDialog": {
+      "title": "Sair do time?",
+      "description": "Você perde o lugar neste time e precisa entrar em outro para competir.",
+      "confirm": "Sair",
+      "cancel": "Cancelar"
+    },
+    "create": {
+      "title": "Criar time",
+      "nameLabel": "Nome do time",
+      "submit": "Criar",
+      "cancel": "Cancelar",
+      "errors": {
+        "nameRequired": "Informe o nome do time",
+        "nameTooLong": "O nome pode ter no máximo 40 caracteres",
+        "nameTaken": "Já existe um time com esse nome",
+        "unexpected": "Não foi possível criar o time. Tente novamente."
+      }
+    },
+    "actionError": {
+      "teamFull": "Esse time ficou cheio antes de você entrar.",
+      "mixedLock": "A mistura entre universidades está travada — esse time é de outra universidade.",
+      "alreadyInTeam": "Você já está em um time.",
+      "notFound": "Esse time não existe mais.",
+      "unexpected": "Não foi possível entrar no time. Tente novamente."
     }
   },
   "auth": {

@@ -10,8 +10,10 @@
 # with: docker compose down -v && docker compose up -d && pnpm db:migrate && pnpm db:seed
 #
 # Step order is deliberate: the 5s cooldown is armed only by a submission that
-# actually reached the sandbox, so the 404 and the codegen refusal run first
-# and cost nothing. The happy path arms it, and the next attempt proves the 429.
+# actually reached the sandbox, so the 404s and the codegen refusal run first
+# and cost nothing. The happy path arms it, and the next attempt proves the
+# 429 — so the closed-round scenario at the end uses a second, untouched team
+# rather than fighting that cooldown.
 
 # 0. Sign up + log in the participant, then give them a team — submitting
 #    now requires one (#32).
@@ -46,7 +48,27 @@ HTTP 200
 [Captures]
 noteam_token: jsonpath "$.token"
 
-# 0b. Log in the seeded organizer for the setup calls below (#27).
+# 0b. A third participant with their own team, untouched by the happy path's
+#     cooldown — used to prove a closed round blocks submissions (step 9).
+POST {{host}}/auth/signup
+Content-Type: application/json
+{ "email": "submissions-e2e-closed@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+HTTP 201
+
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "submissions-e2e-closed@edu.pucrs.br", "password": "supersecret" }
+HTTP 200
+[Captures]
+closed_token: jsonpath "$.token"
+
+POST {{host}}/teams
+Authorization: Bearer {{closed_token}}
+Content-Type: application/json
+{ "name": "Submissions E2E Closed Round" }
+HTTP 201
+
+# 0c. Log in the seeded organizer for the setup calls below (#27).
 POST {{host}}/auth/login
 Content-Type: application/json
 { "email": "{{organizer_email}}", "password": "{{organizer_password}}" }
@@ -86,6 +108,22 @@ HTTP 200
 [Asserts]
 jsonpath "$.status" == "published"
 
+# 1b. A round holding the problem, opened right away — submitting now
+#     requires an open round containing the problem (#37).
+POST {{host}}/organizer/rounds
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "name": "Submissions E2E Round", "durationMinutes": 30, "problemIds": ["{{problem_id}}"] }
+HTTP 201
+[Captures]
+round_id: jsonpath "$.id"
+
+POST {{host}}/organizer/rounds/{{round_id}}/open
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "open"
+
 # 2. A teamless participant submits -> 404 not_in_team, guided to join a team
 #    first (#32). Nothing runs, no cooldown armed.
 POST {{host}}/submissions
@@ -93,6 +131,7 @@ Authorization: Bearer {{noteam_token}}
 Content-Type: application/json
 {
   "problemId": "{{problem_id}}",
+  "roundId": "{{round_id}}",
   "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
 }
 HTTP 404
@@ -105,11 +144,27 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 {
   "problemId": "00000000-0000-0000-0000-000000000000",
+  "roundId": "{{round_id}}",
   "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
 }
 HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
+
+# 3b. A published problem, but a roundId that names no open round at all
+#     (the nil uuid) -> 404 no_active_round. The client's timer/roundId is
+#     never trusted on its own.
+POST {{host}}/submissions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+{
+  "problemId": "{{problem_id}}",
+  "roundId": "00000000-0000-0000-0000-000000000000",
+  "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
+}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "no_active_round"
 
 # 4. A workspace with no root block -> 400 from codegen, message already
 #    localized by @kumite/blocks. Still nothing executed, still no cooldown.
@@ -118,6 +173,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 {
   "problemId": "{{problem_id}}",
+  "roundId": "{{round_id}}",
   "workspace": { "blocks": { "languageVersion": 0, "blocks": [] } }
 }
 HTTP 400
@@ -131,6 +187,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 {
   "problemId": "{{problem_id}}",
+  "roundId": "{{round_id}}",
   "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
 }
 HTTP 201
@@ -153,6 +210,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 {
   "problemId": "{{problem_id}}",
+  "roundId": "{{round_id}}",
   "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
 }
 HTTP 429
@@ -164,8 +222,31 @@ POST {{host}}/submissions
 Content-Type: application/json
 {
   "problemId": "{{problem_id}}",
+  "roundId": "{{round_id}}",
   "workspace": { "blocks": { "languageVersion": 0, "blocks": [] } }
 }
 HTTP 401
 [Asserts]
 jsonpath "$.error" == "unauthorized"
+
+# 8. Organizer closes the round.
+POST {{host}}/organizer/rounds/{{round_id}}/close
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "closed"
+
+# 9. A previously-valid roundId, now closed -> 404 no_active_round even for a
+#    team that never submitted (no cooldown involved). Proves a closed round
+#    blocks new submissions outright.
+POST {{host}}/submissions
+Authorization: Bearer {{closed_token}}
+Content-Type: application/json
+{
+  "problemId": "{{problem_id}}",
+  "roundId": "{{round_id}}",
+  "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
+}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "no_active_round"

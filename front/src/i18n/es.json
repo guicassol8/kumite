@@ -10,7 +10,8 @@
     "signup": "Registrarse",
     "logout": "Salir",
     "organizerLink": "Organizador",
-    "teamsLink": "Equipos"
+    "teamsLink": "Equipos",
+    "leaderboardLink": "Marcador"
   },
   "home": {
     "tagline": "PUCRS × Mérida — programación con bloques",
@@ -260,6 +261,33 @@
       "timeout": "Tiempo agotado ({{seconds}}s)",
       "runtimeError": "Error: {{message}}",
       "empty": "Arma tu solución dentro del bloque “resolver” y haz clic en Ejecutar."
+    }
+  },
+  "leaderboard": {
+    "heading": "Marcador",
+    "tabs": {
+      "round": "Ronda",
+      "event": "General"
+    },
+    "lastClosedRoundLabel": "{{name}} — última ronda cerrada",
+    "columns": {
+      "rank": "#",
+      "team": "Equipo",
+      "total": "Total",
+      "problemFallback": "P{{position}}"
+    },
+    "connection": {
+      "connecting": "Conectando al marcador en vivo...",
+      "reconnecting": "Conexión perdida — reconectando..."
+    },
+    "loading": "Cargando marcador...",
+    "error": {
+      "message": "No fue posible cargar el marcador.",
+      "retry": "Intentar de nuevo"
+    },
+    "empty": {
+      "title": "Todavía no hay equipos en el marcador.",
+      "noRoundEver": "Todavía no se abrió ninguna ronda en esta competencia."
     }
   }
 }

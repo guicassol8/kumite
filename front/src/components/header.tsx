@@ -29,6 +29,9 @@ export function Header() {
             <Link to="/teams" data-testid="header-teams-link" className="text-sm">
               {t('header.teamsLink')}
             </Link>
+            <Link to="/leaderboard" data-testid="header-leaderboard-link" className="text-sm">
+              {t('header.leaderboardLink')}
+            </Link>
             <span data-testid="header-user-email" className="text-muted-foreground text-sm">
               {user.email}
             </span>

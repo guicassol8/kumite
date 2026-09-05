@@ -1,0 +1,278 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const connectEventStream = vi.fn()
+vi.mock('@/lib/sse-client', () => ({
+  connectEventStream: (...args: unknown[]) => connectEventStream(...args),
+}))
+
+vi.mock('@/lib/api', () => ({
+  api: {
+    teams: { $get: vi.fn() },
+    rounds: Object.assign(vi.fn(), {
+      $get: vi.fn(),
+      ':id': { ranking: { $get: vi.fn() } },
+    }),
+    ranking: { $get: vi.fn() },
+    problems: { ':id': { $get: vi.fn() } },
+  },
+}))
+
+import '@/i18n'
+
+import { api } from '@/lib/api'
+import { clearSession, type SessionUser, setSession } from '@/lib/session'
+import type { EventRanking, RoundRanking, SseEvent } from '@/lib/sse-schema'
+import { routeTree } from '@/routeTree.gen'
+
+const mockedTeams = vi.mocked(api.teams.$get)
+const mockedRounds = vi.mocked(api.rounds.$get)
+const mockedRoundRanking = vi.mocked(api.rounds[':id'].ranking.$get)
+const mockedEventRanking = vi.mocked(api.ranking.$get)
+const mockedProblem = vi.mocked(api.problems[':id'].$get)
+
+const participant: SessionUser = {
+  id: 'u1',
+  email: 'ada@edu.pucrs.br',
+  role: 'participant',
+  university: 'pucrs',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stubs
+function jsonResponse(status: number, body: unknown): any {
+  return { ok: status >= 200 && status < 300, status, json: async () => body }
+}
+
+function emit(event: SseEvent) {
+  const onEvent = connectEventStream.mock.calls.at(-1)?.[0] as (e: SseEvent) => void
+  act(() => onEvent(event))
+}
+
+function emitStatus(status: 'connecting' | 'open' | 'reconnecting') {
+  const onStatusChange = connectEventStream.mock.calls.at(-1)?.[1] as (s: string) => void
+  act(() => onStatusChange(status))
+}
+
+const teamsEnvelope = (overrides: Partial<{ myTeamId: string | null }> = {}) => ({
+  maxTeamSize: 4,
+  mixingLocked: false,
+  myTeamId: null,
+  teams: [
+    { id: 't1', name: 'Time 1', members: [{ university: 'pucrs', email: null }] },
+    { id: 't2', name: 'Time 2', members: [{ university: 'merida', email: null }] },
+  ],
+  ...overrides,
+})
+
+const roundRanking: RoundRanking = {
+  roundId: 'r1',
+  roundName: 'Rodada 1',
+  problemIds: ['p1'],
+  teams: [
+    {
+      teamId: 't1',
+      teamName: 'Time 1',
+      rank: 1,
+      totalScore: 100,
+      totalAttempts: 1,
+      tiebreakTimeMs: 5000,
+      problems: [{ problemId: 'p1', score: 100, attempts: 1 }],
+    },
+    {
+      teamId: 't2',
+      teamName: 'Time 2',
+      rank: 2,
+      totalScore: 50,
+      totalAttempts: 2,
+      tiebreakTimeMs: 9000,
+      problems: [{ problemId: 'p1', score: 50, attempts: 2 }],
+    },
+  ],
+}
+
+const eventRanking: EventRanking = {
+  teams: [
+    {
+      teamId: 't1',
+      teamName: 'Time 1',
+      rank: 1,
+      totalScore: 100,
+      totalAttempts: 1,
+      tiebreakTimeMs: 5000,
+      rounds: [
+        { roundId: 'r1', roundName: 'Rodada 1', score: 100, attempts: 1, tiebreakTimeMs: 5000 },
+      ],
+    },
+    {
+      teamId: 't2',
+      teamName: 'Time 2',
+      rank: 2,
+      totalScore: 50,
+      totalAttempts: 2,
+      tiebreakTimeMs: 9000,
+      rounds: [
+        { roundId: 'r1', roundName: 'Rodada 1', score: 50, attempts: 2, tiebreakTimeMs: 9000 },
+      ],
+    },
+  ],
+}
+
+function renderLeaderboard() {
+  const router = createRouter({
+    routeTree,
+    history: createMemoryHistory({ initialEntries: ['/leaderboard'] }),
+  })
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
+  return router
+}
+
+beforeEach(() => {
+  connectEventStream.mockReset()
+  connectEventStream.mockReturnValue(vi.fn())
+  mockedTeams.mockReset()
+  mockedRounds.mockReset()
+  mockedRoundRanking.mockReset()
+  mockedEventRanking.mockReset()
+  mockedProblem.mockReset()
+
+  mockedTeams.mockResolvedValue(jsonResponse(200, teamsEnvelope()))
+  mockedRounds.mockResolvedValue(jsonResponse(200, []))
+  mockedRoundRanking.mockResolvedValue(jsonResponse(200, roundRanking))
+  mockedEventRanking.mockResolvedValue(jsonResponse(200, eventRanking))
+  mockedProblem.mockResolvedValue(jsonResponse(200, { title: 'Soma' }))
+
+  setSession(participant, 'tok-1')
+})
+
+afterEach(() => {
+  cleanup()
+  clearSession('manual')
+})
+
+describe('LeaderboardScreen — active round', () => {
+  it('shows the round grid live, highlighting my team', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(200, teamsEnvelope({ myTeamId: 't1' })))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    const row1 = screen.getByTestId('leaderboard-row-t1')
+    expect(row1.textContent).toContain('Time 1')
+    expect(row1.textContent).toContain('100')
+    expect(screen.getByTestId('leaderboard-your-team-badge')).toBeDefined()
+  })
+
+  it('switches to the Geral tab and shows round columns', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-column-round-r1')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-column-round-r1').textContent).toBe('Rodada 1')
+  })
+})
+
+describe('LeaderboardScreen — no active round', () => {
+  it('shows the last closed round under "Rodada" and opens on "Geral" by default', async () => {
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        {
+          id: 'r1',
+          name: 'Rodada 1',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: new Date('2026-09-01T10:00:00.000Z'),
+          closesAt: null,
+          closedAt: new Date('2026-09-01T10:30:00.000Z'),
+          createdAt: new Date('2026-09-01T09:00:00.000Z'),
+          updatedAt: new Date('2026-09-01T10:30:00.000Z'),
+          problemCount: 1,
+        },
+      ]),
+    )
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-tabs')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-table')).toBeDefined()
+    expect(screen.getByTestId('leaderboard-column-round-r1')).toBeDefined()
+
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-round'))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-last-closed-label')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-last-closed-label').textContent).toContain('Rodada 1')
+    expect(screen.getByTestId('leaderboard-row-t1')).toBeDefined()
+  })
+
+  it('shows a dedicated empty state under "Rodada" when no round ever existed', async () => {
+    mockedRounds.mockResolvedValue(jsonResponse(200, []))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: null,
+      event: { teams: [] },
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-empty-no-round')).toBeDefined())
+  })
+})
+
+describe('LeaderboardScreen — connection banner', () => {
+  it('shows a banner while connecting/reconnecting and hides it once open', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+
+    emitStatus('open')
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-connection-banner')).toBeNull())
+
+    emitStatus('reconnecting')
+    await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+  })
+})
+
+describe('LeaderboardScreen — empty state', () => {
+  it('shows the empty state when the round has zero teams', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: { ...roundRanking, teams: [] },
+      event: { teams: [] },
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-empty')).toBeDefined())
+  })
+})

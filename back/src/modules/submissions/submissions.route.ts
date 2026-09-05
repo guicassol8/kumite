@@ -39,7 +39,11 @@ export const createSubmissionRoute = defineRoute({
 
     const outcome = await submitSolution(db, { userId, teamId }, c.input.body)
     if (outcome.ok) {
-      if (outcome.rankingChanged) markRankingDirty()
+      // Every accepted submission increments the team's attempts for this
+      // problem, which feeds the leaderboard's tie-break order (score → time
+      // → attempts) even when it doesn't beat the team's best score — so
+      // every one of them can move the placar, not only a new best (#44).
+      markRankingDirty()
       return c.json(outcome.result, 201)
     }
 

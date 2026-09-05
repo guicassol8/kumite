@@ -896,79 +896,6 @@ describe('submitSolution', () => {
       expect(outcome).toEqual({ ok: false, error: 'no_active_round' })
     })
   })
-
-  describe('rankingChanged', () => {
-    it(
-      "is true on a team's first submission for a problem, scoring above zero",
-      async () => {
-        const problem = await insertPublishedProblem(solvableCases)
-        const { user, team } = await insertTeamMember()
-
-        const outcome = await submitSolution(
-          db,
-          { userId: user.id, teamId: team.id },
-          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
-        )
-
-        expect(outcome).toMatchObject({ ok: true, rankingChanged: true })
-      },
-      JUDGED_TEST_TIMEOUT_MS,
-    )
-
-    it(
-      'is false when the new submission only ties the existing best score',
-      async () => {
-        const problem = await insertPublishedProblem(solvableCases)
-        const { user, team } = await insertTeamMember()
-        await db.insert(submissionsTable).values({
-          problemId: problem.id,
-          userId: user.id,
-          teamId: team.id,
-          workspace: {},
-          generatedCode: '',
-          caseResults: [],
-          score: 100,
-          attemptNumber: 1,
-        })
-
-        const outcome = await submitSolution(
-          db,
-          { userId: user.id, teamId: team.id },
-          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
-        )
-
-        expect(outcome).toMatchObject({ ok: true, rankingChanged: false })
-      },
-      JUDGED_TEST_TIMEOUT_MS,
-    )
-
-    it(
-      'is true when the new submission beats the existing best score',
-      async () => {
-        const problem = await insertPublishedProblem(solvableCases)
-        const { user, team } = await insertTeamMember()
-        await db.insert(submissionsTable).values({
-          problemId: problem.id,
-          userId: user.id,
-          teamId: team.id,
-          workspace: {},
-          generatedCode: '',
-          caseResults: [],
-          score: 50,
-          attemptNumber: 1,
-        })
-
-        const outcome = await submitSolution(
-          db,
-          { userId: user.id, teamId: team.id },
-          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
-        )
-
-        expect(outcome).toMatchObject({ ok: true, rankingChanged: true })
-      },
-      JUDGED_TEST_TIMEOUT_MS,
-    )
-  })
 })
 
 describe('POST /submissions — marks the ranking dirty on the sse bus (#44)', () => {
@@ -980,7 +907,11 @@ describe('POST /submissions — marks the ranking dirty on the sse bus (#44)', (
   }
 
   it(
-    'a submission that beats the best score reaches the next ranking tick, a tying one leaves nothing new',
+    // Every accepted submission increments the team's attempts for the
+    // problem, which feeds the leaderboard's tie-break order even when it
+    // doesn't beat the best score — so a tying submission marks the ranking
+    // dirty exactly like one that improves it (#44).
+    'both a score-beating and a merely tying submission reach the next ranking tick',
     async () => {
       const problem = await insertPublishedProblem(solvableCases)
       const { user, team } = await insertTeamMember()
@@ -1016,7 +947,7 @@ describe('POST /submissions — marks the ranking dirty on the sse bus (#44)', (
       expect(tying.status).toBe(201)
 
       await runRankingTick(k.resolve('db'), k.resolve('sseBus'))
-      expect(fn).not.toHaveBeenCalled()
+      expect(fn).toHaveBeenCalledWith(expect.objectContaining({ type: 'ranking.updated' }))
 
       unsubscribe()
     },

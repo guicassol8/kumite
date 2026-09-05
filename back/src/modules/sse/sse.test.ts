@@ -6,10 +6,11 @@ import { app } from '../../app'
 import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
 import { k } from '../../context'
 import { createDb } from '../../db/client'
-import { roundsTable, usersTable } from '../../db/schema'
+import { roundsTable, teamsTable, usersTable } from '../../db/schema'
 import type { SseEvent } from './sse.schema'
 import {
   HeartbeatEventSchema,
+  RankingUpdatedEventSchema,
   RoundClosedEventSchema,
   RoundExtendedEventSchema,
   RoundOpenedEventSchema,
@@ -17,12 +18,15 @@ import {
   StateSyncEventSchema,
 } from './sse.schema'
 import {
+  buildRankingUpdatedEvent,
   buildStateSyncEvent,
   createSseBus,
+  markRankingDirty,
   publishRoundClosed,
   publishRoundExtended,
   publishRoundOpened,
   runExpiryTick,
+  runRankingTick,
 } from './sse.service'
 
 describe('sse.schema', () => {
@@ -79,6 +83,62 @@ describe('sse.schema', () => {
   it('rejects an unknown event type', () => {
     const event = { type: 'unknown', serverTime: new Date() }
     expect(SseEventSchema.safeParse(event).success).toBe(false)
+  })
+
+  const eventRankingFixture = {
+    teams: [
+      {
+        teamId: 't1',
+        teamName: 'Team 1',
+        rank: 1,
+        totalScore: 100,
+        totalAttempts: 3,
+        tiebreakTimeMs: 5000,
+        rounds: [],
+      },
+    ],
+  }
+
+  it('round-trips a ranking.updated event with an open round', () => {
+    const event = {
+      type: 'ranking.updated' as const,
+      serverTime: new Date(),
+      round: {
+        roundId: 'r1',
+        roundName: 'Round 1',
+        problemIds: ['p1'],
+        teams: [
+          {
+            teamId: 't1',
+            teamName: 'Team 1',
+            rank: 1,
+            totalScore: 100,
+            totalAttempts: 3,
+            tiebreakTimeMs: 5000,
+            problems: [{ problemId: 'p1', score: 100, attempts: 3 }],
+          },
+        ],
+      },
+      event: eventRankingFixture,
+    }
+    expect(RankingUpdatedEventSchema.safeParse(event).success).toBe(true)
+    expect(SseEventSchema.safeParse(event).success).toBe(true)
+  })
+
+  it('round-trips a ranking.updated event with no open round', () => {
+    const event = {
+      type: 'ranking.updated' as const,
+      serverTime: new Date(),
+      round: null,
+      event: eventRankingFixture,
+    }
+    expect(RankingUpdatedEventSchema.safeParse(event).success).toBe(true)
+    expect(SseEventSchema.safeParse(event).success).toBe(true)
+  })
+
+  it('rejects a ranking.updated event missing the event ranking', () => {
+    const event = { type: 'ranking.updated' as const, serverTime: new Date(), round: null }
+    expect(RankingUpdatedEventSchema.safeParse(event).success).toBe(false)
   })
 })
 
@@ -140,7 +200,7 @@ describe('sse.service', () => {
     const db = createDb()
 
     beforeEach(async () => {
-      await db.execute(sql`truncate table ${roundsTable} restart identity cascade`)
+      await db.execute(sql`truncate table ${roundsTable}, ${teamsTable} restart identity cascade`)
     })
 
     afterAll(async () => {
@@ -225,6 +285,76 @@ describe('sse.service', () => {
         await expect(runExpiryTick(failingDb, bus)).resolves.toBeUndefined()
       })
     })
+
+    describe('buildRankingUpdatedEvent', () => {
+      it('carries the round ranking when a round is open', async () => {
+        const [round] = await db
+          .insert(roundsTable)
+          .values({
+            name: 'Round 1',
+            durationMinutes: 30,
+            status: 'open',
+            openedAt: new Date(),
+            closesAt: new Date(Date.now() + 60_000),
+          })
+          .returning()
+        if (!round) throw new Error('expected fixture')
+
+        const event = await buildRankingUpdatedEvent(db)
+
+        expect(event.type).toBe('ranking.updated')
+        expect(event.round?.roundId).toBe(round.id)
+        expect(event.event).toEqual({ teams: [] })
+      })
+
+      it('carries a null round and a populated event ranking when nothing is open', async () => {
+        const event = await buildRankingUpdatedEvent(db)
+
+        expect(event.round).toBeNull()
+        expect(event.event).toEqual({ teams: [] })
+      })
+    })
+
+    describe('runRankingTick', () => {
+      it('publishes ranking.updated when dirty, then nothing on a second call', async () => {
+        const bus = createSseBus()
+        const fn = vi.fn()
+        bus.subscribe(fn)
+        markRankingDirty()
+
+        await runRankingTick(db, bus)
+
+        expect(fn).toHaveBeenCalledTimes(1)
+        expect(fn).toHaveBeenCalledWith(expect.objectContaining({ type: 'ranking.updated' }))
+
+        await runRankingTick(db, bus)
+
+        expect(fn).toHaveBeenCalledTimes(1)
+      })
+
+      it('publishes nothing when never marked dirty', async () => {
+        const bus = createSseBus()
+        const fn = vi.fn()
+        bus.subscribe(fn)
+
+        await runRankingTick(db, bus)
+
+        expect(fn).not.toHaveBeenCalled()
+      })
+
+      it('does not throw when the db rejects', async () => {
+        const bus = createSseBus()
+        const failingDb = {
+          ...db,
+          select: () => {
+            throw new Error('db is down')
+          },
+        } as unknown as typeof db
+        markRankingDirty()
+
+        await expect(runRankingTick(failingDb, bus)).resolves.toBeUndefined()
+      })
+    })
   })
 })
 
@@ -287,7 +417,13 @@ describe('GET /sse', () => {
     const closesAt = new Date(Date.now() + 60_000)
     const [round] = await db
       .insert(roundsTable)
-      .values({ name: 'Round 1', durationMinutes: 30, status: 'open', closesAt })
+      .values({
+        name: 'Round 1',
+        durationMinutes: 30,
+        status: 'open',
+        openedAt: new Date(),
+        closesAt,
+      })
       .returning()
     if (!round) throw new Error('expected fixture')
     const token = await tokenFor(user)
@@ -305,6 +441,12 @@ describe('GET /sse', () => {
       round: { id: round.id },
     })
 
+    const second = await frames.next()
+    expect(second).toContain('event: ranking.updated')
+    expect(JSON.parse(second.split('data: ')[1] ?? '')).toMatchObject({
+      round: { roundId: round.id },
+    })
+
     // The handler's own continuation (subscribing to the bus) runs after
     // `writeSSE`'s promise resolves, which can trail the client having
     // already read that same chunk by a tick or two — give it one before
@@ -312,8 +454,8 @@ describe('GET /sse', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     k.resolve('sseBus').publish({ type: 'heartbeat', serverTime: new Date() })
 
-    const second = await frames.next()
-    expect(second).toContain('event: heartbeat')
+    const third = await frames.next()
+    expect(third).toContain('event: heartbeat')
 
     await frames.cancel()
   })

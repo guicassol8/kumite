@@ -1,7 +1,8 @@
 import type { Db } from '../../db/client'
+import { getEventRanking, getRoundRanking } from '../ranking/ranking.service'
 import { findOpenRound, reapExpiredRound } from '../rounds/rounds.service'
 
-import type { SseEvent, StateSyncEvent } from './sse.schema'
+import type { RankingUpdatedEvent, SseEvent, StateSyncEvent } from './sse.schema'
 
 export type SseBus = {
   subscribe: (fn: (event: SseEvent) => void) => () => void
@@ -69,4 +70,42 @@ export async function runExpiryTick(db: Db, bus: SseBus): Promise<void> {
     console.error('sse expiry tick failed', error)
   }
   bus.publish({ type: 'heartbeat', serverTime: new Date() })
+}
+
+// --- Ranking debounce (#44) ---
+//
+// Process-local flag, same pattern as inFlightIdentities/cooldownUntil in
+// submissions.service.ts: a single API process is what this event runs.
+// Reuses the 1s expiry tick (wired from main.ts) rather than a timer of its
+// own, so a burst of submissions collapses into at most one emission per
+// tick regardless of how many mark the ranking dirty in between.
+let rankingDirty = false
+
+export function markRankingDirty(): void {
+  rankingDirty = true
+}
+
+export async function buildRankingUpdatedEvent(db: Db): Promise<RankingUpdatedEvent> {
+  const openRound = await findOpenRound(db)
+  return {
+    type: 'ranking.updated',
+    serverTime: new Date(),
+    round: openRound ? await getRoundRanking(db, openRound.id) : null,
+    event: await getEventRanking(db),
+  }
+}
+
+// Clears the flag before computing the snapshot, not after: a submission
+// that marks dirty while the snapshot is being built must not be lost to a
+// clear that lands after that submission's own mark.
+export async function runRankingTick(db: Db, bus: SseBus): Promise<void> {
+  if (!rankingDirty) return
+  rankingDirty = false
+
+  try {
+    const event = await buildRankingUpdatedEvent(db)
+    bus.publish(event)
+  } catch (error) {
+    console.error('sse ranking tick failed', error)
+  }
 }

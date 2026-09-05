@@ -3,7 +3,7 @@ import { streamSSE } from 'hono/streaming'
 import { defineRoute } from '../../context'
 import { requireUser } from '../../middlewares/auth'
 
-import { buildStateSyncEvent } from './sse.service'
+import { buildRankingUpdatedEvent, buildStateSyncEvent } from './sse.service'
 
 // 401 (requireUser) short-circuits before output validation runs (kata
 // ADR-0011), same as every other guarded route — not declared here.
@@ -27,6 +27,12 @@ export const sseRoute = defineRoute({
     return streamSSE(c.raw, async (stream) => {
       const initial = await buildStateSyncEvent(c.get('db'))
       await stream.writeSSE({ event: initial.type, data: JSON.stringify(initial) })
+
+      // Sent unconditionally, outside the debounce tick: every new
+      // connection sees the current leaderboard immediately rather than
+      // waiting up to 1s for the next dirty tick (#44 plan).
+      const initialRanking = await buildRankingUpdatedEvent(c.get('db'))
+      await stream.writeSSE({ event: initialRanking.type, data: JSON.stringify(initialRanking) })
 
       const unsubscribe = c.get('sseBus').subscribe((event) => {
         void stream.writeSSE({ event: event.type, data: JSON.stringify(event) })

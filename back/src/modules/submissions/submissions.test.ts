@@ -892,6 +892,79 @@ describe('submitSolution', () => {
       expect(outcome).toEqual({ ok: false, error: 'no_active_round' })
     })
   })
+
+  describe('rankingChanged', () => {
+    it(
+      "is true on a team's first submission for a problem, scoring above zero",
+      async () => {
+        const problem = await insertPublishedProblem(solvableCases)
+        const { user, team } = await insertTeamMember()
+
+        const outcome = await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        )
+
+        expect(outcome).toMatchObject({ ok: true, rankingChanged: true })
+      },
+      JUDGED_TEST_TIMEOUT_MS,
+    )
+
+    it(
+      'is false when the new submission only ties the existing best score',
+      async () => {
+        const problem = await insertPublishedProblem(solvableCases)
+        const { user, team } = await insertTeamMember()
+        await db.insert(submissionsTable).values({
+          problemId: problem.id,
+          userId: user.id,
+          teamId: team.id,
+          workspace: {},
+          generatedCode: '',
+          caseResults: [],
+          score: 100,
+          attemptNumber: 1,
+        })
+
+        const outcome = await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        )
+
+        expect(outcome).toMatchObject({ ok: true, rankingChanged: false })
+      },
+      JUDGED_TEST_TIMEOUT_MS,
+    )
+
+    it(
+      'is true when the new submission beats the existing best score',
+      async () => {
+        const problem = await insertPublishedProblem(solvableCases)
+        const { user, team } = await insertTeamMember()
+        await db.insert(submissionsTable).values({
+          problemId: problem.id,
+          userId: user.id,
+          teamId: team.id,
+          workspace: {},
+          generatedCode: '',
+          caseResults: [],
+          score: 50,
+          attemptNumber: 1,
+        })
+
+        const outcome = await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        )
+
+        expect(outcome).toMatchObject({ ok: true, rankingChanged: true })
+      },
+      JUDGED_TEST_TIMEOUT_MS,
+    )
+  })
 })
 
 describe('findTeamIdForUser', () => {

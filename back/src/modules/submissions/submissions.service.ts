@@ -168,7 +168,7 @@ export function toResponseCases(
 export type SubmitIdentity = { userId: string; teamId: string }
 
 export type SubmitOutcome =
-  | { ok: true; result: SubmissionResult }
+  | { ok: true; result: SubmissionResult; rankingChanged: boolean }
   | { ok: false; error: 'problem_not_found' }
   | { ok: false; error: 'no_active_round' }
   | {
@@ -259,6 +259,10 @@ export async function submitSolution(
     // The in-flight lock is what serializes this read-then-insert; the partial
     // unique index on (team, problem, attempt) is the backstop.
     const attemptNumber = (await countAttempts(db, identity, problem.id)) + 1
+    // Strictly greater, never >=: a tie (or a worse score) never moves the
+    // leaderboard, so it must never mark the ranking dirty (#44 plan).
+    const previousBest = await getBestSubmission(db, identity.teamId, problem.id)
+    const rankingChanged = score > (previousBest?.score ?? 0)
 
     const submission = await db.transaction(async (tx) => {
       const [row] = await tx
@@ -288,6 +292,7 @@ export async function submitSolution(
 
     return {
       ok: true,
+      rankingChanged,
       result: {
         submissionId: submission.id,
         attemptNumber,

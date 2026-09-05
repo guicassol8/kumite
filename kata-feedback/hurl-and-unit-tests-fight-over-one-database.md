@@ -164,3 +164,59 @@ a documented "reset + reseed immediately before capturing evidence, every time, 
 exceptions" checklist step in `implementing-tasks`/`reviewing-tasks` would have caught the
 oversized-screenshot case before it reached a commit, rather than relying on the
 implementer noticing a `git diff --stat` byte-count anomaly.
+
+---
+
+## Fourth occurrence, implementing #43 (ranking service + API)
+
+Same root cause, new failure shape: a *false negative* in the hurl output that briefly
+looked like a real ranking bug. After writing `ranking.hurl` (3 fresh teams, one that
+never submits, asserting `$.teams count == 3` on `GET /rounds/{{round_id}}/ranking`), the
+first `pnpm hurl` run against this task's own throwaway Postgres (port 5434, spun up
+specifically for this worktree to avoid the shared compose db on 5433) came back with 5
+teams instead of 3 — two of them named
+"Time A" / "Time B", the exact fixture names `rounds.test.ts` and `submissions.test.ts`
+use. A `pnpm --filter @kumite/back test` full run had been executed (for the gate ladder)
+*before* `pnpm hurl`, on the very same DB — each test's `beforeEach` truncates, but nothing
+truncates after the *last* test, so whatever the final test inserted survives into the
+next tool that reads the database.
+
+Worse, a second real bug showed up disguised as the same class of noise: `getEventRanking`
+correctly summed *two* closed rounds (this file's own round plus `problems.hurl`'s
+"Problems E2E Round", since `pnpm hurl` runs every `*.hurl` file against one shared
+server/db in filename order, and `problems` sorts before `ranking`), but the hurl
+assertion had hard-coded `$.teams[0].rounds count == 1`. Full DB reset made the count-3
+symptom disappear, which briefly suggested the second failure was pollution too — it
+wasn't; it was the assertion wrongly assuming this file's round was the only one in the
+event. The fix was to switch to a `rounds[?(@.roundId=='{{round_id}}')]` jsonpath filter,
+the same defensive pattern `rounds.hurl` already uses for its own participant-list
+assertions — a pattern this task would have reached for immediately if the DB-pollution
+noise hadn't been present at the same time to blur which failure was which.
+
+## Metrics (this occurrence)
+
+- **kata-docs calls this task: zero.** The module (new `ranking.schema.ts` /
+  `.service.ts` / `.route.ts` / `.hurl`) followed the existing `rounds`/`submissions`
+  module shape exactly (`defineRoute`, `requireUser`-only guard, `ErrorBodySchema`,
+  DB truncate-per-test pattern) — every question was answered by reading a sibling
+  module, not by querying kata-docs.
+- **`kata verify --strict-coverage`: every run green, ~46 files, well under 1s each.**
+  Zero false positives across 4 commits (schema, pure core, DB assembly, routes).
+- **Cost of the DB-sharing issue this time: 2 full container-recreate cycles** (`docker rm
+  -f` + `docker run` + `db:migrate` + `db:seed` + restart the app process, since the old
+  `postgres-js` pool had cached connections to the just-removed container) plus one hurl
+  assertion rewrite — roughly 10 tool round-trips. Distinct from the first three
+  occurrences: this time the pollution symptom (extra teams) and a genuine test-authoring
+  bug (the hard-coded round count) surfaced in the *same* failing run, which cost extra
+  time to tell apart before concluding only one of the two was actually the DB-sharing
+  issue.
+
+## Reinforced suggestion, again
+
+Every occurrence so far has been solved by throwing away and rebuilding the database —
+never by a tool telling the implementer *which* rows are stale. A cheap, purely-additive
+version of the standing suggestion: `kata verify` or `pnpm hurl` printing a one-line
+warning when a table it's about to assert against contains rows the current `.hurl` run
+didn't itself create (e.g., a row count taken before the file's first request, diffed
+against a fresh reset) would have turned this occurrence's "why are there 5 teams"
+confusion into an immediate, correct diagnosis instead of a full reset-and-retry.

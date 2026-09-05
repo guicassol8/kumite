@@ -89,6 +89,20 @@ describe('Header', () => {
     expect(screen.queryByTestId('header-teams-link')).toBeNull()
   })
 
+  it('shows the leaderboard link to any authenticated user', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    await waitFor(() => expect(screen.getByTestId('header-leaderboard-link')).toBeDefined())
+  })
+
+  it('hides the leaderboard link while anonymous', async () => {
+    renderHeader()
+
+    await waitFor(() => expect(screen.getByTestId('header-login-link')).toBeDefined())
+    expect(screen.queryByTestId('header-leaderboard-link')).toBeNull()
+  })
+
   it('clears the session and navigates home on logout', async () => {
     setSession(fakeUser, 'tok-1')
     const router = renderHeader()

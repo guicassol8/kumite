@@ -10,7 +10,8 @@
     "signup": "Sign up",
     "logout": "Log out",
     "organizerLink": "Organizer",
-    "teamsLink": "Teams"
+    "teamsLink": "Teams",
+    "leaderboardLink": "Leaderboard"
   },
   "home": {
     "tagline": "PUCRS × Mérida — block programming showdown",
@@ -260,6 +261,33 @@
       "timeout": "Timed out ({{seconds}}s)",
       "runtimeError": "Error: {{message}}",
       "empty": "Build your solution inside the “solve” block and click Run."
+    }
+  },
+  "leaderboard": {
+    "heading": "Leaderboard",
+    "tabs": {
+      "round": "Round",
+      "event": "Overall"
+    },
+    "lastClosedRoundLabel": "{{name}} — last closed round",
+    "columns": {
+      "rank": "#",
+      "team": "Team",
+      "total": "Total",
+      "problemFallback": "P{{position}}"
+    },
+    "connection": {
+      "connecting": "Connecting to the live leaderboard...",
+      "reconnecting": "Connection lost — reconnecting..."
+    },
+    "loading": "Loading leaderboard...",
+    "error": {
+      "message": "Could not load the leaderboard.",
+      "retry": "Retry"
+    },
+    "empty": {
+      "title": "No teams on the leaderboard yet.",
+      "noRoundEver": "No round has ever been opened for this event."
     }
   }
 }

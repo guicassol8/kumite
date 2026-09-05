@@ -41,12 +41,75 @@ export const HeartbeatEventSchema = z.object({
   serverTime: z.coerce.date(),
 })
 
+// Mirrors back/src/modules/ranking/ranking.schema.ts.
+export const RankingProblemEntrySchema = z.object({
+  problemId: z.string(),
+  score: z.number().int().nonnegative(),
+  attempts: z.number().int().nonnegative(),
+})
+
+export const RoundRankingTeamSchema = z.object({
+  teamId: z.string(),
+  teamName: z.string(),
+  rank: z.number().int().positive(),
+  totalScore: z.number().int().nonnegative(),
+  totalAttempts: z.number().int().nonnegative(),
+  tiebreakTimeMs: z.number().int().nonnegative(),
+  problems: z.array(RankingProblemEntrySchema),
+})
+
+export const RoundRankingSchema = z.object({
+  roundId: z.string(),
+  roundName: z.string(),
+  problemIds: z.array(z.string()),
+  teams: z.array(RoundRankingTeamSchema),
+})
+
+export const EventRankingRoundEntrySchema = z.object({
+  roundId: z.string(),
+  roundName: z.string(),
+  score: z.number().int().nonnegative(),
+  attempts: z.number().int().nonnegative(),
+  tiebreakTimeMs: z.number().int().nonnegative(),
+})
+
+export const EventRankingTeamSchema = z.object({
+  teamId: z.string(),
+  teamName: z.string(),
+  rank: z.number().int().positive(),
+  totalScore: z.number().int().nonnegative(),
+  totalAttempts: z.number().int().nonnegative(),
+  tiebreakTimeMs: z.number().int().nonnegative(),
+  rounds: z.array(EventRankingRoundEntrySchema),
+})
+
+export const EventRankingSchema = z.object({
+  teams: z.array(EventRankingTeamSchema),
+})
+
+// Carries both scopes — the active round's live leaderboard (`null` when no
+// round is open) and the event-wide leaderboard — in one event (#44 plan).
+export const RankingUpdatedEventSchema = z.object({
+  type: z.literal('ranking.updated'),
+  serverTime: z.coerce.date(),
+  round: RoundRankingSchema.nullable(),
+  event: EventRankingSchema,
+})
+
 export const SseEventSchema = z.discriminatedUnion('type', [
   StateSyncEventSchema,
   RoundOpenedEventSchema,
   RoundExtendedEventSchema,
   RoundClosedEventSchema,
   HeartbeatEventSchema,
+  RankingUpdatedEventSchema,
 ])
 
+export type RankingProblemEntry = z.infer<typeof RankingProblemEntrySchema>
+export type RoundRankingTeam = z.infer<typeof RoundRankingTeamSchema>
+export type RoundRanking = z.infer<typeof RoundRankingSchema>
+export type EventRankingRoundEntry = z.infer<typeof EventRankingRoundEntrySchema>
+export type EventRankingTeam = z.infer<typeof EventRankingTeamSchema>
+export type EventRanking = z.infer<typeof EventRankingSchema>
+export type RankingUpdatedEvent = z.infer<typeof RankingUpdatedEventSchema>
 export type SseEvent = z.infer<typeof SseEventSchema>

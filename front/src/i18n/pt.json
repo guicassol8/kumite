@@ -10,7 +10,8 @@
     "signup": "Cadastrar",
     "logout": "Sair",
     "organizerLink": "Organizador",
-    "teamsLink": "Times"
+    "teamsLink": "Times",
+    "leaderboardLink": "Placar"
   },
   "home": {
     "tagline": "PUCRS × Mérida — programação em blocos",
@@ -260,6 +261,33 @@
       "timeout": "Tempo esgotado ({{seconds}}s)",
       "runtimeError": "Erro: {{message}}",
       "empty": "Monte a sua solução dentro do bloco “resolver” e clique em Executar."
+    }
+  },
+  "leaderboard": {
+    "heading": "Placar",
+    "tabs": {
+      "round": "Rodada",
+      "event": "Geral"
+    },
+    "lastClosedRoundLabel": "{{name}} — última rodada encerrada",
+    "columns": {
+      "rank": "#",
+      "team": "Time",
+      "total": "Total",
+      "problemFallback": "P{{position}}"
+    },
+    "connection": {
+      "connecting": "Conectando ao placar ao vivo...",
+      "reconnecting": "Conexão perdida — reconectando..."
+    },
+    "loading": "Carregando placar...",
+    "error": {
+      "message": "Não foi possível carregar o placar.",
+      "retry": "Tentar novamente"
+    },
+    "empty": {
+      "title": "Nenhum time no placar ainda.",
+      "noRoundEver": "Nenhuma rodada foi aberta ainda nesta competição."
     }
   }
 }

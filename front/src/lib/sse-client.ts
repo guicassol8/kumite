@@ -30,21 +30,33 @@ function consumeFrames(buffer: string, onEvent: (event: SseEvent) => void): stri
   return remainder
 }
 
+export type SseConnectionStatus = 'connecting' | 'open' | 'reconnecting'
+
 // Connects, delivers parsed events to `onEvent`, and reconnects after a
 // fixed delay whenever the stream ends or errors — until the returned
-// function is called. Returns that disconnect function.
-export function connectEventStream(onEvent: (event: SseEvent) => void): () => void {
+// function is called. Returns that disconnect function. `onStatusChange`,
+// when given, is notified 'connecting' before every attempt (initial and
+// each reconnect), 'open' once the response body starts streaming, and
+// 'reconnecting' when a run ends and the retry delay begins.
+export function connectEventStream(
+  onEvent: (event: SseEvent) => void,
+  onStatusChange?: (status: SseConnectionStatus) => void,
+): () => void {
   let stopped = false
   let controller: AbortController | null = null
 
   async function run(): Promise<void> {
+    let first = true
     while (!stopped) {
+      onStatusChange?.(first ? 'connecting' : 'reconnecting')
+      first = false
       controller = new AbortController()
       try {
         const res = await fetch(sseUrl(), { headers: authHeader(), signal: controller.signal })
         const reader = res.body?.getReader()
         if (!reader) throw new Error('sse response has no body')
 
+        onStatusChange?.('open')
         const decoder = new TextDecoder()
         let buffer = ''
         while (!stopped) {

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OrganizerRouteImport } from './routes/organizer'
 import { Route as ProblemRouteImport } from './routes/problem'
@@ -22,6 +23,11 @@ import { Route as OrganizerProblemsIdEditRouteImport } from './routes/organizer.
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaderboardRoute = LeaderboardRouteImport.update({
+  id: '/leaderboard',
+  path: '/leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -67,6 +73,7 @@ const OrganizerProblemsIdEditRoute = OrganizerProblemsIdEditRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
   '/problem': typeof ProblemRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
   '/problem': typeof ProblemRoute
@@ -90,6 +98,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
   '/problem': typeof ProblemRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/leaderboard'
     | '/login'
     | '/organizer'
     | '/problem'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/leaderboard'
     | '/login'
     | '/organizer'
     | '/problem'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/leaderboard'
     | '/login'
     | '/organizer'
     | '/problem'
@@ -137,6 +149,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LeaderboardRoute: typeof LeaderboardRoute
   LoginRoute: typeof LoginRoute
   OrganizerRoute: typeof OrganizerRouteWithChildren
   ProblemRoute: typeof ProblemRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaderboard': {
+      id: '/leaderboard'
+      path: '/leaderboard'
+      fullPath: '/leaderboard'
+      preLoaderRoute: typeof LeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -230,6 +250,7 @@ const OrganizerRouteWithChildren = OrganizerRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LeaderboardRoute: LeaderboardRoute,
   LoginRoute: LoginRoute,
   OrganizerRoute: OrganizerRouteWithChildren,
   ProblemRoute: ProblemRoute,

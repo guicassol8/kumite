@@ -1,6 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { sql } from 'drizzle-orm'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+
+import { createDb } from '../../db/client'
+import {
+  problemsTable,
+  roundProblemsTable,
+  roundsTable,
+  submissionsTable,
+  teamsTable,
+  usersTable,
+} from '../../db/schema'
+import { closeRound, createRound, openRound } from '../rounds/rounds.service'
 
 import {
+  getEventRanking,
+  getRoundRanking,
   rankTeams,
   reduceBestPerProblem,
   type ScoringEntry,
@@ -166,5 +180,215 @@ describe('rankTeams', () => {
 
     expect(ranked.map((team) => team.teamName)).toEqual(['Beta', 'Alfa', 'Zulu'])
     expect(ranked.map((team) => team.rank)).toEqual([1, 2, 3])
+  })
+})
+
+// --- DB-backed assembly (real Postgres, as in submissions.test.ts) ---
+
+const db = createDb()
+
+beforeEach(async () => {
+  await db.execute(
+    sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemsTable}, ${teamsTable}, ${usersTable} restart identity cascade`,
+  )
+})
+
+afterAll(async () => {
+  await db.$client.end()
+})
+
+async function insertProblem(points = 100) {
+  const [problem] = await db
+    .insert(problemsTable)
+    .values({ difficulty: 'easy', status: 'published', points })
+    .returning()
+  if (!problem) throw new Error('expected a problem fixture')
+  return problem
+}
+
+async function insertTeam(name: string) {
+  const [team] = await db.insert(teamsTable).values({ name }).returning()
+  if (!team) throw new Error('expected a team fixture')
+  return team
+}
+
+let userCounter = 0
+
+// userId is required by the submissions schema but irrelevant to ranking,
+// which groups by team — a fresh user per call keeps fixtures independent.
+async function insertUser() {
+  userCounter += 1
+  const [user] = await db
+    .insert(usersTable)
+    .values({
+      email: `ranking-fixture-${userCounter}@edu.pucrs.br`,
+      passwordHash: 'hash',
+      role: 'participant',
+      university: 'pucrs',
+    })
+    .returning()
+  if (!user) throw new Error('expected a user fixture')
+  return user
+}
+
+async function submit(
+  teamId: string,
+  problemId: string,
+  score: number,
+  options: { createdAt?: Date; attemptNumber?: number } = {},
+) {
+  const user = await insertUser()
+  await db.insert(submissionsTable).values({
+    problemId,
+    teamId,
+    userId: user.id,
+    workspace: {},
+    generatedCode: '',
+    caseResults: [],
+    score,
+    attemptNumber: options.attemptNumber ?? 1,
+    ...(options.createdAt ? { createdAt: options.createdAt } : {}),
+  })
+}
+
+describe('getRoundRanking', () => {
+  it('returns null for an unknown round', async () => {
+    expect(await getRoundRanking(db, '00000000-0000-0000-0000-000000000000')).toBeNull()
+  })
+
+  it('returns null for a round still in draft', async () => {
+    const problem = await insertProblem()
+    const created = await createRound(db, {
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!created.ok) throw new Error('expected create to succeed')
+
+    expect(await getRoundRanking(db, created.round.id)).toBeNull()
+  })
+
+  it('orders teams by score, zeroes a team that never submitted', async () => {
+    const problem = await insertProblem()
+    const teamA = await insertTeam('Time A')
+    const teamB = await insertTeam('Time B')
+    const teamC = await insertTeam('Time C')
+    const created = await createRound(db, {
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!created.ok) throw new Error('expected create to succeed')
+    const opened = await openRound(db, created.round.id)
+    if (!opened.ok) throw new Error('expected open to succeed')
+
+    await submit(teamA.id, problem.id, 100)
+    await submit(teamB.id, problem.id, 50)
+
+    const ranking = await getRoundRanking(db, opened.round.id)
+
+    expect(ranking?.problemIds).toEqual([problem.id])
+    expect(ranking?.teams.map((team) => [team.teamName, team.totalScore, team.rank])).toEqual([
+      ['Time A', 100, 1],
+      ['Time B', 50, 2],
+      ['Time C', 0, 3],
+    ])
+    expect(ranking?.teams[0]?.problems).toEqual([
+      { problemId: problem.id, score: 100, attempts: 1 },
+    ])
+  })
+
+  it('only counts submissions made inside this round’s own time window, even for a reused problem', async () => {
+    const problem = await insertProblem()
+    const team = await insertTeam('Time A')
+
+    const firstRound = await createRound(db, {
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!firstRound.ok) throw new Error('expected create to succeed')
+    const openedFirst = await openRound(db, firstRound.round.id)
+    if (!openedFirst.ok) throw new Error('expected open to succeed')
+    await submit(team.id, problem.id, 100)
+    const closedFirst = await closeRound(db, firstRound.round.id)
+    if (!closedFirst.ok) throw new Error('expected close to succeed')
+
+    const secondRound = await createRound(db, {
+      name: 'Rodada 2',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!secondRound.ok) throw new Error('expected create to succeed')
+    const openedSecond = await openRound(db, secondRound.round.id)
+    if (!openedSecond.ok) throw new Error('expected open to succeed')
+    // Same team + problem as the first round's submission above: the unique
+    // index is on (team, problem, attempt), so this is attempt 2 overall —
+    // exactly the point being proven, that it still lands in the second
+    // round's own window rather than the first's.
+    await submit(team.id, problem.id, 40, { attemptNumber: 2 })
+
+    const firstRanking = await getRoundRanking(db, firstRound.round.id)
+    const secondRanking = await getRoundRanking(db, secondRound.round.id)
+
+    expect(firstRanking?.teams[0]).toMatchObject({ totalScore: 100 })
+    expect(secondRanking?.teams[0]).toMatchObject({ totalScore: 40 })
+  })
+})
+
+describe('getEventRanking', () => {
+  it('sums every non-draft round for each team', async () => {
+    const problemA = await insertProblem()
+    const problemB = await insertProblem()
+    const teamA = await insertTeam('Time A')
+    const teamB = await insertTeam('Time B')
+
+    const firstRound = await createRound(db, {
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      problemIds: [problemA.id],
+    })
+    if (!firstRound.ok) throw new Error('expected create to succeed')
+    const openedFirst = await openRound(db, firstRound.round.id)
+    if (!openedFirst.ok) throw new Error('expected open to succeed')
+    await submit(teamA.id, problemA.id, 100)
+    await submit(teamB.id, problemA.id, 20)
+    const closedFirst = await closeRound(db, firstRound.round.id)
+    if (!closedFirst.ok) throw new Error('expected close to succeed')
+
+    const secondRound = await createRound(db, {
+      name: 'Rodada 2',
+      durationMinutes: 30,
+      problemIds: [problemB.id],
+    })
+    if (!secondRound.ok) throw new Error('expected create to succeed')
+    const openedSecond = await openRound(db, secondRound.round.id)
+    if (!openedSecond.ok) throw new Error('expected open to succeed')
+    await submit(teamA.id, problemB.id, 30)
+    await submit(teamB.id, problemB.id, 90)
+    // secondRound stays open — the event ranking must include the active round too.
+
+    const ranking = await getEventRanking(db)
+
+    expect(ranking.teams.map((team) => [team.teamName, team.totalScore, team.rank])).toEqual([
+      ['Time A', 130, 1],
+      ['Time B', 110, 2],
+    ])
+    expect(ranking.teams[0]?.rounds).toEqual([
+      {
+        roundId: firstRound.round.id,
+        roundName: 'Rodada 1',
+        score: 100,
+        attempts: 1,
+        tiebreakTimeMs: expect.any(Number),
+      },
+      {
+        roundId: secondRound.round.id,
+        roundName: 'Rodada 2',
+        score: 30,
+        attempts: 1,
+        tiebreakTimeMs: expect.any(Number),
+      },
+    ])
   })
 })

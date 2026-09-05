@@ -144,6 +144,7 @@ test.describe('leaderboard (#45)', () => {
 
     await page.getByTestId('header-leaderboard-link').click()
     await expect(page).toHaveURL(/\/leaderboard$/)
+    await expect(page.getByTestId('leaderboard-empty-no-round')).toBeVisible()
     await page.screenshot({ path: evidence('01-placar-sem-rodada'), fullPage: true })
 
     // 02 — the organizer opens a round with a problem while this page stays
@@ -172,6 +173,13 @@ test.describe('leaderboard (#45)', () => {
     // (Acceptance #3), showing round columns instead of problem columns.
     await page.getByTestId('leaderboard-tab-event').click()
     await expect(page.getByTestId(`leaderboard-column-round-${roundId}`)).toBeVisible()
+    await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute('data-state', 'active')
+    // The active-tab pill background is a CSS transition (transition-all);
+    // the data-state flip above is instant but the repaint lags a frame or
+    // two behind it, so a screenshot taken right on the assertion catches
+    // the old tab still looking highlighted even though the content (just
+    // asserted above) has already switched. Let the transition settle.
+    await page.waitForTimeout(200)
     await page.screenshot({ path: evidence('04-aba-geral'), fullPage: true })
 
     // 05 — the organizer closes the round; a fresh load of /leaderboard has
@@ -186,6 +194,8 @@ test.describe('leaderboard (#45)', () => {
 
     await page.getByTestId('leaderboard-tab-round').click()
     await expect(page.getByTestId('leaderboard-last-closed-label')).toContainText(roundName)
+    await expect(page.getByTestId('leaderboard-tab-round')).toHaveAttribute('data-state', 'active')
+    await page.waitForTimeout(200) // let the tab pill's CSS transition settle, see #04 above
     await page.screenshot({ path: evidence('06-ultima-rodada-encerrada'), fullPage: true })
   })
 })

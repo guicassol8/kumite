@@ -146,4 +146,65 @@ describe('useLeaderboardStream', () => {
 
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
+
+  it('sets activeRoundId from state.sync', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    emit({
+      type: 'state.sync',
+      serverTime: new Date(),
+      round: { id: 'r1', closesAt: new Date('2026-09-05T13:00:00.000Z') },
+    })
+    expect(result.current.activeRoundId).toBe('r1')
+
+    emit({ type: 'state.sync', serverTime: new Date(), round: null })
+    expect(result.current.activeRoundId).toBeNull()
+  })
+
+  it('sets activeRoundId on round.opened, before any ranking.updated arrives', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+
+    expect(result.current.activeRoundId).toBe('r1')
+    expect(result.current.round).toBeNull()
+  })
+
+  it('clears activeRoundId on round.closed', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+    emit({ type: 'round.closed', serverTime: new Date(), roundId: 'r1' })
+
+    expect(result.current.activeRoundId).toBeNull()
+  })
+
+  it('keeps activeRoundId in sync with ranking.updated', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    expect(result.current.activeRoundId).toBe('r1')
+
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+    expect(result.current.activeRoundId).toBeNull()
+  })
 })

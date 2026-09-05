@@ -57,7 +57,7 @@ function LeaderboardScreen() {
   const teams = useQuery({ queryKey: TEAMS_QUERY_KEY, queryFn: fetchTeams })
   const rounds = useQuery({ queryKey: ROUNDS_QUERY_KEY, queryFn: fetchRounds })
 
-  const hasActiveRound = stream.round !== null
+  const hasActiveRound = stream.activeRoundId !== null
   const closedRounds = (rounds.data ?? [])
     .filter((round) => round.status === 'closed' && round.closedAt)
     .sort((a, b) => new Date(b.closedAt!).getTime() - new Date(a.closedAt!).getTime())
@@ -69,6 +69,16 @@ function LeaderboardScreen() {
     enabled: !hasActiveRound && lastClosedRound !== null,
   })
 
+  // `ranking.updated` only re-publishes on a submission-driven dirty tick
+  // (#44) — a round that opens with zero submissions never arrives via SSE
+  // on its own, so fetch it once over REST as soon as `activeRoundId` shows
+  // up. A later `ranking.updated` for this round overrides it (see below).
+  const activeRoundRanking = useQuery({
+    queryKey: ['ranking', 'round', stream.activeRoundId],
+    queryFn: () => fetchRoundRanking(stream.activeRoundId!),
+    enabled: hasActiveRound && stream.round === null,
+  })
+
   const eventRankingRest = useQuery({
     queryKey: ['ranking', 'event'],
     queryFn: fetchEventRanking,
@@ -76,7 +86,7 @@ function LeaderboardScreen() {
   })
 
   const displayedRound: RoundRanking | null = hasActiveRound
-    ? stream.round
+    ? (stream.round ?? activeRoundRanking.data ?? null)
     : (lastClosedRanking.data ?? null)
   const isLastClosedRound = !hasActiveRound && displayedRound !== null
   const eventRanking = stream.event ?? eventRankingRest.data ?? null
@@ -107,13 +117,22 @@ function LeaderboardScreen() {
     stream.event === null ||
     teams.isPending ||
     rounds.isPending ||
-    (!hasActiveRound && lastClosedRound !== null && lastClosedRanking.isPending)
-  const isError = teams.isError || rounds.isError
+    (!hasActiveRound && lastClosedRound !== null && lastClosedRanking.isPending) ||
+    (hasActiveRound && stream.round === null && activeRoundRanking.isPending)
+  const isError =
+    teams.isError ||
+    rounds.isError ||
+    lastClosedRanking.isError ||
+    activeRoundRanking.isError ||
+    eventRankingRest.isError
   const hasNeverHadARound = !hasActiveRound && lastClosedRound === null
 
   function retry() {
     teams.refetch()
     rounds.refetch()
+    lastClosedRanking.refetch()
+    activeRoundRanking.refetch()
+    eventRankingRest.refetch()
   }
 
   return (

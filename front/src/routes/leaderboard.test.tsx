@@ -196,6 +196,34 @@ describe('LeaderboardScreen — active round', () => {
   })
 })
 
+describe('LeaderboardScreen — round opens with zero submissions', () => {
+  it('shows the round grid from REST as soon as round.opened arrives, before any ranking.updated', async () => {
+    const emptyRoundRanking: RoundRanking = { ...roundRanking, teams: [] }
+    mockedRoundRanking.mockResolvedValue(jsonResponse(200, emptyRoundRanking))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    // Simulates the connection's initial snapshot (state.sync + ranking.updated),
+    // taken before the round opened — no active round yet.
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-empty-no-round')).toBeDefined())
+
+    // The organizer opens a round while this client stays connected. No
+    // submission has happened yet, so no fresh `ranking.updated` follows —
+    // only `round.opened` — but the grid must still update (the reported bug).
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+
+    await waitFor(() => expect(mockedRoundRanking).toHaveBeenCalledWith({ param: { id: 'r1' } }))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-empty')).toBeDefined())
+    expect(screen.queryByTestId('leaderboard-empty-no-round')).toBeNull()
+  })
+})
+
 describe('LeaderboardScreen — no active round', () => {
   it('shows the last closed round under "Rodada" and opens on "Geral" by default', async () => {
     mockedRounds.mockResolvedValue(

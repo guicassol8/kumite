@@ -10,6 +10,7 @@ import { roundsTable, usersTable } from '../../db/schema'
 import type { SseEvent } from './sse.schema'
 import {
   HeartbeatEventSchema,
+  RankingUpdatedEventSchema,
   RoundClosedEventSchema,
   RoundExtendedEventSchema,
   RoundOpenedEventSchema,
@@ -79,6 +80,62 @@ describe('sse.schema', () => {
   it('rejects an unknown event type', () => {
     const event = { type: 'unknown', serverTime: new Date() }
     expect(SseEventSchema.safeParse(event).success).toBe(false)
+  })
+
+  const eventRankingFixture = {
+    teams: [
+      {
+        teamId: 't1',
+        teamName: 'Team 1',
+        rank: 1,
+        totalScore: 100,
+        totalAttempts: 3,
+        tiebreakTimeMs: 5000,
+        rounds: [],
+      },
+    ],
+  }
+
+  it('round-trips a ranking.updated event with an open round', () => {
+    const event = {
+      type: 'ranking.updated' as const,
+      serverTime: new Date(),
+      round: {
+        roundId: 'r1',
+        roundName: 'Round 1',
+        problemIds: ['p1'],
+        teams: [
+          {
+            teamId: 't1',
+            teamName: 'Team 1',
+            rank: 1,
+            totalScore: 100,
+            totalAttempts: 3,
+            tiebreakTimeMs: 5000,
+            problems: [{ problemId: 'p1', score: 100, attempts: 3 }],
+          },
+        ],
+      },
+      event: eventRankingFixture,
+    }
+    expect(RankingUpdatedEventSchema.safeParse(event).success).toBe(true)
+    expect(SseEventSchema.safeParse(event).success).toBe(true)
+  })
+
+  it('round-trips a ranking.updated event with no open round', () => {
+    const event = {
+      type: 'ranking.updated' as const,
+      serverTime: new Date(),
+      round: null,
+      event: eventRankingFixture,
+    }
+    expect(RankingUpdatedEventSchema.safeParse(event).success).toBe(true)
+    expect(SseEventSchema.safeParse(event).success).toBe(true)
+  })
+
+  it('rejects a ranking.updated event missing the event ranking', () => {
+    const event = { type: 'ranking.updated' as const, serverTime: new Date(), round: null }
+    expect(RankingUpdatedEventSchema.safeParse(event).success).toBe(false)
   })
 })
 

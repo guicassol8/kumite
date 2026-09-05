@@ -417,7 +417,13 @@ describe('GET /sse', () => {
     const closesAt = new Date(Date.now() + 60_000)
     const [round] = await db
       .insert(roundsTable)
-      .values({ name: 'Round 1', durationMinutes: 30, status: 'open', closesAt })
+      .values({
+        name: 'Round 1',
+        durationMinutes: 30,
+        status: 'open',
+        openedAt: new Date(),
+        closesAt,
+      })
       .returning()
     if (!round) throw new Error('expected fixture')
     const token = await tokenFor(user)
@@ -435,6 +441,12 @@ describe('GET /sse', () => {
       round: { id: round.id },
     })
 
+    const second = await frames.next()
+    expect(second).toContain('event: ranking.updated')
+    expect(JSON.parse(second.split('data: ')[1] ?? '')).toMatchObject({
+      round: { roundId: round.id },
+    })
+
     // The handler's own continuation (subscribing to the bus) runs after
     // `writeSSE`'s promise resolves, which can trail the client having
     // already read that same chunk by a tick or two — give it one before
@@ -442,8 +454,8 @@ describe('GET /sse', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     k.resolve('sseBus').publish({ type: 'heartbeat', serverTime: new Date() })
 
-    const second = await frames.next()
-    expect(second).toContain('event: heartbeat')
+    const third = await frames.next()
+    expect(third).toContain('event: heartbeat')
 
     await frames.cancel()
   })

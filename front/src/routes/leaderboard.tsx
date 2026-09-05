@@ -1,6 +1,7 @@
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { motion } from 'motion/react'
+import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { type University, UniversityBadge } from '@/components/teams/university-badge'
@@ -52,7 +53,15 @@ function universitiesForTeam(
 function LeaderboardScreen() {
   const { t, i18n } = useTranslation()
   const locale = toApiLocale(i18n.resolvedLanguage ?? i18n.language)
-  const stream = useLeaderboardStream()
+  const queryClient = useQueryClient()
+  // round.opened/round.closed refetch the list so a round that just closed
+  // (or opened) resolves in `closedRounds`/`lastClosedRound` right away,
+  // instead of staying stuck on the stale snapshot until something else
+  // happens to refetch it — same pattern as index.tsx's invalidateRounds.
+  const invalidateRounds = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ROUNDS_QUERY_KEY })
+  }, [queryClient])
+  const stream = useLeaderboardStream(invalidateRounds)
 
   const teams = useQuery({ queryKey: TEAMS_QUERY_KEY, queryFn: fetchTeams })
   const rounds = useQuery({ queryKey: ROUNDS_QUERY_KEY, queryFn: fetchRounds })

@@ -224,6 +224,55 @@ describe('LeaderboardScreen — round opens with zero submissions', () => {
   })
 })
 
+describe('LeaderboardScreen — round closes live', () => {
+  it('refetches rounds on round.closed so the last-closed label appears without a reload', async () => {
+    mockedRounds.mockResolvedValue(jsonResponse(200, []))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+
+    // Organizer closes the round while this client stays connected — the
+    // rounds list mock now reflects the closed round, simulating what the
+    // API returns once refetched (the reported bug: nothing ever refetches
+    // it, so `lastClosedRound` stays stuck on the pre-close snapshot).
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        {
+          id: 'r1',
+          name: 'Rodada 1',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: new Date('2026-09-01T10:00:00.000Z'),
+          closesAt: null,
+          closedAt: new Date('2026-09-01T10:30:00.000Z'),
+          createdAt: new Date('2026-09-01T09:00:00.000Z'),
+          updatedAt: new Date('2026-09-01T10:30:00.000Z'),
+          problemCount: 1,
+        },
+      ]),
+    )
+    emit({ type: 'round.closed', serverTime: new Date(), roundId: 'r1' })
+
+    // A brand-new `lastClosedRanking` query key (only enabled once
+    // `lastClosedRound` resolves) briefly flips `isLoading` back to true,
+    // unmounting/remounting the (uncontrolled) Tabs — so click the round tab
+    // on every poll until the screen settles, rather than once.
+    await waitFor(() => {
+      const roundTab = screen.getByTestId('leaderboard-tab-round')
+      fireEvent.mouseDown(roundTab)
+      expect(screen.getByTestId('leaderboard-last-closed-label')).toBeDefined()
+    })
+    expect(screen.queryByTestId('leaderboard-empty-no-round')).toBeNull()
+  })
+})
+
 describe('LeaderboardScreen — no active round', () => {
   it('shows the last closed round under "Rodada" and opens on "Geral" by default', async () => {
     mockedRounds.mockResolvedValue(

@@ -192,6 +192,23 @@ describe('useLeaderboardStream', () => {
     expect(result.current.activeRoundId).toBeNull()
   })
 
+  it('calls onRoundChange on round.opened and round.closed', () => {
+    setSession(fakeUser, 'tok-1')
+    const onRoundChange = vi.fn()
+    renderHook(() => useLeaderboardStream(onRoundChange))
+
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+    expect(onRoundChange).toHaveBeenCalledTimes(1)
+
+    emit({ type: 'round.closed', serverTime: new Date(), roundId: 'r1' })
+    expect(onRoundChange).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps activeRoundId in sync with ranking.updated', () => {
     setSession(fakeUser, 'tok-1')
     const { result } = renderHook(() => useLeaderboardStream())

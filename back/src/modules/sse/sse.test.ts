@@ -6,7 +6,7 @@ import { app } from '../../app'
 import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
 import { k } from '../../context'
 import { createDb } from '../../db/client'
-import { roundsTable, usersTable } from '../../db/schema'
+import { roundsTable, teamsTable, usersTable } from '../../db/schema'
 import type { SseEvent } from './sse.schema'
 import {
   HeartbeatEventSchema,
@@ -18,12 +18,15 @@ import {
   StateSyncEventSchema,
 } from './sse.schema'
 import {
+  buildRankingUpdatedEvent,
   buildStateSyncEvent,
   createSseBus,
+  markRankingDirty,
   publishRoundClosed,
   publishRoundExtended,
   publishRoundOpened,
   runExpiryTick,
+  runRankingTick,
 } from './sse.service'
 
 describe('sse.schema', () => {
@@ -197,7 +200,7 @@ describe('sse.service', () => {
     const db = createDb()
 
     beforeEach(async () => {
-      await db.execute(sql`truncate table ${roundsTable} restart identity cascade`)
+      await db.execute(sql`truncate table ${roundsTable}, ${teamsTable} restart identity cascade`)
     })
 
     afterAll(async () => {
@@ -280,6 +283,76 @@ describe('sse.service', () => {
         } as unknown as typeof db
 
         await expect(runExpiryTick(failingDb, bus)).resolves.toBeUndefined()
+      })
+    })
+
+    describe('buildRankingUpdatedEvent', () => {
+      it('carries the round ranking when a round is open', async () => {
+        const [round] = await db
+          .insert(roundsTable)
+          .values({
+            name: 'Round 1',
+            durationMinutes: 30,
+            status: 'open',
+            openedAt: new Date(),
+            closesAt: new Date(Date.now() + 60_000),
+          })
+          .returning()
+        if (!round) throw new Error('expected fixture')
+
+        const event = await buildRankingUpdatedEvent(db)
+
+        expect(event.type).toBe('ranking.updated')
+        expect(event.round?.roundId).toBe(round.id)
+        expect(event.event).toEqual({ teams: [] })
+      })
+
+      it('carries a null round and a populated event ranking when nothing is open', async () => {
+        const event = await buildRankingUpdatedEvent(db)
+
+        expect(event.round).toBeNull()
+        expect(event.event).toEqual({ teams: [] })
+      })
+    })
+
+    describe('runRankingTick', () => {
+      it('publishes ranking.updated when dirty, then nothing on a second call', async () => {
+        const bus = createSseBus()
+        const fn = vi.fn()
+        bus.subscribe(fn)
+        markRankingDirty()
+
+        await runRankingTick(db, bus)
+
+        expect(fn).toHaveBeenCalledTimes(1)
+        expect(fn).toHaveBeenCalledWith(expect.objectContaining({ type: 'ranking.updated' }))
+
+        await runRankingTick(db, bus)
+
+        expect(fn).toHaveBeenCalledTimes(1)
+      })
+
+      it('publishes nothing when never marked dirty', async () => {
+        const bus = createSseBus()
+        const fn = vi.fn()
+        bus.subscribe(fn)
+
+        await runRankingTick(db, bus)
+
+        expect(fn).not.toHaveBeenCalled()
+      })
+
+      it('does not throw when the db rejects', async () => {
+        const bus = createSseBus()
+        const failingDb = {
+          ...db,
+          select: () => {
+            throw new Error('db is down')
+          },
+        } as unknown as typeof db
+        markRankingDirty()
+
+        await expect(runRankingTick(failingDb, bus)).resolves.toBeUndefined()
       })
     })
   })

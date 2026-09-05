@@ -1,8 +1,11 @@
+import { signJwt } from '@katajs-framework/core/jwt'
 import { somaDosPares } from '@kumite/blocks'
 import { eq, sql } from 'drizzle-orm'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { SUBMISSION_COOLDOWN_MS } from '../../config'
+import { app } from '../../app'
+import { JWT_SECRET, SUBMISSION_COOLDOWN_MS, TOKEN_TTL_SECONDS } from '../../config'
+import { k } from '../../context'
 import { createDb } from '../../db/client'
 import {
   problemsTable,
@@ -19,6 +22,7 @@ import type { JudgeCaseResult } from '../judge/judge.schema'
 import { WorkspaceSchema } from '../judge/judge.schema'
 import type { TestCase } from '../problems/problems.schema'
 import { closeRound, createRound, openRound } from '../rounds/rounds.service'
+import { runRankingTick } from '../sse/sse.service'
 
 import { SubmitSolutionBodySchema } from './submissions.schema'
 import {
@@ -965,6 +969,59 @@ describe('submitSolution', () => {
       JUDGED_TEST_TIMEOUT_MS,
     )
   })
+})
+
+describe('POST /submissions — marks the ranking dirty on the sse bus (#44)', () => {
+  async function tokenForParticipant(userId: string) {
+    return signJwt(
+      { role: 'participant', university: 'pucrs' },
+      { secret: JWT_SECRET, subject: userId, expiresInSeconds: TOKEN_TTL_SECONDS },
+    )
+  }
+
+  it(
+    'a submission that beats the best score reaches the next ranking tick, a tying one leaves nothing new',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const token = await tokenForParticipant(user.id)
+      const fn = vi.fn()
+      const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+      const res = await app.request('/submissions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problemId: problem.id,
+          roundId: problem.roundId,
+          workspace: solutionWorkspace,
+        }),
+      })
+      expect(res.status).toBe(201)
+
+      await runRankingTick(k.resolve('db'), k.resolve('sseBus'))
+      expect(fn).toHaveBeenCalledWith(expect.objectContaining({ type: 'ranking.updated' }))
+
+      fn.mockClear()
+      resetSubmissionThrottle()
+      const tying = await app.request('/submissions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problemId: problem.id,
+          roundId: problem.roundId,
+          workspace: solutionWorkspace,
+        }),
+      })
+      expect(tying.status).toBe(201)
+
+      await runRankingTick(k.resolve('db'), k.resolve('sseBus'))
+      expect(fn).not.toHaveBeenCalled()
+
+      unsubscribe()
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
 })
 
 describe('findTeamIdForUser', () => {

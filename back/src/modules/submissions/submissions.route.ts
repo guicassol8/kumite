@@ -4,6 +4,8 @@ import { SUBMISSION_MAX_BODY_BYTES } from '../../config'
 import { defineRoute } from '../../context'
 import { requireUser } from '../../middlewares/auth'
 
+import { markRankingDirty } from '../sse/sse.service'
+
 import { SubmissionResultSchema, SubmitSolutionBodySchema } from './submissions.schema'
 import { findTeamIdForUser, submitSolution } from './submissions.service'
 
@@ -36,7 +38,10 @@ export const createSubmissionRoute = defineRoute({
     }
 
     const outcome = await submitSolution(db, { userId, teamId }, c.input.body)
-    if (outcome.ok) return c.json(outcome.result, 201)
+    if (outcome.ok) {
+      if (outcome.rankingChanged) markRankingDirty()
+      return c.json(outcome.result, 201)
+    }
 
     switch (outcome.error) {
       case 'problem_not_found':

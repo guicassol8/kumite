@@ -220,3 +220,81 @@ warning when a table it's about to assert against contains rows the current `.hu
 didn't itself create (e.g., a row count taken before the file's first request, diffed
 against a fresh reset) would have turned this occurrence's "why are there 5 teams"
 confusion into an immediate, correct diagnosis instead of a full reset-and-retry.
+
+---
+
+## Fifth occurrence, implementing #45 (leaderboard screen) — different blast radius
+
+This one is the same mechanism as every prior entry, but a materially worse outcome: the
+task's own approved plan stated up front that it was "100% front-end... nenhuma mudança
+de schema, migração ou `.hurl` é necessária," so no dedicated throwaway DB was set up
+before starting. `back/.env` was copied from `.env.example` as-is to satisfy the
+`JWT_SECRET` requirement in `config.ts`, which left `DATABASE_URL` pointing at its
+documented default — `postgres://kumite:kumite@localhost:5433/kumite`, the docker-compose
+service this repo's own worktree conventions call "shared across worktrees, do not run
+tests against it" (this is written down as project memory precisely *because* of that
+convention, yet the front-only framing of this task's plan was enough to skip acting on
+it). The pre-commit hook's `pnpm test` step then ran `back`'s DB-backed suite — which
+truncates `users`, `teams`, `rounds`, `event_config`, etc. per test, same as every prior
+occurrence — against that shared instance, on at least two real commits, before a manual
+browser-verification step (checking the new SSE-driven grid actually renders, which
+`vitest`/jsdom cannot exercise) surfaced the mistake by needing its own live Postgres.
+
+The distinction from occurrences 1-4 worth naming explicitly: those were all
+**self-inflicted** — an implementer's own seed data or E2E fixtures getting truncated by
+their own later test run, on their own throwaway or long-lived dev database. This one had
+the *other* agents on the shared `5433` instance as the blast radius: two `pnpm test`
+runs against the default `DATABASE_URL`, before the mistake was caught, means any
+concurrently-running worktree's in-progress dev data (accounts, teams, rounds, problems)
+was liable to be wiped mid-task, for a reason that has nothing to do with the diff being
+authored. The plan's own accurate claim ("front-only, no back changes") is exactly what
+made this easy to miss: "this task doesn't touch the database" and "this task's tooling
+is safe to run against the shared database" are different claims, and only the second one
+determines whether `pnpm test`/`kata verify --strict-coverage` are safe to run at all in
+this repo's multi-worktree setup. Every kumite task runs the pre-commit ladder on every
+commit regardless of what it touches, so this risk is present on literally every task,
+not just DB-shaped ones.
+
+Caught by luck, not by tooling: the manual-verification need (this task needed a real
+running back+SSE stream to see the grid) happened to force a dedicated Postgres container
+into existence, and a "wait, what port is `DATABASE_URL` actually pointing at" check
+before wiring up that container is what surfaced the earlier commits' mistake. A
+purely-front task that never needs to eyeball a live server (most of them, per the other
+front-task entries in this file) would have no such trigger and would run `pnpm test`
+against the shared DB for the task's entire duration without ever finding out.
+
+## Metrics (this occurrence)
+
+- **kata-docs calls this task: zero.** Every schema mirrored in the front (ranking event
+  shapes, connection-status callback) came from reading `back/src/modules/ranking/` and
+  `sse/` directly — a genuinely front-only task in the sense the plan meant, which is
+  exactly why DB isolation didn't come to mind until forced by manual verification.
+- **`kata verify --strict-coverage`: every run green** (46 files, back untouched by this
+  task's diff) — consistent with every other front-only entry in this file: cheap,
+  correct, no false positives from a diff that never touches `back/src`.
+  `pnpm -r test`, in the same ladder, is what carried the risk.
+- **Estimated blast radius before the mistake was caught: 2 pre-commit `pnpm test` runs**
+  against the shared `5433` Postgres, each one truncating and never repopulating
+  `users`/`teams`/`rounds`/`event_config`/etc. No confirmed casualty this time (no other
+  agent reported lost work), but nothing in the tooling would have surfaced it if there
+  had been one — same "green but wrong, silently" shape the third occurrence's oversized
+  screenshots already demonstrated, just aimed outward at other sessions instead of
+  inward at one's own fixtures.
+- **Recovery cost once caught:** one throwaway Postgres container (`docker run
+  postgres:17-alpine` on a free port), `db:migrate` + `db:seed`, and re-running the full
+  gate ladder against it (~1 min) to confirm the earlier green runs were still
+  legitimately green once isolated — call it 5-6 tool round-trips, small compared to the
+  unbounded downside of what the first two runs could have destroyed elsewhere.
+
+## Sharpened suggestion
+
+The standing per-file/per-run suggestions (a `@requires-clean-db` marker, a stale-row
+warning) all assume the person running the suite already knows to be worried. This
+occurrence argues for a stronger default specifically for the *unbounded blast-radius*
+case: `back`'s DB-backed test setup refusing to run (loud error, not a silent pass) when
+`DATABASE_URL` resolves to the project's documented shared/default host+port without an
+explicit opt-in (e.g. a `ALLOW_SHARED_TEST_DB=1` escape hatch for the rare case it's
+actually wanted). A destructive suite defaulting to "safe unless told otherwise" would
+have turned this task's silent risk into an immediate, correct refusal on the very first
+`pnpm test` invocation — before any commit, before any truncation, regardless of whether
+the implementer (or their plan) correctly believed the task itself was front-only.

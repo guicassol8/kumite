@@ -5,6 +5,7 @@ import { motion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { RoundCountdown } from '@/components/round-countdown'
 import { type University, UniversityBadge } from '@/components/teams/university-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +26,7 @@ import { fetchRounds, ROUNDS_QUERY_KEY } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
 import type { EventRankingTeam, RoundRanking, RoundRankingTeam } from '@/lib/sse-schema'
 import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/leaderboard')({
   beforeLoad: requireAuth,
@@ -94,6 +96,7 @@ function LeaderboardScreen() {
   const rounds = useQuery({ queryKey: ROUNDS_QUERY_KEY, queryFn: fetchRounds })
 
   const hasActiveRound = stream.activeRoundId !== null
+  const serverTimeOffsetMs = stream.serverTime ? stream.serverTime.getTime() - Date.now() : 0
   const closedRounds = (rounds.data ?? [])
     .filter((round) => round.status === 'closed' && round.closedAt)
     .sort((a, b) => new Date(b.closedAt!).getTime() - new Date(a.closedAt!).getTime())
@@ -173,8 +176,10 @@ function LeaderboardScreen() {
 
   return (
     <main ref={mainRef} className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-8">
-      <div className="flex items-center gap-2">
-        <h1 className="font-bold text-2xl">{t('leaderboard.heading')}</h1>
+      <div className="flex items-center gap-4">
+        <h1 className={cn('font-bold text-2xl', isPresentation && 'text-5xl')}>
+          {t('leaderboard.heading')}
+        </h1>
         <Button
           type="button"
           variant="ghost"
@@ -188,6 +193,9 @@ function LeaderboardScreen() {
         >
           {isPresentation ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
         </Button>
+        {isPresentation && hasActiveRound && stream.closesAt !== null && (
+          <RoundCountdown closesAt={stream.closesAt} serverTimeOffsetMs={serverTimeOffsetMs} />
+        )}
       </div>
 
       {stream.connectionStatus !== 'open' && (
@@ -219,10 +227,18 @@ function LeaderboardScreen() {
       {!isLoading && !isError && (
         <Tabs defaultValue={hasActiveRound || hasNeverHadARound ? 'round' : 'event'}>
           <TabsList data-testid="leaderboard-tabs">
-            <TabsTrigger value="round" data-testid="leaderboard-tab-round">
+            <TabsTrigger
+              value="round"
+              data-testid="leaderboard-tab-round"
+              className={cn(isPresentation && 'text-xl')}
+            >
               {t('leaderboard.tabs.round')}
             </TabsTrigger>
-            <TabsTrigger value="event" data-testid="leaderboard-tab-event">
+            <TabsTrigger
+              value="event"
+              data-testid="leaderboard-tab-event"
+              className={cn(isPresentation && 'text-xl')}
+            >
               {t('leaderboard.tabs.event')}
             </TabsTrigger>
           </TabsList>
@@ -252,7 +268,10 @@ function LeaderboardScreen() {
                     {t('leaderboard.lastClosedRoundLabel', { name: displayedRound.roundName })}
                   </p>
                 )}
-                <Table data-testid="leaderboard-table">
+                <Table
+                  data-testid="leaderboard-table"
+                  className={cn(isPresentation && '[&_td]:text-3xl [&_th]:text-2xl')}
+                >
                   <TableHeader>
                     <TableRow>
                       <TableHead data-testid="leaderboard-column-rank">
@@ -321,7 +340,10 @@ function LeaderboardScreen() {
                 <p className="text-muted-foreground">{t('leaderboard.empty.title')}</p>
               </div>
             ) : (
-              <Table data-testid="leaderboard-table">
+              <Table
+                data-testid="leaderboard-table"
+                className={cn(isPresentation && '[&_td]:text-3xl [&_th]:text-2xl')}
+              >
                 <TableHeader>
                   <TableRow>
                     <TableHead data-testid="leaderboard-column-rank">

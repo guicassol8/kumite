@@ -432,4 +432,45 @@ describe('LeaderboardScreen — presentation mode', () => {
 
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
   })
+
+  it('hides the round countdown in normal mode even with an active round', async () => {
+    await renderWithActiveRound()
+
+    expect(screen.queryByTestId('round-countdown')).toBeNull()
+  })
+
+  it('shows the round countdown once presentation mode is toggled on', async () => {
+    await renderWithActiveRound()
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    expect(screen.getByTestId('round-countdown')).toBeDefined()
+  })
+
+  it('hides the round countdown in presentation mode when there is no active round', async () => {
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        {
+          id: 'r1',
+          name: 'Rodada 1',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: new Date('2026-09-01T10:00:00.000Z'),
+          closesAt: null,
+          closedAt: new Date('2026-09-01T10:30:00.000Z'),
+          createdAt: new Date('2026-09-01T09:00:00.000Z'),
+          updatedAt: new Date('2026-09-01T10:30:00.000Z'),
+          problemCount: 1,
+        },
+      ]),
+    )
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-tabs')).toBeDefined())
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    expect(screen.queryByTestId('round-countdown')).toBeNull()
+  })
 })

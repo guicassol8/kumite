@@ -301,6 +301,10 @@
       "title": "Ronda no encontrada.",
       "backHome": "Volver al inicio"
     },
+    "loadError": {
+      "message": "No fue posible cargar la ronda.",
+      "retry": "Intentar de nuevo"
+    },
     "columns": {
       "title": "Título",
       "difficulty": "Dificultad",

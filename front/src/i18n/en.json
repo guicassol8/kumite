@@ -301,6 +301,10 @@
       "title": "Round not found.",
       "backHome": "Back to home"
     },
+    "loadError": {
+      "message": "Could not load the round.",
+      "retry": "Retry"
+    },
     "columns": {
       "title": "Title",
       "difficulty": "Difficulty",

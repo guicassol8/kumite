@@ -301,6 +301,10 @@
       "title": "Rodada não encontrada.",
       "backHome": "Voltar para o início"
     },
+    "loadError": {
+      "message": "Não foi possível carregar a rodada.",
+      "retry": "Tentar novamente"
+    },
     "columns": {
       "title": "Título",
       "difficulty": "Dificuldade",

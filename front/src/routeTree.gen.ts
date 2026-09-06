@@ -16,6 +16,7 @@ import { Route as OrganizerRouteImport } from './routes/organizer'
 import { Route as ProblemRouteImport } from './routes/problem'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TeamsRouteImport } from './routes/teams'
+import { Route as RoundsIdRouteImport } from './routes/rounds.$id'
 import { Route as OrganizerProblemsIndexRouteImport } from './routes/organizer.problems.index'
 import { Route as OrganizerProblemsNewRouteImport } from './routes/organizer.problems.new'
 import { Route as OrganizerProblemsIdEditRouteImport } from './routes/organizer.problems.$id.edit'
@@ -55,6 +56,11 @@ const TeamsRoute = TeamsRouteImport.update({
   path: '/teams',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RoundsIdRoute = RoundsIdRouteImport.update({
+  id: '/rounds/$id',
+  path: '/rounds/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrganizerProblemsIndexRoute = OrganizerProblemsIndexRouteImport.update({
   id: '/problems/',
   path: '/problems/',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/problem': typeof ProblemRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
+  '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
   '/organizer/problems/': typeof OrganizerProblemsIndexRoute
   '/organizer/problems/$id/edit': typeof OrganizerProblemsIdEditRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/problem': typeof ProblemRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
+  '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
   '/organizer/problems': typeof OrganizerProblemsIndexRoute
   '/organizer/problems/$id/edit': typeof OrganizerProblemsIdEditRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/problem': typeof ProblemRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
+  '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
   '/organizer/problems/': typeof OrganizerProblemsIndexRoute
   '/organizer/problems/$id/edit': typeof OrganizerProblemsIdEditRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/problem'
     | '/signup'
     | '/teams'
+    | '/rounds/$id'
     | '/organizer/problems/new'
     | '/organizer/problems/'
     | '/organizer/problems/$id/edit'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/problem'
     | '/signup'
     | '/teams'
+    | '/rounds/$id'
     | '/organizer/problems/new'
     | '/organizer/problems'
     | '/organizer/problems/$id/edit'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/problem'
     | '/signup'
     | '/teams'
+    | '/rounds/$id'
     | '/organizer/problems/new'
     | '/organizer/problems/'
     | '/organizer/problems/$id/edit'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   ProblemRoute: typeof ProblemRoute
   SignupRoute: typeof SignupRoute
   TeamsRoute: typeof TeamsRoute
+  RoundsIdRoute: typeof RoundsIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rounds/$id': {
+      id: '/rounds/$id'
+      path: '/rounds/$id'
+      fullPath: '/rounds/$id'
+      preLoaderRoute: typeof RoundsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/organizer/problems/': {
       id: '/organizer/problems/'
       path: '/problems'
@@ -256,6 +276,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProblemRoute: ProblemRoute,
   SignupRoute: SignupRoute,
   TeamsRoute: TeamsRoute,
+  RoundsIdRoute: RoundsIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

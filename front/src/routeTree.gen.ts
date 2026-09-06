@@ -19,7 +19,10 @@ import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as RoundsIdRouteImport } from './routes/rounds.$id'
 import { Route as OrganizerProblemsIndexRouteImport } from './routes/organizer.problems.index'
 import { Route as OrganizerProblemsNewRouteImport } from './routes/organizer.problems.new'
+import { Route as OrganizerRoundsIndexRouteImport } from './routes/organizer.rounds.index'
+import { Route as OrganizerRoundsNewRouteImport } from './routes/organizer.rounds.new'
 import { Route as OrganizerProblemsIdEditRouteImport } from './routes/organizer.problems.$id.edit'
+import { Route as OrganizerRoundsIdEditRouteImport } from './routes/organizer.rounds.$id.edit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -71,9 +74,24 @@ const OrganizerProblemsNewRoute = OrganizerProblemsNewRouteImport.update({
   path: '/problems/new',
   getParentRoute: () => OrganizerRoute,
 } as any)
+const OrganizerRoundsIndexRoute = OrganizerRoundsIndexRouteImport.update({
+  id: '/rounds/',
+  path: '/rounds/',
+  getParentRoute: () => OrganizerRoute,
+} as any)
+const OrganizerRoundsNewRoute = OrganizerRoundsNewRouteImport.update({
+  id: '/rounds/new',
+  path: '/rounds/new',
+  getParentRoute: () => OrganizerRoute,
+} as any)
 const OrganizerProblemsIdEditRoute = OrganizerProblemsIdEditRouteImport.update({
   id: '/problems/$id/edit',
   path: '/problems/$id/edit',
+  getParentRoute: () => OrganizerRoute,
+} as any)
+const OrganizerRoundsIdEditRoute = OrganizerRoundsIdEditRouteImport.update({
+  id: '/rounds/$id/edit',
+  path: '/rounds/$id/edit',
   getParentRoute: () => OrganizerRoute,
 } as any)
 
@@ -87,8 +105,11 @@ export interface FileRoutesByFullPath {
   '/teams': typeof TeamsRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
+  '/organizer/rounds/new': typeof OrganizerRoundsNewRoute
   '/organizer/problems/': typeof OrganizerProblemsIndexRoute
+  '/organizer/rounds/': typeof OrganizerRoundsIndexRoute
   '/organizer/problems/$id/edit': typeof OrganizerProblemsIdEditRoute
+  '/organizer/rounds/$id/edit': typeof OrganizerRoundsIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -100,8 +121,11 @@ export interface FileRoutesByTo {
   '/teams': typeof TeamsRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
+  '/organizer/rounds/new': typeof OrganizerRoundsNewRoute
   '/organizer/problems': typeof OrganizerProblemsIndexRoute
+  '/organizer/rounds': typeof OrganizerRoundsIndexRoute
   '/organizer/problems/$id/edit': typeof OrganizerProblemsIdEditRoute
+  '/organizer/rounds/$id/edit': typeof OrganizerRoundsIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -114,8 +138,11 @@ export interface FileRoutesById {
   '/teams': typeof TeamsRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
+  '/organizer/rounds/new': typeof OrganizerRoundsNewRoute
   '/organizer/problems/': typeof OrganizerProblemsIndexRoute
+  '/organizer/rounds/': typeof OrganizerRoundsIndexRoute
   '/organizer/problems/$id/edit': typeof OrganizerProblemsIdEditRoute
+  '/organizer/rounds/$id/edit': typeof OrganizerRoundsIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -129,8 +156,11 @@ export interface FileRouteTypes {
     | '/teams'
     | '/rounds/$id'
     | '/organizer/problems/new'
+    | '/organizer/rounds/new'
     | '/organizer/problems/'
+    | '/organizer/rounds/'
     | '/organizer/problems/$id/edit'
+    | '/organizer/rounds/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -142,8 +172,11 @@ export interface FileRouteTypes {
     | '/teams'
     | '/rounds/$id'
     | '/organizer/problems/new'
+    | '/organizer/rounds/new'
     | '/organizer/problems'
+    | '/organizer/rounds'
     | '/organizer/problems/$id/edit'
+    | '/organizer/rounds/$id/edit'
   id:
     | '__root__'
     | '/'
@@ -155,8 +188,11 @@ export interface FileRouteTypes {
     | '/teams'
     | '/rounds/$id'
     | '/organizer/problems/new'
+    | '/organizer/rounds/new'
     | '/organizer/problems/'
+    | '/organizer/rounds/'
     | '/organizer/problems/$id/edit'
+    | '/organizer/rounds/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -242,6 +278,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizerProblemsNewRouteImport
       parentRoute: typeof OrganizerRoute
     }
+    '/organizer/rounds/': {
+      id: '/organizer/rounds/'
+      path: '/rounds'
+      fullPath: '/organizer/rounds/'
+      preLoaderRoute: typeof OrganizerRoundsIndexRouteImport
+      parentRoute: typeof OrganizerRoute
+    }
+    '/organizer/rounds/new': {
+      id: '/organizer/rounds/new'
+      path: '/rounds/new'
+      fullPath: '/organizer/rounds/new'
+      preLoaderRoute: typeof OrganizerRoundsNewRouteImport
+      parentRoute: typeof OrganizerRoute
+    }
     '/organizer/problems/$id/edit': {
       id: '/organizer/problems/$id/edit'
       path: '/problems/$id/edit'
@@ -249,19 +299,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizerProblemsIdEditRouteImport
       parentRoute: typeof OrganizerRoute
     }
+    '/organizer/rounds/$id/edit': {
+      id: '/organizer/rounds/$id/edit'
+      path: '/rounds/$id/edit'
+      fullPath: '/organizer/rounds/$id/edit'
+      preLoaderRoute: typeof OrganizerRoundsIdEditRouteImport
+      parentRoute: typeof OrganizerRoute
+    }
   }
 }
 
 interface OrganizerRouteChildren {
   OrganizerProblemsNewRoute: typeof OrganizerProblemsNewRoute
+  OrganizerRoundsNewRoute: typeof OrganizerRoundsNewRoute
   OrganizerProblemsIndexRoute: typeof OrganizerProblemsIndexRoute
+  OrganizerRoundsIndexRoute: typeof OrganizerRoundsIndexRoute
   OrganizerProblemsIdEditRoute: typeof OrganizerProblemsIdEditRoute
+  OrganizerRoundsIdEditRoute: typeof OrganizerRoundsIdEditRoute
 }
 
 const OrganizerRouteChildren: OrganizerRouteChildren = {
   OrganizerProblemsNewRoute: OrganizerProblemsNewRoute,
+  OrganizerRoundsNewRoute: OrganizerRoundsNewRoute,
   OrganizerProblemsIndexRoute: OrganizerProblemsIndexRoute,
+  OrganizerRoundsIndexRoute: OrganizerRoundsIndexRoute,
   OrganizerProblemsIdEditRoute: OrganizerProblemsIdEditRoute,
+  OrganizerRoundsIdEditRoute: OrganizerRoundsIdEditRoute,
 }
 
 const OrganizerRouteWithChildren = OrganizerRoute._addFileChildren(

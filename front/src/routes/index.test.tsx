@@ -311,5 +311,8 @@ describe('Home — organizer shortcuts card (#40)', () => {
     expect(screen.getByTestId('home-organizer-shortcuts-problems').getAttribute('href')).toBe(
       '/organizer/problems',
     )
+    expect(screen.getByTestId('home-organizer-shortcuts-rounds').getAttribute('href')).toBe(
+      '/organizer/rounds',
+    )
   })
 })

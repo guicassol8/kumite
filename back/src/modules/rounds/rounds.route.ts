@@ -7,6 +7,8 @@ import { publishRoundClosed, publishRoundExtended, publishRoundOpened } from '..
 import {
   CreateRoundBodySchema,
   ExtendRoundBodySchema,
+  ParticipantRoundDetailSchema,
+  ParticipantRoundQuerySchema,
   RoundDetailSchema,
   RoundIdParamsSchema,
   RoundSummaryListSchema,
@@ -16,6 +18,7 @@ import {
   closeRound,
   createRound,
   extendRound,
+  getParticipantRound,
   getRound,
   listParticipantRounds,
   listRounds,
@@ -59,6 +62,24 @@ export const listParticipantRoundsRoute = defineRoute({
   input: {},
   output: RoundSummaryListSchema,
   handler: async (c) => listParticipantRounds(c.get('db')),
+})
+
+export const getParticipantRoundRoute = defineRoute({
+  method: 'GET',
+  path: '/rounds/:id',
+  use: [requireUser],
+  input: { params: RoundIdParamsSchema, query: ParticipantRoundQuerySchema },
+  output: { 200: ParticipantRoundDetailSchema, 404: ErrorBodySchema },
+  handler: async (c) => {
+    const round = await getParticipantRound(
+      c.get('db'),
+      c.input.params.id,
+      c.input.query.locale,
+      c.get('currentUser').id,
+    )
+    if (!round) return c.error('not_found', 'Round not found', { status: 404 })
+    return round
+  },
 })
 
 export const getRoundRoute = defineRoute({

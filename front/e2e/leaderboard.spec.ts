@@ -7,6 +7,7 @@ import { expect, type Page, test } from '@playwright/test'
 // updates live over SSE (#44) without a reload. Also needs no round already
 // open in the shared dev db (a fresh `pnpm db:seed` never opens one).
 const evidence = (name: string) => `e2e/evidence/45/${name}.png`
+const evidence46 = (name: string) => `e2e/evidence/46/${name}.png`
 
 const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
@@ -168,6 +169,34 @@ test.describe('leaderboard (#45)', () => {
     })
     await expect(myRow).toContainText('100', { timeout: 15_000 })
     await page.screenshot({ path: evidence('03-pontuacao-ao-vivo'), fullPage: true })
+
+    // 46-01 (#46) — toggling presentation mode enters real fullscreen, scales
+    // typography, and shows the round timer next to the score (Acceptance
+    // #1, #2) — the round from step 02 is still open.
+    await page.getByTestId('leaderboard-presentation-toggle').click()
+    await expect(page.getByTestId('leaderboard-presentation-toggle')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
+    await expect(page.getByTestId('round-countdown')).toBeVisible()
+    await page.screenshot({ path: evidence46('01-modo-apresentacao'), fullPage: true })
+
+    // 46-02 (#46) — Esc exits fullscreen natively in a real browser, which
+    // fires `fullscreenchange`; the route listens for that event, not the
+    // key itself (see leaderboard.tsx), and syncs state back to normal,
+    // dropping the enlarged layout and the timer (Acceptance #3). Headless
+    // Chromium's CDP-dispatched key events don't reach the browser-chrome
+    // Escape-exits-fullscreen shortcut, so this triggers the same
+    // `fullscreenchange` transition a real Esc keypress produces.
+    await page.evaluate(() => document.exitFullscreen())
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(false)
+    await expect(page.getByTestId('leaderboard-presentation-toggle')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    await expect(page.getByTestId('round-countdown')).toBeHidden()
+    await page.screenshot({ path: evidence46('02-modo-normal'), fullPage: true })
 
     // 04 — switching to "Geral" changes the scope without a reload
     // (Acceptance #3), showing round columns instead of problem columns.

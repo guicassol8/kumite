@@ -383,6 +383,10 @@
     "empty": {
       "title": "Nenhum time no placar ainda.",
       "noRoundEver": "Nenhuma rodada foi aberta ainda nesta competição."
+    },
+    "presentation": {
+      "enter": "Ativar modo apresentação",
+      "exit": "Sair do modo apresentação"
     }
   },
   "roundDetail": {

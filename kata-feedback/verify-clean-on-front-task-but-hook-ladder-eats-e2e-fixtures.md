@@ -101,3 +101,51 @@ That's the shape of the problem worth recording: the trap is now fully
 documented on the kumite side and still fires on every single commit —
 each session pays a small tax forever, and any session that forgets pays
 the full ~3 minutes. It is a fixture-lifecycle gap, not a knowledge gap.
+
+## Update — a new symptom of the same root cause (#46, dedicated throwaway DB)
+
+Fourth occurrence, on a task following the "spin up your own disposable
+Postgres per worktree" convention specifically to dodge the shared-db
+version of this trap — and it still bit, in a new shape.
+
+Sequence: fresh `docker run postgres:17-alpine` on a free port →
+`db:migrate` → `db:seed` (organizer only, no rounds) → pre-commit ladders
+for three front-only commits (each running `pnpm -r test`, back included)
+→ started the `#45`/`#46` Playwright leaderboard spec against that same
+throwaway db. First assertion failure: `leaderboard-empty-no-round` never
+appeared — the "Geral" tab instead showed a real column header **"Round
+1"** with a live score row. Not a wiped fixture this time but a *planted*
+one: `back/src/modules/rounds/rounds.test.ts` and
+`back/src/modules/sse/sse.test.ts` both insert literal `name: 'Round 1'`
+rows directly via Drizzle, and at least one such row survived to the end
+of the back suite's run (no final teardown truncate, or a later test's
+`insert` racing a truncate — didn't dig further) instead of test isolation
+cleaning it up per-test. The E2E spec's precondition comment ("no round
+already open in the shared dev db") wasn't wrong about *itself* — it just
+didn't anticipate `pnpm -r test` running against the *same* fresh db
+in between seeding and the browser run, same as observation 2 above.
+
+Fix applied here: `docker rm -f` the throwaway container and redo
+migrate+seed immediately before the Playwright run, every time, treating
+any intervening `pnpm -r test` as db-dirtying. Confirms the suggested fix
+in observation 2 generalizes beyond `users`/`ORGANIZER_EMAIL`: any
+DB-backed back unit test that inserts fixture rows without full teardown
+is a landmine for whatever E2E run shares its database, worktree-local or
+not. Per-worktree throwaway databases sidestep cross-*worktree*
+contamination but not cross-*command* contamination within the same
+worktree session.
+
+### Metrics
+
+- Cost of this occurrence: one full Playwright run to the first failing
+  assertion (~30s timeout) plus reading its error-context snapshot to spot
+  the phantom "Round 1" column — ~1 minute total, cheaper than the
+  `users`-wipe case because the symptom (an unexpected column header) was
+  visible directly in the failure's accessibility snapshot, no `psql`
+  round-trip needed.
+- `kata-docs` MCP queries this task: **0** — same pattern as every prior
+  front-only entry here; this task never needed the framework's API
+  surface, only its test/DB behavior, which isn't kata-docs-covered ground
+  anyway.
+- `kata verify --strict-coverage`: 5 runs across the task's commits, all
+  green, no false positives from the route/hook/i18n/e2e-spec diff.

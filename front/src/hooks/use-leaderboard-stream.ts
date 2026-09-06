@@ -12,6 +12,7 @@ export type LeaderboardStreamState = {
   // round with zero submissions never refreshes `round` on its own — this
   // field lets the route fall back to a REST fetch for that round instead.
   activeRoundId: string | null
+  closesAt: Date | null
   round: RoundRanking | null
   event: EventRanking | null
   serverTime: Date | null
@@ -20,6 +21,7 @@ export type LeaderboardStreamState = {
 const INITIAL_STATE: LeaderboardStreamState = {
   connectionStatus: 'connecting',
   activeRoundId: null,
+  closesAt: null,
   round: null,
   event: null,
   serverTime: null,
@@ -49,14 +51,28 @@ export function useLeaderboardStream(onRoundChange?: () => void): LeaderboardStr
       (event: SseEvent) => {
         switch (event.type) {
           case 'state.sync':
-            setState((prev) => ({ ...prev, activeRoundId: event.round?.id ?? null }))
+            setState((prev) => ({
+              ...prev,
+              activeRoundId: event.round?.id ?? null,
+              closesAt: event.round?.closesAt ?? null,
+            }))
             return
           case 'round.opened':
-            setState((prev) => ({ ...prev, activeRoundId: event.roundId, round: null }))
+            setState((prev) => ({
+              ...prev,
+              activeRoundId: event.roundId,
+              closesAt: event.closesAt,
+              round: null,
+            }))
             onRoundChangeRef.current?.()
             return
+          case 'round.extended':
+            setState((prev) =>
+              prev.activeRoundId === event.roundId ? { ...prev, closesAt: event.closesAt } : prev,
+            )
+            return
           case 'round.closed':
-            setState((prev) => ({ ...prev, activeRoundId: null, round: null }))
+            setState((prev) => ({ ...prev, activeRoundId: null, closesAt: null, round: null }))
             onRoundChangeRef.current?.()
             return
           case 'ranking.updated':

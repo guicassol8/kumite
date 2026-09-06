@@ -49,4 +49,6 @@ task #16).
 - **Blockly**: decided (2026-08-25, epic #1) — official `blockly` npm package
   + our own thin React wrapper (#2); custom block definitions live only in
   `@kumite/blocks` (#16).
-- **Deploy/hosting**: undecided; event is small (hundreds of users, one server).
+- **Deploy/hosting**: decided (2026-09-06, `back/docs/adr/0002-event-hosting.md`)
+  — single VPS on GCP (`e2-small`, São Paulo) under the free trial, running
+  the existing compose file plus Caddy as reverse proxy.

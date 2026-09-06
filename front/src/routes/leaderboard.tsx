@@ -165,6 +165,9 @@ function LeaderboardScreen() {
     activeRoundRanking.isError ||
     eventRankingRest.isError
   const hasNeverHadARound = !hasActiveRound && lastClosedRound === null
+  const defaultTab = hasActiveRound || hasNeverHadARound ? 'round' : 'event'
+  const [manualTab, setManualTab] = useState<'round' | 'event' | null>(null)
+  const selectedTab = manualTab ?? defaultTab
 
   function retry() {
     teams.refetch()
@@ -228,7 +231,10 @@ function LeaderboardScreen() {
       )}
 
       {!isLoading && !isError && (
-        <Tabs defaultValue={hasActiveRound || hasNeverHadARound ? 'round' : 'event'}>
+        <Tabs
+          value={selectedTab}
+          onValueChange={(value) => setManualTab(value as 'round' | 'event')}
+        >
           <TabsList data-testid="leaderboard-tabs">
             <TabsTrigger
               value="round"

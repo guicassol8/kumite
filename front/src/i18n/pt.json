@@ -31,7 +31,8 @@
     },
     "round": {
       "waiting": "Aguardando a próxima rodada.",
-      "timeRemaining": "Termina em {{time}}"
+      "timeRemaining": "Termina em {{time}}",
+      "cta": "Ver rodada"
     },
     "closedRounds": {
       "title": "Rodadas encerradas",

@@ -31,7 +31,8 @@
     },
     "round": {
       "waiting": "Esperando la próxima ronda.",
-      "timeRemaining": "Termina en {{time}}"
+      "timeRemaining": "Termina en {{time}}",
+      "cta": "Ver ronda"
     },
     "closedRounds": {
       "title": "Rondas cerradas",

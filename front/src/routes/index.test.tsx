@@ -219,6 +219,7 @@ describe('Home — round card (#40)', () => {
       expect(screen.getByTestId('home-round-card').textContent).toContain('Rodada Abertura'),
     )
     expect(screen.getByTestId('round-countdown')).toBeDefined()
+    expect(screen.getByTestId('home-round-cta').getAttribute('href')).toBe('/rounds/r1')
   })
 
   it('reflects a round opening live, via SSE-triggered query invalidation, without a page reload', async () => {
@@ -289,6 +290,7 @@ describe('Home — closed rounds card (#40)', () => {
     )
     const cardText = screen.getByTestId('home-closed-rounds').textContent ?? ''
     expect(cardText).not.toMatch(/\d+\s*(pts|pontos|points)/i)
+    expect(screen.getByTestId('home-closed-round-r9').getAttribute('href')).toBe('/rounds/r9')
   })
 })
 

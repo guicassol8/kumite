@@ -31,7 +31,8 @@
     },
     "round": {
       "waiting": "Waiting for the next round.",
-      "timeRemaining": "Ends in {{time}}"
+      "timeRemaining": "Ends in {{time}}",
+      "cta": "View round"
     },
     "closedRounds": {
       "title": "Closed rounds",

@@ -433,6 +433,14 @@ describe('LeaderboardScreen — presentation mode', () => {
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
   })
 
+  it('paints an opaque background on the fullscreened main so the browser backdrop never shows through', async () => {
+    await renderWithActiveRound()
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    expect(document.querySelector('main')?.className).toContain('bg-background')
+  })
+
   it('hides the round countdown in normal mode even with an active round', async () => {
     await renderWithActiveRound()
 

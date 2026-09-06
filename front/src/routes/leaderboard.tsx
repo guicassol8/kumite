@@ -175,7 +175,10 @@ function LeaderboardScreen() {
   }
 
   return (
-    <main ref={mainRef} className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-8">
+    <main
+      ref={mainRef}
+      className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 bg-background p-8"
+    >
       <div className="flex items-center gap-4">
         <h1 className={cn('font-bold text-2xl', isPresentation && 'text-5xl')}>
           {t('leaderboard.heading')}

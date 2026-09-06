@@ -289,5 +289,39 @@
       "title": "Nenhum time no placar ainda.",
       "noRoundEver": "Nenhuma rodada foi aberta ainda nesta competição."
     }
+  },
+  "roundDetail": {
+    "heading": "Rodada",
+    "status": {
+      "open": "Aberta",
+      "closed": "Encerrada"
+    },
+    "waiting": "Carregando a rodada...",
+    "notFound": {
+      "title": "Rodada não encontrada.",
+      "backHome": "Voltar para o início"
+    },
+    "columns": {
+      "title": "Título",
+      "difficulty": "Dificuldade",
+      "points": "Pontos",
+      "bestScore": "Melhor pontuação do meu time"
+    },
+    "difficulty": {
+      "easy": "Fácil",
+      "medium": "Médio",
+      "hard": "Difícil"
+    },
+    "bestScore": {
+      "hidden": "—"
+    },
+    "connection": {
+      "reconnecting": "Conexão perdida — reconectando..."
+    },
+    "justClosed": {
+      "message": "A rodada foi encerrada.",
+      "dismiss": "Dispensar"
+    },
+    "emptyProblems": "Nenhum problema nesta rodada."
   }
 }

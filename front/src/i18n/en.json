@@ -289,5 +289,39 @@
       "title": "No teams on the leaderboard yet.",
       "noRoundEver": "No round has ever been opened for this event."
     }
+  },
+  "roundDetail": {
+    "heading": "Round",
+    "status": {
+      "open": "Open",
+      "closed": "Closed"
+    },
+    "waiting": "Loading the round...",
+    "notFound": {
+      "title": "Round not found.",
+      "backHome": "Back to home"
+    },
+    "columns": {
+      "title": "Title",
+      "difficulty": "Difficulty",
+      "points": "Points",
+      "bestScore": "My team's best score"
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "bestScore": {
+      "hidden": "—"
+    },
+    "connection": {
+      "reconnecting": "Connection lost — reconnecting..."
+    },
+    "justClosed": {
+      "message": "The round has ended.",
+      "dismiss": "Dismiss"
+    },
+    "emptyProblems": "No problems in this round."
   }
 }

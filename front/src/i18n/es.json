@@ -289,5 +289,39 @@
       "title": "Todavía no hay equipos en el marcador.",
       "noRoundEver": "Todavía no se abrió ninguna ronda en esta competencia."
     }
+  },
+  "roundDetail": {
+    "heading": "Ronda",
+    "status": {
+      "open": "Abierta",
+      "closed": "Cerrada"
+    },
+    "waiting": "Cargando la ronda...",
+    "notFound": {
+      "title": "Ronda no encontrada.",
+      "backHome": "Volver al inicio"
+    },
+    "columns": {
+      "title": "Título",
+      "difficulty": "Dificultad",
+      "points": "Puntos",
+      "bestScore": "Mejor puntuación de mi equipo"
+    },
+    "difficulty": {
+      "easy": "Fácil",
+      "medium": "Media",
+      "hard": "Difícil"
+    },
+    "bestScore": {
+      "hidden": "—"
+    },
+    "connection": {
+      "reconnecting": "Conexión perdida — reconectando..."
+    },
+    "justClosed": {
+      "message": "La ronda ha finalizado.",
+      "dismiss": "Descartar"
+    },
+    "emptyProblems": "No hay problemas en esta ronda."
   }
 }

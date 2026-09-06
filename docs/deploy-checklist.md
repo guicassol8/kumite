@@ -15,7 +15,7 @@ verification; no charge unless usage is explicitly upgraded past the trial.
 
 ## 2. Provision the VM
 
-- Instance: `e2-small`, region `southamerica-east1` (São Paulo).
+- Instance: `e2-medium`, region `southamerica-east1` (São Paulo).
 - Install Docker + the Compose plugin on it (Docker's official install
   script, or the distro's packages — either way, confirm with
   `docker compose version`).

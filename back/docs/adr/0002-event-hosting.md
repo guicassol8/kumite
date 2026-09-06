@@ -110,3 +110,20 @@ preferred. This remains the fallback if the GCP trial signup has friction.
   the seed script, and the post-event teardown checklist.
 - `#62` should verify the 10-minute SSE hold-open behavior end to end through
   Caddy before the event, not just assume it from the proxy's config.
+
+## Amendment (2026-09-06)
+
+`#62`'s planning session corrected this ADR's scope: the front stays on
+**Vercel**, where it is already live and auto-deploys on push to `main`
+(`docs/workflow.md` § Releases already treats `main` as the release branch
+Vercel deploys from). It is not served by Caddy from the VPS as the
+"serving the built front" language above implied.
+
+The VPS/Caddy therefore only host **back + Postgres**. `docker-compose.prod.yml`
+reflects this: three services (`db`, `back`, `caddy`), no static file serving
+for the front. The front's `VITE_API_URL` is repointed at the VPS's domain
+(`kumite-api.ligadealgoritmos.com`) instead of the VPS serving both halves —
+this is a one-line Vercel env var change, not a deploy architecture change.
+
+The rest of this ADR (region, VM size, trial, cost/criteria analysis) is
+unaffected — only the "what the VPS serves" scope narrows.

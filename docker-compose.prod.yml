@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: kumite
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: kumite
+    volumes:
+      - db-data-prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U kumite -d kumite']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  back:
+    build:
+      context: .
+      dockerfile: back/Dockerfile
+    image: ghcr.io/${GHCR_OWNER:-guicassol8}/kumite-back:${TAG:-latest}
+    env_file:
+      - back/.env
+    environment:
+      # Overrides back/.env's local-dev default: the app reaches Postgres
+      # through the compose network, not localhost.
+      DATABASE_URL: postgres://kumite:${POSTGRES_PASSWORD}@db:5432/kumite
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      - KUMITE_DOMAIN
+      - CADDY_EMAIL
+    depends_on:
+      - back
+    restart: unless-stopped
+
+volumes:
+  db-data-prod:
+  caddy-data:
+  caddy-config:

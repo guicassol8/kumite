@@ -94,9 +94,14 @@ function Home() {
         <Card className="w-full" data-testid="home-round-card">
           <CardContent>
             {eventStream.currentRoundId && closesAt ? (
-              <div className="flex flex-col items-start gap-1">
+              <div className="flex flex-col items-start gap-2">
                 {openRound && <span className="font-medium">{openRound.name}</span>}
                 <RoundCountdown closesAt={closesAt} serverTimeOffsetMs={serverTimeOffsetMs} />
+                <Button asChild size="sm" data-testid="home-round-cta">
+                  <Link to="/rounds/$id" params={{ id: eventStream.currentRoundId }}>
+                    {t('home.round.cta')}
+                  </Link>
+                </Button>
               </div>
             ) : (
               <span className="text-muted-foreground text-sm">{t('home.round.waiting')}</span>
@@ -144,7 +149,14 @@ function Home() {
             ) : (
               closedRounds.map((round) => (
                 <div key={round.id} className="flex w-full items-baseline justify-between gap-4">
-                  <span>{round.name}</span>
+                  <Link
+                    to="/rounds/$id"
+                    params={{ id: round.id }}
+                    data-testid={`home-closed-round-${round.id}`}
+                    className="text-primary underline"
+                  >
+                    {round.name}
+                  </Link>
                   {round.closedAt && (
                     <span className="text-muted-foreground text-sm">
                       {t('home.closedRounds.closedAt', {

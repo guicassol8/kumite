@@ -244,6 +244,46 @@ HTTP 200
 jsonpath "$.status" == "closed"
 jsonpath "$.closedAt" exists
 
+# 9a. Participant round-detail (#39): GET /rounds/{{round_id}}. No token -> 401.
+GET {{host}}/rounds/{{round_id}}
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
+# 9a-b. Unknown id -> 404.
+GET {{host}}/rounds/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{participant_token}}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "not_found"
+
+# 9a-c. A still-draft round (second_round_id, before it's reopened in step
+# 10) -> 404, same "never announces itself" rule as an unpublished problem.
+GET {{host}}/rounds/{{second_round_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "not_found"
+
+# 9a-d. The closed round -> 200, with both problems, nobody's submitted so
+# bestScore is null, and the default (pt) locale title.
+GET {{host}}/rounds/{{round_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "closed"
+jsonpath "$.problems" count == 2
+jsonpath "$.problems[0].problemId" == "{{problem_id}}"
+jsonpath "$.problems[0].bestScore" == null
+jsonpath "$.problems[0].title" == "Soma"
+
+# 9a-e. ?locale=es returns the Spanish title captured earlier.
+GET {{host}}/rounds/{{round_id}}?locale=es
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.problems[0].title" == "Suma"
+
 # 9b. GET the detail again -> reflects the closed state.
 GET {{host}}/organizer/rounds/{{round_id}}
 Authorization: Bearer {{organizer_token}}

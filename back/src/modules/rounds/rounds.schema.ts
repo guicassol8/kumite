@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+import { LocaleSchema } from '../../lib/locale'
+
+import { DifficultySchema } from '../problems/problems.schema'
+
 // Mirrors the `rounds` drizzle table (db/schema.ts).
 export const RoundStatusSchema = z.enum(['draft', 'open', 'closed'])
 
@@ -110,3 +114,45 @@ export type ExtendRoundBody = z.infer<typeof ExtendRoundBodySchema>
 export type RoundProblemDetail = z.infer<typeof RoundProblemDetailSchema>
 export type RoundDetail = z.infer<typeof RoundDetailSchema>
 export type RoundSummary = z.infer<typeof RoundSummarySchema>
+
+// --- Participant round-detail DTOs (#39) ---
+
+// Narrower than RoundStatusSchema: a draft round is never visible to a
+// participant (same "never announces itself" rule as listParticipantRounds).
+export const ParticipantRoundStatusSchema = z.enum(['open', 'closed'])
+
+// Optional query param: no `?locale=` means pt, same shape as
+// problems.schema.ts's ParticipantProblemQuerySchema.
+export const ParticipantRoundQuerySchema = z.object({
+  locale: LocaleSchema.default('pt'),
+})
+
+export const ParticipantRoundProblemSchema = z.object({
+  problemId: z.string(),
+  position: z.number().int().nonnegative(),
+  title: z.string(),
+  difficulty: DifficultySchema,
+  points: z.number().int(),
+  // The team's best score on this problem. Null while the round is open (the
+  // participant doesn't need it yet, same rule as getPublishedProblem) and
+  // once the round is closed, null only when the team never submitted.
+  bestScore: z.number().int().nullable(),
+})
+
+// coerce, not date(): kata re-validates the output after JSON serialization,
+// where a Date has already become an ISO string (see RoundDetailSchema above).
+export const ParticipantRoundDetailSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: ParticipantRoundStatusSchema,
+  durationMinutes: z.number().int().positive(),
+  openedAt: z.coerce.date().nullable(),
+  closesAt: z.coerce.date().nullable(),
+  closedAt: z.coerce.date().nullable(),
+  problems: z.array(ParticipantRoundProblemSchema),
+})
+
+export type ParticipantRoundStatus = z.infer<typeof ParticipantRoundStatusSchema>
+export type ParticipantRoundQuery = z.infer<typeof ParticipantRoundQuerySchema>
+export type ParticipantRoundProblem = z.infer<typeof ParticipantRoundProblemSchema>
+export type ParticipantRoundDetail = z.infer<typeof ParticipantRoundDetailSchema>

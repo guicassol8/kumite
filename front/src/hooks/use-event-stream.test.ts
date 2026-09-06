@@ -7,6 +7,7 @@ vi.mock('@/lib/sse-client', () => ({
 }))
 
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
+import type { SseConnectionStatus } from '@/lib/sse-client'
 import type { SseEvent } from '@/lib/sse-schema'
 
 import { useEventStream } from './use-event-stream'
@@ -61,6 +62,7 @@ describe('useEventStream', () => {
       currentRoundId: 'r1',
       closesAt: new Date('2026-09-02T12:30:00.000Z'),
       serverTime,
+      status: 'connecting',
     })
   })
 
@@ -144,5 +146,21 @@ describe('useEventStream', () => {
     unmount()
 
     expect(unsubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('tracks connection status changes reported by connectEventStream', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useEventStream())
+
+    expect(result.current.status).toBe('connecting')
+
+    const onStatusChange = connectEventStream.mock.calls.at(-1)?.[1] as (
+      status: SseConnectionStatus,
+    ) => void
+    act(() => onStatusChange('open'))
+    expect(result.current.status).toBe('open')
+
+    act(() => onStatusChange('reconnecting'))
+    expect(result.current.status).toBe('reconnecting')
   })
 })

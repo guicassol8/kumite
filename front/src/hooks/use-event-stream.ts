@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { connectEventStream } from '@/lib/sse-client'
+import { connectEventStream, type SseConnectionStatus } from '@/lib/sse-client'
 import type { SseEvent } from '@/lib/sse-schema'
 
 import { useSession } from './use-session'
@@ -9,9 +9,15 @@ export type EventStreamState = {
   currentRoundId: string | null
   closesAt: Date | null
   serverTime: Date | null
+  status: SseConnectionStatus
 }
 
-const INITIAL_STATE: EventStreamState = { currentRoundId: null, closesAt: null, serverTime: null }
+const INITIAL_STATE: EventStreamState = {
+  currentRoundId: null,
+  closesAt: null,
+  serverTime: null,
+  status: 'connecting',
+}
 
 // Live current-round state for the home screen, sourced from the /sse
 // channel (#38). Only connects while authenticated — there's nothing to
@@ -31,42 +37,47 @@ export function useEventStream(onRoundChange?: () => void): EventStreamState {
       return
     }
 
-    return connectEventStream((event: SseEvent) => {
-      switch (event.type) {
-        case 'state.sync':
-          setState({
-            currentRoundId: event.round?.id ?? null,
-            closesAt: event.round?.closesAt ?? null,
-            serverTime: event.serverTime,
-          })
-          return
-        case 'round.opened':
-          setState({
-            currentRoundId: event.roundId,
-            closesAt: event.closesAt,
-            serverTime: event.serverTime,
-          })
-          onRoundChangeRef.current?.()
-          return
-        case 'round.extended':
-          setState((prev) =>
-            prev.currentRoundId === event.roundId
-              ? { ...prev, closesAt: event.closesAt, serverTime: event.serverTime }
-              : prev,
-          )
-          return
-        case 'round.closed':
-          setState((prev) =>
-            prev.currentRoundId === event.roundId
-              ? { currentRoundId: null, closesAt: null, serverTime: event.serverTime }
-              : prev,
-          )
-          onRoundChangeRef.current?.()
-          return
-        case 'heartbeat':
-          setState((prev) => ({ ...prev, serverTime: event.serverTime }))
-      }
-    })
+    return connectEventStream(
+      (event: SseEvent) => {
+        switch (event.type) {
+          case 'state.sync':
+            setState((prev) => ({
+              ...prev,
+              currentRoundId: event.round?.id ?? null,
+              closesAt: event.round?.closesAt ?? null,
+              serverTime: event.serverTime,
+            }))
+            return
+          case 'round.opened':
+            setState((prev) => ({
+              ...prev,
+              currentRoundId: event.roundId,
+              closesAt: event.closesAt,
+              serverTime: event.serverTime,
+            }))
+            onRoundChangeRef.current?.()
+            return
+          case 'round.extended':
+            setState((prev) =>
+              prev.currentRoundId === event.roundId
+                ? { ...prev, closesAt: event.closesAt, serverTime: event.serverTime }
+                : prev,
+            )
+            return
+          case 'round.closed':
+            setState((prev) =>
+              prev.currentRoundId === event.roundId
+                ? { ...prev, currentRoundId: null, closesAt: null, serverTime: event.serverTime }
+                : prev,
+            )
+            onRoundChangeRef.current?.()
+            return
+          case 'heartbeat':
+            setState((prev) => ({ ...prev, serverTime: event.serverTime }))
+        }
+      },
+      (status) => setState((prev) => ({ ...prev, status })),
+    )
   }, [status])
 
   return state

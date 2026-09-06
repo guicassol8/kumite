@@ -231,7 +231,21 @@ describe('ProblemScreen', () => {
     await screen.findByTestId('problem-submit-button')
     fireEvent.click(screen.getByTestId('problem-submit-button'))
 
-    expect(await screen.findByTestId('problem-submit-error-banner')).toBeDefined()
+    const banner = await screen.findByTestId('problem-submit-error-banner')
+    expect(banner.textContent).toContain('Algo mudou')
+  })
+
+  it('shows the generic unexpected-error banner on a 5xx during submit, not the race message', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+    mockedSubmit.mockResolvedValue(jsonResponse(500, { error: 'internal', message: 'boom' }))
+
+    renderProblem()
+    await screen.findByTestId('problem-submit-button')
+    fireEvent.click(screen.getByTestId('problem-submit-button'))
+
+    const banner = await screen.findByTestId('problem-submit-error-banner')
+    expect(banner.textContent).not.toContain('Algo mudou')
+    expect(banner.textContent).toContain('Não foi possível enviar')
   })
 
   it('shows the closed-round notice with the best score and no submit button', async () => {

@@ -109,9 +109,16 @@ function ProblemScreen() {
         )
         return
       }
-      // 404: not_in_team / no_active_round / problem_not_found — only ever a
-      // race (team left, round closed mid-edit).
-      setSubmitBanner({ key: 'problem.submitError.race' })
+      if (res.status === 404) {
+        // not_in_team / no_active_round / problem_not_found — only ever a
+        // race (team left, round closed mid-edit).
+        setSubmitBanner({ key: 'problem.submitError.race' })
+        return
+      }
+      // Any other/undeclared status (a genuine 5xx included) is not a race —
+      // same generic fallback the rest of the front uses for this case
+      // (teams.tsx, organizer.rounds.new.tsx).
+      setSubmitBanner({ key: 'problem.submitError.unexpected' })
     } catch {
       setSubmitBanner({ key: 'problem.submitError.unexpected' })
     }

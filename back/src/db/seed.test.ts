@@ -1,8 +1,18 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
+import {
+  computeMissingLocales,
+  evaluateTestCaseCoverage,
+} from '../modules/problems/problems.service'
 import { createDb } from './client'
-import { eventCodesTable, eventConfigTable, usersTable } from './schema'
+import {
+  eventCodesTable,
+  eventConfigTable,
+  problemsTable,
+  problemTranslationsTable,
+  usersTable,
+} from './schema'
 import { seed } from './seed'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
@@ -16,7 +26,7 @@ beforeEach(async () => {
   process.env['ORGANIZER_EMAIL'] = ORGANIZER_EMAIL
   process.env['ORGANIZER_PASSWORD'] = ORGANIZER_PASSWORD
   await db.execute(
-    sql`truncate table ${usersTable}, ${eventCodesTable}, ${eventConfigTable} restart identity cascade`,
+    sql`truncate table ${usersTable}, ${eventCodesTable}, ${eventConfigTable}, ${problemsTable}, ${problemTranslationsTable} restart identity cascade`,
   )
 })
 
@@ -71,5 +81,63 @@ describe('seed', () => {
     expect(await db.select().from(usersTable)).toHaveLength(1)
     expect(await db.select().from(eventCodesTable)).toHaveLength(2)
     expect(await db.select().from(eventConfigTable)).toHaveLength(1)
+    expect(await db.select().from(problemsTable)).toHaveLength(4)
+    expect(await db.select().from(problemTranslationsTable)).toHaveLength(12)
+  })
+})
+
+describe('problem seed', () => {
+  it('creates 4 published problems with complete translations and covered test cases', async () => {
+    await seed(db)
+
+    const problems = await db.select().from(problemsTable)
+    expect(problems).toHaveLength(4)
+
+    const translations = await db.select().from(problemTranslationsTable)
+    const translationsByProblem = new Map<string, typeof translations>()
+    for (const translation of translations) {
+      const list = translationsByProblem.get(translation.problemId) ?? []
+      list.push(translation)
+      translationsByProblem.set(translation.problemId, list)
+    }
+
+    for (const problem of problems) {
+      expect(problem.status).toBe('published')
+
+      const problemTranslations = translationsByProblem.get(problem.id) ?? []
+      const missingLocales = computeMissingLocales(problemTranslations.map((t) => t.locale))
+      expect(missingLocales).toEqual([])
+
+      expect(evaluateTestCaseCoverage(problem.testCases)).toBe('ok')
+    }
+  })
+
+  it('covers all three difficulties', async () => {
+    await seed(db)
+
+    const problems = await db.select().from(problemsTable)
+    const difficulties = new Set(problems.map((p) => p.difficulty))
+    expect(difficulties).toEqual(new Set(['easy', 'medium', 'hard']))
+  })
+
+  it('includes the "Soma dos Pares" problem identical to the demo hardcode', async () => {
+    await seed(db)
+
+    const translations = await db
+      .select()
+      .from(problemTranslationsTable)
+      .where(eq(problemTranslationsTable.locale, 'pt'))
+    const somaDosPares = translations.find((t) => t.title === 'Soma dos Pares')
+    expect(somaDosPares).toBeDefined()
+
+    const [problem] = await db
+      .select()
+      .from(problemsTable)
+      .where(eq(problemsTable.id, somaDosPares!.problemId))
+    expect(problem?.testCases.filter((tc) => !tc.hidden)).toEqual([
+      { input: [1, 2, 3, 4], expected: 6, hidden: false },
+      { input: [5, 7, 9], expected: 0, hidden: false },
+      { input: [2, 4, 6, 8], expected: 20, hidden: false },
+    ])
   })
 })

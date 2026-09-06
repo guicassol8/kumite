@@ -224,4 +224,63 @@ describe('useLeaderboardStream', () => {
     emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
     expect(result.current.activeRoundId).toBeNull()
   })
+
+  it('hydrates closesAt from state.sync', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    emit({
+      type: 'state.sync',
+      serverTime: new Date(),
+      round: { id: 'r1', closesAt: new Date('2026-09-05T13:00:00.000Z') },
+    })
+    expect(result.current.closesAt).toEqual(new Date('2026-09-05T13:00:00.000Z'))
+
+    emit({ type: 'state.sync', serverTime: new Date(), round: null })
+    expect(result.current.closesAt).toBeNull()
+  })
+
+  it('sets closesAt on round.opened and clears it on round.closed', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+    expect(result.current.closesAt).toEqual(new Date('2026-09-05T13:00:00.000Z'))
+
+    emit({ type: 'round.closed', serverTime: new Date(), roundId: 'r1' })
+    expect(result.current.closesAt).toBeNull()
+  })
+
+  it('updates closesAt on round.extended for the active round only', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+
+    emit({
+      type: 'round.extended',
+      serverTime: new Date(),
+      roundId: 'r2',
+      closesAt: new Date('2026-09-05T14:00:00.000Z'),
+    })
+    expect(result.current.closesAt).toEqual(new Date('2026-09-05T13:00:00.000Z'))
+
+    emit({
+      type: 'round.extended',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T15:00:00.000Z'),
+    })
+    expect(result.current.closesAt).toEqual(new Date('2026-09-05T15:00:00.000Z'))
+  })
 })

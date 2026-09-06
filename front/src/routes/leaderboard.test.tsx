@@ -353,3 +353,132 @@ describe('LeaderboardScreen — empty state', () => {
     await waitFor(() => expect(screen.getByTestId('leaderboard-empty')).toBeDefined())
   })
 })
+
+describe('LeaderboardScreen — presentation mode', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.requestFullscreen = vi.fn().mockResolvedValue(undefined)
+    document.exitFullscreen = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: null,
+    })
+  })
+
+  async function renderWithActiveRound() {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+  }
+
+  it('enters presentation mode on toggle click and requests fullscreen', async () => {
+    await renderWithActiveRound()
+
+    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+
+    fireEvent.click(toggle)
+
+    expect(HTMLElement.prototype.requestFullscreen).toHaveBeenCalledTimes(1)
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('exits presentation mode when the browser reports fullscreen exit (Esc path)', async () => {
+    await renderWithActiveRound()
+
+    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
+    act(() => document.dispatchEvent(new Event('fullscreenchange')))
+
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('exits presentation mode via the toggle itself, calling exitFullscreen', async () => {
+    await renderWithActiveRound()
+
+    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
+    fireEvent.click(toggle)
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: document.querySelector('main'),
+    })
+
+    fireEvent.click(toggle)
+
+    expect(document.exitFullscreen).toHaveBeenCalledTimes(1)
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('degrades gracefully when requestFullscreen rejects', async () => {
+    HTMLElement.prototype.requestFullscreen = vi.fn().mockRejectedValue(new Error('denied'))
+    await renderWithActiveRound()
+
+    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
+    fireEvent.click(toggle)
+
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('paints an opaque background on the fullscreened main so the browser backdrop never shows through', async () => {
+    await renderWithActiveRound()
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    expect(document.querySelector('main')?.className).toContain('bg-background')
+  })
+
+  it('hides the round countdown in normal mode even with an active round', async () => {
+    await renderWithActiveRound()
+
+    expect(screen.queryByTestId('round-countdown')).toBeNull()
+  })
+
+  it('shows the round countdown once presentation mode is toggled on', async () => {
+    await renderWithActiveRound()
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    expect(screen.getByTestId('round-countdown')).toBeDefined()
+  })
+
+  it('hides the round countdown in presentation mode when there is no active round', async () => {
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        {
+          id: 'r1',
+          name: 'Rodada 1',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: new Date('2026-09-01T10:00:00.000Z'),
+          closesAt: null,
+          closedAt: new Date('2026-09-01T10:30:00.000Z'),
+          createdAt: new Date('2026-09-01T09:00:00.000Z'),
+          updatedAt: new Date('2026-09-01T10:30:00.000Z'),
+          problemCount: 1,
+        },
+      ]),
+    )
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-tabs')).toBeDefined())
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    expect(screen.queryByTestId('round-countdown')).toBeNull()
+  })
+})

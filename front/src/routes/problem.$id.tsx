@@ -58,7 +58,7 @@ function ProblemScreen() {
   const lang = i18n.resolvedLanguage ?? i18n.language
 
   const workspaceRef = useRef<BlocklyWorkspaceHandle>(null)
-  const toolbox = useBlocklyLocale(workspaceRef)
+  const { toolbox, onReady: onWorkspaceReady } = useBlocklyLocale(workspaceRef)
   const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(id)
 
   useEventStream(() => queryClient.invalidateQueries({ queryKey: problemQueryKey(id) }))
@@ -248,6 +248,7 @@ function ProblemScreen() {
             // the blocks.
             initialState={withRootBlock(initialState)}
             onChange={handleChange}
+            onReady={onWorkspaceReady}
           />
         </div>
         <div className="flex items-center gap-2">

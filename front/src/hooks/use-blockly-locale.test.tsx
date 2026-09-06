@@ -31,9 +31,14 @@ function fieldTexts(handle: BlocklyWorkspaceHandle, type: string) {
 function renderHost() {
   const workspaceRef = createRef<BlocklyWorkspaceHandle>()
   function Host() {
-    const toolbox = useBlocklyLocale(workspaceRef)
+    const { toolbox, onReady } = useBlocklyLocale(workspaceRef)
     return (
-      <BlocklyWorkspace ref={workspaceRef} toolbox={toolbox} initialState={fixtureWithExtraBlock} />
+      <BlocklyWorkspace
+        ref={workspaceRef}
+        toolbox={toolbox}
+        initialState={fixtureWithExtraBlock}
+        onReady={onReady}
+      />
     )
   }
   const utils = render(<Host />)

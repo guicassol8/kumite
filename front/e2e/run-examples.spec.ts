@@ -2,19 +2,18 @@ import { emptyWorkspaceState, ROOT_BLOCK_TYPE, somaDosPares } from '@kumite/bloc
 import { expect, type Page, test } from '@playwright/test'
 
 // Visual walkthrough for #5, one screenshot per acceptance criterion.
+// #7 moved the editor behind a real problem id — this suite only needs to
+// *view* one, so `beforeAll` seeds a problem+round once (opened then
+// immediately closed, so it never holds the single-open-round slot) and every
+// test signs in via a seeded token instead of the UI. The seeded problem's
+// three visible test cases mirror the old hardcoded somaDosParesProblem
+// exactly, so every existing assertion below stays unchanged.
 const evidence = (name: string) => `e2e/evidence/5/${name}.png`
 
-const STORAGE_KEY = 'kumite:workspace:soma-dos-pares'
-
-/** Seeds the saved workspace, which is what the screen restores on mount. */
-async function seedWorkspace(page: Page, state: unknown) {
-  await page.addInitScript(
-    ([key, saved]) => {
-      window.localStorage.setItem(key as string, saved as string)
-    },
-    [STORAGE_KEY, JSON.stringify(state)],
-  )
-}
+const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
+const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
+const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
+const PASSWORD = 'supersecret'
 
 /**
  * The canonical solution with its `resto = 0` test flipped to `resto ≠ 0`, so
@@ -100,105 +99,190 @@ const removeFromNumber = {
   variables: [{ name: 'numero', id: 'varNumero' }],
 }
 
-async function runAndWait(page: Page) {
-  await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
-  await page.getByTestId('problem-run-button').click()
-  await expect(page.getByTestId('problem-results-panel')).toBeVisible()
-}
+test.describe('running examples locally (#5)', () => {
+  test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
-test('every example passes when the solution is right', async ({ page }) => {
-  await seedWorkspace(page, somaDosPares)
-  await page.goto('/problem')
+  let problemId: string
+  let participantToken: string
 
-  // 01 — the three cases run and the header reports the overall success.
-  await runAndWait(page)
-  const summary = page.getByTestId('problem-results-summary')
-  await expect(summary).toHaveText('3/3 casos')
-  await expect(summary).toHaveAttribute('data-state', 'passed')
-  for (const index of [0, 1, 2]) {
-    await expect(page.getByTestId(`problem-result-${index}`)).toHaveAttribute(
-      'data-status',
-      'passed',
+  test.beforeAll(async () => {
+    const orgLogin = await fetch(`${BACK_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
+    })
+    const { token: orgToken } = (await orgLogin.json()) as { token: string }
+    const auth = { authorization: `Bearer ${orgToken}` }
+
+    const created = await fetch(`${BACK_URL}/organizer/problems`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...auth },
+      body: JSON.stringify({ difficulty: 'easy' }),
+    })
+    const { id } = (await created.json()) as { id: string }
+    problemId = id
+    await fetch(`${BACK_URL}/organizer/problems/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...auth },
+      body: JSON.stringify({
+        translations: [
+          { locale: 'pt', title: 'Soma dos Pares', statementMd: 'Some os números pares.' },
+          { locale: 'es', title: 'Suma de Pares', statementMd: 'Suma los números pares.' },
+          { locale: 'en', title: 'Sum of Evens', statementMd: 'Sum the even numbers.' },
+        ],
+        // Mirrors somaDosParesProblem.examples exactly, plus one hidden case
+        // so publish succeeds.
+        testCases: [
+          { input: [1, 2, 3, 4], expected: 6, hidden: false },
+          { input: [5, 7, 9], expected: 0, hidden: false },
+          { input: [2, 4, 6, 8], expected: 20, hidden: false },
+          { input: [10, 11, 12], expected: 22, hidden: true },
+        ],
+      }),
+    })
+    await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST', headers: auth })
+
+    const roundRes = await fetch(`${BACK_URL}/organizer/rounds`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...auth },
+      body: JSON.stringify({
+        name: `Run Examples E2E ${Date.now()}`,
+        durationMinutes: 30,
+        problemIds: [id],
+      }),
+    })
+    const { id: roundId } = (await roundRes.json()) as { id: string }
+    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, { method: 'POST', headers: auth })
+    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
+
+    const participantEmail = `run-examples-e2e-${Date.now()}@edu.pucrs.br`
+    await fetch(`${BACK_URL}/auth/signup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: participantEmail, password: PASSWORD, code: 'PUCRS2026' }),
+    })
+    const participantLogin = await fetch(`${BACK_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: participantEmail, password: PASSWORD }),
+    })
+    const { token } = (await participantLogin.json()) as { token: string }
+    participantToken = token
+  })
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(
+      ([key, token]) => window.localStorage.setItem(key as string, token as string),
+      ['kumite-token', participantToken],
+    )
+  })
+
+  /** Seeds the saved workspace, which is what the screen restores on mount. */
+  async function seedWorkspace(page: Page, state: unknown) {
+    await page.addInitScript(
+      ([key, saved]) => {
+        window.localStorage.setItem(key as string, saved as string)
+      },
+      [`kumite:workspace:${problemId}`, JSON.stringify(state)],
     )
   }
-  await page.screenshot({ path: evidence('01-todos-passam') })
-})
 
-test('a wrong solution fails each case showing expected against obtained', async ({ page }) => {
-  await seedWorkspace(page, somaDosImpares)
-  await page.goto('/problem')
-
-  // 02 — summing the odd numbers instead: every case is ✗ and says what it
-  // expected and what it got.
-  await runAndWait(page)
-  for (const index of [0, 1, 2]) {
-    await expect(page.getByTestId(`problem-result-${index}`)).toHaveAttribute(
-      'data-status',
-      'failed',
-    )
+  async function runAndWait(page: Page) {
+    await page.goto(`/problem/${problemId}`)
+    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+    await page.getByTestId('problem-run-button').click()
+    await expect(page.getByTestId('problem-results-panel')).toBeVisible()
   }
-  const summary = page.getByTestId('problem-results-summary')
-  await expect(summary).toHaveText('0/3 casos')
-  await expect(summary).toHaveAttribute('data-state', 'failed')
-  const first = page.getByTestId('problem-result-0')
-  await expect(first).toContainText('esperado 6')
-  await expect(first).toContainText('obtido 4')
-  await page.screenshot({ path: evidence('02-caso-falha') })
-})
 
-test('an infinite loop is aborted by the timeout, case by case', async ({ page }) => {
-  // Three cases × 2s of timeout, plus the page boot.
-  test.setTimeout(60_000)
-  await seedWorkspace(page, infiniteLoop)
-  await page.goto('/problem')
+  test('every example passes when the solution is right', async ({ page }) => {
+    await seedWorkspace(page, somaDosPares)
 
-  // 03 — the button is disabled while it runs, and each case comes back as a
-  // timeout instead of hanging the tab.
-  await runAndWait(page)
-  await expect(page.getByTestId('problem-run-button')).toBeDisabled()
-  for (const index of [0, 1, 2]) {
-    await expect(page.getByTestId(`problem-result-${index}`)).toHaveAttribute(
-      'data-status',
-      'timeout',
-      { timeout: 15_000 },
+    // 01 — the three cases run and the header reports the overall success.
+    await runAndWait(page)
+    const summary = page.getByTestId('problem-results-summary')
+    await expect(summary).toHaveText('3/3 casos')
+    await expect(summary).toHaveAttribute('data-state', 'passed')
+    for (const index of [0, 1, 2]) {
+      await expect(page.getByTestId(`problem-result-${index}`)).toHaveAttribute(
+        'data-status',
+        'passed',
+      )
+    }
+    await page.screenshot({ path: evidence('01-todos-passam') })
+  })
+
+  test('a wrong solution fails each case showing expected against obtained', async ({ page }) => {
+    await seedWorkspace(page, somaDosImpares)
+
+    // 02 — summing the odd numbers instead: every case is ✗ and says what it
+    // expected and what it got.
+    await runAndWait(page)
+    for (const index of [0, 1, 2]) {
+      await expect(page.getByTestId(`problem-result-${index}`)).toHaveAttribute(
+        'data-status',
+        'failed',
+      )
+    }
+    const summary = page.getByTestId('problem-results-summary')
+    await expect(summary).toHaveText('0/3 casos')
+    await expect(summary).toHaveAttribute('data-state', 'failed')
+    const first = page.getByTestId('problem-result-0')
+    await expect(first).toContainText('esperado 6')
+    await expect(first).toContainText('obtido 4')
+    await page.screenshot({ path: evidence('02-caso-falha') })
+  })
+
+  test('an infinite loop is aborted by the timeout, case by case', async ({ page }) => {
+    // Three cases × 2s of timeout, plus the page boot.
+    test.setTimeout(60_000)
+    await seedWorkspace(page, infiniteLoop)
+
+    // 03 — the button is disabled while it runs, and each case comes back as a
+    // timeout instead of hanging the tab.
+    await runAndWait(page)
+    await expect(page.getByTestId('problem-run-button')).toBeDisabled()
+    for (const index of [0, 1, 2]) {
+      await expect(page.getByTestId(`problem-result-${index}`)).toHaveAttribute(
+        'data-status',
+        'timeout',
+        { timeout: 15_000 },
+      )
+    }
+    await expect(page.getByTestId('problem-result-0')).toContainText('Tempo esgotado (2s)')
+    await expect(page.getByTestId('problem-run-button')).toBeEnabled()
+    await page.screenshot({ path: evidence('03-timeout') })
+  })
+
+  test('a solution that throws reports the error and keeps running the other cases', async ({
+    page,
+  }) => {
+    await seedWorkspace(page, removeFromNumber)
+
+    // 04 — `numero.shift()` over a number throws on every case; the message shows
+    // in the case that raised it and the run reaches the last one.
+    await runAndWait(page)
+    for (const index of [0, 1, 2]) {
+      await expect(page.getByTestId(`problem-result-${index}`)).toHaveAttribute(
+        'data-status',
+        'error',
+      )
+    }
+    await expect(page.getByTestId('problem-result-0')).toContainText('Erro:')
+    await expect(page.getByTestId('problem-result-0')).toContainText('shift')
+    await page.screenshot({ path: evidence('04-erro-runtime') })
+  })
+
+  test('an empty workspace gets a friendly warning instead of an error', async ({ page }) => {
+    await seedWorkspace(page, emptyWorkspaceState)
+
+    // 05 — nothing plugged into the root: a nudge on what to do, no case list and
+    // no scary error.
+    await runAndWait(page)
+    await expect(page.getByTestId('problem-results-empty')).toHaveText(
+      'Monte a sua solução dentro do bloco “resolver” e clique em Executar.',
     )
-  }
-  await expect(page.getByTestId('problem-result-0')).toContainText('Tempo esgotado (2s)')
-  await expect(page.getByTestId('problem-run-button')).toBeEnabled()
-  await page.screenshot({ path: evidence('03-timeout') })
-})
-
-test('a solution that throws reports the error and keeps running the other cases', async ({
-  page,
-}) => {
-  await seedWorkspace(page, removeFromNumber)
-  await page.goto('/problem')
-
-  // 04 — `numero.shift()` over a number throws on every case; the message shows
-  // in the case that raised it and the run reaches the last one.
-  await runAndWait(page)
-  for (const index of [0, 1, 2]) {
-    await expect(page.getByTestId(`problem-result-${index}`)).toHaveAttribute(
-      'data-status',
-      'error',
-    )
-  }
-  await expect(page.getByTestId('problem-result-0')).toContainText('Erro:')
-  await expect(page.getByTestId('problem-result-0')).toContainText('shift')
-  await page.screenshot({ path: evidence('04-erro-runtime') })
-})
-
-test('an empty workspace gets a friendly warning instead of an error', async ({ page }) => {
-  await seedWorkspace(page, emptyWorkspaceState)
-  await page.goto('/problem')
-
-  // 05 — nothing plugged into the root: a nudge on what to do, no case list and
-  // no scary error.
-  await runAndWait(page)
-  await expect(page.getByTestId('problem-results-empty')).toHaveText(
-    'Monte a sua solução dentro do bloco “resolver” e clique em Executar.',
-  )
-  await expect(page.getByTestId('problem-result-0')).toHaveCount(0)
-  await expect(page.getByTestId('problem-results-summary')).toHaveCount(0)
-  await page.screenshot({ path: evidence('05-workspace-vazio') })
+    await expect(page.getByTestId('problem-result-0')).toHaveCount(0)
+    await expect(page.getByTestId('problem-results-summary')).toHaveCount(0)
+    await page.screenshot({ path: evidence('05-workspace-vazio') })
+  })
 })

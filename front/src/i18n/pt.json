@@ -356,6 +356,15 @@
       "timeout": "Tempo esgotado ({{seconds}}s)",
       "runtimeError": "Erro: {{message}}",
       "empty": "Monte a sua solução dentro do bloco “resolver” e clique em Executar."
+    },
+    "verdict": {
+      "title": "Veredito",
+      "summary": "{{score}}/{{maxScore}} pontos",
+      "caseLabel": "Caso {{index}}",
+      "expected": "esperado",
+      "obtained": "obtido",
+      "timeout": "Tempo esgotado",
+      "runtimeError": "Erro: {{detail}}"
     }
   },
   "leaderboard": {

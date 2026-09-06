@@ -356,6 +356,15 @@
       "timeout": "Timed out ({{seconds}}s)",
       "runtimeError": "Error: {{message}}",
       "empty": "Build your solution inside the “solve” block and click Run."
+    },
+    "verdict": {
+      "title": "Verdict",
+      "summary": "{{score}}/{{maxScore}} points",
+      "caseLabel": "Case {{index}}",
+      "expected": "expected",
+      "obtained": "got",
+      "timeout": "Timed out",
+      "runtimeError": "Error: {{detail}}"
     }
   },
   "leaderboard": {

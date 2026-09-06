@@ -356,6 +356,15 @@
       "timeout": "Tiempo agotado ({{seconds}}s)",
       "runtimeError": "Error: {{message}}",
       "empty": "Arma tu solución dentro del bloque “resolver” y haz clic en Ejecutar."
+    },
+    "verdict": {
+      "title": "Veredicto",
+      "summary": "{{score}}/{{maxScore}} puntos",
+      "caseLabel": "Caso {{index}}",
+      "expected": "esperado",
+      "obtained": "obtenido",
+      "timeout": "Tiempo agotado",
+      "runtimeError": "Error: {{detail}}"
     }
   },
   "leaderboard": {

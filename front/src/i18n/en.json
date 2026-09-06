@@ -41,7 +41,8 @@
     },
     "organizerShortcuts": {
       "title": "Organizer area",
-      "problems": "Problems"
+      "problems": "Problems",
+      "rounds": "Rounds"
     }
   },
   "editor": {
@@ -50,6 +51,10 @@
   "organizer": {
     "stub": {
       "title": "Organizer area"
+    },
+    "nav": {
+      "problems": "Problems",
+      "rounds": "Rounds"
     },
     "problems": {
       "heading": "Catalog problems",
@@ -138,6 +143,95 @@
         "loadFailed": "Couldn't load the problem.",
         "retry": "Try again",
         "notFound": "Problem not found."
+      }
+    },
+    "rounds": {
+      "heading": "Rounds",
+      "createAction": "Create round",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "duration": "Duration",
+        "problems": "Problems",
+        "actions": "Actions"
+      },
+      "status": {
+        "draft": "Draft",
+        "open": "Open",
+        "closed": "Closed"
+      },
+      "loading": "Loading rounds...",
+      "durationValue": "{{minutes}} min",
+      "closedAt": "Closed on {{date}}",
+      "empty": {
+        "title": "No rounds created yet.",
+        "cta": "Create the first round"
+      },
+      "error": {
+        "message": "Couldn't load the rounds.",
+        "retry": "Try again"
+      },
+      "editAction": "Edit",
+      "openAction": "Open",
+      "extendAction": "Extend",
+      "closeAction": "Close",
+      "openDisabledTooltip": "Close \"{{name}}\" before opening another round.",
+      "dialogs": {
+        "open": {
+          "title": "Open round?",
+          "description": "Participants will be able to access this round's problems immediately.",
+          "confirm": "Open",
+          "cancel": "Cancel"
+        },
+        "extend": {
+          "title": "Extend round",
+          "description": "Add minutes to this round's remaining time.",
+          "minutesLabel": "Additional minutes",
+          "minutesInvalid": "Enter a whole number of minutes greater than zero.",
+          "confirm": "Extend",
+          "cancel": "Cancel"
+        },
+        "close": {
+          "title": "Close the round early?",
+          "description": "Participants immediately lose access to this round's problems. This action cannot be undone.",
+          "confirm": "Close",
+          "cancel": "Cancel"
+        }
+      },
+      "actionError": {
+        "anotherRoundOpen": "Another round is already open.",
+        "roundNotDraft": "That round is no longer a draft.",
+        "roundNotOpen": "That round is not open.",
+        "noProblems": "Add at least one problem before opening the round.",
+        "notFound": "That round no longer exists.",
+        "unexpected": "Couldn't complete the action. Try again."
+      }
+    },
+    "roundForm": {
+      "createTitle": "New round",
+      "editTitle": "Edit round",
+      "loading": "Loading round...",
+      "nameLabel": "Name",
+      "durationLabel": "Duration (minutes)",
+      "problemsHeading": "Problems",
+      "problemsEmpty": "No published problems available.",
+      "moveUpAction": "Move up",
+      "moveDownAction": "Move down",
+      "saveAction": "Save",
+      "savedMessage": "Changes saved.",
+      "backToList": "Back to the list",
+      "errors": {
+        "nameRequired": "Enter the round's name",
+        "nameTooLong": "The name can have at most 120 characters",
+        "durationInvalid": "Enter a whole duration greater than zero.",
+        "saveFailed": "Couldn't save the round. Try again.",
+        "invalidProblemIds": "One or more selected problems are invalid.",
+        "notFound": "Round not found.",
+        "roundNotDraft": "That round is no longer a draft."
+      },
+      "notDraft": {
+        "title": "This round has already been opened or closed and can no longer be edited.",
+        "backToList": "Back to the list"
       }
     }
   },

@@ -22,7 +22,7 @@ setup/teardown simplicity, and latency for users in Porto Alegre and Mérida.
 ## Decision
 
 We will host the event on a **single VPS on Google Cloud Platform**
-(`e2-small`, `southamerica-east1` / São Paulo), provisioned under GCP's
+(`e2-medium`, `southamerica-east1` / São Paulo), provisioned under GCP's
 $300/90-day free trial (self-serve signup, no student or business status
 required — the user's GitHub Student Pack DigitalOcean credit expired
 2026-08-01 and no longer applies).
@@ -34,7 +34,7 @@ new architecture.
 
 High-level steps:
 1. Activate the GCP free trial (self-serve).
-2. Provision the `e2-small` VM in `southamerica-east1`.
+2. Provision the `e2-medium` VM in `southamerica-east1`.
 3. `docker compose up` on the VM: `back` + Postgres + Caddy (reverse proxy +
    TLS) serving the built front.
 4. Point DNS (or the front's `VITE_API_URL`, if no custom domain) at the VM.

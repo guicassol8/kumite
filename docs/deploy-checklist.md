@@ -65,9 +65,10 @@ GHCR_OWNER=<github owner, e.g. guicassol8>
 ## 6. Authenticate the VPS to GHCR
 
 One-time, so `docker compose pull` can fetch the private-by-default GHCR
-image:
+image. Pipe the PAT through stdin, not `-p` — a CLI arg lands in shell
+history and `ps`:
 ```bash
-docker login ghcr.io -u <github-username> -p <a PAT with read:packages>
+echo <a PAT with read:packages> | docker login ghcr.io -u <github-username> --password-stdin
 ```
 
 ## 7. DNS

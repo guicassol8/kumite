@@ -178,9 +178,12 @@ function Home() {
           <CardHeader>
             <CardTitle>{t('home.organizerShortcuts.title')}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex items-center gap-2">
             <Button asChild size="sm" data-testid="home-organizer-shortcuts-problems">
               <Link to="/organizer/problems">{t('home.organizerShortcuts.problems')}</Link>
+            </Button>
+            <Button asChild size="sm" data-testid="home-organizer-shortcuts-rounds">
+              <Link to="/organizer/rounds">{t('home.organizerShortcuts.rounds')}</Link>
             </Button>
           </CardContent>
         </Card>

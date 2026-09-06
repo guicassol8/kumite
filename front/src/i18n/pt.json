@@ -41,7 +41,8 @@
     },
     "organizerShortcuts": {
       "title": "Área do organizador",
-      "problems": "Problemas"
+      "problems": "Problemas",
+      "rounds": "Rodadas"
     }
   },
   "editor": {
@@ -50,6 +51,10 @@
   "organizer": {
     "stub": {
       "title": "Área do organizador"
+    },
+    "nav": {
+      "problems": "Problemas",
+      "rounds": "Rodadas"
     },
     "problems": {
       "heading": "Problemas do catálogo",
@@ -138,6 +143,95 @@
         "loadFailed": "Não foi possível carregar o problema.",
         "retry": "Tentar novamente",
         "notFound": "Problema não encontrado."
+      }
+    },
+    "rounds": {
+      "heading": "Rodadas",
+      "createAction": "Criar rodada",
+      "columns": {
+        "name": "Nome",
+        "status": "Estado",
+        "duration": "Duração",
+        "problems": "Problemas",
+        "actions": "Ações"
+      },
+      "status": {
+        "draft": "Rascunho",
+        "open": "Aberta",
+        "closed": "Encerrada"
+      },
+      "loading": "Carregando rodadas...",
+      "durationValue": "{{minutes}} min",
+      "closedAt": "Encerrada em {{date}}",
+      "empty": {
+        "title": "Nenhuma rodada criada ainda.",
+        "cta": "Criar a primeira rodada"
+      },
+      "error": {
+        "message": "Não foi possível carregar as rodadas.",
+        "retry": "Tentar novamente"
+      },
+      "editAction": "Editar",
+      "openAction": "Abrir",
+      "extendAction": "Estender",
+      "closeAction": "Encerrar",
+      "openDisabledTooltip": "Encerre \"{{name}}\" antes de abrir outra rodada.",
+      "dialogs": {
+        "open": {
+          "title": "Abrir rodada?",
+          "description": "Os participantes poderão acessar os problemas desta rodada imediatamente.",
+          "confirm": "Abrir",
+          "cancel": "Cancelar"
+        },
+        "extend": {
+          "title": "Estender rodada",
+          "description": "Some minutos ao tempo restante desta rodada.",
+          "minutesLabel": "Minutos adicionais",
+          "minutesInvalid": "Informe um número inteiro de minutos maior que zero.",
+          "confirm": "Estender",
+          "cancel": "Cancelar"
+        },
+        "close": {
+          "title": "Encerrar rodada antecipadamente?",
+          "description": "Os participantes perdem o acesso aos problemas desta rodada imediatamente. Essa ação não pode ser desfeita.",
+          "confirm": "Encerrar",
+          "cancel": "Cancelar"
+        }
+      },
+      "actionError": {
+        "anotherRoundOpen": "Já existe outra rodada aberta.",
+        "roundNotDraft": "Essa rodada não é mais um rascunho.",
+        "roundNotOpen": "Essa rodada não está aberta.",
+        "noProblems": "Adicione ao menos um problema antes de abrir a rodada.",
+        "notFound": "Essa rodada não existe mais.",
+        "unexpected": "Não foi possível concluir a ação. Tente novamente."
+      }
+    },
+    "roundForm": {
+      "createTitle": "Nova rodada",
+      "editTitle": "Editar rodada",
+      "loading": "Carregando rodada...",
+      "nameLabel": "Nome",
+      "durationLabel": "Duração (minutos)",
+      "problemsHeading": "Problemas",
+      "problemsEmpty": "Nenhum problema publicado disponível.",
+      "moveUpAction": "Mover para cima",
+      "moveDownAction": "Mover para baixo",
+      "saveAction": "Salvar",
+      "savedMessage": "Alterações salvas.",
+      "backToList": "Voltar para a lista",
+      "errors": {
+        "nameRequired": "Informe o nome da rodada",
+        "nameTooLong": "O nome pode ter no máximo 120 caracteres",
+        "durationInvalid": "Informe uma duração inteira maior que zero.",
+        "saveFailed": "Não foi possível salvar a rodada. Tente novamente.",
+        "invalidProblemIds": "Um ou mais problemas selecionados são inválidos.",
+        "notFound": "Rodada não encontrada.",
+        "roundNotDraft": "Essa rodada não é mais um rascunho."
+      },
+      "notDraft": {
+        "title": "Essa rodada já foi aberta ou encerrada e não pode mais ser editada.",
+        "backToList": "Voltar para a lista"
       }
     }
   },

@@ -1,10 +1,24 @@
-import { and, eq, inArray, lte, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, lte, ne } from 'drizzle-orm'
 import postgres from 'postgres'
 
 import type { Db } from '../../db/client'
-import { problemsTable, roundProblemsTable, roundsTable } from '../../db/schema'
+import {
+  problemsTable,
+  problemTranslationsTable,
+  roundProblemsTable,
+  roundsTable,
+  submissionsTable,
+  teamMembersTable,
+} from '../../db/schema'
+import type { Locale } from '../../lib/locale'
 
-import type { CreateRoundBody, RoundDetail, RoundSummary, UpdateRoundBody } from './rounds.schema'
+import type {
+  CreateRoundBody,
+  ParticipantRoundDetail,
+  RoundDetail,
+  RoundSummary,
+  UpdateRoundBody,
+} from './rounds.schema'
 
 type RoundRow = typeof roundsTable.$inferSelect
 type RoundProblemRow = typeof roundProblemsTable.$inferSelect
@@ -357,4 +371,129 @@ export async function closeRound(db: Db, id: string): Promise<CloseRoundResult> 
   const detail = await getRound(db, id)
   if (!detail) throw new Error('expected round to still exist right after close')
   return { ok: true, round: detail }
+}
+
+// --- Participant round detail (#39) ---
+
+// Local copies of submissions.service.ts's findTeamIdForUser/getBestSubmission
+// query shapes: that module already imports isProblemInOpenRound from this
+// one, so importing back from here would create a rounds.service.ts <->
+// submissions.service.ts circular import.
+async function findTeamIdForParticipant(db: Db, userId: string): Promise<string | null> {
+  const [membership] = await db
+    .select({ teamId: teamMembersTable.teamId })
+    .from(teamMembersTable)
+    .where(eq(teamMembersTable.userId, userId))
+  return membership?.teamId ?? null
+}
+
+// One round trip for every problem in the round: rows come back sorted by
+// score desc (then earliest createdAt on a tie), so the first row seen for a
+// given problemId is already that problem's best submission.
+async function getBestScoresForTeam(
+  db: Db,
+  teamId: string,
+  problemIds: string[],
+): Promise<Map<string, number>> {
+  if (problemIds.length === 0) return new Map()
+
+  const rows = await db
+    .select({ problemId: submissionsTable.problemId, score: submissionsTable.score })
+    .from(submissionsTable)
+    .where(
+      and(eq(submissionsTable.teamId, teamId), inArray(submissionsTable.problemId, problemIds)),
+    )
+    .orderBy(desc(submissionsTable.score), asc(submissionsTable.createdAt))
+
+  const bestByProblem = new Map<string, number>()
+  for (const row of rows) {
+    if (!bestByProblem.has(row.problemId)) bestByProblem.set(row.problemId, row.score)
+  }
+  return bestByProblem
+}
+
+// The participant read of a round (#39): a missing round or one still
+// 'draft' returns null — same "never announces itself" rule as
+// listParticipantRounds. bestScore stays null for every problem while the
+// round is open (mid-round, the participant doesn't need it yet, matching
+// getPublishedProblem) and only reflects real submissions once closed.
+export async function getParticipantRound(
+  db: Db,
+  id: string,
+  locale: Locale,
+  userId: string,
+): Promise<ParticipantRoundDetail | null> {
+  await reapExpiredRound(db)
+
+  const [round] = await db.select().from(roundsTable).where(eq(roundsTable.id, id))
+  if (!round || round.status === 'draft') return null
+
+  const roundProblems = await db
+    .select()
+    .from(roundProblemsTable)
+    .where(eq(roundProblemsTable.roundId, id))
+  const problemIds = roundProblems.map((rp) => rp.problemId)
+
+  const [problems, translations] = await Promise.all([
+    problemIds.length === 0
+      ? []
+      : db.select().from(problemsTable).where(inArray(problemsTable.id, problemIds)),
+    problemIds.length === 0
+      ? []
+      : db
+          .select()
+          .from(problemTranslationsTable)
+          .where(inArray(problemTranslationsTable.problemId, problemIds)),
+  ])
+
+  const problemById = new Map(problems.map((problem) => [problem.id, problem]))
+  const translationsByProblem = new Map<string, typeof translations>()
+  for (const translation of translations) {
+    const list = translationsByProblem.get(translation.problemId) ?? []
+    list.push(translation)
+    translationsByProblem.set(translation.problemId, list)
+  }
+
+  const bestScores =
+    round.status === 'closed'
+      ? await (async () => {
+          const teamId = await findTeamIdForParticipant(db, userId)
+          return teamId === null
+            ? new Map<string, number>()
+            : getBestScoresForTeam(db, teamId, problemIds)
+        })()
+      : new Map<string, number>()
+
+  return {
+    id: round.id,
+    name: round.name,
+    status: round.status,
+    durationMinutes: round.durationMinutes,
+    openedAt: round.openedAt,
+    closesAt: round.closesAt,
+    closedAt: round.closedAt,
+    problems: roundProblems
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map((rp) => {
+        const problem = problemById.get(rp.problemId)
+        if (!problem) throw new Error('expected round problem to reference an existing problem')
+
+        // pt is the fallback when the requested locale has no translation —
+        // unreachable in practice since publishing requires every locale.
+        const problemTranslations = translationsByProblem.get(rp.problemId) ?? []
+        const translation =
+          problemTranslations.find((t) => t.locale === locale) ??
+          problemTranslations.find((t) => t.locale === 'pt')
+
+        return {
+          problemId: rp.problemId,
+          position: rp.position,
+          title: translation?.title ?? '',
+          difficulty: problem.difficulty,
+          points: problem.points,
+          bestScore: bestScores.get(rp.problemId) ?? null,
+        }
+      }),
+  }
 }

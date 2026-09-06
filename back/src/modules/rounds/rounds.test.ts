@@ -11,6 +11,7 @@ import {
   problemTranslationsTable,
   roundProblemsTable,
   roundsTable,
+  submissionsTable,
   teamMembersTable,
   teamsTable,
   usersTable,
@@ -19,6 +20,7 @@ import {
   closeRound,
   createRound,
   extendRound,
+  getParticipantRound,
   getProblemRoundAccess,
   getRound,
   isProblemInOpenRound,
@@ -35,7 +37,7 @@ const db = createDb()
 
 beforeEach(async () => {
   await db.execute(
-    sql`truncate table ${roundProblemsTable}, ${roundsTable}, ${problemTranslationsTable}, ${problemsTable}, ${teamMembersTable}, ${teamsTable}, ${usersTable} restart identity cascade`,
+    sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemTranslationsTable}, ${problemsTable}, ${teamMembersTable}, ${teamsTable}, ${usersTable} restart identity cascade`,
   )
 })
 
@@ -753,6 +755,221 @@ describe('rounds.service', () => {
       const result = await closeRound(db, round.id)
 
       expect(result).toEqual({ ok: false, error: 'round_not_open' })
+    })
+  })
+
+  describe('getParticipantRound', () => {
+    async function insertUser() {
+      const [user] = await db
+        .insert(usersTable)
+        .values({
+          email: `participant-${crypto.randomUUID()}@example.com`,
+          passwordHash: 'hash',
+          role: 'participant',
+          university: 'pucrs',
+        })
+        .returning()
+      if (!user) throw new Error('expected fixture')
+      return user
+    }
+
+    async function insertTeamFor(userId: string) {
+      const [team] = await db
+        .insert(teamsTable)
+        .values({ name: `Team ${crypto.randomUUID()}` })
+        .returning()
+      if (!team) throw new Error('expected fixture')
+      await db.insert(teamMembersTable).values({ userId, teamId: team.id })
+      return team
+    }
+
+    async function insertPublishedProblemWithTranslations(
+      overrides: { points?: number; missingEs?: boolean } = {},
+    ) {
+      const [problem] = await db
+        .insert(problemsTable)
+        .values({
+          difficulty: 'easy',
+          status: 'published',
+          points: overrides.points ?? 10,
+        })
+        .returning()
+      if (!problem) throw new Error('expected fixture')
+
+      const translations = [
+        { problemId: problem.id, locale: 'pt' as const, title: 'Soma', statementMd: 'x' },
+        { problemId: problem.id, locale: 'en' as const, title: 'Sum', statementMd: 'x' },
+        ...(overrides.missingEs
+          ? []
+          : [{ problemId: problem.id, locale: 'es' as const, title: 'Suma', statementMd: 'x' }]),
+      ]
+      await db.insert(problemTranslationsTable).values(translations)
+      return problem
+    }
+
+    async function insertSubmission(
+      teamId: string,
+      userId: string,
+      problemId: string,
+      score: number,
+      attemptNumber: number,
+    ) {
+      await db.insert(submissionsTable).values({
+        problemId,
+        userId,
+        teamId,
+        workspace: {},
+        generatedCode: '// generated',
+        score,
+        attemptNumber,
+      })
+    }
+
+    it('returns null for an unknown id', async () => {
+      const user = await insertUser()
+
+      expect(
+        await getParticipantRound(db, '00000000-0000-0000-0000-000000000000', 'pt', user.id),
+      ).toBeNull()
+    })
+
+    it('returns null for a draft round', async () => {
+      const user = await insertUser()
+      const problem = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+
+      expect(await getParticipantRound(db, created.round.id, 'pt', user.id)).toBeNull()
+    })
+
+    it('reports every problem with bestScore null while the round is open, even with an existing submission', async () => {
+      const user = await insertUser()
+      const team = await insertTeamFor(user.id)
+      const problem = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      await insertSubmission(team.id, user.id, problem.id, 7, 1)
+
+      const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
+
+      expect(detail?.status).toBe('open')
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({ problemId: problem.id, bestScore: null }),
+      ])
+    })
+
+    it('reports the real best score (score desc, earliest createdAt on a tie) once the round is closed', async () => {
+      const user = await insertUser()
+      const team = await insertTeamFor(user.id)
+      const problem = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      await insertSubmission(team.id, user.id, problem.id, 4, 1)
+      await insertSubmission(team.id, user.id, problem.id, 9, 2)
+      await insertSubmission(team.id, user.id, problem.id, 9, 3)
+      const closed = await closeRound(db, created.round.id)
+      if (!closed.ok) throw new Error('expected close to succeed')
+
+      const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
+
+      expect(detail?.status).toBe('closed')
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({ problemId: problem.id, bestScore: 9 }),
+      ])
+    })
+
+    it('reports bestScore null once closed when the team never submitted', async () => {
+      const user = await insertUser()
+      await insertTeamFor(user.id)
+      const problem = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      const closed = await closeRound(db, created.round.id)
+      if (!closed.ok) throw new Error('expected close to succeed')
+
+      const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
+
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({ problemId: problem.id, bestScore: null }),
+      ])
+    })
+
+    it('reports bestScore null once closed when the user has no team at all', async () => {
+      const user = await insertUser()
+      const problem = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      const closed = await closeRound(db, created.round.id)
+      if (!closed.ok) throw new Error('expected close to succeed')
+
+      const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
+
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({ problemId: problem.id, bestScore: null }),
+      ])
+    })
+
+    it('falls back to the pt title when the requested locale has no translation', async () => {
+      const user = await insertUser()
+      const problem = await insertPublishedProblemWithTranslations({ missingEs: true })
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+
+      const detail = await getParticipantRound(db, created.round.id, 'es', user.id)
+
+      expect(detail?.problems[0]?.title).toBe('Soma')
+    })
+
+    it('orders problems by position regardless of insertion order', async () => {
+      const user = await insertUser()
+      const problemA = await insertPublishedProblemWithTranslations()
+      const problemB = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problemB.id, problemA.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+
+      const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
+
+      expect(detail?.problems.map((p) => p.problemId)).toEqual([problemB.id, problemA.id])
     })
   })
 })

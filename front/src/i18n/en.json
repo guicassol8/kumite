@@ -383,6 +383,10 @@
     "empty": {
       "title": "No teams on the leaderboard yet.",
       "noRoundEver": "No round has ever been opened for this event."
+    },
+    "presentation": {
+      "enter": "Enter presentation mode",
+      "exit": "Exit presentation mode"
     }
   },
   "roundDetail": {

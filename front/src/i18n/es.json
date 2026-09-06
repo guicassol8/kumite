@@ -383,6 +383,10 @@
     "empty": {
       "title": "Todavía no hay equipos en el marcador.",
       "noRoundEver": "Todavía no se abrió ninguna ronda en esta competencia."
+    },
+    "presentation": {
+      "enter": "Activar modo presentación",
+      "exit": "Salir del modo presentación"
     }
   },
   "roundDetail": {

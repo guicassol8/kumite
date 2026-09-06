@@ -1,7 +1,8 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { Maximize2, Minimize2 } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { type University, UniversityBadge } from '@/components/teams/university-badge'
@@ -54,6 +55,32 @@ function LeaderboardScreen() {
   const { t, i18n } = useTranslation()
   const locale = toApiLocale(i18n.resolvedLanguage ?? i18n.language)
   const queryClient = useQueryClient()
+  const mainRef = useRef<HTMLElement>(null)
+  const [isPresentation, setIsPresentation] = useState(false)
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsPresentation(document.fullscreenElement === mainRef.current)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  const togglePresentation = useCallback(() => {
+    if (isPresentation) {
+      setIsPresentation(false)
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {})
+      }
+      return
+    }
+    // Set optimistically: if the Fullscreen API is unsupported or the
+    // request is denied, the enlarged layout still applies (degrade
+    // gracefully) — a real transition later confirms the same state via
+    // the fullscreenchange listener above.
+    setIsPresentation(true)
+    mainRef.current?.requestFullscreen().catch(() => {})
+  }, [isPresentation])
   // round.opened/round.closed refetch the list so a round that just closed
   // (or opened) resolves in `closedRounds`/`lastClosedRound` right away,
   // instead of staying stuck on the stale snapshot until something else
@@ -145,8 +172,23 @@ function LeaderboardScreen() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-8">
-      <h1 className="font-bold text-2xl">{t('leaderboard.heading')}</h1>
+    <main ref={mainRef} className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 p-8">
+      <div className="flex items-center gap-2">
+        <h1 className="font-bold text-2xl">{t('leaderboard.heading')}</h1>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          data-testid="leaderboard-presentation-toggle"
+          aria-pressed={isPresentation}
+          aria-label={t(
+            isPresentation ? 'leaderboard.presentation.exit' : 'leaderboard.presentation.enter',
+          )}
+          onClick={togglePresentation}
+        >
+          {isPresentation ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+        </Button>
+      </div>
 
       {stream.connectionStatus !== 'open' && (
         <Alert data-testid="leaderboard-connection-banner">

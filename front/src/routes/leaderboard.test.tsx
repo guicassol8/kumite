@@ -353,3 +353,83 @@ describe('LeaderboardScreen — empty state', () => {
     await waitFor(() => expect(screen.getByTestId('leaderboard-empty')).toBeDefined())
   })
 })
+
+describe('LeaderboardScreen — presentation mode', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.requestFullscreen = vi.fn().mockResolvedValue(undefined)
+    document.exitFullscreen = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: null,
+    })
+  })
+
+  async function renderWithActiveRound() {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+  }
+
+  it('enters presentation mode on toggle click and requests fullscreen', async () => {
+    await renderWithActiveRound()
+
+    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+
+    fireEvent.click(toggle)
+
+    expect(HTMLElement.prototype.requestFullscreen).toHaveBeenCalledTimes(1)
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('exits presentation mode when the browser reports fullscreen exit (Esc path)', async () => {
+    await renderWithActiveRound()
+
+    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
+    act(() => document.dispatchEvent(new Event('fullscreenchange')))
+
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('exits presentation mode via the toggle itself, calling exitFullscreen', async () => {
+    await renderWithActiveRound()
+
+    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
+    fireEvent.click(toggle)
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: document.querySelector('main'),
+    })
+
+    fireEvent.click(toggle)
+
+    expect(document.exitFullscreen).toHaveBeenCalledTimes(1)
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('degrades gracefully when requestFullscreen rejects', async () => {
+    HTMLElement.prototype.requestFullscreen = vi.fn().mockRejectedValue(new Error('denied'))
+    await renderWithActiveRound()
+
+    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
+    fireEvent.click(toggle)
+
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+  })
+})

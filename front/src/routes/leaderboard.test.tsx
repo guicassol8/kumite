@@ -260,15 +260,129 @@ describe('LeaderboardScreen — round closes live', () => {
     )
     emit({ type: 'round.closed', serverTime: new Date(), roundId: 'r1' })
 
-    // A brand-new `lastClosedRanking` query key (only enabled once
-    // `lastClosedRound` resolves) briefly flips `isLoading` back to true,
-    // unmounting/remounting the (uncontrolled) Tabs — so click the round tab
-    // on every poll until the screen settles, rather than once.
+    // Once a round has closed with nobody having picked a tab, the default
+    // correctly settles on "Geral" (#111) — switch to "Rodada" to see the
+    // last-closed label. The screen still flips through a loading state
+    // while `rounds` and then `lastClosedRanking` resolve, so retry the
+    // click until it lands past that; unlike before the #111 fix, once it
+    // lands it sticks — no more losing the selection on a later remount.
     await waitFor(() => {
-      const roundTab = screen.getByTestId('leaderboard-tab-round')
-      fireEvent.mouseDown(roundTab)
+      fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-round'))
       expect(screen.getByTestId('leaderboard-last-closed-label')).toBeDefined()
     })
+    expect(screen.queryByTestId('leaderboard-empty-no-round')).toBeNull()
+  })
+})
+
+describe('LeaderboardScreen — tab selection persists', () => {
+  it('keeps the manually selected "Rodada" tab when a later round.closed recomputes the default to "Geral"', async () => {
+    // Start with an *earlier* closed round (r0) already on record and no
+    // active round — the computed default is "Geral" here (a round has
+    // closed before and none is active), so switching to "Rodada" below is
+    // a genuine value change, not a no-op click on an already-active tab.
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        {
+          id: 'r0',
+          name: 'Rodada 0',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: new Date('2026-09-01T09:00:00.000Z'),
+          closesAt: null,
+          closedAt: new Date('2026-09-01T09:30:00.000Z'),
+          createdAt: new Date('2026-09-01T08:00:00.000Z'),
+          updatedAt: new Date('2026-09-01T09:30:00.000Z'),
+          problemCount: 1,
+        },
+      ]),
+    )
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-tabs')).toBeDefined())
+
+    // Manually switch to "Rodada" to look at r0's grid.
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-round'))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-last-closed-label')).toBeDefined())
+
+    // Organizer closes a *different*, more recent round (r1) while this
+    // client stays connected. Once the rounds refetch resolves, `r1`
+    // supersedes `r0` as `lastClosedRound`, so the recomputed default is
+    // still "Geral" — and a brand-new `lastClosedRanking` query key (keyed
+    // on r1 now, never fetched before) briefly flips `isLoading` true,
+    // which used to remount the (uncontrolled) Tabs and pick up that
+    // recomputed default, kicking the participant out of "Rodada" even
+    // though they had just switched to it.
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        {
+          id: 'r0',
+          name: 'Rodada 0',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: new Date('2026-09-01T09:00:00.000Z'),
+          closesAt: null,
+          closedAt: new Date('2026-09-01T09:30:00.000Z'),
+          createdAt: new Date('2026-09-01T08:00:00.000Z'),
+          updatedAt: new Date('2026-09-01T09:30:00.000Z'),
+          problemCount: 1,
+        },
+        {
+          id: 'r1',
+          name: 'Rodada 1',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: new Date('2026-09-01T10:00:00.000Z'),
+          closesAt: null,
+          closedAt: new Date('2026-09-01T10:30:00.000Z'),
+          createdAt: new Date('2026-09-01T09:00:00.000Z'),
+          updatedAt: new Date('2026-09-01T10:30:00.000Z'),
+          problemCount: 1,
+        },
+      ]),
+    )
+    emit({ type: 'round.closed', serverTime: new Date(), roundId: 'r1' })
+
+    // Wait for the *new* key's fetch — proof the recompute (and the
+    // isLoading flip/remount it drives) actually happened, not just that
+    // the label was already there from before r1 closed.
+    await waitFor(() => expect(mockedRoundRanking).toHaveBeenCalledWith({ param: { id: 'r1' } }))
+
+    // No re-click: "Rodada" must still be the one showing.
+    await waitFor(() => expect(screen.getByTestId('leaderboard-last-closed-label')).toBeDefined())
+    expect(screen.queryByTestId('leaderboard-column-round-r1')).toBeNull()
+  })
+
+  it('keeps the manually selected "Geral" tab when round.opened recomputes the default to "Rodada"', async () => {
+    // No round has ever existed — the computed default is "Rodada" here,
+    // so switching to "Geral" below is a genuine value change.
+    mockedRounds.mockResolvedValue(jsonResponse(200, []))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-empty-no-round')).toBeDefined())
+
+    // Manually switch to "Geral".
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-column-round-r1')).toBeDefined())
+
+    // The organizer opens a round while this client stays connected, with
+    // no submission yet — only `round.opened`, no `ranking.updated` — so a
+    // fresh `activeRoundRanking` query key becomes enabled and briefly
+    // `isPending`, same isLoading-flip/remount mechanism as the round.closed
+    // case above. The recomputed default flips to "Rodada" (there's now an
+    // active round), which used to override the participant's manual
+    // "Geral" selection on remount.
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+
+    // No re-click: "Geral" must still be the one showing.
+    await waitFor(() => expect(mockedRoundRanking).toHaveBeenCalledWith({ param: { id: 'r1' } }))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-column-round-r1')).toBeDefined())
     expect(screen.queryByTestId('leaderboard-empty-no-round')).toBeNull()
   })
 })

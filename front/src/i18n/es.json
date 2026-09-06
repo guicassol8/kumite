@@ -336,16 +336,36 @@
     }
   },
   "problem": {
+    "loading": "Cargando problema...",
+    "notFound": {
+      "title": "Problema no encontrado.",
+      "backHome": "Volver al inicio"
+    },
+    "loadError": {
+      "message": "No se pudo cargar el problema.",
+      "retry": "Intentar de nuevo"
+    },
     "statementLabel": "Enunciado del problema",
     "examplesHeading": "Casos de ejemplo",
     "exampleInput": "Entrada",
     "exampleOutput": "Salida esperada",
     "executeButton": "Ejecutar",
     "submitButton": "Enviar",
-    "submitHint": "Disponible en la competencia",
+    "submitProgress": "Enviando...",
     "clearButton": "Limpiar bloques",
     "clearConfirm": "Esto borrará todos los bloques de este problema. ¿Continuar?",
     "executeRunning": "Ejecutando...",
+    "submitError": {
+      "cooldown": "Espera antes de volver a enviar.",
+      "race": "Algo cambió en esta ronda — recarga la página e intenta de nuevo.",
+      "unexpected": "No se pudo enviar la solución. Intenta de nuevo.",
+      "dismiss": "Descartar"
+    },
+    "closedRound": {
+      "notice": "Esta ronda fue cerrada — el problema ahora es de solo lectura.",
+      "bestScore": "Mejor puntuación de tu equipo: {{score}} ({{attempts}} intentos, el {{date}})",
+      "neverSubmitted": "Tu equipo no llegó a enviar una solución para este problema."
+    },
     "results": {
       "title": "Resultados",
       "summary": "{{passed}}/{{total}} casos",

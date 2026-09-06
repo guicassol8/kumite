@@ -336,16 +336,36 @@
     }
   },
   "problem": {
+    "loading": "Carregando problema...",
+    "notFound": {
+      "title": "Problema não encontrado.",
+      "backHome": "Voltar para o início"
+    },
+    "loadError": {
+      "message": "Não foi possível carregar o problema.",
+      "retry": "Tentar novamente"
+    },
     "statementLabel": "Enunciado do problema",
     "examplesHeading": "Casos de exemplo",
     "exampleInput": "Entrada",
     "exampleOutput": "Saída esperada",
     "executeButton": "Executar",
     "submitButton": "Submeter",
-    "submitHint": "Disponível na competição",
+    "submitProgress": "Enviando...",
     "clearButton": "Limpar blocos",
     "clearConfirm": "Isso vai apagar todos os blocos deste problema. Continuar?",
     "executeRunning": "Executando...",
+    "submitError": {
+      "cooldown": "Aguarde antes de submeter de novo.",
+      "race": "Algo mudou nesta rodada — recarregue a página e tente de novo.",
+      "unexpected": "Não foi possível enviar a submissão. Tente novamente.",
+      "dismiss": "Dispensar"
+    },
+    "closedRound": {
+      "notice": "Esta rodada foi encerrada — o problema agora é somente leitura.",
+      "bestScore": "Melhor pontuação do seu time: {{score}} ({{attempts}} tentativas, em {{date}})",
+      "neverSubmitted": "Seu time não chegou a submeter uma solução para este problema."
+    },
     "results": {
       "title": "Resultados",
       "summary": "{{passed}}/{{total}} casos",

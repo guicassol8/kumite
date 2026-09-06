@@ -13,9 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OrganizerRouteImport } from './routes/organizer'
-import { Route as ProblemRouteImport } from './routes/problem'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TeamsRouteImport } from './routes/teams'
+import { Route as ProblemIdRouteImport } from './routes/problem.$id'
 import { Route as RoundsIdRouteImport } from './routes/rounds.$id'
 import { Route as OrganizerProblemsIndexRouteImport } from './routes/organizer.problems.index'
 import { Route as OrganizerProblemsNewRouteImport } from './routes/organizer.problems.new'
@@ -44,11 +44,6 @@ const OrganizerRoute = OrganizerRouteImport.update({
   path: '/organizer',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProblemRoute = ProblemRouteImport.update({
-  id: '/problem',
-  path: '/problem',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -57,6 +52,11 @@ const SignupRoute = SignupRouteImport.update({
 const TeamsRoute = TeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProblemIdRoute = ProblemIdRouteImport.update({
+  id: '/problem/$id',
+  path: '/problem/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RoundsIdRoute = RoundsIdRouteImport.update({
@@ -100,9 +100,9 @@ export interface FileRoutesByFullPath {
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
-  '/problem': typeof ProblemRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
+  '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
   '/organizer/rounds/new': typeof OrganizerRoundsNewRoute
@@ -116,9 +116,9 @@ export interface FileRoutesByTo {
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
-  '/problem': typeof ProblemRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
+  '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
   '/organizer/rounds/new': typeof OrganizerRoundsNewRoute
@@ -133,9 +133,9 @@ export interface FileRoutesById {
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
-  '/problem': typeof ProblemRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
+  '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
   '/organizer/rounds/new': typeof OrganizerRoundsNewRoute
@@ -151,9 +151,9 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/login'
     | '/organizer'
-    | '/problem'
     | '/signup'
     | '/teams'
+    | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/problems/new'
     | '/organizer/rounds/new'
@@ -167,9 +167,9 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/login'
     | '/organizer'
-    | '/problem'
     | '/signup'
     | '/teams'
+    | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/problems/new'
     | '/organizer/rounds/new'
@@ -183,9 +183,9 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/login'
     | '/organizer'
-    | '/problem'
     | '/signup'
     | '/teams'
+    | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/problems/new'
     | '/organizer/rounds/new'
@@ -200,9 +200,9 @@ export interface RootRouteChildren {
   LeaderboardRoute: typeof LeaderboardRoute
   LoginRoute: typeof LoginRoute
   OrganizerRoute: typeof OrganizerRouteWithChildren
-  ProblemRoute: typeof ProblemRoute
   SignupRoute: typeof SignupRoute
   TeamsRoute: typeof TeamsRoute
+  ProblemIdRoute: typeof ProblemIdRoute
   RoundsIdRoute: typeof RoundsIdRoute
 }
 
@@ -236,13 +236,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizerRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/problem': {
-      id: '/problem'
-      path: '/problem'
-      fullPath: '/problem'
-      preLoaderRoute: typeof ProblemRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -255,6 +248,13 @@ declare module '@tanstack/react-router' {
       path: '/teams'
       fullPath: '/teams'
       preLoaderRoute: typeof TeamsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/problem/$id': {
+      id: '/problem/$id'
+      path: '/problem/$id'
+      fullPath: '/problem/$id'
+      preLoaderRoute: typeof ProblemIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rounds/$id': {
@@ -336,9 +336,9 @@ const rootRouteChildren: RootRouteChildren = {
   LeaderboardRoute: LeaderboardRoute,
   LoginRoute: LoginRoute,
   OrganizerRoute: OrganizerRouteWithChildren,
-  ProblemRoute: ProblemRoute,
   SignupRoute: SignupRoute,
   TeamsRoute: TeamsRoute,
+  ProblemIdRoute: ProblemIdRoute,
   RoundsIdRoute: RoundsIdRoute,
 }
 export const routeTree = rootRouteImport

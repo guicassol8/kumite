@@ -1,6 +1,6 @@
 import type { BlockLocale } from '@kumite/blocks'
 import * as Blockly from 'blockly'
-import { type RefObject, useEffect, useRef, useState } from 'react'
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { BlocklyWorkspaceHandle } from '@/components/blockly/blockly-workspace'
@@ -16,18 +16,29 @@ function toBlockLocale(language: string): BlockLocale {
  * it changes, reloads the live workspace through its own serialized state so
  * every block re-runs `init()` with the new locale's labels while what was
  * built stays exactly as connected.
+ *
+ * `onReady` must be wired to `BlocklyWorkspace`'s own `onReady` prop — it is
+ * what does the *first* registration, tied to the exact instance Blockly
+ * injects rather than to this hook's own effect timing (see that prop's doc
+ * for why: React StrictMode's dev-only double-mount can otherwise leave the
+ * registration on an instance Blockly has already disposed).
  */
-export function useBlocklyLocale(
-  workspaceRef: RefObject<BlocklyWorkspaceHandle | null>,
-): Blockly.utils.toolbox.ToolboxDefinition {
+export function useBlocklyLocale(workspaceRef: RefObject<BlocklyWorkspaceHandle | null>): {
+  toolbox: Blockly.utils.toolbox.ToolboxDefinition
+  onReady: (workspace: Blockly.WorkspaceSvg) => void
+} {
   const { i18n } = useTranslation()
   const locale = toBlockLocale(i18n.resolvedLanguage ?? i18n.language)
   const [toolbox, setToolbox] = useState(() => applyBlocklyLocale(locale))
   const appliedLocaleRef = useRef(locale)
+  const localeRef = useRef(locale)
+  localeRef.current = locale
+
+  const onReady = useCallback((workspace: Blockly.WorkspaceSvg) => {
+    registerVariablesFlyout(workspace, localeRef.current)
+  }, [])
 
   useEffect(() => {
-    registerVariablesFlyout(workspaceRef.current?.getWorkspace(), locale)
-
     if (appliedLocaleRef.current === locale) return
     appliedLocaleRef.current = locale
 
@@ -35,6 +46,9 @@ export function useBlocklyLocale(
 
     const handle = workspaceRef.current
     if (!handle) return
+    const workspace = handle.getWorkspace()
+    if (workspace) registerVariablesFlyout(workspace, locale)
+
     const state = handle.serialize()
     Blockly.Events.disable()
     try {
@@ -45,5 +59,5 @@ export function useBlocklyLocale(
     }
   }, [locale, workspaceRef])
 
-  return toolbox
+  return { toolbox, onReady }
 }

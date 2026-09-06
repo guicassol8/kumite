@@ -150,7 +150,15 @@ function RoundDetailScreen() {
           <TableBody>
             {round.data.problems.map((problem) => (
               <TableRow key={problem.problemId} data-testid={`round-problem-${problem.problemId}`}>
-                <TableCell>{problem.title}</TableCell>
+                <TableCell>
+                  <Link
+                    to="/problem/$id"
+                    params={{ id: problem.problemId }}
+                    className="text-primary underline"
+                  >
+                    {problem.title}
+                  </Link>
+                </TableCell>
                 <TableCell>
                   <Badge variant="outline">
                     {t(`roundDetail.difficulty.${problem.difficulty}`)}

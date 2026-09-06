@@ -20,6 +20,16 @@ export type BlocklyWorkspaceProps = {
   onChange?: (state: WorkspaceState) => void
   options?: Partial<Blockly.BlocklyOptions>
   className?: string
+  /**
+   * Fires once, synchronously within the injection effect, with the actual
+   * surviving workspace instance. In dev, React StrictMode mounts this
+   * component's effects twice (inject → dispose → inject again) as part of
+   * the very same commit; a caller that instead waits for its own separate
+   * effect to observe the ref can run between those two injections and end
+   * up wiring the disposed instance. Use this for anything that must attach
+   * to the exact workspace Blockly is keeping.
+   */
+  onReady?: (workspace: Blockly.WorkspaceSvg) => void
 }
 
 const defaultOptions: Partial<Blockly.BlocklyOptions> = {
@@ -36,7 +46,7 @@ const defaultOptions: Partial<Blockly.BlocklyOptions> = {
  * driven through the imperative handle.
  */
 export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorkspaceProps>(
-  function BlocklyWorkspace({ toolbox, initialState, onChange, options, className }, ref) {
+  function BlocklyWorkspace({ toolbox, initialState, onChange, options, className, onReady }, ref) {
     const { t } = useTranslation()
     const containerRef = useRef<HTMLDivElement>(null)
     const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
@@ -44,8 +54,8 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
 
     // The workspace is injected once, so the injection effect reads the props
     // from here instead of depending on them.
-    const propsRef = useRef({ toolbox, initialState, onChange, options })
-    propsRef.current = { toolbox, initialState, onChange, options }
+    const propsRef = useRef({ toolbox, initialState, onChange, options, onReady })
+    propsRef.current = { toolbox, initialState, onChange, options, onReady }
 
     useEffect(() => {
       const container = containerRef.current
@@ -59,6 +69,7 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       })
       workspaceRef.current = workspace
       appliedToolboxRef.current = injected
+      propsRef.current.onReady?.(workspace)
 
       // Restoring a saved workspace is not a user edit: suppress the events
       // altogether, then start listening.

@@ -336,16 +336,36 @@
     }
   },
   "problem": {
+    "loading": "Loading problem...",
+    "notFound": {
+      "title": "Problem not found.",
+      "backHome": "Back to home"
+    },
+    "loadError": {
+      "message": "Could not load the problem.",
+      "retry": "Try again"
+    },
     "statementLabel": "Problem statement",
     "examplesHeading": "Example cases",
     "exampleInput": "Input",
     "exampleOutput": "Expected output",
     "executeButton": "Run",
     "submitButton": "Submit",
-    "submitHint": "Available during the competition",
+    "submitProgress": "Submitting...",
     "clearButton": "Clear blocks",
     "clearConfirm": "This will erase all blocks for this problem. Continue?",
     "executeRunning": "Running...",
+    "submitError": {
+      "cooldown": "Wait a moment before submitting again.",
+      "race": "Something changed in this round — reload the page and try again.",
+      "unexpected": "Could not submit your solution. Please try again.",
+      "dismiss": "Dismiss"
+    },
+    "closedRound": {
+      "notice": "This round has closed — the problem is now read-only.",
+      "bestScore": "Your team's best score: {{score}} ({{attempts}} attempts, on {{date}})",
+      "neverSubmitted": "Your team never submitted a solution for this problem."
+    },
     "results": {
       "title": "Results",
       "summary": "{{passed}}/{{total}} cases",
@@ -356,6 +376,15 @@
       "timeout": "Timed out ({{seconds}}s)",
       "runtimeError": "Error: {{message}}",
       "empty": "Build your solution inside the “solve” block and click Run."
+    },
+    "verdict": {
+      "title": "Verdict",
+      "summary": "{{score}}/{{maxScore}} points",
+      "caseLabel": "Case {{index}}",
+      "expected": "expected",
+      "obtained": "got",
+      "timeout": "Timed out",
+      "runtimeError": "Error: {{detail}}"
     }
   },
   "leaderboard": {

@@ -102,6 +102,60 @@ documented on the kumite side and still fires on every single commit —
 each session pays a small tax forever, and any session that forgets pays
 the full ~3 minutes. It is a fixture-lifecycle gap, not a knowledge gap.
 
+## Update — #7 (problem screen ↔ API integration), a fourth independent hit
+
+Fourth reproduction, and the first on a task whose E2E suites depend on
+*organizer-seeded* fixtures created fresh per spec run (not one seeded
+account reused across a whole session) — the blast radius turned out
+bigger than "re-run `db:seed`".
+
+- `kata verify`: every commit (7 total, all `front/` — no back code touched
+  at all for #7), always green, same negligible share of the ladder.
+- `kata-docs` MCP queries: **0**. No back schema questions arose because
+  #11/#21 had already shipped everything the front needed; this is now the
+  fourth `front/`-only task in a row to need zero lookups.
+- The truncation hit differently here: this task uses a dedicated
+  per-worktree Postgres (not the shared dev DB `db:seed` targets), and each
+  of the 7 commits' pre-commit `pnpm -r test` truncated it via the back
+  suite's `beforeEach`. `users` sat at 0 rows by the end of the session.
+  Re-seeding the organizer account was cheap (`pnpm db:seed`), but the
+  bigger cost was every *E2E-created* fixture — published problems, rounds,
+  team memberships, participant accounts — vanishing with it. Three
+  separate debugging detours during this task turned out to be nothing but
+  a round left `open` by state a previous truncation (or a manually killed
+  Playwright run) never got to close, which then blocked every subsequent
+  run's own `POST /organizer/rounds/:id/open` (409, silently ignored by the
+  spec's fire-and-forget `fetch`) — cascading into unrelated-looking
+  failures ("Problema não encontrado", a stuck "Aguardando a próxima
+  rodada.") that cost roughly 20+ minutes total to trace back to one open
+  round each time, across four separate incidents.
+
+## Why it matters (addendum)
+
+The original suggested fix (re-insert the seeded organizer after
+truncation) would not have prevented this task's actual time sink: the
+expensive failures were never "the organizer is gone", they were "a round
+another test session opened is still open, and every open-round check
+after it fails for a reason several layers removed from the real cause."
+A DB-backed E2E suite that creates its *own* rounds per run needs either
+(a) each spec's own crash-safety — closing what it opened even when a
+later assertion in the same test fails, not just on the happy path, or
+(b) the app itself refusing to treat "one open round system-wide" as a
+silent 409 a fire-and-forget test fetch can ignore. Neither is a kata gap
+specifically, but the truncation trap in this file is exactly what
+produces the orphaned-open-round state in the first place: a suite killed
+mid-run by an unrelated `pnpm -r test` truncation event has no chance to
+run its own cleanup.
+
+## Metrics (addendum)
+
+- Time lost to the "stray open round" cascade across this task: ~20-25
+  minutes across 4 occurrences, each initially misdiagnosed as a product
+  regression before the actual cause (an open round from a previous/killed
+  run) was found via direct `psql`/API inspection.
+- Every occurrence was resolved by one manual
+  `POST /organizer/rounds/:id/close` call — cheap once identified, expensive
+  to identify from the front-end symptom alone.
 ## Update — a new symptom of the same root cause (#46, dedicated throwaway DB)
 
 Fourth occurrence, on a task following the "spin up your own disposable

@@ -131,6 +131,9 @@ describe('RoundDetailScreen', () => {
     expect(await screen.findByTestId('round-problem-p1')).toBeDefined()
     expect(screen.getByTestId('round-problem-p1').textContent).toContain('—')
     expect(screen.queryByTestId('round-countdown')).toBeNull()
+    expect(screen.getByTestId('round-problem-p1').querySelector('a')?.getAttribute('href')).toBe(
+      '/problem/p1',
+    )
 
     emitSse({
       type: 'state.sync',
@@ -176,6 +179,12 @@ describe('RoundDetailScreen', () => {
     expect(screen.getByTestId('round-problem-p1').textContent).toContain('8')
     expect(screen.getByTestId('round-problem-p2').textContent).toContain('—')
     expect(screen.queryByTestId('round-countdown')).toBeNull()
+    expect(screen.getByTestId('round-problem-p1').querySelector('a')?.getAttribute('href')).toBe(
+      '/problem/p1',
+    )
+    expect(screen.getByTestId('round-problem-p2').querySelector('a')?.getAttribute('href')).toBe(
+      '/problem/p2',
+    )
   })
 
   it('shows and hides the connection indicator as the event stream status changes', async () => {

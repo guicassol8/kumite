@@ -260,13 +260,14 @@ describe('LeaderboardScreen — round closes live', () => {
     )
     emit({ type: 'round.closed', serverTime: new Date(), roundId: 'r1' })
 
-    // A brand-new `lastClosedRanking` query key (only enabled once
-    // `lastClosedRound` resolves) briefly flips `isLoading` back to true,
-    // unmounting/remounting the (uncontrolled) Tabs — so click the round tab
-    // on every poll until the screen settles, rather than once.
+    // Once a round has closed with nobody having picked a tab, the default
+    // correctly settles on "Geral" (#111) — switch to "Rodada" to see the
+    // last-closed label. The screen still flips through a loading state
+    // while `rounds` and then `lastClosedRanking` resolve, so retry the
+    // click until it lands past that; unlike before the #111 fix, once it
+    // lands it sticks — no more losing the selection on a later remount.
     await waitFor(() => {
-      const roundTab = screen.getByTestId('leaderboard-tab-round')
-      fireEvent.mouseDown(roundTab)
+      fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-round'))
       expect(screen.getByTestId('leaderboard-last-closed-label')).toBeDefined()
     })
     expect(screen.queryByTestId('leaderboard-empty-no-round')).toBeNull()

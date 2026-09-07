@@ -8,8 +8,10 @@ export const EventCodeSchema = z.object({
   university: UniversitySchema,
   allowedEmailSuffixes: z.array(z.string()),
   active: z.boolean(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  // coerce, not date(): kata re-validates the output after JSON serialization,
+  // where a Date has already become an ISO string (same fix as TeamSchema).
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 })
 
 export type EventCode = z.infer<typeof EventCodeSchema>

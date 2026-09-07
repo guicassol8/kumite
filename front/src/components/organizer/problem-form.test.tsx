@@ -286,6 +286,7 @@ describe('ProblemForm', () => {
     expect(screen.getByTestId('problem-form-publish-hint').getAttribute('aria-label')).toBe(
       'Não é possível publicar um problema arquivado.',
     )
+    expect(screen.getByTestId('problem-form-publish-hint').getAttribute('tabIndex')).toBe('0')
 
     fireEvent.click(screen.getByTestId('problem-form-save'))
     expect(onSave).toHaveBeenCalledTimes(1)
@@ -298,6 +299,7 @@ describe('ProblemForm', () => {
     expect(screen.getByTestId('problem-form-publish-hint').getAttribute('aria-label')).toBe(
       'Este problema já está publicado.',
     )
+    expect(screen.getByTestId('problem-form-publish-hint').getAttribute('tabIndex')).toBe('0')
     expect(screen.getByTestId('problem-form-status').textContent).toBe('Publicado')
   })
 

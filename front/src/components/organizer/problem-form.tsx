@@ -457,6 +457,8 @@ export function ProblemForm({
                 <span
                   data-testid="problem-form-publish-hint"
                   aria-label={publishDisabledReason ?? undefined}
+                  tabIndex={0}
+                  className="rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <Button
                     type="button"

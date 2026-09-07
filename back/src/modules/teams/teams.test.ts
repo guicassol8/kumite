@@ -2,10 +2,26 @@ import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
-import { eventConfigTable, teamMembersTable, teamsTable, usersTable } from '../../db/schema'
+import {
+  eventConfigTable,
+  problemsTable,
+  submissionsTable,
+  teamMembersTable,
+  teamsTable,
+  usersTable,
+} from '../../db/schema'
 import type { University } from '../users/users.schema'
 
-import { createTeam, joinTeam, leaveTeam, listTeams } from './teams.service'
+import {
+  createTeam,
+  joinTeam,
+  leaveTeam,
+  listTeams,
+  moveMember,
+  removeMember,
+  removeTeam,
+  renameTeam,
+} from './teams.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #30 migration must already be applied.
@@ -29,9 +45,32 @@ async function insertUser(university: University = 'pucrs') {
 
 beforeEach(async () => {
   await db.execute(
-    sql`truncate table ${teamMembersTable}, ${teamsTable}, ${eventConfigTable}, ${usersTable} restart identity cascade`,
+    sql`truncate table ${submissionsTable}, ${problemsTable}, ${teamMembersTable}, ${teamsTable}, ${eventConfigTable}, ${usersTable} restart identity cascade`,
   )
 })
+
+async function insertSubmission(teamId: string, userId: string) {
+  const [problem] = await db
+    .insert(problemsTable)
+    .values({ difficulty: 'easy', status: 'published' })
+    .returning()
+  if (!problem) throw new Error('expected a problem fixture')
+  const [submission] = await db
+    .insert(submissionsTable)
+    .values({
+      problemId: problem.id,
+      teamId,
+      userId,
+      workspace: {},
+      generatedCode: '',
+      caseResults: [],
+      score: 100,
+      attemptNumber: 1,
+    })
+    .returning()
+  if (!submission) throw new Error('expected a submission fixture')
+  return submission
+}
 
 afterAll(async () => {
   await db.$client.end()
@@ -246,6 +285,301 @@ describe('leaveTeam', () => {
       .from(teamMembersTable)
       .where(eq(teamMembersTable.userId, creator.id))
     expect(membership).toBeDefined()
+  })
+})
+
+describe('renameTeam', () => {
+  it('renames an active team', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await renameTeam(db, created.team.id, 'Team B')
+
+    expect(result).toMatchObject({ ok: true, team: { name: 'Team B' } })
+  })
+
+  it('renames a frozen team without requiring it to be unfrozen', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, created.team.id))
+
+    const result = await renameTeam(db, created.team.id, 'Team B')
+
+    expect(result).toMatchObject({ ok: true, team: { name: 'Team B' } })
+  })
+
+  it('rejects an unknown team id', async () => {
+    const result = await renameTeam(db, '00000000-0000-0000-0000-000000000000', 'Team B')
+
+    expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  it('rejects a removed team id', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ removedAt: new Date() })
+      .where(eq(teamsTable.id, created.team.id))
+
+    const result = await renameTeam(db, created.team.id, 'Team B')
+
+    expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  it('rejects a name colliding case-insensitively with another active team', async () => {
+    const creatorA = await insertUser()
+    const creatorB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, creatorB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    const result = await renameTeam(db, teamA.team.id, 'team b')
+
+    expect(result).toEqual({ ok: false, error: 'name_taken' })
+  })
+
+  it('allows renaming to a name that collided only with a removed team', async () => {
+    const creatorA = await insertUser()
+    const creatorB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, creatorB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ removedAt: new Date() })
+      .where(eq(teamsTable.id, teamB.team.id))
+
+    const result = await renameTeam(db, teamA.team.id, 'Team B')
+
+    expect(result).toMatchObject({ ok: true, team: { name: 'Team B' } })
+  })
+})
+
+describe('moveMember', () => {
+  it('moves a member between two active teams', async () => {
+    const creatorA = await insertUser()
+    const memberB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, memberB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    const result = await moveMember(db, memberB.id, teamA.team.id)
+
+    expect(result).toEqual({ ok: true })
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, memberB.id))
+    expect(membership?.teamId).toBe(teamA.team.id)
+  })
+
+  it('moves a member out of a frozen source team', async () => {
+    const creatorA = await insertUser()
+    const memberB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, memberB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, teamB.team.id))
+
+    const result = await moveMember(db, memberB.id, teamA.team.id)
+
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('moves a member into a frozen destination team', async () => {
+    const creatorA = await insertUser()
+    const memberB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, memberB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, teamA.team.id))
+
+    const result = await moveMember(db, memberB.id, teamA.team.id)
+
+    expect(result).toEqual({ ok: true })
+  })
+
+  it('rejects a user with no team', async () => {
+    const creator = await insertUser()
+    const teamless = await insertUser()
+    const team = await createTeam(db, creator.id, 'Team A')
+    if (!team.ok) throw new Error('expected success')
+
+    const result = await moveMember(db, teamless.id, team.team.id)
+
+    expect(result).toEqual({ ok: false, error: 'member_not_found' })
+  })
+
+  it('rejects an unknown destination team', async () => {
+    const creator = await insertUser()
+    await createTeam(db, creator.id, 'Team A')
+
+    const result = await moveMember(db, creator.id, '00000000-0000-0000-0000-000000000000')
+
+    expect(result).toEqual({ ok: false, error: 'team_not_found' })
+  })
+
+  it('rejects a removed destination team', async () => {
+    const creatorA = await insertUser()
+    const creatorB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, creatorB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ removedAt: new Date() })
+      .where(eq(teamsTable.id, teamB.team.id))
+
+    const result = await moveMember(db, creatorA.id, teamB.team.id)
+
+    expect(result).toEqual({ ok: false, error: 'team_not_found' })
+  })
+
+  it('rejects a move that would exceed the destination max team size', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 1 })
+    const creatorA = await insertUser()
+    const creatorB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, creatorB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    const result = await moveMember(db, creatorB.id, teamA.team.id)
+
+    expect(result).toEqual({ ok: false, error: 'team_full' })
+  })
+
+  it('allows a cross-university move even when mixing is locked', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, mixingLocked: true })
+    const creatorA = await insertUser('pucrs')
+    const memberB = await insertUser('merida')
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, memberB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    const result = await moveMember(db, memberB.id, teamA.team.id)
+
+    expect(result).toEqual({ ok: true })
+  })
+})
+
+describe('removeMember', () => {
+  it('removes a member from an active team', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await removeMember(db, creator.id)
+
+    expect(result).toEqual({ ok: true })
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, creator.id))
+    expect(membership).toBeUndefined()
+  })
+
+  it('removes a member from a frozen team without error', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, created.team.id))
+
+    const result = await removeMember(db, creator.id)
+
+    expect(result).toEqual({ ok: true })
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, creator.id))
+    expect(membership).toBeUndefined()
+  })
+
+  it('rejects a user with no team', async () => {
+    const user = await insertUser()
+
+    const result = await removeMember(db, user.id)
+
+    expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+})
+
+describe('removeTeam', () => {
+  it('removes an active team, leaving members teamless', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await removeTeam(db, created.team.id)
+
+    expect(result).toEqual({ ok: true })
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, creator.id))
+    expect(membership).toBeUndefined()
+    const [team] = await db.select().from(teamsTable).where(eq(teamsTable.id, created.team.id))
+    expect(team?.removedAt).not.toBeNull()
+  })
+
+  it('removes a frozen team without touching its submissions', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    const submission = await insertSubmission(created.team.id, creator.id)
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, created.team.id))
+
+    const result = await removeTeam(db, created.team.id)
+
+    expect(result).toEqual({ ok: true })
+    const [preservedSubmission] = await db
+      .select()
+      .from(submissionsTable)
+      .where(eq(submissionsTable.id, submission.id))
+    expect(preservedSubmission).toBeDefined()
+    expect(preservedSubmission?.teamId).toBe(created.team.id)
+  })
+
+  it('rejects an unknown or already-removed team id', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    const first = await removeTeam(db, created.team.id)
+    expect(first).toEqual({ ok: true })
+
+    const result = await removeTeam(db, created.team.id)
+
+    expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  it('removes the team from listTeams', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    const viewer = await insertUser()
+
+    await removeTeam(db, created.team.id)
+    const result = await listTeams(db, viewer.id)
+
+    expect(result.teams).toEqual([])
   })
 })
 

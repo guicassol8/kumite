@@ -81,9 +81,41 @@ export const TeamsListSchema = z.object({
 
 export const NoContentSchema = z.void()
 
+// --- Organizer moderation DTOs (#50) ---
+
+export const RenameTeamParamsSchema = z.object({
+  id: z.string(),
+})
+
+export const RenameTeamBodySchema = z.object({
+  name: z.string().min(1).max(40),
+})
+
+export const MoveMemberParamsSchema = z.object({
+  userId: z.string(),
+})
+
+export const MoveMemberBodySchema = z.object({
+  teamId: z.string(),
+})
+
+export const RemoveMemberParamsSchema = z.object({
+  userId: z.string(),
+})
+
+export const RemoveTeamParamsSchema = z.object({
+  id: z.string(),
+})
+
 export type CreateTeamBody = z.infer<typeof CreateTeamBodySchema>
 export type JoinTeamParams = z.infer<typeof JoinTeamParamsSchema>
 export type TeamMemberView = z.infer<typeof TeamMemberViewSchema>
 export type JoinBlockedReason = z.infer<typeof JoinBlockedReasonSchema>
 export type TeamSummary = z.infer<typeof TeamSummarySchema>
 export type TeamsList = z.infer<typeof TeamsListSchema>
+export type RenameTeamParams = z.infer<typeof RenameTeamParamsSchema>
+export type RenameTeamBody = z.infer<typeof RenameTeamBodySchema>
+export type MoveMemberParams = z.infer<typeof MoveMemberParamsSchema>
+export type MoveMemberBody = z.infer<typeof MoveMemberBodySchema>
+export type RemoveMemberParams = z.infer<typeof RemoveMemberParamsSchema>
+export type RemoveTeamParams = z.infer<typeof RemoveTeamParamsSchema>

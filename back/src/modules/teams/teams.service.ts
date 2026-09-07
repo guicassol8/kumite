@@ -1,4 +1,5 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
+import postgres from 'postgres'
 
 import type { Db } from '../../db/client'
 import { eventConfigTable, teamMembersTable, teamsTable, usersTable } from '../../db/schema'
@@ -51,6 +52,7 @@ export async function listTeams(db: Db, viewerId: string): Promise<TeamsList> {
     .from(teamsTable)
     .leftJoin(teamMembersTable, eq(teamMembersTable.teamId, teamsTable.id))
     .leftJoin(usersTable, eq(usersTable.id, teamMembersTable.userId))
+    .where(isNull(teamsTable.removedAt))
     .orderBy(teamsTable.createdAt)
 
   const teams = new Map<string, TeamSummary>()
@@ -169,6 +171,112 @@ export async function leaveTeam(db: Db, userId: string): Promise<LeaveTeamResult
   if (team?.firstSubmittedAt) return { ok: false, error: 'team_frozen' }
 
   await db.delete(teamMembersTable).where(eq(teamMembersTable.userId, userId))
+
+  return { ok: true }
+}
+
+// --- Organizer moderation (#50) ---
+//
+// All three actions below intentionally skip the joinTeam/leaveTeam guards
+// (frozen check, mixing lock): the organizer is the one sanctioned way to
+// move team membership after the 1st submission, per #50's spec.
+
+export type RenameTeamResult =
+  | { ok: true; team: Team }
+  | { ok: false; error: 'not_found' }
+  | { ok: false; error: 'name_taken' }
+
+export async function renameTeam(db: Db, teamId: string, name: string): Promise<RenameTeamResult> {
+  try {
+    const [team] = await db
+      .update(teamsTable)
+      .set({ name, updatedAt: new Date() })
+      .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.removedAt)))
+      .returning()
+    if (!team) return { ok: false, error: 'not_found' }
+
+    return { ok: true, team }
+  } catch (error) {
+    // Same pattern as openRound (rounds.service.ts): the unique index is the
+    // real source of truth for name collisions, caught here rather than
+    // pre-checked to avoid a race between the check and the update.
+    const cause = error instanceof Error ? error.cause : undefined
+    if (
+      cause instanceof postgres.PostgresError &&
+      cause.constraint_name === 'teams_lower_name_idx'
+    ) {
+      return { ok: false, error: 'name_taken' }
+    }
+    throw error
+  }
+}
+
+export type MoveMemberResult =
+  | { ok: true }
+  | { ok: false; error: 'member_not_found' }
+  | { ok: false; error: 'team_not_found' }
+  | { ok: false; error: 'team_full' }
+
+export async function moveMember(
+  db: Db,
+  userId: string,
+  destinationTeamId: string,
+): Promise<MoveMemberResult> {
+  const [membership] = await db
+    .select()
+    .from(teamMembersTable)
+    .where(eq(teamMembersTable.userId, userId))
+  if (!membership) return { ok: false, error: 'member_not_found' }
+
+  const [destination] = await db
+    .select()
+    .from(teamsTable)
+    .where(and(eq(teamsTable.id, destinationTeamId), isNull(teamsTable.removedAt)))
+  if (!destination) return { ok: false, error: 'team_not_found' }
+
+  const [members, { maxTeamSize }] = await Promise.all([
+    db.select().from(teamMembersTable).where(eq(teamMembersTable.teamId, destinationTeamId)),
+    getEventConfig(db),
+  ])
+  if (members.length >= maxTeamSize) return { ok: false, error: 'team_full' }
+
+  await db
+    .update(teamMembersTable)
+    .set({ teamId: destinationTeamId })
+    .where(eq(teamMembersTable.userId, userId))
+
+  return { ok: true }
+}
+
+export type RemoveMemberResult = { ok: true } | { ok: false; error: 'not_found' }
+
+export async function removeMember(db: Db, userId: string): Promise<RemoveMemberResult> {
+  const [membership] = await db
+    .select()
+    .from(teamMembersTable)
+    .where(eq(teamMembersTable.userId, userId))
+  if (!membership) return { ok: false, error: 'not_found' }
+
+  // Unlike leaveTeam, no team_frozen guard: this route is the sanctioned way
+  // to remove a member from a frozen team.
+  await db.delete(teamMembersTable).where(eq(teamMembersTable.userId, userId))
+
+  return { ok: true }
+}
+
+export type RemoveTeamResult = { ok: true } | { ok: false; error: 'not_found' }
+
+export async function removeTeam(db: Db, teamId: string): Promise<RemoveTeamResult> {
+  const [team] = await db
+    .update(teamsTable)
+    .set({ removedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.removedAt)))
+    .returning()
+  if (!team) return { ok: false, error: 'not_found' }
+
+  // Submissions stay untouched (ON DELETE RESTRICT + the audit requirement):
+  // only membership is deleted, leaving members teamless.
+  await db.delete(teamMembersTable).where(eq(teamMembersTable.teamId, teamId))
 
   return { ok: true }
 }

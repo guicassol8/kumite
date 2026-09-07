@@ -4,7 +4,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDb } from '../../db/client'
 import { usersTable } from '../../db/schema'
 import type { NewUser } from './users.schema'
-import { UserClaimsSchema } from './users.schema'
+import { ListUsersQuerySchema, UserClaimsSchema } from './users.schema'
 import { createUser, findUserByEmail, findUserById } from './users.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
@@ -39,6 +39,39 @@ describe('UserClaimsSchema', () => {
       university: 'pucrs',
     })
     expect(result.success).toBe(true)
+  })
+})
+
+describe('ListUsersQuerySchema', () => {
+  it('fills in limit=20 and offset=0 when omitted', () => {
+    expect(ListUsersQuerySchema.parse({})).toEqual({ limit: 20, offset: 0 })
+  })
+
+  it('coerces limit and offset from query-string values', () => {
+    expect(ListUsersQuerySchema.parse({ limit: '5', offset: '10' })).toEqual({
+      limit: 5,
+      offset: 10,
+    })
+  })
+
+  it('rejects a limit above 100', () => {
+    const result = ListUsersQuerySchema.safeParse({ limit: '101' })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts optional filters', () => {
+    const result = ListUsersQuerySchema.parse({
+      q: 'ada',
+      role: 'organizer',
+      university: 'pucrs',
+      teamId: 'team-1',
+    })
+    expect(result).toMatchObject({
+      q: 'ada',
+      role: 'organizer',
+      university: 'pucrs',
+      teamId: 'team-1',
+    })
   })
 })
 

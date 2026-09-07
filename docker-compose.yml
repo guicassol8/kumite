@@ -6,8 +6,10 @@ services:
       POSTGRES_PASSWORD: kumite
       POSTGRES_DB: kumite
     ports:
-      # 5433 on the host: 5432 is commonly taken by other local projects
-      - '5433:5432'
+      # 5433 on the host: 5432 is commonly taken by other local projects.
+      # Override with DB_PORT to run a second stack (e.g. a parallel
+      # worktree) without colliding — see docs/workflow.md § Worktrees.
+      - '${DB_PORT:-5433}:5432'
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:

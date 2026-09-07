@@ -86,7 +86,16 @@ pnpm install        # node_modules are per-worktree, not shared
 - Running the app in parallel worktrees: the default ports (3000 back,
   5173 front) collide — override with `PORT` / `--port` and `VITE_API_URL`
   in that worktree's `.env` files.
-- After the PR merges: `git worktree remove .worktrees/task-<N>-<slug>` and
+- Postgres collides too: the compose host port is fixed unless overridden.
+  Copy `.env.example` to `.env` at that worktree's root and set `DB_PORT` to
+  a free port (e.g. `DB_PORT=5439`), then `docker compose up -d` binds there
+  instead of 5433. Each worktree is already its own compose project
+  (directory-based), so its volume is separate and disposable on its own —
+  point that worktree's `back/.env` `DATABASE_URL` at the same port
+  (`postgres://kumite:kumite@localhost:5439/kumite`) and run
+  `pnpm --filter @kumite/back db:migrate` (+ `db:seed` if needed).
+- After the PR merges: `docker compose down -v` (if this worktree ran its own
+  Postgres) before `git worktree remove .worktrees/task-<N>-<slug>` and
   delete the branch.
 - In Claude Code, prefer the harness's managed isolation (EnterWorktree /
   subagent `isolation: "worktree"`) — it creates and cleans worktrees itself.

@@ -1,4 +1,5 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
+import postgres from 'postgres'
 
 import type { Db } from '../../db/client'
 import { eventConfigTable, teamMembersTable, teamsTable, usersTable } from '../../db/schema'
@@ -171,4 +172,40 @@ export async function leaveTeam(db: Db, userId: string): Promise<LeaveTeamResult
   await db.delete(teamMembersTable).where(eq(teamMembersTable.userId, userId))
 
   return { ok: true }
+}
+
+// --- Organizer moderation (#50) ---
+//
+// All three actions below intentionally skip the joinTeam/leaveTeam guards
+// (frozen check, mixing lock): the organizer is the one sanctioned way to
+// move team membership after the 1st submission, per #50's spec.
+
+export type RenameTeamResult =
+  | { ok: true; team: Team }
+  | { ok: false; error: 'not_found' }
+  | { ok: false; error: 'name_taken' }
+
+export async function renameTeam(db: Db, teamId: string, name: string): Promise<RenameTeamResult> {
+  try {
+    const [team] = await db
+      .update(teamsTable)
+      .set({ name, updatedAt: new Date() })
+      .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.removedAt)))
+      .returning()
+    if (!team) return { ok: false, error: 'not_found' }
+
+    return { ok: true, team }
+  } catch (error) {
+    // Same pattern as openRound (rounds.service.ts): the unique index is the
+    // real source of truth for name collisions, caught here rather than
+    // pre-checked to avoid a race between the check and the update.
+    const cause = error instanceof Error ? error.cause : undefined
+    if (
+      cause instanceof postgres.PostgresError &&
+      cause.constraint_name === 'teams_lower_name_idx'
+    ) {
+      return { ok: false, error: 'name_taken' }
+    }
+    throw error
+  }
 }

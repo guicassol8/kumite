@@ -5,7 +5,7 @@ import { createDb } from '../../db/client'
 import { eventConfigTable, teamMembersTable, teamsTable, usersTable } from '../../db/schema'
 import type { University } from '../users/users.schema'
 
-import { createTeam, joinTeam, leaveTeam, listTeams } from './teams.service'
+import { createTeam, joinTeam, leaveTeam, listTeams, renameTeam } from './teams.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #30 migration must already be applied.
@@ -246,6 +246,80 @@ describe('leaveTeam', () => {
       .from(teamMembersTable)
       .where(eq(teamMembersTable.userId, creator.id))
     expect(membership).toBeDefined()
+  })
+})
+
+describe('renameTeam', () => {
+  it('renames an active team', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await renameTeam(db, created.team.id, 'Team B')
+
+    expect(result).toMatchObject({ ok: true, team: { name: 'Team B' } })
+  })
+
+  it('renames a frozen team without requiring it to be unfrozen', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, created.team.id))
+
+    const result = await renameTeam(db, created.team.id, 'Team B')
+
+    expect(result).toMatchObject({ ok: true, team: { name: 'Team B' } })
+  })
+
+  it('rejects an unknown team id', async () => {
+    const result = await renameTeam(db, '00000000-0000-0000-0000-000000000000', 'Team B')
+
+    expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  it('rejects a removed team id', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ removedAt: new Date() })
+      .where(eq(teamsTable.id, created.team.id))
+
+    const result = await renameTeam(db, created.team.id, 'Team B')
+
+    expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  it('rejects a name colliding case-insensitively with another active team', async () => {
+    const creatorA = await insertUser()
+    const creatorB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, creatorB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    const result = await renameTeam(db, teamA.team.id, 'team b')
+
+    expect(result).toEqual({ ok: false, error: 'name_taken' })
+  })
+
+  it('allows renaming to a name that collided only with a removed team', async () => {
+    const creatorA = await insertUser()
+    const creatorB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, creatorB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ removedAt: new Date() })
+      .where(eq(teamsTable.id, teamB.team.id))
+
+    const result = await renameTeam(db, teamA.team.id, 'Team B')
+
+    expect(result).toMatchObject({ ok: true, team: { name: 'Team B' } })
   })
 })
 

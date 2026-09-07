@@ -55,7 +55,7 @@ const DUMMY_PASSWORD_HASH =
 export async function login(db: Db, input: LoginBody): Promise<LoginResult> {
   const user = await findUserByEmail(db, input.email)
   const valid = await argon2.verify(user?.passwordHash ?? DUMMY_PASSWORD_HASH, input.password)
-  if (!user || !valid) return { ok: false, error: 'invalid_credentials' }
+  if (!user || !valid || !user.active) return { ok: false, error: 'invalid_credentials' }
 
   const token = await signJwt(
     { role: user.role, university: user.university },

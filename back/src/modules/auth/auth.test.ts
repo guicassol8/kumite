@@ -1,5 +1,5 @@
 import { verifyJwt } from '@katajs-framework/core/jwt'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { JWT_SECRET } from '../../config'
@@ -150,6 +150,17 @@ describe('auth.service login', () => {
 
   it('rejects an unknown email with the same shape as a wrong password', async () => {
     const result = await login(db, { email: 'nobody@edu.pucrs.br', password: 'supersecret' })
+    expect(result).toEqual({ ok: false, error: 'invalid_credentials' })
+  })
+
+  it('rejects correct credentials for a deactivated account with the same shape', async () => {
+    await signup(db, { email: 'ada@edu.pucrs.br', password: 'supersecret', code: 'PUCRS2026' })
+    await db
+      .update(usersTable)
+      .set({ active: false })
+      .where(eq(usersTable.email, 'ada@edu.pucrs.br'))
+
+    const result = await login(db, { email: 'ada@edu.pucrs.br', password: 'supersecret' })
     expect(result).toEqual({ ok: false, error: 'invalid_credentials' })
   })
 })

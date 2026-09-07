@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
@@ -333,6 +333,38 @@ describe('getRoundRanking', () => {
 
     expect(firstRanking?.teams[0]).toMatchObject({ totalScore: 100 })
     expect(secondRanking?.teams[0]).toMatchObject({ totalScore: 40 })
+  })
+
+  // Part of #50: a team removed by the organizer keeps its submissions for
+  // audit, but must drop out of the leaderboard.
+  it('excludes a removed team, while its submissions stay queryable', async () => {
+    const problem = await insertProblem()
+    const activeTeam = await insertTeam('Time A')
+    const removedTeam = await insertTeam('Time B')
+    const created = await createRound(db, {
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!created.ok) throw new Error('expected create to succeed')
+    const opened = await openRound(db, created.round.id)
+    if (!opened.ok) throw new Error('expected open to succeed')
+
+    await submit(activeTeam.id, problem.id, 100)
+    await submit(removedTeam.id, problem.id, 90)
+    await db
+      .update(teamsTable)
+      .set({ removedAt: new Date() })
+      .where(eq(teamsTable.id, removedTeam.id))
+
+    const ranking = await getRoundRanking(db, opened.round.id)
+
+    expect(ranking?.teams.map((team) => team.teamName)).toEqual(['Time A'])
+    const [preserved] = await db
+      .select()
+      .from(submissionsTable)
+      .where(eq(submissionsTable.teamId, removedTeam.id))
+    expect(preserved).toBeDefined()
   })
 })
 

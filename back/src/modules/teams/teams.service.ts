@@ -52,6 +52,7 @@ export async function listTeams(db: Db, viewerId: string): Promise<TeamsList> {
     .from(teamsTable)
     .leftJoin(teamMembersTable, eq(teamMembersTable.teamId, teamsTable.id))
     .leftJoin(usersTable, eq(usersTable.id, teamMembersTable.userId))
+    .where(isNull(teamsTable.removedAt))
     .orderBy(teamsTable.createdAt)
 
   const teams = new Map<string, TeamSummary>()
@@ -259,6 +260,23 @@ export async function removeMember(db: Db, userId: string): Promise<RemoveMember
   // Unlike leaveTeam, no team_frozen guard: this route is the sanctioned way
   // to remove a member from a frozen team.
   await db.delete(teamMembersTable).where(eq(teamMembersTable.userId, userId))
+
+  return { ok: true }
+}
+
+export type RemoveTeamResult = { ok: true } | { ok: false; error: 'not_found' }
+
+export async function removeTeam(db: Db, teamId: string): Promise<RemoveTeamResult> {
+  const [team] = await db
+    .update(teamsTable)
+    .set({ removedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.removedAt)))
+    .returning()
+  if (!team) return { ok: false, error: 'not_found' }
+
+  // Submissions stay untouched (ON DELETE RESTRICT + the audit requirement):
+  // only membership is deleted, leaving members teamless.
+  await db.delete(teamMembersTable).where(eq(teamMembersTable.teamId, teamId))
 
   return { ok: true }
 }

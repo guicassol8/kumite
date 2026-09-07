@@ -25,16 +25,6 @@ export const TeamMemberSchema = z.object({
 
 export type TeamMember = z.infer<typeof TeamMemberSchema>
 
-// Mirrors the `event_config` drizzle table (db/schema.ts).
-export const EventConfigSchema = z.object({
-  id: z.number(),
-  mixingLocked: z.boolean(),
-  maxTeamSize: z.number().int().positive(),
-  updatedAt: z.coerce.date(),
-})
-
-export type EventConfig = z.infer<typeof EventConfigSchema>
-
 // --- Team lifecycle DTOs (#31) ---
 
 export const CreateTeamBodySchema = z.object({

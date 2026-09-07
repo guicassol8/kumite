@@ -57,6 +57,13 @@
       "when": 1788371940493,
       "tag": "0007_icy_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788789702031,
+      "tag": "0008_red_iron_monger",
+      "breakpoints": true
     }
   ]
 }

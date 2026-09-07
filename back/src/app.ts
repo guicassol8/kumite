@@ -3,6 +3,8 @@ import { cors } from '@katajs-framework/core'
 import { createApp } from './context'
 import { requestLogger } from './middlewares/request-logger'
 import * as auth from './modules/auth/auth.route'
+import * as eventCodes from './modules/event-codes/event-codes.route'
+import * as eventConfig from './modules/event-config/event-config.route'
 import * as greetings from './modules/greetings/greetings.route'
 import * as health from './modules/health/health.route'
 import * as passwordReset from './modules/password-reset/password-reset.route'
@@ -26,6 +28,8 @@ export const app = createApp({
     users,
     passwordReset,
     problems,
+    eventConfig,
+    eventCodes,
     teams,
     submissions,
     rounds,

@@ -2,20 +2,12 @@ import { and, eq, isNull } from 'drizzle-orm'
 import postgres from 'postgres'
 
 import type { Db } from '../../db/client'
-import { eventConfigTable, teamMembersTable, teamsTable, usersTable } from '../../db/schema'
+import { teamMembersTable, teamsTable, usersTable } from '../../db/schema'
 
+import { getEventConfig } from '../event-config/event-config.service'
 import type { University } from '../users/users.schema'
 
 import type { JoinBlockedReason, Team, TeamSummary, TeamsList } from './teams.schema'
-
-// Table defaults (mixingLocked: false, maxTeamSize: 3) apply even before
-// db:seed has inserted the singleton event_config row.
-async function getEventConfig(db: Db): Promise<{ mixingLocked: boolean; maxTeamSize: number }> {
-  const [config] = await db.select().from(eventConfigTable).where(eq(eventConfigTable.id, 1))
-  return config
-    ? { mixingLocked: config.mixingLocked, maxTeamSize: config.maxTeamSize }
-    : { mixingLocked: false, maxTeamSize: 3 }
-}
 
 // Mirrors joinTeam's guards, in the same order, so a disabled button in the
 // UI and a 409 from the API always agree on the reason.

@@ -209,3 +209,40 @@ export async function renameTeam(db: Db, teamId: string, name: string): Promise<
     throw error
   }
 }
+
+export type MoveMemberResult =
+  | { ok: true }
+  | { ok: false; error: 'member_not_found' }
+  | { ok: false; error: 'team_not_found' }
+  | { ok: false; error: 'team_full' }
+
+export async function moveMember(
+  db: Db,
+  userId: string,
+  destinationTeamId: string,
+): Promise<MoveMemberResult> {
+  const [membership] = await db
+    .select()
+    .from(teamMembersTable)
+    .where(eq(teamMembersTable.userId, userId))
+  if (!membership) return { ok: false, error: 'member_not_found' }
+
+  const [destination] = await db
+    .select()
+    .from(teamsTable)
+    .where(and(eq(teamsTable.id, destinationTeamId), isNull(teamsTable.removedAt)))
+  if (!destination) return { ok: false, error: 'team_not_found' }
+
+  const [members, { maxTeamSize }] = await Promise.all([
+    db.select().from(teamMembersTable).where(eq(teamMembersTable.teamId, destinationTeamId)),
+    getEventConfig(db),
+  ])
+  if (members.length >= maxTeamSize) return { ok: false, error: 'team_full' }
+
+  await db
+    .update(teamMembersTable)
+    .set({ teamId: destinationTeamId })
+    .where(eq(teamMembersTable.userId, userId))
+
+  return { ok: true }
+}

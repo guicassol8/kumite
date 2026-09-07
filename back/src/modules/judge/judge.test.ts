@@ -89,7 +89,7 @@ describe('runJudge', () => {
   })
 
   it(
-    'queues submissions beyond the concurrency limit instead of refusing them',
+    'distinguishes parallel execution from serial by relative timing, not a fixed margin',
     async () => {
       // A short busy-loop, well under timeoutMs, so ordering can be read
       // straight off wall-clock elapsed time without any side channel.
@@ -97,41 +97,27 @@ describe('runJudge', () => {
         'function solve(input) { const until = Date.now() + 200; while (Date.now() < until) {} return 1 }'
       const cases: JudgeCase[] = [{ input: [], expected: 1 }]
 
-      const start = Date.now()
-      const [a, b] = await Promise.all([
-        runJudge(source, cases, { ...testConfig, concurrency: 1 }),
-        runJudge(source, cases, { ...testConfig, concurrency: 1 }),
-      ])
-      const elapsed = Date.now() - start
+      async function runPair(concurrency: number): Promise<number> {
+        const start = Date.now()
+        const [a, b] = await Promise.all([
+          runJudge(source, cases, { ...testConfig, concurrency }),
+          runJudge(source, cases, { ...testConfig, concurrency }),
+        ])
+        expect(a[0]?.outcome).toBe('passed')
+        expect(b[0]?.outcome).toBe('passed')
+        return Date.now() - start
+      }
 
-      expect(a[0]?.outcome).toBe('passed')
-      expect(b[0]?.outcome).toBe('passed')
-      // Serialized: the second call's worker only spawns after the first
-      // releases its slot, so total wall time is roughly 2x one call.
-      expect(elapsed).toBeGreaterThanOrEqual(350)
-    },
-    TEST_TIMEOUT_MS,
-  )
+      // concurrency:1 forces the second submission to wait for the first
+      // worker's slot (serial baseline); concurrency:2 lets both spawn a
+      // worker at once (parallel). Both runs pay the same worker-spawn
+      // overhead, so comparing parallel to a fraction of the serial baseline
+      // (#120) holds regardless of how fast/slow the runner is, unlike an
+      // absolute margin.
+      const serialElapsed = await runPair(1)
+      const parallelElapsed = await runPair(2)
 
-  it(
-    'runs submissions in parallel when the concurrency limit allows it',
-    async () => {
-      const source =
-        'function solve(input) { const until = Date.now() + 200; while (Date.now() < until) {} return 1 }'
-      const cases: JudgeCase[] = [{ input: [], expected: 1 }]
-
-      const start = Date.now()
-      const [a, b] = await Promise.all([
-        runJudge(source, cases, { ...testConfig, concurrency: 2 }),
-        runJudge(source, cases, { ...testConfig, concurrency: 2 }),
-      ])
-      const elapsed = Date.now() - start
-
-      expect(a[0]?.outcome).toBe('passed')
-      expect(b[0]?.outcome).toBe('passed')
-      // Parallel: total wall time stays close to one call's duration,
-      // not double — guards against a queue that always serializes.
-      expect(elapsed).toBeLessThan(350)
+      expect(parallelElapsed).toBeLessThan(serialElapsed * 0.75)
     },
     TEST_TIMEOUT_MS,
   )

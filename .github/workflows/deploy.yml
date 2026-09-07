@@ -45,7 +45,7 @@ jobs:
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /opt/kumite
+            cd ~/kumite
             git pull
             docker compose -f docker-compose.prod.yml pull back
             docker compose -f docker-compose.prod.yml up -d

@@ -36,7 +36,7 @@ Also set the `VPS_HOST` and `VPS_SSH_USER` GitHub Actions secrets.
 ## 4. Clone the repo onto the VPS
 
 ```bash
-git clone git@github.com:<owner>/kumite.git /opt/kumite
+git clone git@github.com:<owner>/kumite.git ~/kumite
 ```
 (using the GitHub Deploy Key from step 3 — configure it in the VPS's SSH
 config or `GIT_SSH_COMMAND` so `git pull` in `deploy.yml`'s SSH script works
@@ -44,7 +44,7 @@ non-interactively.)
 
 ## 5. Hand-create the env files on the VPS
 
-Never commit these. Two files, both under `/opt/kumite`:
+Never commit these. Two files, both under `~/kumite`:
 
 **`back/.env`** (app secrets — do *not* set `DATABASE_URL` here;
 `docker-compose.prod.yml` overrides it to point at the `db` service):
@@ -80,7 +80,7 @@ Add an A record: `kumite-api.ligadealgoritmos.com` → the VM's public IP.
 Every later deploy is automated by `deploy.yml`; the very first one is manual
 because the VM starts with no image pulled yet and no schema migrated:
 ```bash
-cd /opt/kumite
+cd ~/kumite
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec -T back pnpm --filter @kumite/back db:migrate
 docker compose -f docker-compose.prod.yml exec -T back pnpm --filter @kumite/back db:seed

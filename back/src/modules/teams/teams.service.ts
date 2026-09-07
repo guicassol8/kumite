@@ -246,3 +246,19 @@ export async function moveMember(
 
   return { ok: true }
 }
+
+export type RemoveMemberResult = { ok: true } | { ok: false; error: 'not_found' }
+
+export async function removeMember(db: Db, userId: string): Promise<RemoveMemberResult> {
+  const [membership] = await db
+    .select()
+    .from(teamMembersTable)
+    .where(eq(teamMembersTable.userId, userId))
+  if (!membership) return { ok: false, error: 'not_found' }
+
+  // Unlike leaveTeam, no team_frozen guard: this route is the sanctioned way
+  // to remove a member from a frozen team.
+  await db.delete(teamMembersTable).where(eq(teamMembersTable.userId, userId))
+
+  return { ok: true }
+}

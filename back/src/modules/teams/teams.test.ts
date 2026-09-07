@@ -5,7 +5,15 @@ import { createDb } from '../../db/client'
 import { eventConfigTable, teamMembersTable, teamsTable, usersTable } from '../../db/schema'
 import type { University } from '../users/users.schema'
 
-import { createTeam, joinTeam, leaveTeam, listTeams, moveMember, renameTeam } from './teams.service'
+import {
+  createTeam,
+  joinTeam,
+  leaveTeam,
+  listTeams,
+  moveMember,
+  removeMember,
+  renameTeam,
+} from './teams.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #30 migration must already be applied.
@@ -433,6 +441,50 @@ describe('moveMember', () => {
     const result = await moveMember(db, memberB.id, teamA.team.id)
 
     expect(result).toEqual({ ok: true })
+  })
+})
+
+describe('removeMember', () => {
+  it('removes a member from an active team', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await removeMember(db, creator.id)
+
+    expect(result).toEqual({ ok: true })
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, creator.id))
+    expect(membership).toBeUndefined()
+  })
+
+  it('removes a member from a frozen team without error', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, created.team.id))
+
+    const result = await removeMember(db, creator.id)
+
+    expect(result).toEqual({ ok: true })
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, creator.id))
+    expect(membership).toBeUndefined()
+  })
+
+  it('rejects a user with no team', async () => {
+    const user = await insertUser()
+
+    const result = await removeMember(db, user.id)
+
+    expect(result).toEqual({ ok: false, error: 'not_found' })
   })
 })
 

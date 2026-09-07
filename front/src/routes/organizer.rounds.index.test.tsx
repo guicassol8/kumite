@@ -155,6 +155,7 @@ describe('OrganizerRoundsList', () => {
     expect(
       screen.getByTestId('organizer-rounds-open-hint-r2').getAttribute('aria-label'),
     ).toContain('Rodada aberta')
+    expect(screen.getByTestId('organizer-rounds-open-hint-r2').getAttribute('tabIndex')).toBe('0')
   })
 
   it('shows the mapped error when opening fails with another_round_open', async () => {

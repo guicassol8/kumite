@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OrganizerRouteImport } from './routes/organizer'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as ProblemIdRouteImport } from './routes/problem.$id'
@@ -42,6 +43,11 @@ const LoginRoute = LoginRouteImport.update({
 const OrganizerRoute = OrganizerRouteImport.update({
   id: '/organizer',
   path: '/organizer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignupRoute = SignupRouteImport.update({
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
   '/problem/$id': typeof ProblemIdRoute
@@ -116,6 +123,7 @@ export interface FileRoutesByTo {
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
   '/problem/$id': typeof ProblemIdRoute
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
+  '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
   '/problem/$id': typeof ProblemIdRoute
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/login'
     | '/organizer'
+    | '/reset-password'
     | '/signup'
     | '/teams'
     | '/problem/$id'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/login'
     | '/organizer'
+    | '/reset-password'
     | '/signup'
     | '/teams'
     | '/problem/$id'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/leaderboard'
     | '/login'
     | '/organizer'
+    | '/reset-password'
     | '/signup'
     | '/teams'
     | '/problem/$id'
@@ -200,6 +212,7 @@ export interface RootRouteChildren {
   LeaderboardRoute: typeof LeaderboardRoute
   LoginRoute: typeof LoginRoute
   OrganizerRoute: typeof OrganizerRouteWithChildren
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   TeamsRoute: typeof TeamsRoute
   ProblemIdRoute: typeof ProblemIdRoute
@@ -234,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/organizer'
       fullPath: '/organizer'
       preLoaderRoute: typeof OrganizerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signup': {
@@ -336,6 +356,7 @@ const rootRouteChildren: RootRouteChildren = {
   LeaderboardRoute: LeaderboardRoute,
   LoginRoute: LoginRoute,
   OrganizerRoute: OrganizerRouteWithChildren,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   TeamsRoute: TeamsRoute,
   ProblemIdRoute: ProblemIdRoute,

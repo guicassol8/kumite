@@ -333,6 +333,25 @@
         "passwordRequired": "Ingresa la contraseña",
         "invalidCredentials": "Correo o contraseña incorrectos"
       }
+    },
+    "resetPassword": {
+      "title": "Restablecer contraseña",
+      "emailLabel": "Correo electrónico",
+      "otpLabel": "Código de verificación",
+      "newPasswordLabel": "Nueva contraseña",
+      "confirmPasswordLabel": "Confirmar nueva contraseña",
+      "submitButton": "Restablecer contraseña",
+      "successTitle": "Contraseña restablecida",
+      "successMessage": "Tu contraseña se restableció correctamente.",
+      "successLoginLink": "Ir a iniciar sesión",
+      "errors": {
+        "emailInvalid": "Ingresa un correo electrónico válido",
+        "otpInvalid": "El código debe tener 6 dígitos",
+        "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
+        "passwordMismatch": "Las contraseñas no coinciden",
+        "invalidOtp": "Código inválido o expirado",
+        "unexpected": "No se pudo restablecer la contraseña. Intenta de nuevo."
+      }
     }
   },
   "problem": {

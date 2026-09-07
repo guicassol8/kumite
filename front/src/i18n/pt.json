@@ -333,6 +333,25 @@
         "passwordRequired": "Informe a senha",
         "invalidCredentials": "E-mail ou senha incorretos"
       }
+    },
+    "resetPassword": {
+      "title": "Redefinir senha",
+      "emailLabel": "E-mail",
+      "otpLabel": "Código de verificação",
+      "newPasswordLabel": "Nova senha",
+      "confirmPasswordLabel": "Confirmar nova senha",
+      "submitButton": "Redefinir senha",
+      "successTitle": "Senha redefinida",
+      "successMessage": "Sua senha foi redefinida com sucesso.",
+      "successLoginLink": "Ir para o login",
+      "errors": {
+        "emailInvalid": "Informe um e-mail válido",
+        "otpInvalid": "O código deve ter 6 dígitos",
+        "passwordTooShort": "A senha precisa ter pelo menos 8 caracteres",
+        "passwordMismatch": "As senhas não coincidem",
+        "invalidOtp": "Código inválido ou expirado",
+        "unexpected": "Não foi possível redefinir a senha. Tente novamente."
+      }
     }
   },
   "problem": {

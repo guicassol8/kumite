@@ -64,6 +64,13 @@
       "when": 1788789702031,
       "tag": "0008_red_iron_monger",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788792971598,
+      "tag": "0009_thick_caretaker",
+      "breakpoints": true
     }
   ]
 }

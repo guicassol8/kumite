@@ -24,6 +24,7 @@
     "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.1127.0",
     "@hono/node-server": "^1.13",
     "@katajs-framework/core": "^0.4.2",
     "@kumite/blocks": "workspace:*",

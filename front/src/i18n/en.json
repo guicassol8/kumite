@@ -333,6 +333,25 @@
         "passwordRequired": "Enter your password",
         "invalidCredentials": "Incorrect email or password"
       }
+    },
+    "resetPassword": {
+      "title": "Reset password",
+      "emailLabel": "Email",
+      "otpLabel": "Verification code",
+      "newPasswordLabel": "New password",
+      "confirmPasswordLabel": "Confirm new password",
+      "submitButton": "Reset password",
+      "successTitle": "Password reset",
+      "successMessage": "Your password has been reset successfully.",
+      "successLoginLink": "Go to login",
+      "errors": {
+        "emailInvalid": "Enter a valid email",
+        "otpInvalid": "The code must be 6 digits",
+        "passwordTooShort": "Password must be at least 8 characters",
+        "passwordMismatch": "Passwords do not match",
+        "invalidOtp": "Invalid or expired code",
+        "unexpected": "Could not reset the password. Please try again."
+      }
     }
   },
   "problem": {

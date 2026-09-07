@@ -47,11 +47,24 @@ export const usersTable = pgTable(
     passwordHash: text('password_hash').notNull(),
     role: roleEnum('role').notNull(),
     university: universityEnum('university').notNull(),
+    active: boolean('active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex('users_lower_email_idx').on(sql`lower(${table.email})`)],
 )
+
+// One pending OTP per user (userId as PK, like team_members) — a new
+// organizer-triggered reset upserts and replaces any pending row.
+export const passwordResetOtpsTable = pgTable('password_reset_otps', {
+  userId: uuid('user_id')
+    .primaryKey()
+    .references(() => usersTable.id, { onDelete: 'cascade' }),
+  otpHash: text('otp_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  attemptsRemaining: smallint('attempts_remaining').notNull().default(5),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
 
 export const eventCodesTable = pgTable('event_codes', {
   code: text('code').primaryKey(),

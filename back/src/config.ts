@@ -8,6 +8,13 @@ try {
   // no .env file — fine, rely on the actual environment
 }
 
+// Treats an explicitly blank env var (`AWS_REGION=` in .env, as documented in
+// .env.example) the same as an unset one — z's own `.optional()` only skips
+// `undefined`, not `''`, and would otherwise fail EnvSchema.parse() for
+// anyone following .env.example's own setup instructions verbatim.
+const optionalNonEmptyString = () =>
+  z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).optional())
+
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url().default('postgres://kumite:kumite@localhost:5433/kumite'),
@@ -17,6 +24,16 @@ const EnvSchema = z.object({
   JUDGE_CONCURRENCY: z.coerce.number().int().positive().default(4),
   SUBMISSION_COOLDOWN_MS: z.coerce.number().int().nonnegative().default(5000),
   SUBMISSION_MAX_BODY_BYTES: z.coerce.number().int().positive().default(262144),
+  // All optional: SES email sending (notifications.service.ts) falls back to
+  // console.log when any of these is missing — keeps CI's hurl job (no AWS
+  // secrets available) and local dev/test green with zero AWS config.
+  AWS_REGION: optionalNonEmptyString(),
+  AWS_ACCESS_KEY_ID: optionalNonEmptyString(),
+  AWS_SECRET_ACCESS_KEY: optionalNonEmptyString(),
+  SES_FROM_EMAIL: z
+    .string()
+    .min(1)
+    .default('Liga de Algoritmos - PUCRS <contato@ligadealgoritmos.com>'),
 })
 
 export const env = EnvSchema.parse(process.env)
@@ -28,3 +45,7 @@ export const JUDGE_MEMORY_MB = env.JUDGE_MEMORY_MB
 export const JUDGE_CONCURRENCY = env.JUDGE_CONCURRENCY
 export const SUBMISSION_COOLDOWN_MS = env.SUBMISSION_COOLDOWN_MS
 export const SUBMISSION_MAX_BODY_BYTES = env.SUBMISSION_MAX_BODY_BYTES
+export const AWS_REGION = env.AWS_REGION
+export const AWS_ACCESS_KEY_ID = env.AWS_ACCESS_KEY_ID
+export const AWS_SECRET_ACCESS_KEY = env.AWS_SECRET_ACCESS_KEY
+export const SES_FROM_EMAIL = env.SES_FROM_EMAIL

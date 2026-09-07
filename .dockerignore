@@ -1,0 +1,13 @@
+# Never let real secrets or local dev state leak into a Docker build
+# context/image layer, even on a manual `docker build`/`docker compose build`.
+.env
+**/.env
+node_modules
+**/node_modules
+.git
+.worktrees
+dist
+**/dist
+*.log
+.DS_Store
+data/

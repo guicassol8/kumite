@@ -8,6 +8,13 @@ try {
   // no .env file — fine, rely on the actual environment
 }
 
+// Treats an explicitly blank env var (`AWS_REGION=` in .env, as documented in
+// .env.example) the same as an unset one — z's own `.optional()` only skips
+// `undefined`, not `''`, and would otherwise fail EnvSchema.parse() for
+// anyone following .env.example's own setup instructions verbatim.
+const optionalNonEmptyString = () =>
+  z.preprocess((value) => (value === '' ? undefined : value), z.string().min(1).optional())
+
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().url().default('postgres://kumite:kumite@localhost:5433/kumite'),
@@ -20,9 +27,9 @@ const EnvSchema = z.object({
   // All optional: SES email sending (notifications.service.ts) falls back to
   // console.log when any of these is missing — keeps CI's hurl job (no AWS
   // secrets available) and local dev/test green with zero AWS config.
-  AWS_REGION: z.string().min(1).optional(),
-  AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
-  AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  AWS_REGION: optionalNonEmptyString(),
+  AWS_ACCESS_KEY_ID: optionalNonEmptyString(),
+  AWS_SECRET_ACCESS_KEY: optionalNonEmptyString(),
   SES_FROM_EMAIL: z
     .string()
     .min(1)

@@ -108,10 +108,20 @@ export const teamsTable = pgTable(
     // Owned by #31 until #18/#21 land a real `submissions` table and take
     // over setting it; a set value freezes the team's membership (leave route).
     firstSubmittedAt: timestamp('first_submitted_at', { withTimezone: true }),
+    // Set by the organizer's removeTeam (#50) instead of a real delete:
+    // submissions.teamId is ON DELETE RESTRICT and submissions must survive
+    // for audit even though the team drops out of every listing/ranking.
+    removedAt: timestamp('removed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex('teams_lower_name_idx').on(sql`lower(${table.name})`)],
+  (table) => [
+    // Partial, not plain unique: a removed team's name must be immediately
+    // reusable (same pattern as rounds_single_open_idx).
+    uniqueIndex('teams_lower_name_idx')
+      .on(sql`lower(${table.name})`)
+      .where(sql`${table.removedAt} IS NULL`),
+  ],
 )
 
 export const teamMembersTable = pgTable('team_members', {

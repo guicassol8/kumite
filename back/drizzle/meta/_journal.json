@@ -71,6 +71,13 @@
       "when": 1788792971598,
       "tag": "0009_thick_caretaker",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788809298096,
+      "tag": "0010_typical_madame_masque",
+      "breakpoints": true
     }
   ]
 }

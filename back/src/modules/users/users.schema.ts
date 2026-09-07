@@ -73,6 +73,8 @@ export const UserIdParamsSchema = z.object({
   id: z.string(),
 })
 
+export const NoContentSchema = z.void()
+
 export type ListUsersQuery = z.infer<typeof ListUsersQuerySchema>
 export type TeamRef = z.infer<typeof TeamRefSchema>
 export type UserSummary = z.infer<typeof UserSummarySchema>

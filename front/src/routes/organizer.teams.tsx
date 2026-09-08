@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Check, Pencil, X } from 'lucide-react'
+import { ArrowRightLeft, Check, Pencil, UserMinus, X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -210,9 +210,12 @@ function MoveMemberAction({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <Select value={destinationTeamId} onValueChange={setDestinationTeamId}>
-          <SelectTrigger className="h-8 w-40" data-testid={`team-moderation-move-select-${userId}`}>
+          <SelectTrigger
+            className="h-8 w-28 text-xs"
+            data-testid={`team-moderation-move-select-${userId}`}
+          >
             <SelectValue placeholder={t('organizer.teamModeration.move.selectPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
@@ -230,12 +233,14 @@ function MoveMemberAction({
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="icon"
+          className="size-8"
           data-testid={`team-moderation-move-action-${userId}`}
           disabled={!destinationTeamId || move.isPending}
           onClick={onMove}
+          aria-label={t('organizer.teamModeration.move.action')}
         >
-          {t('organizer.teamModeration.move.action')}
+          <ArrowRightLeft className="size-4" />
         </Button>
       </div>
       {error && (
@@ -360,11 +365,13 @@ function RemoveMemberAction({ userId, onRemoved }: { userId: string; onRemoved: 
       <Button
         type="button"
         variant="outline"
-        size="sm"
+        size="icon"
+        className="size-8"
         data-testid={`team-moderation-remove-member-action-${userId}`}
         onClick={() => setConfirmOpen(true)}
+        aria-label={t('organizer.teamModeration.removeMember.action')}
       >
-        {t('organizer.teamModeration.removeMember.action')}
+        <UserMinus className="size-4" />
       </Button>
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent data-testid={`team-moderation-remove-member-confirm-${userId}`}>

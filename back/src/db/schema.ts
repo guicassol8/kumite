@@ -48,6 +48,10 @@ export const usersTable = pgTable(
     role: roleEnum('role').notNull(),
     university: universityEnum('university').notNull(),
     active: boolean('active').notNull().default(true),
+    // Set by the organizer-driven reset (#143): while true every authenticated
+    // route answers 403 `password_change_required` except the two escape
+    // hatches (GET /me and POST /auth/change-password) — see ADR-0004.
+    mustChangePassword: boolean('must_change_password').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -66,13 +70,24 @@ export const passwordResetOtpsTable = pgTable('password_reset_otps', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const passwordResetActionEnum = pgEnum('password_reset_action', ['request', 'complete'])
+export const passwordResetActionEnum = pgEnum('password_reset_action', [
+  'request',
+  'complete',
+  'organizer_reset',
+])
 
 // Append-only log backing the sliding-window throttle on the two public
-// password-reset routes (#142). Deliberately has no FK to `users`: the whole
-// point is to count attempts against addresses that may not exist, since
-// those are exactly the ones an enumeration sweep uses. Rows older than the
-// window are deleted opportunistically on the next request.
+// password-reset routes (#142) and on the organizer step-up (#143).
+// Deliberately has no FK to `users`: the whole point is to count attempts
+// against addresses that may not exist, since those are exactly the ones an
+// enumeration sweep uses. Rows older than the window are deleted
+// opportunistically on the next request.
+//
+// `email_key` is the *subject key of the window*, not always an address: the
+// two public actions key by e-mail, `organizer_reset` keys by the acting
+// organizer's id (the session is already authenticated, so there is nothing to
+// enumerate and the IP is the wrong bucket). Kept under the original column
+// name so no rename migration is needed — see ADR-0004.
 export const passwordResetRequestsTable = pgTable(
   'password_reset_requests',
   {

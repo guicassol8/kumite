@@ -1,19 +1,19 @@
 import { emptyWorkspaceState, ROOT_BLOCK_TYPE, somaDosPares } from '@kumite/blocks'
 import { expect, type Page, test } from '@playwright/test'
 
+import {
+  hasOrganizerCredentials,
+  seedEditorFixture,
+  seedParticipantToken,
+} from './support/editor-fixture'
+
 // Visual walkthrough for #5, one screenshot per acceptance criterion.
 // #7 moved the editor behind a real problem id — this suite only needs to
-// *view* one, so `beforeAll` seeds a problem+round once (opened then
-// immediately closed, so it never holds the single-open-round slot) and every
-// test signs in via a seeded token instead of the UI. The seeded problem's
+// *view* one, so `beforeAll` seeds a problem+round once via the shared fixture
+// and every test signs in with a seeded token instead of the UI. The fixture's
 // three visible test cases mirror the old hardcoded somaDosParesProblem
 // exactly, so every existing assertion below stays unchanged.
 const evidence = (name: string) => `e2e/evidence/5/${name}.png`
-
-const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
-const PASSWORD = 'supersecret'
 
 /**
  * The canonical solution with its `resto = 0` test flipped to `resto ≠ 0`, so
@@ -100,81 +100,17 @@ const removeFromNumber = {
 }
 
 test.describe('running examples locally (#5)', () => {
-  test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
+  test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string
   let participantToken: string
 
   test.beforeAll(async () => {
-    const orgLogin = await fetch(`${BACK_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-    })
-    const { token: orgToken } = (await orgLogin.json()) as { token: string }
-    const auth = { authorization: `Bearer ${orgToken}` }
-
-    const created = await fetch(`${BACK_URL}/organizer/problems`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({ difficulty: 'easy' }),
-    })
-    const { id } = (await created.json()) as { id: string }
-    problemId = id
-    await fetch(`${BACK_URL}/organizer/problems/${id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({
-        translations: [
-          { locale: 'pt', title: 'Soma dos Pares', statementMd: 'Some os números pares.' },
-          { locale: 'es', title: 'Suma de Pares', statementMd: 'Suma los números pares.' },
-          { locale: 'en', title: 'Sum of Evens', statementMd: 'Sum the even numbers.' },
-        ],
-        // Mirrors somaDosParesProblem.examples exactly, plus one hidden case
-        // so publish succeeds.
-        testCases: [
-          { input: [1, 2, 3, 4], expected: 6, hidden: false },
-          { input: [5, 7, 9], expected: 0, hidden: false },
-          { input: [2, 4, 6, 8], expected: 20, hidden: false },
-          { input: [10, 11, 12], expected: 22, hidden: true },
-        ],
-      }),
-    })
-    await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST', headers: auth })
-
-    const roundRes = await fetch(`${BACK_URL}/organizer/rounds`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({
-        name: `Run Examples E2E ${Date.now()}`,
-        durationMinutes: 30,
-        problemIds: [id],
-      }),
-    })
-    const { id: roundId } = (await roundRes.json()) as { id: string }
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, { method: 'POST', headers: auth })
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
-
-    const participantEmail = `run-examples-e2e-${Date.now()}@edu.pucrs.br`
-    await fetch(`${BACK_URL}/auth/signup`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: participantEmail, password: PASSWORD, code: 'PUCRS2026' }),
-    })
-    const participantLogin = await fetch(`${BACK_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: participantEmail, password: PASSWORD }),
-    })
-    const { token } = (await participantLogin.json()) as { token: string }
-    participantToken = token
+    ;({ problemId, participantToken } = await seedEditorFixture('Run Examples'))
   })
 
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(
-      ([key, token]) => window.localStorage.setItem(key as string, token as string),
-      ['kumite-token', participantToken],
-    )
+    await seedParticipantToken(page, participantToken)
   })
 
   /** Seeds the saved workspace, which is what the screen restores on mount. */

@@ -37,7 +37,8 @@
     "closedRounds": {
       "title": "Rodadas encerradas",
       "empty": "Nenhuma rodada encerrada ainda.",
-      "closedAt": "Encerrada em {{date}}"
+      "closedAt": "Encerrada em {{date}}",
+      "result": "#{{rank}} · {{score}} pts"
     },
     "organizerShortcuts": {
       "title": "Área do organizador",

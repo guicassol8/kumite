@@ -7,7 +7,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     health: { $get: vi.fn() },
     teams: Object.assign(vi.fn(), { $get: vi.fn() }),
-    rounds: Object.assign(vi.fn(), { $get: vi.fn() }),
+    rounds: Object.assign(vi.fn(), { $get: vi.fn(), ':id': { ranking: { $get: vi.fn() } } }),
     me: { $get: vi.fn() },
   },
 }))
@@ -27,6 +27,7 @@ import { routeTree } from '@/routeTree.gen'
 const mockedHealth = vi.mocked(api.health.$get)
 const mockedTeams = vi.mocked(api.teams.$get)
 const mockedRounds = vi.mocked(api.rounds.$get)
+const mockedRoundRanking = vi.mocked(api.rounds[':id'].ranking.$get)
 const sseUnsubscribe = vi.fn()
 
 function emitSse(event: SseEvent) {
@@ -90,6 +91,7 @@ beforeEach(() => {
   mockedHealth.mockReset()
   mockedTeams.mockReset()
   mockedRounds.mockReset()
+  mockedRoundRanking.mockReset()
   connectEventStream.mockReset()
   sseUnsubscribe.mockReset()
   connectEventStream.mockReturnValue(sseUnsubscribe)
@@ -272,8 +274,57 @@ describe('Home — closed rounds card (#40)', () => {
     )
   })
 
-  it('lists closed rounds by name and closing date, without a score', async () => {
+  it("lists closed rounds with the signed-in team's rank and score", async () => {
     setSession(fakeUser, 'tok-1')
+    mockedTeams.mockResolvedValue(
+      jsonResponse(200, { maxTeamSize: 3, mixingLocked: false, myTeamId: 't1', teams: [] }),
+    )
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({
+          id: 'r9',
+          name: 'Rodada Encerrada',
+          status: 'closed',
+          closedAt: '2026-09-01T18:30:00.000Z',
+        }),
+      ]),
+    )
+    mockedRoundRanking.mockResolvedValue(
+      jsonResponse(200, {
+        roundId: 'r9',
+        roundName: 'Rodada Encerrada',
+        problemIds: [],
+        teams: [
+          {
+            teamId: 't1',
+            teamName: 'Blockly Busters',
+            rank: 3,
+            totalScore: 120,
+            totalAttempts: 5,
+            tiebreakTimeMs: 1000,
+            problems: [],
+          },
+        ],
+      }),
+    )
+    renderHome()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-closed-rounds').textContent).toContain('Rodada Encerrada'),
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('home-closed-round-result-r9').textContent).toContain(
+        '#3 · 120 pts',
+      ),
+    )
+    expect(screen.getByTestId('home-closed-round-r9').getAttribute('href')).toBe('/rounds/r9')
+  })
+
+  it('shows nothing extra when the user has no team', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedTeams.mockResolvedValue(
+      jsonResponse(200, { maxTeamSize: 3, mixingLocked: false, myTeamId: null, teams: [] }),
+    )
     mockedRounds.mockResolvedValue(
       jsonResponse(200, [
         roundSummary({
@@ -289,9 +340,77 @@ describe('Home — closed rounds card (#40)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('home-closed-rounds').textContent).toContain('Rodada Encerrada'),
     )
-    const cardText = screen.getByTestId('home-closed-rounds').textContent ?? ''
-    expect(cardText).not.toMatch(/\d+\s*(pts|pontos|points)/i)
-    expect(screen.getByTestId('home-closed-round-r9').getAttribute('href')).toBe('/rounds/r9')
+    expect(screen.queryByTestId('home-closed-round-result-r9')).toBeNull()
+    expect(mockedRoundRanking).not.toHaveBeenCalled()
+  })
+
+  it('shows nothing extra when the team never submitted in that round', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedTeams.mockResolvedValue(
+      jsonResponse(200, { maxTeamSize: 3, mixingLocked: false, myTeamId: 't1', teams: [] }),
+    )
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({
+          id: 'r9',
+          name: 'Rodada Encerrada',
+          status: 'closed',
+          closedAt: '2026-09-01T18:30:00.000Z',
+        }),
+      ]),
+    )
+    // getRoundRanking (#43) returns every current team for every closed
+    // round, even ones that never submitted in it — this is what that looks
+    // like: present in the ranking, zero attempts.
+    mockedRoundRanking.mockResolvedValue(
+      jsonResponse(200, {
+        roundId: 'r9',
+        roundName: 'Rodada Encerrada',
+        problemIds: [],
+        teams: [
+          {
+            teamId: 't1',
+            teamName: 'Blockly Busters',
+            rank: 1,
+            totalScore: 0,
+            totalAttempts: 0,
+            tiebreakTimeMs: 0,
+            problems: [],
+          },
+        ],
+      }),
+    )
+    renderHome()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-closed-rounds').textContent).toContain('Rodada Encerrada'),
+    )
+    await waitFor(() => expect(mockedRoundRanking).toHaveBeenCalled())
+    expect(screen.queryByTestId('home-closed-round-result-r9')).toBeNull()
+  })
+
+  it("shows nothing extra while the round's ranking is still loading", async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedTeams.mockResolvedValue(
+      jsonResponse(200, { maxTeamSize: 3, mixingLocked: false, myTeamId: 't1', teams: [] }),
+    )
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({
+          id: 'r9',
+          name: 'Rodada Encerrada',
+          status: 'closed',
+          closedAt: '2026-09-01T18:30:00.000Z',
+        }),
+      ]),
+    )
+    mockedRoundRanking.mockReturnValue(new Promise(() => {}))
+    renderHome()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-closed-rounds').textContent).toContain('Rodada Encerrada'),
+    )
+    expect(screen.queryByTestId('home-closed-round-result-r9')).toBeNull()
   })
 })
 

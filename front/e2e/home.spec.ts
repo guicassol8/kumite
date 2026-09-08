@@ -1,3 +1,4 @@
+import { somaDosPares } from '@kumite/blocks'
 import { expect, type Page, test } from '@playwright/test'
 
 // Visual walkthrough for #40. Prereqs (like teams.spec.ts / organizer-problems.spec.ts):
@@ -9,6 +10,8 @@ import { expect, type Page, test } from '@playwright/test'
 // `pnpm db:seed` never opens one) — apiOpenRound below would otherwise fail
 // with another_round_open and every assertion after it would time out.
 const evidence = (name: string) => `e2e/evidence/40/${name}.png`
+// Visual walkthrough for #104 (the team's rank/score on a closed round).
+const evidence104 = (name: string) => `e2e/evidence/104/${name}.png`
 
 const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
@@ -18,6 +21,9 @@ const PASSWORD = 'supersecret'
 const stamp = Date.now()
 const participantEmail = `home-e2e-participant-${stamp}@edu.pucrs.br`
 const roundName = `Rodada E2E ${stamp}`
+const resultParticipantEmail = `home-e2e-result-${stamp}@edu.pucrs.br`
+const resultTeamName = `Resultado E2E ${stamp}`
+const resultRoundName = `Rodada Resultado E2E ${stamp}`
 
 test.describe('home (#40)', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
@@ -63,12 +69,44 @@ test.describe('home (#40)', () => {
     return id
   }
 
-  async function apiCreateRound(problemId: string): Promise<string> {
+  // #104's evidence needs a submission that actually scores, so this mirrors
+  // "Soma dos Pares" exactly (see run-examples.spec.ts) — `somaDosPares` below
+  // is the canonical block solution for these test cases.
+  async function apiCreateSomaDosParesProblem(): Promise<string> {
+    const auth = await organizerAuthHeader()
+    const created = await fetch(`${BACK_URL}/organizer/problems`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...auth },
+      body: JSON.stringify({ difficulty: 'easy' }),
+    })
+    const { id } = (await created.json()) as { id: string }
+    await fetch(`${BACK_URL}/organizer/problems/${id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...auth },
+      body: JSON.stringify({
+        translations: [
+          { locale: 'pt', title: 'Soma dos Pares', statementMd: 'Some os números pares.' },
+          { locale: 'es', title: 'Suma de Pares', statementMd: 'Suma los números pares.' },
+          { locale: 'en', title: 'Sum of Evens', statementMd: 'Sum the even numbers.' },
+        ],
+        testCases: [
+          { input: [1, 2, 3, 4], expected: 6, hidden: false },
+          { input: [5, 7, 9], expected: 0, hidden: false },
+          { input: [2, 4, 6, 8], expected: 20, hidden: false },
+          { input: [10, 11, 12], expected: 22, hidden: true },
+        ],
+      }),
+    })
+    await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST', headers: auth })
+    return id
+  }
+
+  async function apiCreateRound(problemId: string, name: string = roundName): Promise<string> {
     const auth = await organizerAuthHeader()
     const res = await fetch(`${BACK_URL}/organizer/rounds`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({ name: roundName, durationMinutes: 30, problemIds: [problemId] }),
+      body: JSON.stringify({ name, durationMinutes: 30, problemIds: [problemId] }),
     })
     const { id } = (await res.json()) as { id: string }
     return id
@@ -82,6 +120,42 @@ test.describe('home (#40)', () => {
   async function apiCloseRound(roundId: string): Promise<void> {
     const auth = await organizerAuthHeader()
     await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
+  }
+
+  const identityWorkspace = {
+    blocks: {
+      languageVersion: 0,
+      blocks: [
+        {
+          type: 'kumite_solve',
+          id: 'raiz',
+          inputs: { RETURN: { block: { type: 'kumite_input', id: 'entrada' } } },
+        },
+      ],
+    },
+  }
+
+  async function apiSubmitSolution(
+    token: string,
+    problemId: string,
+    roundId: string,
+    workspace: unknown = identityWorkspace,
+  ) {
+    await fetch(`${BACK_URL}/submissions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ problemId, roundId, workspace }),
+    })
+  }
+
+  async function loginToken(email: string): Promise<string> {
+    const res = await fetch(`${BACK_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password: PASSWORD }),
+    })
+    const { token } = (await res.json()) as { token: string }
+    return token
   }
 
   async function signupThroughUi(page: Page, email: string): Promise<void> {
@@ -137,5 +211,31 @@ test.describe('home (#40)', () => {
     await expect(organizerPage.getByTestId('home-organizer-shortcuts')).toBeVisible()
     await organizerPage.screenshot({ path: evidence('04-atalhos-organizador'), fullPage: true })
     await organizerContext.close()
+  })
+
+  test('shows the signed-in team its rank and score once the round closes (#104)', async ({
+    page,
+  }) => {
+    // 01 — a participant with a team submits a solution while the round is open.
+    await signupThroughUi(page, resultParticipantEmail)
+    await page.getByTestId('header-teams-link').click()
+    await page.getByTestId('teams-create-open').click()
+    await page.getByTestId('teams-create-name-input').fill(resultTeamName)
+    await page.getByTestId('teams-create-submit').click()
+    await expect(page.getByTestId('my-team-panel')).toBeVisible()
+
+    const problemId = await apiCreateSomaDosParesProblem()
+    const roundId = await apiCreateRound(problemId, resultRoundName)
+    await apiOpenRound(roundId)
+    const token = await loginToken(resultParticipantEmail)
+    await apiSubmitSolution(token, problemId, roundId, somaDosPares)
+
+    // 02 — closing the round while this page stays open (SSE, no reload) reveals
+    // the team's rank and score next to the round's name (Acceptance).
+    await apiCloseRound(roundId)
+    await page.goto('/')
+    const resultBadge = page.getByTestId(`home-closed-round-result-${roundId}`)
+    await expect(resultBadge).toContainText('#1 · 100 pts', { timeout: 15_000 })
+    await page.screenshot({ path: evidence104('01-resultado-do-time'), fullPage: true })
   })
 })

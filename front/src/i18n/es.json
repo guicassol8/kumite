@@ -37,7 +37,8 @@
     "closedRounds": {
       "title": "Rondas cerradas",
       "empty": "Todavía no hay rondas cerradas.",
-      "closedAt": "Cerrada el {{date}}"
+      "closedAt": "Cerrada el {{date}}",
+      "result": "#{{rank}} · {{score}} pts"
     },
     "organizerShortcuts": {
       "title": "Área del organizador",

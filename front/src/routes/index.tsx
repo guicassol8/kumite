@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -12,6 +12,7 @@ import { useEventStream } from '@/hooks/use-event-stream'
 import { useSession } from '@/hooks/use-session'
 import { formatDate } from '@/i18n/format'
 import { api } from '@/lib/api'
+import { fetchRoundRanking } from '@/lib/ranking-query'
 import { fetchRounds, ROUNDS_QUERY_KEY } from '@/lib/rounds-query'
 import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 
@@ -69,6 +70,29 @@ function Home() {
     ? eventStream.serverTime.getTime() - Date.now()
     : 0
   const closedRounds = rounds.data?.filter((round) => round.status === 'closed') ?? []
+  const myTeamId = teams.data?.myTeamId
+  const closedRoundRankings = useQueries({
+    queries: closedRounds.map((round) => ({
+      queryKey: ['ranking', 'round', round.id],
+      queryFn: () => fetchRoundRanking(round.id),
+      enabled: isAuthenticated && myTeamId != null,
+    })),
+  })
+  const myResultByRoundId = new Map(
+    closedRounds
+      .map((round, index) => {
+        const myTeamResult = closedRoundRankings[index]?.data?.teams.find(
+          (team) => team.teamId === myTeamId,
+        )
+        // getRoundRanking (#43) returns every current team for every closed
+        // round, including ones that never submitted in it (0 attempts) —
+        // only surface a result for rounds the team actually competed in.
+        return myTeamResult && myTeamResult.totalAttempts > 0
+          ? ([round.id, { rank: myTeamResult.rank, totalScore: myTeamResult.totalScore }] as const)
+          : null
+      })
+      .filter((entry) => entry !== null),
+  )
 
   return (
     <main className="mx-auto flex flex-1 max-w-xl flex-col items-center justify-center gap-6 p-8">
@@ -147,28 +171,44 @@ function Home() {
             {closedRounds.length === 0 ? (
               <span className="text-muted-foreground text-sm">{t('home.closedRounds.empty')}</span>
             ) : (
-              closedRounds.map((round) => (
-                <div key={round.id} className="flex w-full items-baseline justify-between gap-4">
-                  <Link
-                    to="/rounds/$id"
-                    params={{ id: round.id }}
-                    data-testid={`home-closed-round-${round.id}`}
-                    className="text-primary underline"
-                  >
-                    {round.name}
-                  </Link>
-                  {round.closedAt && (
-                    <span className="text-muted-foreground text-sm">
-                      {t('home.closedRounds.closedAt', {
-                        date: formatDate(
-                          new Date(round.closedAt),
-                          i18n.resolvedLanguage ?? i18n.language,
-                        ),
-                      })}
-                    </span>
-                  )}
-                </div>
-              ))
+              closedRounds.map((round) => {
+                const myResult = myResultByRoundId.get(round.id)
+                return (
+                  <div key={round.id} className="flex w-full items-baseline justify-between gap-4">
+                    <div className="flex items-baseline gap-2">
+                      <Link
+                        to="/rounds/$id"
+                        params={{ id: round.id }}
+                        data-testid={`home-closed-round-${round.id}`}
+                        className="text-primary underline"
+                      >
+                        {round.name}
+                      </Link>
+                      {myResult && (
+                        <span
+                          data-testid={`home-closed-round-result-${round.id}`}
+                          className="text-muted-foreground text-sm"
+                        >
+                          {t('home.closedRounds.result', {
+                            rank: myResult.rank,
+                            score: myResult.totalScore,
+                          })}
+                        </span>
+                      )}
+                    </div>
+                    {round.closedAt && (
+                      <span className="text-muted-foreground text-sm">
+                        {t('home.closedRounds.closedAt', {
+                          date: formatDate(
+                            new Date(round.closedAt),
+                            i18n.resolvedLanguage ?? i18n.language,
+                          ),
+                        })}
+                      </span>
+                    )}
+                  </div>
+                )
+              })
             )}
           </CardContent>
         </Card>

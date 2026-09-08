@@ -4,6 +4,7 @@ import { expect, type Page, test } from '@playwright/test'
 //   docker compose up -d && pnpm db:migrate
 // Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD in the environment.
 const evidence = (name: string) => `e2e/evidence/41/${name}.png`
+const evidence129 = (name: string) => `e2e/evidence/129/${name}.png`
 
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
 const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
@@ -122,6 +123,12 @@ test.describe('organizer rounds', () => {
     await page.getByTestId(`organizer-rounds-open-hint-${roundBId}`).hover()
     await expect(page.getByRole('tooltip')).toContainText('Rodada A')
     await page.screenshot({ path: evidence('05-a-open-b-disabled'), fullPage: true })
+
+    // 05b — #129: the same tooltip via keyboard focus (the wrapper span is
+    // now tabIndex={0}), not just hover.
+    await page.getByTestId(`organizer-rounds-open-hint-${roundBId}`).focus()
+    await expect(page.getByRole('tooltip')).toContainText('Rodada A')
+    await page.screenshot({ path: evidence129('05b-open-hint-focus'), fullPage: true })
 
     // 06 — editing an open round's problems is blocked with an explanation
     // (Acceptance #4). The list no longer links to it once it's open, so

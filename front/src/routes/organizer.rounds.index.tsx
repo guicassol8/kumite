@@ -255,6 +255,8 @@ function OrganizerRoundsList() {
                                       })
                                     : undefined
                                 }
+                                tabIndex={disableOpen ? 0 : undefined}
+                                className="rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                               >
                                 <Button
                                   type="button"

@@ -227,6 +227,10 @@ describe('ProblemForm', () => {
 
     expect(onPublish).toHaveBeenCalledTimes(1)
     expect(onPublish.mock.calls[0]?.[0].testCases).toHaveLength(2)
+    // #129's tabIndex is only for the disabled case (its Tooltip has content
+    // to show on focus); an enabled Publicar mustn't gain an extra, silent
+    // tab stop on its wrapper span ahead of the button itself.
+    expect(screen.getByTestId('problem-form-publish-hint').getAttribute('tabIndex')).toBeNull()
   })
 
   it('adds, reorders and removes test-case rows', () => {
@@ -286,6 +290,7 @@ describe('ProblemForm', () => {
     expect(screen.getByTestId('problem-form-publish-hint').getAttribute('aria-label')).toBe(
       'Não é possível publicar um problema arquivado.',
     )
+    expect(screen.getByTestId('problem-form-publish-hint').getAttribute('tabIndex')).toBe('0')
 
     fireEvent.click(screen.getByTestId('problem-form-save'))
     expect(onSave).toHaveBeenCalledTimes(1)
@@ -298,6 +303,7 @@ describe('ProblemForm', () => {
     expect(screen.getByTestId('problem-form-publish-hint').getAttribute('aria-label')).toBe(
       'Este problema já está publicado.',
     )
+    expect(screen.getByTestId('problem-form-publish-hint').getAttribute('tabIndex')).toBe('0')
     expect(screen.getByTestId('problem-form-status').textContent).toBe('Publicado')
   })
 

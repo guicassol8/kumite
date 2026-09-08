@@ -44,13 +44,13 @@ function lastOtp(): string {
 }
 
 describe('issuePasswordResetOtp', () => {
-  it('invalidates the old password immediately', async () => {
+  it('keeps the current password usable until the reset completes', async () => {
     const user = await createTestUser()
     await issuePasswordResetOtp(db, user.id)
 
     const updated = await findUserById(db, user.id)
     const stillValid = await argon2.verify(updated?.passwordHash ?? '', 'original-password')
-    expect(stillValid).toBe(false)
+    expect(stillValid).toBe(true)
   })
 
   it('sends the OTP by email', async () => {
@@ -86,6 +86,10 @@ describe('completePasswordReset', () => {
     const updated = await findUserById(db, user.id)
     const valid = await argon2.verify(updated?.passwordHash ?? '', 'brand-new-password')
     expect(valid).toBe(true)
+
+    // The old password stops working here, and only here.
+    const oldStillValid = await argon2.verify(updated?.passwordHash ?? '', 'original-password')
+    expect(oldStillValid).toBe(false)
 
     // Consumed: reusing the same OTP now fails.
     const reuse = await completePasswordReset(db, {

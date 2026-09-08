@@ -6,6 +6,7 @@ import { expect, type Page, test } from '@playwright/test'
 // seeded organizer. Unlike #12's spec this one doesn't need an empty
 // `problems` table — every assertion is scoped to the problem it creates.
 const evidence = (name: string) => `e2e/evidence/13/${name}.png`
+const evidence129 = (name: string) => `e2e/evidence/129/${name}.png`
 
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
 const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
@@ -141,5 +142,15 @@ test.describe('organizer problem form', () => {
     await expect(page.getByTestId('problem-form-status')).toHaveText('Publicado')
     await expect(page).toHaveURL(new RegExp(`/organizer/problems/${problemId}/edit$`))
     await page.screenshot({ path: evidence('08-published-edit-saved'), fullPage: true })
+
+    // 09 — #129: the publish-disabled tooltip shows on hover, and — since the
+    // wrapper span is now keyboard-focusable — on Tab focus too, with the
+    // same reason.
+    await page.getByTestId('problem-form-publish-hint').hover()
+    await expect(page.getByRole('tooltip')).toContainText('Este problema já está publicado.')
+
+    await page.getByTestId('problem-form-publish-hint').focus()
+    await expect(page.getByRole('tooltip')).toContainText('Este problema já está publicado.')
+    await page.screenshot({ path: evidence129('09-publish-hint-focus'), fullPage: true })
   })
 })

@@ -9,6 +9,7 @@ import {
   MoveMemberBodySchema,
   MoveMemberParamsSchema,
   NoContentSchema,
+  OrganizerTeamsListSchema,
   RemoveMemberParamsSchema,
   RemoveTeamParamsSchema,
   RenameTeamBodySchema,
@@ -20,6 +21,7 @@ import {
   createTeam,
   joinTeam,
   leaveTeam,
+  listOrganizerTeams,
   listTeams,
   moveMember,
   removeMember,
@@ -105,8 +107,18 @@ export const leaveTeamRoute = defineRoute({
   },
 })
 
-// Organizer moderation (#50). 401 (requireUser) and 403 (requireOrganizer)
-// are not declared on any route below — same note as problems.route.ts.
+// Organizer moderation (#50) / listing (#51). 401 (requireUser) and 403
+// (requireOrganizer) are not declared on any route below — same note as
+// problems.route.ts.
+
+export const listOrganizerTeamsRoute = defineRoute({
+  method: 'GET',
+  path: '/organizer/teams',
+  use: [requireUser, requireOrganizer],
+  input: {},
+  output: OrganizerTeamsListSchema,
+  handler: async (c) => listOrganizerTeams(c.get('db')),
+})
 
 export const renameTeamRoute = defineRoute({
   method: 'PATCH',

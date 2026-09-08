@@ -1,7 +1,7 @@
 import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
-import { requireOrganizer, requireUser } from '../../middlewares/auth'
+import { requireOrganizer, requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
 import {
   CreateTeamBodySchema,
@@ -32,7 +32,7 @@ import {
 export const createTeamRoute = defineRoute({
   method: 'POST',
   path: '/teams',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: { body: CreateTeamBodySchema },
   output: { 201: TeamSchema, 409: ErrorBodySchema },
   handler: async (c) => {
@@ -51,7 +51,7 @@ export const createTeamRoute = defineRoute({
 export const listTeamsRoute = defineRoute({
   method: 'GET',
   path: '/teams',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: {},
   output: TeamsListSchema,
   handler: async (c) => listTeams(c.get('db'), c.get('currentUser').id),
@@ -60,7 +60,7 @@ export const listTeamsRoute = defineRoute({
 export const joinTeamRoute = defineRoute({
   method: 'POST',
   path: '/teams/:id/join',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: { params: JoinTeamParamsSchema },
   output: { 200: TeamSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
   handler: async (c) => {
@@ -87,7 +87,7 @@ export const joinTeamRoute = defineRoute({
 export const leaveTeamRoute = defineRoute({
   method: 'POST',
   path: '/teams/leave',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: {},
   output: { 204: NoContentSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
   handler: async (c) => {
@@ -114,7 +114,7 @@ export const leaveTeamRoute = defineRoute({
 export const listOrganizerTeamsRoute = defineRoute({
   method: 'GET',
   path: '/organizer/teams',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: {},
   output: OrganizerTeamsListSchema,
   handler: async (c) => listOrganizerTeams(c.get('db')),
@@ -123,7 +123,7 @@ export const listOrganizerTeamsRoute = defineRoute({
 export const renameTeamRoute = defineRoute({
   method: 'PATCH',
   path: '/organizer/teams/:id',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: RenameTeamParamsSchema, body: RenameTeamBodySchema },
   output: { 200: TeamSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
   handler: async (c) => {
@@ -142,7 +142,7 @@ export const renameTeamRoute = defineRoute({
 export const moveMemberRoute = defineRoute({
   method: 'POST',
   path: '/organizer/teams/members/:userId/move',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: MoveMemberParamsSchema, body: MoveMemberBodySchema },
   output: { 204: NoContentSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
   handler: async (c) => {
@@ -165,7 +165,7 @@ export const moveMemberRoute = defineRoute({
 export const removeMemberRoute = defineRoute({
   method: 'DELETE',
   path: '/organizer/teams/members/:userId',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: RemoveMemberParamsSchema },
   output: { 204: NoContentSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -182,7 +182,7 @@ export const removeMemberRoute = defineRoute({
 export const removeTeamRoute = defineRoute({
   method: 'DELETE',
   path: '/organizer/teams/:id',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: RemoveTeamParamsSchema },
   output: { 204: NoContentSchema, 404: ErrorBodySchema },
   handler: async (c) => {

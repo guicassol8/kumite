@@ -2,7 +2,7 @@ import { bodyLimit, ErrorBodySchema } from '@katajs-framework/core'
 
 import { SUBMISSION_MAX_BODY_BYTES } from '../../config'
 import { defineRoute } from '../../context'
-import { requireUser } from '../../middlewares/auth'
+import { requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
 import { markRankingDirty } from '../sse/sse.service'
 
@@ -21,7 +21,7 @@ function throttleMessage(reason: 'in_flight' | 'cooldown', retryAfterMs: number)
 export const createSubmissionRoute = defineRoute({
   method: 'POST',
   path: '/submissions',
-  use: [bodyLimit({ maxSize: SUBMISSION_MAX_BODY_BYTES }), requireUser],
+  use: [bodyLimit({ maxSize: SUBMISSION_MAX_BODY_BYTES }), requireUser, requirePasswordUpToDate],
   input: { body: SubmitSolutionBodySchema },
   output: {
     201: SubmissionResultSchema,

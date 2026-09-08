@@ -1,7 +1,7 @@
 import { streamSSE } from 'hono/streaming'
 
 import { defineRoute } from '../../context'
-import { requireUser } from '../../middlewares/auth'
+import { requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
 import type { SseEvent } from './sse.schema'
 import { buildRankingUpdatedEvent, buildStateSyncEvent } from './sse.service'
@@ -21,7 +21,7 @@ import { buildRankingUpdatedEvent, buildStateSyncEvent } from './sse.service'
 export const sseRoute = defineRoute({
   method: 'GET',
   path: '/sse',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: {},
   output: {},
   handler: async (c) => {

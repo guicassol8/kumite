@@ -1,7 +1,7 @@
 import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
-import { requireOrganizer, requireUser } from '../../middlewares/auth'
+import { requireOrganizer, requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 import { publishRoundClosed, publishRoundExtended, publishRoundOpened } from '../sse/sse.service'
 
 import {
@@ -34,7 +34,7 @@ import {
 export const createRoundRoute = defineRoute({
   method: 'POST',
   path: '/organizer/rounds',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { body: CreateRoundBodySchema },
   output: { 201: RoundDetailSchema, 400: ErrorBodySchema },
   handler: async (c) => {
@@ -49,7 +49,7 @@ export const createRoundRoute = defineRoute({
 export const listRoundsRoute = defineRoute({
   method: 'GET',
   path: '/organizer/rounds',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: {},
   output: RoundSummaryListSchema,
   handler: async (c) => listRounds(c.get('db')),
@@ -58,7 +58,7 @@ export const listRoundsRoute = defineRoute({
 export const listParticipantRoundsRoute = defineRoute({
   method: 'GET',
   path: '/rounds',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: {},
   output: RoundSummaryListSchema,
   handler: async (c) => listParticipantRounds(c.get('db')),
@@ -67,7 +67,7 @@ export const listParticipantRoundsRoute = defineRoute({
 export const getParticipantRoundRoute = defineRoute({
   method: 'GET',
   path: '/rounds/:id',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: { params: RoundIdParamsSchema, query: ParticipantRoundQuerySchema },
   output: { 200: ParticipantRoundDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -85,7 +85,7 @@ export const getParticipantRoundRoute = defineRoute({
 export const getRoundRoute = defineRoute({
   method: 'GET',
   path: '/organizer/rounds/:id',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: RoundIdParamsSchema },
   output: { 200: RoundDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -98,7 +98,7 @@ export const getRoundRoute = defineRoute({
 export const updateRoundRoute = defineRoute({
   method: 'PATCH',
   path: '/organizer/rounds/:id',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: RoundIdParamsSchema, body: UpdateRoundBodySchema },
   output: {
     200: RoundDetailSchema,
@@ -126,7 +126,7 @@ export const updateRoundRoute = defineRoute({
 export const openRoundRoute = defineRoute({
   method: 'POST',
   path: '/organizer/rounds/:id/open',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: RoundIdParamsSchema },
   output: {
     200: RoundDetailSchema,
@@ -158,7 +158,7 @@ export const openRoundRoute = defineRoute({
 export const extendRoundRoute = defineRoute({
   method: 'POST',
   path: '/organizer/rounds/:id/extend',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: RoundIdParamsSchema, body: ExtendRoundBodySchema },
   output: { 200: RoundDetailSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
   handler: async (c) => {
@@ -184,7 +184,7 @@ export const extendRoundRoute = defineRoute({
 export const closeRoundRoute = defineRoute({
   method: 'POST',
   path: '/organizer/rounds/:id/close',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: RoundIdParamsSchema },
   output: { 200: RoundDetailSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
   handler: async (c) => {

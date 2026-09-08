@@ -13,6 +13,9 @@ export const UserSchema = z.object({
   role: RoleSchema,
   university: UniversitySchema,
   active: z.boolean(),
+  // Rides along on PublicUserSchema, so GET /me carries it — the front reads
+  // it off the session to force the change screen (#143).
+  mustChangePassword: z.boolean(),
   // coerce, not date(): kata re-validates the output after JSON serialization,
   // where a Date has already become an ISO string.
   createdAt: z.coerce.date(),
@@ -36,7 +39,9 @@ export type PublicUser = z.infer<typeof PublicUserSchema>
 export type UserClaims = z.infer<typeof UserClaimsSchema>
 // active is omitted: the db column defaults to true, and every user is
 // created active — deactivation is a separate organizer action (T5/T7).
-export type NewUser = Omit<User, 'id' | 'active' | 'createdAt' | 'updatedAt'>
+// mustChangePassword likewise defaults to false; only the organizer reset
+// (#143) ever raises it.
+export type NewUser = Omit<User, 'id' | 'active' | 'mustChangePassword' | 'createdAt' | 'updatedAt'>
 
 // --- Organizer admin DTOs (#52) ---
 
@@ -78,8 +83,22 @@ export const UserIdParamsSchema = z.object({
   id: UuidSchema,
 })
 
+// Step-up body for the organizer reset (#143). No `.min(8)`: this is checked
+// against a real hash, not for strength — same reasoning as LoginBodySchema.
+export const ResetUserPasswordBodySchema = z.object({
+  adminPassword: z.string().min(1),
+})
+
+// Only the password comes back. Nothing visible in the users table changed, and
+// the front refetches the list anyway — echoing a UserSummary here would just
+// be one more copy of the row for no reader.
+export const ResetUserPasswordResponseSchema = z.object({
+  temporaryPassword: z.string(),
+})
+
 export type ListUsersQuery = z.infer<typeof ListUsersQuerySchema>
 export type TeamRef = z.infer<typeof TeamRefSchema>
 export type UserSummary = z.infer<typeof UserSummarySchema>
 export type UserList = z.infer<typeof UserListSchema>
 export type UserIdParams = z.infer<typeof UserIdParamsSchema>
+export type ResetUserPasswordBody = z.infer<typeof ResetUserPasswordBodySchema>

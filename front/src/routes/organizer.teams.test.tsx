@@ -185,4 +185,39 @@ describe('OrganizerTeamsScreen', () => {
     )
     expect(screen.getByTestId('team-moderation-rename-input-team-1')).toBeDefined()
   })
+
+  it('moves a member to another team and disables a full destination option', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedMemberMove.mockResolvedValue(jsonResponse(204, undefined))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-move-select-u1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('team-moderation-move-select-u1'))
+
+    const fullOption = await screen.findByRole('option', { name: 'Frozen Squad' })
+    expect(fullOption.getAttribute('data-disabled')).not.toBeNull()
+
+    fireEvent.click(fullOption)
+    expect(screen.getByTestId('team-moderation-move-action-u1').hasAttribute('disabled')).toBe(true)
+  })
+
+  it('maps move errors (team_full, team_not_found) onto an inline row error', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedMemberMove.mockResolvedValueOnce(jsonResponse(409, { error: 'team_full' }))
+    mockedMemberMove.mockResolvedValueOnce(jsonResponse(404, { error: 'team_not_found' }))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-member-row-u3')).toBeDefined())
+    fireEvent.click(screen.getByTestId('team-moderation-move-select-u3'))
+    fireEvent.click(await screen.findByRole('option', { name: 'Blockly Busters' }))
+    fireEvent.click(screen.getByTestId('team-moderation-move-action-u3'))
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-move-error-u3')).toBeDefined())
+
+    fireEvent.click(screen.getByTestId('team-moderation-move-select-u3'))
+    fireEvent.click(await screen.findByRole('option', { name: 'Blockly Busters' }))
+    fireEvent.click(screen.getByTestId('team-moderation-move-action-u3'))
+
+    await waitFor(() => expect(mockedMemberMove).toHaveBeenCalledTimes(2))
+  })
 })

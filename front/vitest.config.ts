@@ -15,6 +15,7 @@ export default defineConfig({
       './src/test/web-storage-jsdom.ts',
       './src/test/blockly-jsdom.ts',
       './src/test/router-jsdom.ts',
+      './src/test/radix-select-jsdom.ts',
     ],
     include: ['src/**/*.test.{ts,tsx}'],
   },

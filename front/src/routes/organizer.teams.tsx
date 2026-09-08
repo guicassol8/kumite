@@ -11,6 +11,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -80,7 +87,12 @@ function OrganizerTeamsScreen() {
       {teams.data && (
         <div className="flex flex-col gap-4">
           {teams.data.teams.map((team) => (
-            <TeamCard key={team.id} team={team} onChanged={invalidateTeams} />
+            <TeamCard
+              key={team.id}
+              team={team}
+              allTeams={teams.data.teams}
+              onChanged={invalidateTeams}
+            />
           ))}
         </div>
       )}
@@ -88,7 +100,15 @@ function OrganizerTeamsScreen() {
   )
 }
 
-function TeamCard({ team, onChanged }: { team: OrganizerTeam; onChanged: () => void }) {
+function TeamCard({
+  team,
+  allTeams,
+  onChanged,
+}: {
+  team: OrganizerTeam
+  allTeams: OrganizerTeam[]
+  onChanged: () => void
+}) {
   const { t } = useTranslation()
 
   return (
@@ -127,13 +147,97 @@ function TeamCard({ team, onChanged }: { team: OrganizerTeam; onChanged: () => v
                 <TableCell>
                   <Badge variant="outline">{t(ROLE_KEYS[member.role])}</Badge>
                 </TableCell>
-                <TableCell />
+                <TableCell>
+                  <MoveMemberAction
+                    userId={member.userId}
+                    destinations={allTeams.filter((candidate) => candidate.id !== team.id)}
+                    onMoved={onChanged}
+                  />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </CardContent>
     </Card>
+  )
+}
+
+const MOVE_ERROR_KEYS: Record<string, string> = {
+  team_full: 'organizer.teamModeration.move.errors.teamFull',
+  team_not_found: 'organizer.teamModeration.move.errors.teamNotFound',
+  member_not_found: 'organizer.teamModeration.move.errors.memberNotFound',
+}
+
+function MoveMemberAction({
+  userId,
+  destinations,
+  onMoved,
+}: {
+  userId: string
+  destinations: OrganizerTeam[]
+  onMoved: () => void
+}) {
+  const { t } = useTranslation()
+  const [destinationTeamId, setDestinationTeamId] = useState<string | undefined>(undefined)
+  const [error, setError] = useState<string | null>(null)
+
+  const move = useMutation({
+    mutationFn: async (teamId: string) =>
+      api.organizer.teams.members[':userId'].move.$post({ param: { userId }, json: { teamId } }),
+  })
+
+  async function onMove() {
+    if (!destinationTeamId) return
+    const res = await move.mutateAsync(destinationTeamId)
+    if (res.status === 204) {
+      setDestinationTeamId(undefined)
+      setError(null)
+      onMoved()
+      return
+    }
+    const body = (await res.json().catch(() => null)) as { error?: string } | null
+    setError(
+      t(MOVE_ERROR_KEYS[body?.error ?? ''] ?? 'organizer.teamModeration.move.errors.teamNotFound'),
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <Select value={destinationTeamId} onValueChange={setDestinationTeamId}>
+          <SelectTrigger className="h-8 w-40" data-testid={`team-moderation-move-select-${userId}`}>
+            <SelectValue placeholder={t('organizer.teamModeration.move.selectPlaceholder')} />
+          </SelectTrigger>
+          <SelectContent>
+            {destinations.map((destination) => (
+              <SelectItem
+                key={destination.id}
+                value={destination.id}
+                disabled={destination.slotsAvailable === 0}
+              >
+                {destination.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid={`team-moderation-move-action-${userId}`}
+          disabled={!destinationTeamId || move.isPending}
+          onClick={onMove}
+        >
+          {t('organizer.teamModeration.move.action')}
+        </Button>
+      </div>
+      {error && (
+        <Alert variant="destructive" data-testid={`team-moderation-move-error-${userId}`}>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
   )
 }
 

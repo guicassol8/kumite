@@ -94,7 +94,13 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
     headers: { 'content-type': 'application/json', ...auth },
     body: JSON.stringify({ difficulty: 'easy' }),
   })
-  const { id: problemId } = (await created.json()) as { id: string }
+  const { id: problemId } = (await created.json()) as { id?: string }
+  // Same reason as the login guard above: without this the id travels as the
+  // literal "undefined" through PATCH, publish and the round, and the suite
+  // blames `openWithRetry` 90s later instead of the request that actually broke.
+  if (!problemId) {
+    throw new Error(`could not create the problem (HTTP ${created.status})`)
+  }
 
   await fetch(`${BACK_URL}/organizer/problems/${problemId}`, {
     method: 'PATCH',
@@ -127,9 +133,25 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
       problemIds: [problemId],
     }),
   })
-  const { id: roundId } = (await roundRes.json()) as { id: string }
+  const { id: roundId } = (await roundRes.json()) as { id?: string }
+  // See the problem guard: a missing id here would send `openWithRetry` after
+  // /organizer/rounds/undefined/open for the full ~90s before giving up.
+  if (!roundId) {
+    throw new Error(`could not create the round for problem ${problemId} (HTTP ${roundRes.status})`)
+  }
   await openWithRetry(roundId, auth)
-  await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
+  // A close that fails in silence is the one way this fixture could cause the
+  // very thing it works around: a round left open holds the single-open-round
+  // slot for its whole 30min duration (#150). Fail here instead.
+  const closed = await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, {
+    method: 'POST',
+    headers: auth,
+  })
+  if (!closed.ok) {
+    throw new Error(
+      `could not close round ${roundId} (HTTP ${closed.status}) — it now holds the open-round slot`,
+    )
+  }
 
   const participantEmail = `${slug}-e2e-${Date.now()}@edu.pucrs.br`
   await fetch(`${BACK_URL}/auth/signup`, {

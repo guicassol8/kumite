@@ -66,7 +66,15 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
   })
-  const { token: orgToken } = (await orgLogin.json()) as { token: string }
+  const { token: orgToken } = (await orgLogin.json()) as { token?: string }
+  // Without this, every later request goes out as `Bearer undefined` and the
+  // suite blames the first one that answers 401 instead of the login. The
+  // usual cause is a database wiped by `pnpm test` and not re-seeded.
+  if (!orgToken) {
+    throw new Error(
+      `organizer login failed for ${ORGANIZER_EMAIL} (HTTP ${orgLogin.status}) — is the database seeded?`,
+    )
+  }
   const auth = { authorization: `Bearer ${orgToken}` }
 
   const created = await fetch(`${BACK_URL}/organizer/problems`, {

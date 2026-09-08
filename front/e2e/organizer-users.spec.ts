@@ -122,6 +122,12 @@ test.describe('organizer user administration', () => {
     await expect(page.getByTestId(`organizer-users-self-tooltip-${organizerId}`)).toBeVisible()
     await expect(page.getByTestId(`organizer-users-demote-${organizerId}`)).toBeDisabled()
     await expect(page.getByTestId(`organizer-users-deactivate-${organizerId}`)).toBeDisabled()
+    // Acceptance asks for the explanation, not just the greyed buttons — hover
+    // the wrapper (disabled buttons swallow pointer events) to surface it.
+    await page.getByTestId(`organizer-users-self-tooltip-${organizerId}`).hover()
+    await expect(page.getByRole('tooltip').first()).toHaveText(
+      'Você não pode alterar a sua própria conta.',
+    )
     await page.screenshot({ path: evidence('07-own-row-disabled'), fullPage: true })
   })
 })

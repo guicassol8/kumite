@@ -163,7 +163,7 @@ function ProblemScreen() {
   const isClosed = data.roundStatus === 'closed'
 
   return (
-    <main className="flex h-dvh flex-col gap-4 p-4 md:flex-row">
+    <main className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:flex-row">
       <Card
         data-testid="problem-statement-panel"
         aria-label={t('problem.statementLabel')}

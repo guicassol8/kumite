@@ -362,14 +362,21 @@ function UserRowActions({
 
   async function perform(action: Action) {
     setConfirming(null)
-    const res = await run.mutateAsync(action)
-    if (res.ok) {
-      setError(null)
-      queryClient.invalidateQueries({ queryKey: [USERS_QUERY_KEY] })
-      return
+    try {
+      const res = await run.mutateAsync(action)
+      if (res.ok) {
+        setError(null)
+        queryClient.invalidateQueries({ queryKey: [USERS_QUERY_KEY] })
+        return
+      }
+      const body = (await res.json().catch(() => null)) as { error?: string } | null
+      setError(t(ACTION_ERROR_KEYS[body?.error ?? ''] ?? 'organizer.users.actions.errors.failed'))
+    } catch {
+      // A dead network rejects `mutateAsync` instead of answering: without
+      // this the row would show nothing at all and the rejection would go
+      // unhandled, since both call sites fire this off without awaiting.
+      setError(t('organizer.users.actions.errors.failed'))
     }
-    const body = (await res.json().catch(() => null)) as { error?: string } | null
-    setError(t(ACTION_ERROR_KEYS[body?.error ?? ''] ?? 'organizer.users.actions.errors.failed'))
   }
 
   const roleAction: Action = user.role === 'organizer' ? 'demote' : 'promote'

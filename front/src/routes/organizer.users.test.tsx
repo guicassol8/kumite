@@ -297,6 +297,17 @@ describe('OrganizerUsersScreen', () => {
     ).toBe(true)
   })
 
+  it('shows a generic failure in the row when the request never lands', async () => {
+    mockedPromote.mockRejectedValue(new Error('network down'))
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u1')
+
+    fireEvent.click(screen.getByTestId('organizer-users-promote-u1'))
+
+    const alert = await screen.findByTestId('organizer-users-action-error-u1')
+    expect(alert.textContent).toContain('Não foi possível concluir a ação.')
+  })
+
   it('shows the refusal in the row when the API answers 403', async () => {
     mockedDeactivate.mockResolvedValue(jsonResponse(403, { error: 'cannot_deactivate_self' }))
     renderScreen()

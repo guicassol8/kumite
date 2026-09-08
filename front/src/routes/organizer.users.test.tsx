@@ -6,7 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/api', () => ({
   api: {
     organizer: {
-      users: { $get: vi.fn() },
+      users: {
+        $get: vi.fn(),
+        ':id': {
+          promote: { $post: vi.fn() },
+          demote: { $post: vi.fn() },
+          deactivate: { $post: vi.fn() },
+          reactivate: { $post: vi.fn() },
+        },
+      },
       teams: { $get: vi.fn() },
     },
   },
@@ -20,6 +28,10 @@ import { routeTree } from '@/routeTree.gen'
 
 const mockedUsersGet = vi.mocked(api.organizer.users.$get)
 const mockedTeamsGet = vi.mocked(api.organizer.teams.$get)
+const mockedPromote = vi.mocked(api.organizer.users[':id'].promote.$post)
+const mockedDemote = vi.mocked(api.organizer.users[':id'].demote.$post)
+const mockedDeactivate = vi.mocked(api.organizer.users[':id'].deactivate.$post)
+const mockedReactivate = vi.mocked(api.organizer.users[':id'].reactivate.$post)
 
 const organizerUser: SessionUser = {
   id: 'org-1',
@@ -101,6 +113,10 @@ beforeEach(() => {
   mockedUsersGet.mockResolvedValue(jsonResponse(200, defaultList))
   mockedTeamsGet.mockReset()
   mockedTeamsGet.mockResolvedValue(jsonResponse(200, teamsList))
+  for (const action of [mockedPromote, mockedDemote, mockedDeactivate, mockedReactivate]) {
+    action.mockReset()
+    action.mockResolvedValue(jsonResponse(200, user()))
+  }
   setSession(organizerUser, 'tok-1')
 })
 
@@ -218,5 +234,78 @@ describe('OrganizerUsersScreen', () => {
 
     await waitFor(() => expect(lastQuery().offset).toBe(0))
     expect(lastQuery().role).toBe('organizer')
+  })
+  it('promotes a participant straight away and refreshes the listing', async () => {
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u1')
+    const before = mockedUsersGet.mock.calls.length
+
+    fireEvent.click(screen.getByTestId('organizer-users-promote-u1'))
+
+    await waitFor(() => expect(mockedPromote).toHaveBeenCalledWith({ param: { id: 'u1' } }))
+    await waitFor(() => expect(mockedUsersGet.mock.calls.length).toBeGreaterThan(before))
+  })
+
+  it('reactivates a deactivated user straight away', async () => {
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u2')
+
+    fireEvent.click(screen.getByTestId('organizer-users-reactivate-u2'))
+
+    await waitFor(() => expect(mockedReactivate).toHaveBeenCalledWith({ param: { id: 'u2' } }))
+  })
+
+  it('deactivates only once the confirmation is accepted', async () => {
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u1')
+
+    fireEvent.click(screen.getByTestId('organizer-users-deactivate-u1'))
+    fireEvent.click(await screen.findByTestId('organizer-users-confirm-cancel-u1'))
+    expect(mockedDeactivate).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByTestId('organizer-users-deactivate-u1'))
+    fireEvent.click(await screen.findByTestId('organizer-users-confirm-confirm-u1'))
+    await waitFor(() => expect(mockedDeactivate).toHaveBeenCalledWith({ param: { id: 'u1' } }))
+  })
+
+  it('demotes only once the confirmation is accepted', async () => {
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u2')
+
+    fireEvent.click(screen.getByTestId('organizer-users-demote-u2'))
+    fireEvent.click(await screen.findByTestId('organizer-users-confirm-confirm-u2'))
+
+    await waitFor(() => expect(mockedDemote).toHaveBeenCalledWith({ param: { id: 'u2' } }))
+  })
+
+  it('disables both actions on the signed-in organizer own row', async () => {
+    mockedUsersGet.mockResolvedValue(
+      jsonResponse(200, {
+        items: [user({ id: 'org-1', email: organizerUser.email, role: 'organizer', team: null })],
+        total: 1,
+      }),
+    )
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-org-1')
+
+    expect(screen.getByTestId('organizer-users-self-tooltip-org-1')).toBeTruthy()
+    expect((screen.getByTestId('organizer-users-demote-org-1') as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+    expect(
+      (screen.getByTestId('organizer-users-deactivate-org-1') as HTMLButtonElement).disabled,
+    ).toBe(true)
+  })
+
+  it('shows the refusal in the row when the API answers 403', async () => {
+    mockedDeactivate.mockResolvedValue(jsonResponse(403, { error: 'cannot_deactivate_self' }))
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u1')
+
+    fireEvent.click(screen.getByTestId('organizer-users-deactivate-u1'))
+    fireEvent.click(await screen.findByTestId('organizer-users-confirm-confirm-u1'))
+
+    const alert = await screen.findByTestId('organizer-users-action-error-u1')
+    expect(alert.textContent).toContain('própria conta')
   })
 })

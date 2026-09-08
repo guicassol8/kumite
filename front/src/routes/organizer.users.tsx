@@ -1,9 +1,21 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { ShieldMinus, ShieldPlus, UserCheck, UserX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { UniversityBadge } from '@/components/teams/university-badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,12 +35,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useSession } from '@/hooks/use-session'
 import { api } from '@/lib/api'
 
 export const Route = createFileRoute('/organizer/users')({
   component: OrganizerUsersScreen,
 })
 
+const USERS_QUERY_KEY = 'organizer-users'
 const PAGE_SIZE = 20
 const SEARCH_DEBOUNCE_MS = 300
 
@@ -77,6 +92,7 @@ const ROLE_KEYS = {
 
 function OrganizerUsersScreen() {
   const { t } = useTranslation()
+  const session = useSession()
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS)
   // The search box is the only filter that doesn't hit the API on every
   // keystroke: `filters.q` is what was typed, `debouncedQ` is what is queried.
@@ -89,7 +105,7 @@ function OrganizerUsersScreen() {
 
   const users = useQuery({
     queryKey: [
-      'organizer-users',
+      USERS_QUERY_KEY,
       debouncedQ,
       filters.role,
       filters.university,
@@ -221,7 +237,9 @@ function OrganizerUsersScreen() {
                         : t('organizer.users.status.inactive')}
                     </Badge>
                   </TableCell>
-                  <TableCell />
+                  <TableCell>
+                    <UserRowActions user={item} isSelf={session.user?.id === item.id} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -299,5 +317,164 @@ function FilterSelect({
         </SelectContent>
       </Select>
     </div>
+  )
+}
+
+const ACTIONS = {
+  promote: (id: string) => api.organizer.users[':id'].promote.$post({ param: { id } }),
+  demote: (id: string) => api.organizer.users[':id'].demote.$post({ param: { id } }),
+  deactivate: (id: string) => api.organizer.users[':id'].deactivate.$post({ param: { id } }),
+  reactivate: (id: string) => api.organizer.users[':id'].reactivate.$post({ param: { id } }),
+} as const
+
+type Action = keyof typeof ACTIONS
+
+// Only the two destructive directions ask for confirmation; promoting and
+// reactivating are one click away because both are trivially undoable.
+const CONFIRMED_ACTIONS = ['demote', 'deactivate'] as const satisfies readonly Action[]
+
+// The API refuses self-service for the same reason the UI greys the row out,
+// so both surfaces say the same sentence.
+const ACTION_ERROR_KEYS: Record<string, string> = {
+  cannot_demote_self: 'organizer.users.actions.selfDisabled',
+  cannot_deactivate_self: 'organizer.users.actions.selfDisabled',
+}
+
+function UserRowActions({
+  user,
+  isSelf,
+}: {
+  user: { id: string; role: Role; active: boolean }
+  isSelf: boolean
+}) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [confirming, setConfirming] = useState<(typeof CONFIRMED_ACTIONS)[number] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const run = useMutation({
+    mutationFn: (action: Action) => ACTIONS[action](user.id),
+  })
+
+  async function perform(action: Action) {
+    setConfirming(null)
+    const res = await run.mutateAsync(action)
+    if (res.ok) {
+      setError(null)
+      queryClient.invalidateQueries({ queryKey: [USERS_QUERY_KEY] })
+      return
+    }
+    const body = (await res.json().catch(() => null)) as { error?: string } | null
+    setError(t(ACTION_ERROR_KEYS[body?.error ?? ''] ?? 'organizer.users.actions.errors.failed'))
+  }
+
+  const roleAction: Action = user.role === 'organizer' ? 'demote' : 'promote'
+  const statusAction: Action = user.active ? 'deactivate' : 'reactivate'
+
+  return (
+    <div className="flex flex-col gap-1">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              data-testid={isSelf ? `organizer-users-self-tooltip-${user.id}` : undefined}
+              aria-label={isSelf ? t('organizer.users.actions.selfDisabled') : undefined}
+              tabIndex={isSelf ? 0 : undefined}
+              className="flex items-center gap-1 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <RowActionButton
+                action={roleAction}
+                userId={user.id}
+                disabled={isSelf}
+                onActivate={() => onActivate(roleAction)}
+              />
+              <RowActionButton
+                action={statusAction}
+                userId={user.id}
+                disabled={isSelf}
+                onActivate={() => onActivate(statusAction)}
+              />
+            </span>
+          </TooltipTrigger>
+          {isSelf && <TooltipContent>{t('organizer.users.actions.selfDisabled')}</TooltipContent>}
+        </Tooltip>
+      </TooltipProvider>
+
+      {error && (
+        <Alert variant="destructive" data-testid={`organizer-users-action-error-${user.id}`}>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <AlertDialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
+        <AlertDialogContent data-testid={`organizer-users-confirm-${user.id}`}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(`organizer.users.actions.confirm.${confirming ?? 'demote'}.title`)}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(`organizer.users.actions.confirm.${confirming ?? 'demote'}.description`)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid={`organizer-users-confirm-cancel-${user.id}`}>
+              {t('organizer.users.actions.confirm.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid={`organizer-users-confirm-confirm-${user.id}`}
+              onClick={() => confirming && perform(confirming)}
+            >
+              {t('organizer.users.actions.confirm.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+
+  function onActivate(action: Action) {
+    setError(null)
+    if ((CONFIRMED_ACTIONS as readonly Action[]).includes(action)) {
+      setConfirming(action as (typeof CONFIRMED_ACTIONS)[number])
+      return
+    }
+    void perform(action)
+  }
+}
+
+const ACTION_ICONS = {
+  promote: ShieldPlus,
+  demote: ShieldMinus,
+  deactivate: UserX,
+  reactivate: UserCheck,
+} as const
+
+function RowActionButton({
+  action,
+  userId,
+  disabled,
+  onActivate,
+}: {
+  action: Action
+  userId: string
+  disabled: boolean
+  onActivate: () => void
+}) {
+  const { t } = useTranslation()
+  const Icon = ACTION_ICONS[action]
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      className="size-8"
+      disabled={disabled}
+      data-testid={`organizer-users-${action}-${userId}`}
+      aria-label={t(`organizer.users.actions.${action}`)}
+      onClick={onActivate}
+    >
+      <Icon className="size-4" />
+    </Button>
   )
 }

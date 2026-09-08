@@ -390,6 +390,28 @@
         "range": "{{from}}–{{to}} de {{total}}",
         "previous": "Anterior",
         "next": "Siguiente"
+      },
+      "actions": {
+        "promote": "Promover a organizador",
+        "demote": "Degradar a participante",
+        "deactivate": "Desactivar cuenta",
+        "reactivate": "Reactivar cuenta",
+        "selfDisabled": "No puedes modificar tu propia cuenta.",
+        "confirm": {
+          "demote": {
+            "title": "¿Degradar a este organizador?",
+            "description": "La cuenta pierde el acceso al Panel y vuelve a ser de participante."
+          },
+          "deactivate": {
+            "title": "¿Desactivar esta cuenta?",
+            "description": "La persona no podrá iniciar sesión hasta que se reactive la cuenta."
+          },
+          "cancel": "Cancelar",
+          "confirm": "Confirmar"
+        },
+        "errors": {
+          "failed": "No se pudo completar la acción."
+        }
       }
     },
     "overview": {

@@ -390,6 +390,28 @@
         "range": "{{from}}–{{to}} de {{total}}",
         "previous": "Anterior",
         "next": "Próxima"
+      },
+      "actions": {
+        "promote": "Promover a organizador",
+        "demote": "Despromover a participante",
+        "deactivate": "Desativar conta",
+        "reactivate": "Reativar conta",
+        "selfDisabled": "Você não pode alterar a sua própria conta.",
+        "confirm": {
+          "demote": {
+            "title": "Despromover este organizador?",
+            "description": "A conta perde o acesso ao Painel e volta a ser de participante."
+          },
+          "deactivate": {
+            "title": "Desativar esta conta?",
+            "description": "A pessoa deixa de conseguir entrar até a conta ser reativada."
+          },
+          "cancel": "Cancelar",
+          "confirm": "Confirmar"
+        },
+        "errors": {
+          "failed": "Não foi possível concluir a ação."
+        }
       }
     },
     "overview": {

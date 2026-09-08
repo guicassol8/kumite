@@ -175,21 +175,7 @@ Content-Type: application/json
 { "email": "users-e2e-target@edu.pucrs.br", "password": "originalpass" }
 HTTP 200
 
-# 13. Reset-password -> 204, and the old password stops working immediately
-# (the OTP itself — issued here — is exercised end-to-end in password-reset.hurl,
-# which triggers its own reset since the plaintext OTP isn't observable over HTTP).
-POST {{host}}/organizer/users/{{target_id}}/reset-password
-Authorization: Bearer {{organizer_token}}
-HTTP 204
-
-POST {{host}}/auth/login
-Content-Type: application/json
-{ "email": "users-e2e-target@edu.pucrs.br", "password": "originalpass" }
-HTTP 401
-[Asserts]
-jsonpath "$.error" == "invalid_credentials"
-
-# 14. Every organizer action 404s on an unknown id.
+# 13. Every organizer action 404s on an unknown id.
 GET {{host}}/organizer/users/00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{organizer_token}}
 HTTP 404
@@ -213,12 +199,6 @@ HTTP 404
 jsonpath "$.error" == "not_found"
 
 POST {{host}}/organizer/users/00000000-0000-0000-0000-000000000000/reactivate
-Authorization: Bearer {{organizer_token}}
-HTTP 404
-[Asserts]
-jsonpath "$.error" == "not_found"
-
-POST {{host}}/organizer/users/00000000-0000-0000-0000-000000000000/reset-password
 Authorization: Bearer {{organizer_token}}
 HTTP 404
 [Asserts]

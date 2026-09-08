@@ -56,7 +56,8 @@
     "nav": {
       "problems": "Problems",
       "rounds": "Rounds",
-      "eventConfig": "Event configuration"
+      "eventConfig": "Event configuration",
+      "teams": "Teams"
     },
     "problems": {
       "heading": "Catalog problems",
@@ -287,6 +288,67 @@
           "suffixesRequired": "Enter at least one email suffix.",
           "codeTaken": "This code is already in use.",
           "saveFailed": "Could not save. Please try again."
+        }
+      }
+    },
+    "teamModeration": {
+      "heading": "Team moderation",
+      "loading": "Loading teams...",
+      "error": {
+        "message": "Could not load the teams.",
+        "retry": "Try again"
+      },
+      "frozenBadge": "Frozen",
+      "role": {
+        "participant": "Participant",
+        "organizer": "Organizer"
+      },
+      "columns": {
+        "email": "Email",
+        "university": "University",
+        "role": "Role",
+        "actions": "Actions"
+      },
+      "rename": {
+        "editAction": "Rename",
+        "save": "Save",
+        "cancel": "Cancel",
+        "errors": {
+          "nameTaken": "A team with this name already exists.",
+          "saveFailed": "Could not save. Please try again."
+        }
+      },
+      "move": {
+        "selectPlaceholder": "Move to...",
+        "action": "Move",
+        "errors": {
+          "teamFull": "The destination team is full.",
+          "teamNotFound": "The destination team no longer exists.",
+          "memberNotFound": "This member no longer belongs to a team."
+        }
+      },
+      "removeMember": {
+        "action": "Remove",
+        "confirm": {
+          "title": "Remove member from team?",
+          "description": "The member becomes teamless; the team stays with its remaining members.",
+          "cancel": "Cancel",
+          "confirm": "Remove"
+        },
+        "errors": {
+          "failed": "Could not remove this member. Please try again."
+        }
+      },
+      "removeTeam": {
+        "action": "Remove team",
+        "confirm": {
+          "title": "Remove team?",
+          "description": "Members become teamless. Submissions are preserved for audit but excluded from the leaderboard.",
+          "cancel": "Cancel",
+          "confirm": "Remove"
+        },
+        "errors": {
+          "failed": "Could not remove this team. Please try again."
         }
       }
     }

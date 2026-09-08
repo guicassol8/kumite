@@ -16,6 +16,7 @@ import {
   createTeam,
   joinTeam,
   leaveTeam,
+  listOrganizerTeams,
   listTeams,
   moveMember,
   removeMember,
@@ -728,5 +729,69 @@ describe('listTeams', () => {
     const result = await listTeams(db, viewer.id)
 
     expect(result.teams[0]?.joinBlockedReason).toBeNull()
+  })
+})
+
+describe('listOrganizerTeams', () => {
+  it("exposes every member's userId, email, university and role regardless of viewer", async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 3 })
+    const creator = await insertUser('pucrs')
+    const joiner = await insertUser('merida')
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await joinTeam(db, joiner.id, created.team.id)
+
+    const result = await listOrganizerTeams(db)
+
+    expect(result).toEqual({
+      maxTeamSize: 3,
+      teams: [
+        {
+          id: created.team.id,
+          name: 'Team A',
+          frozen: false,
+          slotsAvailable: 1,
+          members: expect.arrayContaining([
+            { userId: creator.id, email: creator.email, university: 'pucrs', role: 'participant' },
+            { userId: joiner.id, email: joiner.email, university: 'merida', role: 'participant' },
+          ]),
+        },
+      ],
+    })
+  })
+
+  it('still lists a team with zero members with an empty members array', async () => {
+    await db.insert(teamsTable).values({ name: 'Orphan' })
+
+    const result = await listOrganizerTeams(db)
+
+    expect(result.teams).toEqual([
+      expect.objectContaining({ name: 'Orphan', members: [], slotsAvailable: 3 }),
+    ])
+  })
+
+  it('excludes a removed team', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    await removeTeam(db, created.team.id)
+    const result = await listOrganizerTeams(db)
+
+    expect(result.teams).toEqual([])
+  })
+
+  it('marks a team that has already submitted as frozen', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, created.team.id))
+
+    const result = await listOrganizerTeams(db)
+
+    expect(result.teams[0]?.frozen).toBe(true)
   })
 })

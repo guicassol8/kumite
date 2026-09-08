@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { UniversitySchema } from '../users/users.schema'
+import { RoleSchema, UniversitySchema } from '../users/users.schema'
 
 // Mirrors the `teams` drizzle table (db/schema.ts).
 export const TeamSchema = z.object({
@@ -97,6 +97,32 @@ export const RemoveTeamParamsSchema = z.object({
   id: z.string(),
 })
 
+// --- Organizer listing DTOs (#51) ---
+//
+// Unlike TeamSummarySchema (viewer-anonymized, no userId), this exposes every
+// member's real identity — the moderation UI needs userId to call
+// move/remove and email/role to show who's who regardless of viewer.
+
+export const OrganizerTeamMemberSchema = z.object({
+  userId: z.string(),
+  email: z.string().email(),
+  university: UniversitySchema,
+  role: RoleSchema,
+})
+
+export const OrganizerTeamSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  frozen: z.boolean(),
+  slotsAvailable: z.number().int(),
+  members: z.array(OrganizerTeamMemberSchema),
+})
+
+export const OrganizerTeamsListSchema = z.object({
+  maxTeamSize: z.number().int().positive(),
+  teams: z.array(OrganizerTeamSchema),
+})
+
 export type CreateTeamBody = z.infer<typeof CreateTeamBodySchema>
 export type JoinTeamParams = z.infer<typeof JoinTeamParamsSchema>
 export type TeamMemberView = z.infer<typeof TeamMemberViewSchema>
@@ -109,3 +135,6 @@ export type MoveMemberParams = z.infer<typeof MoveMemberParamsSchema>
 export type MoveMemberBody = z.infer<typeof MoveMemberBodySchema>
 export type RemoveMemberParams = z.infer<typeof RemoveMemberParamsSchema>
 export type RemoveTeamParams = z.infer<typeof RemoveTeamParamsSchema>
+export type OrganizerTeamMember = z.infer<typeof OrganizerTeamMemberSchema>
+export type OrganizerTeam = z.infer<typeof OrganizerTeamSchema>
+export type OrganizerTeamsList = z.infer<typeof OrganizerTeamsListSchema>

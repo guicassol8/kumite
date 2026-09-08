@@ -410,3 +410,52 @@ DELETE {{host}}/organizer/teams/{{team_id}}
 HTTP 401
 [Asserts]
 jsonpath "$.error" == "unauthorized"
+
+# --- Organizer listing (#51) ---
+# State so far: team_id ("Renamed Busters") is 3/3 (cross, rival, fourth);
+# team2_id ("Second Squad") is empty (fourth moved out in step 21); team3_id
+# ("Third Squad") was removed in step 28.
+
+# 43. Capture cross's and rival's ids for the member assertions below.
+GET {{host}}/me
+Authorization: Bearer {{cross_token}}
+HTTP 200
+[Captures]
+cross_id: jsonpath "$.id"
+
+GET {{host}}/me
+Authorization: Bearer {{rival_token}}
+HTTP 200
+[Captures]
+rival_id: jsonpath "$.id"
+
+# 44. List, as the organizer -> every member's userId/email/university/role
+#     is visible (no anonymization), team_id is 3/3 (frozen false), team2_id
+#     is a listed empty team, and the removed team3_id is gone.
+GET {{host}}/organizer/teams
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.maxTeamSize" == 3
+jsonpath "$.teams[?(@.id=='{{team_id}}')].frozen" == false
+jsonpath "$.teams[?(@.id=='{{team_id}}')].slotsAvailable" == 0
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{cross_id}}')].email" == "teams-e2e-cross@merida.edu.mx"
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{cross_id}}')].university" == "merida"
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{cross_id}}')].role" == "participant"
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{rival_id}}')].email" == "teams-e2e-rival@edu.pucrs.br"
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{fourth_id}}')].email" == "teams-e2e-fourth@edu.pucrs.br"
+jsonpath "$.teams[?(@.id=='{{team2_id}}')].members" count == 0
+jsonpath "$.teams[?(@.id=='{{team3_id}}')]" not exists
+
+# 45. Same route with a participant token -> 403.
+GET {{host}}/organizer/teams
+Authorization: Bearer {{rival_token}}
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "forbidden"
+
+# 46. Same route with no token -> 401.
+GET {{host}}/organizer/teams
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"

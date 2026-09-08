@@ -7,7 +7,14 @@ import { teamMembersTable, teamsTable, usersTable } from '../../db/schema'
 import { getEventConfig } from '../event-config/event-config.service'
 import type { University } from '../users/users.schema'
 
-import type { JoinBlockedReason, Team, TeamSummary, TeamsList } from './teams.schema'
+import type {
+  JoinBlockedReason,
+  OrganizerTeam,
+  OrganizerTeamsList,
+  Team,
+  TeamSummary,
+  TeamsList,
+} from './teams.schema'
 
 // Mirrors joinTeam's guards, in the same order, so a disabled button in the
 // UI and a 409 from the API always agree on the reason.
@@ -84,6 +91,57 @@ export async function listTeams(db: Db, viewerId: string): Promise<TeamsList> {
     myTeamId,
     teams: [...teams.values()],
   }
+}
+
+// Organizer-scoped listing (#51): same join shape as listTeams, but
+// unanonymized (real userId/email/role) and not viewer-scoped.
+export async function listOrganizerTeams(db: Db): Promise<OrganizerTeamsList> {
+  const config = await getEventConfig(db)
+
+  const rows = await db
+    .select({
+      teamId: teamsTable.id,
+      teamName: teamsTable.name,
+      teamFirstSubmittedAt: teamsTable.firstSubmittedAt,
+      userId: usersTable.id,
+      email: usersTable.email,
+      university: usersTable.university,
+      role: usersTable.role,
+    })
+    .from(teamsTable)
+    .leftJoin(teamMembersTable, eq(teamMembersTable.teamId, teamsTable.id))
+    .leftJoin(usersTable, eq(usersTable.id, teamMembersTable.userId))
+    .where(isNull(teamsTable.removedAt))
+    .orderBy(teamsTable.createdAt)
+
+  const teams = new Map<string, OrganizerTeam>()
+  for (const row of rows) {
+    let team = teams.get(row.teamId)
+    if (!team) {
+      team = {
+        id: row.teamId,
+        name: row.teamName,
+        frozen: row.teamFirstSubmittedAt !== null,
+        slotsAvailable: config.maxTeamSize,
+        members: [],
+      }
+      teams.set(row.teamId, team)
+    }
+    if (row.userId && row.email && row.university && row.role) {
+      team.members.push({
+        userId: row.userId,
+        email: row.email,
+        university: row.university,
+        role: row.role,
+      })
+    }
+  }
+
+  for (const team of teams.values()) {
+    team.slotsAvailable = config.maxTeamSize - team.members.length
+  }
+
+  return { maxTeamSize: config.maxTeamSize, teams: [...teams.values()] }
 }
 
 export type CreateTeamResult =

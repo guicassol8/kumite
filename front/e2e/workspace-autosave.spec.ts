@@ -1,6 +1,15 @@
 import { expect, test } from '@playwright/test'
 
+import {
+  EDITOR_FIXTURE_TIMEOUT_MS,
+  hasOrganizerCredentials,
+  seedEditorFixture,
+  seedParticipantToken,
+} from './support/editor-fixture'
+
 // Visual walkthrough for #6, one screenshot per acceptance criterion.
+// #7 moved the editor behind a real problem id, so `beforeAll` seeds one via
+// the shared fixture and every test signs in with a seeded token (#149).
 const evidence = (name: string) => `e2e/evidence/6/${name}.png`
 
 async function dragBlockFromFlyout(page: import('@playwright/test').Page) {
@@ -20,58 +29,100 @@ async function dragBlockFromFlyout(page: import('@playwright/test').Page) {
   await page.mouse.up()
 }
 
-test('the workspace auto-saves per problem, restores on reopen, and Limpar blocos resets it', async ({
-  page,
-}) => {
-  const host = page.getByTestId('blockly-workspace')
-  const draggedBlock = host.locator('g.blocklyDraggable:visible').first()
+test.describe('the workspace auto-save (#6)', () => {
+  test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
-  // 01 — a dragged block survives a reload of the same screen (auto-saved,
-  // debounced, then read back).
-  await page.goto('/problem')
-  await dragBlockFromFlyout(page)
-  await expect(draggedBlock).toBeVisible()
-  await page.waitForTimeout(600)
-  await page.reload()
-  await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
-  await page.screenshot({ path: evidence('01-persisted-across-reload') })
+  let problemId: string
+  let participantToken: string
 
-  // 02 — navigating away and back restores the same saved blocks.
-  await page.goto('/')
-  await page.goto('/problem')
-  await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
-  await page.screenshot({ path: evidence('02-restored-on-reopen') })
-
-  // 03 — confirming "Limpar blocos" resets the workspace to just the root
-  // block (it isn't offered by the toolbox, so losing it would strand the
-  // user) and removes the saved state, so it stays that way after a reload.
-  page.once('dialog', (dialog) => dialog.accept())
-  await page.getByTestId('problem-clear-button').click()
-  await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
-  await page.reload()
-  await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
-  await page.screenshot({ path: evidence('03-cleared-and-stays-empty') })
-})
-
-test('the workspace still mounts and accepts blocks when localStorage is unavailable', async ({
-  page,
-}) => {
-  const host = page.getByTestId('blockly-workspace')
-
-  // 04 — localStorage throwing on every access must not crash the screen:
-  // it mounts and still accepts a dragged block, just without persistence.
-  await page.addInitScript(() => {
-    const throwUnavailable = () => {
-      throw new Error('localStorage unavailable')
-    }
-    Object.defineProperty(window, 'localStorage', {
-      configurable: true,
-      get: throwUnavailable,
-    })
+  test.beforeAll(async () => {
+    test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
+    ;({ problemId, participantToken } = await seedEditorFixture('Workspace Autosave'))
   })
-  await page.goto('/problem')
-  await expect(host.locator('svg.blocklySvg')).toBeVisible()
-  await dragBlockFromFlyout(page)
-  await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
-  await page.screenshot({ path: evidence('04-localstorage-unavailable') })
+
+  test.beforeEach(async ({ page }) => {
+    await seedParticipantToken(page, participantToken)
+  })
+
+  test('the workspace auto-saves per problem, restores on reopen, and Limpar blocos resets it', async ({
+    page,
+  }) => {
+    const host = page.getByTestId('blockly-workspace')
+    const draggedBlock = host.locator('g.blocklyDraggable:visible').first()
+
+    // 01 — a dragged block survives a reload of the same screen (auto-saved,
+    // debounced, then read back).
+    await page.goto(`/problem/${problemId}`)
+    await dragBlockFromFlyout(page)
+    await expect(draggedBlock).toBeVisible()
+    await page.waitForTimeout(600)
+    await page.reload()
+    await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
+    await page.screenshot({ path: evidence('01-persisted-across-reload') })
+
+    // 02 — navigating away and back restores the same saved blocks.
+    await page.goto('/')
+    await page.goto(`/problem/${problemId}`)
+    await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
+    await page.screenshot({ path: evidence('02-restored-on-reopen') })
+
+    // 03 — confirming "Limpar blocos" resets the workspace to just the root
+    // block (it isn't offered by the toolbox, so losing it would strand the
+    // user) and removes the saved state, so it stays that way after a reload.
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByTestId('problem-clear-button').click()
+    await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
+    await page.reload()
+    await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
+    await page.screenshot({ path: evidence('03-cleared-and-stays-empty') })
+  })
+
+  test('the workspace still mounts and accepts blocks when its saved state is unreadable', async ({
+    page,
+  }) => {
+    const host = page.getByTestId('blockly-workspace')
+
+    // 04 — the persistence layer throwing on every access must not crash the
+    // screen: it mounts and still accepts a dragged block, just without
+    // persistence.
+    //
+    // The stub throws only for the `kumite:workspace:*` keys, not for all of
+    // localStorage: `/problem/$id` is behind `requireAuth` and the session
+    // token lives in localStorage too (`session.ts`), so a stub that threw on
+    // everything would bounce this test to /login before Blockly ever mounted.
+    // Scoping it to the workspace keys leaves the guard alone and still proves
+    // what this test is for — auto-save is best-effort, and losing it does not
+    // take the editor down with it.
+    await page.addInitScript(() => {
+      const real = window.localStorage
+      const refuse = (key: string) => {
+        if (key.startsWith('kumite:workspace:')) throw new Error('localStorage unavailable')
+      }
+      const stub: Storage = {
+        getItem: (key: string) => {
+          refuse(key)
+          return real.getItem(key)
+        },
+        setItem: (key: string, value: string) => {
+          refuse(key)
+          real.setItem(key, value)
+        },
+        removeItem: (key: string) => {
+          refuse(key)
+          real.removeItem(key)
+        },
+        clear: () => real.clear(),
+        key: (index: number) => real.key(index),
+        get length() {
+          return real.length
+        },
+      }
+      Object.defineProperty(window, 'localStorage', { configurable: true, get: () => stub })
+    })
+    await page.goto(`/problem/${problemId}`)
+    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await dragBlockFromFlyout(page)
+    await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
+    await page.screenshot({ path: evidence('04-localstorage-unavailable') })
+  })
 })

@@ -12,6 +12,7 @@ import * as problems from './modules/problems/problems.route'
 import * as ranking from './modules/ranking/ranking.route'
 import * as rounds from './modules/rounds/rounds.route'
 import * as sse from './modules/sse/sse.route'
+import * as stats from './modules/stats/stats.route'
 import * as submissions from './modules/submissions/submissions.route'
 import * as teams from './modules/teams/teams.route'
 import * as users from './modules/users/users.route'
@@ -34,6 +35,7 @@ export const app = createApp({
     submissions,
     rounds,
     ranking,
+    stats,
     sse,
   ],
   middlewares: [cors(), requestLogger],

@@ -13,10 +13,21 @@ function OrganizerScreen() {
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-8">
-      <h1 className="font-bold text-2xl" data-testid="organizer-stub">
-        {t('organizer.stub.title')}
+      <h1 className="font-bold text-2xl" data-testid="organizer-heading">
+        {t('organizer.heading')}
       </h1>
       <nav className="flex items-center gap-4 border-b pb-2">
+        <Link
+          to="/organizer"
+          data-testid="organizer-nav-overview"
+          // Without `exact`, the index link stays active on every child
+          // route, since they all sit under /organizer.
+          activeOptions={{ exact: true }}
+          activeProps={{ className: 'font-semibold text-foreground' }}
+          className="text-muted-foreground text-sm"
+        >
+          {t('organizer.nav.overview')}
+        </Link>
         <Link
           to="/organizer/problems"
           data-testid="organizer-nav-problems"

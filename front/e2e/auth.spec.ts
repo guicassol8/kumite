@@ -94,7 +94,9 @@ test('a fresh participant hitting /organizer is redirected home with the forbidd
 test.describe('seeded organizer account', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
-  test('logs in, reaches the /organizer stub, and logs out back to anonymous', async ({ page }) => {
+  test('logs in, reaches the /organizer panel, and logs out back to anonymous', async ({
+    page,
+  }) => {
     await page.goto('/login')
     await page.getByTestId('login-email-input').fill(ORGANIZER_EMAIL)
     await page.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
@@ -102,7 +104,7 @@ test.describe('seeded organizer account', () => {
     await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
 
     await page.goto('/organizer')
-    await expect(page.getByTestId('organizer-stub')).toBeVisible()
+    await expect(page.getByTestId('organizer-heading')).toBeVisible()
     await page.screenshot({ path: evidence('07-organizer-stub-visible'), fullPage: true })
 
     await page.getByTestId('header-logout-button').click()

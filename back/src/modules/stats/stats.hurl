@@ -1,0 +1,64 @@
+# API E2E for the organizer stats module (#54) — the Painel overview's
+# numbers, guarded by requireUser + requireOrganizer (#27). Prereqs, in
+# order:
+#   docker compose up -d
+#   pnpm db:migrate
+#   pnpm db:seed         # seeds the PUCRS2026 code + the ORGANIZER_EMAIL/PASSWORD organizer
+#   pnpm start           # in another terminal
+#   pnpm hurl            # reads ORGANIZER_EMAIL / ORGANIZER_PASSWORD from the environment
+#
+# Idempotent on its own: this module is read-only, and step 0a accepts any
+# status (`HTTP *`) so a rerun against a db that already has that participant
+# still proceeds to the login that actually matters.
+
+# 0a. Sign up + log in a participant.
+POST {{host}}/auth/signup
+Content-Type: application/json
+{ "email": "stats-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+HTTP *
+
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "stats-e2e-participant@edu.pucrs.br", "password": "supersecret" }
+HTTP 200
+[Captures]
+participant_token: jsonpath "$.token"
+
+# 0b. Log in the seeded organizer.
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "{{organizer_email}}", "password": "{{organizer_password}}" }
+HTTP 200
+[Captures]
+organizer_token: jsonpath "$.token"
+
+# 0c. No token -> 401, before any organizer logic runs.
+GET {{host}}/organizer/stats
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
+# 0d. Participant token -> 403.
+GET {{host}}/organizer/stats
+Authorization: Bearer {{participant_token}}
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "forbidden"
+
+# 1. Organizer -> 200 with the full aggregate. The participant signed up
+# above guarantees at least one active participant, so the totals are never
+# vacuously zero.
+GET {{host}}/organizer/stats
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.participants.total" >= 1
+jsonpath "$.participants.pucrs" >= 1
+jsonpath "$.participants.merida" >= 0
+jsonpath "$.participants.inTeam" >= 0
+jsonpath "$.participants.withoutTeam" >= 0
+jsonpath "$.teams.total" >= 0
+jsonpath "$.teams.openSlots" >= 0
+jsonpath "$.teams.maxTeamSize" >= 1
+jsonpath "$.submissions.total" >= 0
+jsonpath "$.round" exists

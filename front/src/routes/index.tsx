@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -12,6 +12,7 @@ import { useEventStream } from '@/hooks/use-event-stream'
 import { useSession } from '@/hooks/use-session'
 import { formatDate } from '@/i18n/format'
 import { api } from '@/lib/api'
+import { fetchRoundRanking } from '@/lib/ranking-query'
 import { fetchRounds, ROUNDS_QUERY_KEY } from '@/lib/rounds-query'
 import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 
@@ -69,6 +70,26 @@ function Home() {
     ? eventStream.serverTime.getTime() - Date.now()
     : 0
   const closedRounds = rounds.data?.filter((round) => round.status === 'closed') ?? []
+  const myTeamId = teams.data?.myTeamId
+  const closedRoundRankings = useQueries({
+    queries: closedRounds.map((round) => ({
+      queryKey: ['ranking', 'round', round.id],
+      queryFn: () => fetchRoundRanking(round.id),
+      enabled: isAuthenticated && myTeamId != null,
+    })),
+  })
+  const myResultByRoundId = new Map(
+    closedRounds
+      .map((round, index) => {
+        const myTeamResult = closedRoundRankings[index]?.data?.teams.find(
+          (team) => team.teamId === myTeamId,
+        )
+        return myTeamResult
+          ? ([round.id, { rank: myTeamResult.rank, totalScore: myTeamResult.totalScore }] as const)
+          : null
+      })
+      .filter((entry) => entry !== null),
+  )
 
   return (
     <main className="mx-auto flex flex-1 max-w-xl flex-col items-center justify-center gap-6 p-8">
@@ -149,14 +170,27 @@ function Home() {
             ) : (
               closedRounds.map((round) => (
                 <div key={round.id} className="flex w-full items-baseline justify-between gap-4">
-                  <Link
-                    to="/rounds/$id"
-                    params={{ id: round.id }}
-                    data-testid={`home-closed-round-${round.id}`}
-                    className="text-primary underline"
-                  >
-                    {round.name}
-                  </Link>
+                  <div className="flex items-baseline gap-2">
+                    <Link
+                      to="/rounds/$id"
+                      params={{ id: round.id }}
+                      data-testid={`home-closed-round-${round.id}`}
+                      className="text-primary underline"
+                    >
+                      {round.name}
+                    </Link>
+                    {myResultByRoundId.get(round.id) && (
+                      <span
+                        data-testid={`home-closed-round-result-${round.id}`}
+                        className="text-muted-foreground text-sm"
+                      >
+                        {t('home.closedRounds.result', {
+                          rank: myResultByRoundId.get(round.id)?.rank,
+                          score: myResultByRoundId.get(round.id)?.totalScore,
+                        })}
+                      </span>
+                    )}
+                  </div>
                   {round.closedAt && (
                     <span className="text-muted-foreground text-sm">
                       {t('home.closedRounds.closedAt', {

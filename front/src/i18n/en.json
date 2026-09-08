@@ -37,7 +37,8 @@
     "closedRounds": {
       "title": "Closed rounds",
       "empty": "No closed rounds yet.",
-      "closedAt": "Closed at {{date}}"
+      "closedAt": "Closed at {{date}}",
+      "result": "#{{rank}} · {{score}} pts"
     },
     "organizerShortcuts": {
       "title": "Organizer area",

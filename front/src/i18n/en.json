@@ -13,6 +13,9 @@
     "teamsLink": "Teams",
     "leaderboardLink": "Leaderboard"
   },
+  "footer": {
+    "contactLabel": "Questions? Talk to the organizers:"
+  },
   "home": {
     "tagline": "PUCRS × Mérida — block programming showdown",
     "apiStatus": "API status",

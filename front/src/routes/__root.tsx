@@ -2,6 +2,7 @@ import { createRootRoute, Outlet, useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
 import { VercelAnalytics } from '@/components/analytics'
+import { Footer } from '@/components/footer'
 import { Header } from '@/components/header'
 import { ensureHydrated, getState, subscribe } from '@/lib/session'
 
@@ -31,6 +32,7 @@ function RootComponent() {
       <VercelAnalytics />
       <Header />
       <Outlet />
+      <Footer />
     </div>
   )
 }

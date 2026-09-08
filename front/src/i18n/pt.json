@@ -13,6 +13,9 @@
     "teamsLink": "Times",
     "leaderboardLink": "Placar"
   },
+  "footer": {
+    "contactLabel": "Dúvidas? Fale com a organização:"
+  },
   "home": {
     "tagline": "PUCRS × Mérida — programação em blocos",
     "apiStatus": "Status da API",

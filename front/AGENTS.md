@@ -27,3 +27,8 @@ TanStack Router (file-based) + TanStack Query · i18next · zod ^3.
 - Every interactive or asserted element gets a `data-testid`.
 - Review evidence: Playwright specs in `e2e/`, screenshots committed to
   `e2e/evidence/<issue>/` (see `.claude/skills/reviewing-tasks`).
+- Telemetry lives ONLY in `<VercelAnalytics />` (`src/components/analytics.tsx`),
+  mounted once in `src/routes/__root.tsx`. Nothing else imports
+  `@vercel/analytics` or `@vercel/speed-insights`, and it reports the route
+  *pattern* (`/problem/[id]`), never the visited URL. It is inert unless
+  `VITE_VERCEL_ENV === 'production'`.

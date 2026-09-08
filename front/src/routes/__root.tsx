@@ -1,6 +1,7 @@
 import { createRootRoute, Outlet, useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
+import { VercelAnalytics } from '@/components/analytics'
 import { Header } from '@/components/header'
 import { ensureHydrated, getState, subscribe } from '@/lib/session'
 
@@ -27,6 +28,7 @@ function RootComponent() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
+      <VercelAnalytics />
       <Header />
       <Outlet />
     </div>

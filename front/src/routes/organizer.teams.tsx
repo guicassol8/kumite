@@ -6,6 +6,16 @@ import { useTranslation } from 'react-i18next'
 
 import { UniversityBadge } from '@/components/teams/university-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -148,11 +158,14 @@ function TeamCard({
                   <Badge variant="outline">{t(ROLE_KEYS[member.role])}</Badge>
                 </TableCell>
                 <TableCell>
-                  <MoveMemberAction
-                    userId={member.userId}
-                    destinations={allTeams.filter((candidate) => candidate.id !== team.id)}
-                    onMoved={onChanged}
-                  />
+                  <div className="flex items-center gap-2">
+                    <MoveMemberAction
+                      userId={member.userId}
+                      destinations={allTeams.filter((candidate) => candidate.id !== team.id)}
+                      onMoved={onChanged}
+                    />
+                    <RemoveMemberAction userId={member.userId} onRemoved={onChanged} />
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -337,5 +350,57 @@ function TeamNameHeader({ team, onRenamed }: { team: OrganizerTeam; onRenamed: (
         </Alert>
       )}
     </div>
+  )
+}
+
+function RemoveMemberAction({ userId, onRemoved }: { userId: string; onRemoved: () => void }) {
+  const { t } = useTranslation()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const remove = useMutation({
+    mutationFn: async () => api.organizer.teams.members[':userId'].$delete({ param: { userId } }),
+    onSuccess: () => onRemoved(),
+  })
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        data-testid={`team-moderation-remove-member-action-${userId}`}
+        onClick={() => setConfirmOpen(true)}
+      >
+        {t('organizer.teamModeration.removeMember.action')}
+      </Button>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent data-testid={`team-moderation-remove-member-confirm-${userId}`}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('organizer.teamModeration.removeMember.confirm.title')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('organizer.teamModeration.removeMember.confirm.description')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              data-testid={`team-moderation-remove-member-confirm-cancel-${userId}`}
+            >
+              {t('organizer.teamModeration.removeMember.confirm.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid={`team-moderation-remove-member-confirm-confirm-${userId}`}
+              onClick={() => {
+                remove.mutate()
+                setConfirmOpen(false)
+              }}
+            >
+              {t('organizer.teamModeration.removeMember.confirm.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

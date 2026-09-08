@@ -220,4 +220,25 @@ describe('OrganizerTeamsScreen', () => {
 
     await waitFor(() => expect(mockedMemberMove).toHaveBeenCalledTimes(2))
   })
+
+  it('removes a member after confirming the dialog', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedMemberDelete.mockResolvedValue(jsonResponse(204, undefined))
+    renderScreen()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-member-action-u1')).toBeDefined(),
+    )
+    fireEvent.click(screen.getByTestId('team-moderation-remove-member-action-u1'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-member-confirm-u1')).toBeDefined(),
+    )
+    fireEvent.click(screen.getByTestId('team-moderation-remove-member-confirm-confirm-u1'))
+
+    await waitFor(() =>
+      expect(mockedMemberDelete).toHaveBeenCalledWith({ param: { userId: 'u1' } }),
+    )
+    await waitFor(() => expect(mockedTeamsGet).toHaveBeenCalledTimes(2))
+  })
 })

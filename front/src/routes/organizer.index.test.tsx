@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
@@ -10,19 +10,29 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-// The overview subscribes to /sse; the stream itself is covered by
-// use-event-stream.test.ts, so here it only has to not open a real
-// EventSource.
-vi.mock('@/lib/sse-client', () => ({ connectEventStream: vi.fn(() => () => {}) }))
+// The overview subscribes to /sse. The stream's own parsing is covered by
+// use-event-stream.test.ts; captured here so a test can push an event
+// through the screen's callbacks without opening a real EventSource.
+const connectEventStream = vi.fn()
+vi.mock('@/lib/sse-client', () => ({
+  connectEventStream: (...args: unknown[]) => connectEventStream(...args),
+}))
 
 import '@/i18n'
 
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
+import type { SseEvent } from '@/lib/sse-schema'
 import { routeTree } from '@/routeTree.gen'
 
 const mockedStatsGet = vi.mocked(api.organizer.stats.$get)
 const mockedRankingGet = vi.mocked(api.rounds[':id'].ranking.$get)
+const sseUnsubscribe = vi.fn()
+
+function emitSse(event: SseEvent) {
+  const onEvent = connectEventStream.mock.calls.at(-1)?.[0] as (e: SseEvent) => void
+  act(() => onEvent(event))
+}
 
 const organizerUser: SessionUser = {
   id: 'u1',
@@ -90,6 +100,9 @@ function renderScreen() {
 beforeEach(() => {
   mockedStatsGet.mockReset()
   mockedRankingGet.mockReset()
+  connectEventStream.mockReset()
+  sseUnsubscribe.mockReset()
+  connectEventStream.mockReturnValue(sseUnsubscribe)
   setSession(organizerUser, 'tok-1')
 })
 
@@ -139,6 +152,54 @@ describe('organizer overview', () => {
     // A live ranking mid-round would be a spoiler — and nothing was fetched.
     expect(screen.queryByTestId('overview-round-podium')).toBeNull()
     expect(mockedRankingGet).not.toHaveBeenCalled()
+  })
+
+  // The "ao vivo" half of the open-round criterion: a judged submission is
+  // announced as ranking.updated (#44), and the screen answers it by
+  // refetching its own numbers — no reload, no new SSE event type.
+  it('refetches this round´s submissions live when ranking.updated arrives', async () => {
+    mockedStatsGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        stats({
+          submissions: { total: 120, inRound: 17 },
+          round: { active: roundRef(), lastClosed: null },
+        }),
+      ),
+    )
+
+    renderScreen()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('overview-submissions-in-round').textContent).toContain(
+        '17 nesta rodada',
+      ),
+    )
+    await waitFor(() => expect(connectEventStream).toHaveBeenCalledTimes(1))
+
+    mockedStatsGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        stats({
+          submissions: { total: 121, inRound: 18 },
+          round: { active: roundRef(), lastClosed: null },
+        }),
+      ),
+    )
+    emitSse({
+      type: 'ranking.updated',
+      serverTime: new Date('2026-09-02T12:05:00.000Z'),
+      round: null,
+      event: { teams: [] },
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('overview-submissions-in-round').textContent).toContain(
+        '18 nesta rodada',
+      ),
+    )
+    expect(screen.getByTestId('overview-submissions-total').textContent).toContain('121')
+    expect(mockedStatsGet).toHaveBeenCalledTimes(2)
   })
 
   it('shows the last closed round with its podium when no round is open', async () => {

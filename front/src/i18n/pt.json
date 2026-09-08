@@ -351,6 +351,47 @@
         }
       }
     },
+    "users": {
+      "heading": "Usuários",
+      "loading": "Carregando usuários...",
+      "error": {
+        "message": "Não foi possível carregar os usuários.",
+        "retry": "Tentar novamente"
+      },
+      "empty": "Nenhum usuário encontrado com esses filtros.",
+      "search": {
+        "label": "Buscar por e-mail",
+        "placeholder": "parte do e-mail"
+      },
+      "filters": {
+        "all": "Todos",
+        "university": "Universidade",
+        "role": "Papel",
+        "team": "Time"
+      },
+      "role": {
+        "participant": "Participante",
+        "organizer": "Organizador"
+      },
+      "columns": {
+        "email": "E-mail",
+        "university": "Universidade",
+        "role": "Papel",
+        "team": "Time",
+        "status": "Status",
+        "actions": "Ações"
+      },
+      "noTeam": "—",
+      "status": {
+        "active": "Ativo",
+        "inactive": "Desativado"
+      },
+      "pagination": {
+        "range": "{{from}}–{{to}} de {{total}}",
+        "previous": "Anterior",
+        "next": "Próxima"
+      }
+    },
     "overview": {
       "heading": "Visão geral",
       "loading": "Carregando os números do evento...",

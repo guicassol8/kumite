@@ -351,6 +351,47 @@
         }
       }
     },
+    "users": {
+      "heading": "Users",
+      "loading": "Loading users...",
+      "error": {
+        "message": "We couldn't load the users.",
+        "retry": "Try again"
+      },
+      "empty": "No users match these filters.",
+      "search": {
+        "label": "Search by email",
+        "placeholder": "part of the email"
+      },
+      "filters": {
+        "all": "All",
+        "university": "University",
+        "role": "Role",
+        "team": "Team"
+      },
+      "role": {
+        "participant": "Participant",
+        "organizer": "Organizer"
+      },
+      "columns": {
+        "email": "Email",
+        "university": "University",
+        "role": "Role",
+        "team": "Team",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "noTeam": "—",
+      "status": {
+        "active": "Active",
+        "inactive": "Deactivated"
+      },
+      "pagination": {
+        "range": "{{from}}–{{to}} of {{total}}",
+        "previous": "Previous",
+        "next": "Next"
+      }
+    },
     "overview": {
       "heading": "Overview",
       "loading": "Loading the event numbers...",

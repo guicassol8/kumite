@@ -19,6 +19,7 @@ import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as OrganizerIndexRouteImport } from './routes/organizer.index'
 import { Route as OrganizerEventConfigRouteImport } from './routes/organizer.event-config'
 import { Route as OrganizerTeamsRouteImport } from './routes/organizer.teams'
+import { Route as OrganizerUsersRouteImport } from './routes/organizer.users'
 import { Route as ProblemIdRouteImport } from './routes/problem.$id'
 import { Route as RoundsIdRouteImport } from './routes/rounds.$id'
 import { Route as OrganizerProblemsIndexRouteImport } from './routes/organizer.problems.index'
@@ -78,6 +79,11 @@ const OrganizerTeamsRoute = OrganizerTeamsRouteImport.update({
   path: '/teams',
   getParentRoute: () => OrganizerRoute,
 } as any)
+const OrganizerUsersRoute = OrganizerUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => OrganizerRoute,
+} as any)
 const ProblemIdRoute = ProblemIdRouteImport.update({
   id: '/problem/$id',
   path: '/problem/$id',
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/teams': typeof TeamsRoute
   '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/organizer/teams': typeof OrganizerTeamsRoute
+  '/organizer/users': typeof OrganizerUsersRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/': typeof OrganizerIndexRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/teams': typeof TeamsRoute
   '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/organizer/teams': typeof OrganizerTeamsRoute
+  '/organizer/users': typeof OrganizerUsersRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer': typeof OrganizerIndexRoute
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/teams': typeof TeamsRoute
   '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/organizer/teams': typeof OrganizerTeamsRoute
+  '/organizer/users': typeof OrganizerUsersRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/': typeof OrganizerIndexRoute
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
     | '/teams'
     | '/organizer/event-config'
     | '/organizer/teams'
+    | '/organizer/users'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/'
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
     | '/teams'
     | '/organizer/event-config'
     | '/organizer/teams'
+    | '/organizer/users'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer'
@@ -230,6 +241,7 @@ export interface FileRouteTypes {
     | '/teams'
     | '/organizer/event-config'
     | '/organizer/teams'
+    | '/organizer/users'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/'
@@ -325,6 +337,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizerTeamsRouteImport
       parentRoute: typeof OrganizerRoute
     }
+    '/organizer/users': {
+      id: '/organizer/users'
+      path: '/users'
+      fullPath: '/organizer/users'
+      preLoaderRoute: typeof OrganizerUsersRouteImport
+      parentRoute: typeof OrganizerRoute
+    }
     '/problem/$id': {
       id: '/problem/$id'
       path: '/problem/$id'
@@ -387,6 +406,7 @@ declare module '@tanstack/react-router' {
 interface OrganizerRouteChildren {
   OrganizerEventConfigRoute: typeof OrganizerEventConfigRoute
   OrganizerTeamsRoute: typeof OrganizerTeamsRoute
+  OrganizerUsersRoute: typeof OrganizerUsersRoute
   OrganizerIndexRoute: typeof OrganizerIndexRoute
   OrganizerProblemsNewRoute: typeof OrganizerProblemsNewRoute
   OrganizerRoundsNewRoute: typeof OrganizerRoundsNewRoute
@@ -399,6 +419,7 @@ interface OrganizerRouteChildren {
 const OrganizerRouteChildren: OrganizerRouteChildren = {
   OrganizerEventConfigRoute: OrganizerEventConfigRoute,
   OrganizerTeamsRoute: OrganizerTeamsRoute,
+  OrganizerUsersRoute: OrganizerUsersRoute,
   OrganizerIndexRoute: OrganizerIndexRoute,
   OrganizerProblemsNewRoute: OrganizerProblemsNewRoute,
   OrganizerRoundsNewRoute: OrganizerRoundsNewRoute,

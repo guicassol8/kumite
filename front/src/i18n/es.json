@@ -56,7 +56,8 @@
     "nav": {
       "problems": "Problemas",
       "rounds": "Rondas",
-      "eventConfig": "Configuración del evento"
+      "eventConfig": "Configuración del evento",
+      "teams": "Equipos"
     },
     "problems": {
       "heading": "Problemas del catálogo",
@@ -287,6 +288,62 @@
           "suffixesRequired": "Ingresa al menos un sufijo de email.",
           "codeTaken": "Ese código ya está en uso.",
           "saveFailed": "No se pudo guardar. Intenta de nuevo."
+        }
+      }
+    },
+    "teamModeration": {
+      "heading": "Moderación de equipos",
+      "loading": "Cargando equipos...",
+      "error": {
+        "message": "No se pudieron cargar los equipos.",
+        "retry": "Intentar de nuevo"
+      },
+      "frozenBadge": "Congelado",
+      "role": {
+        "participant": "Participante",
+        "organizer": "Organizador"
+      },
+      "columns": {
+        "email": "Email",
+        "university": "Universidad",
+        "role": "Rol",
+        "actions": "Acciones"
+      },
+      "removeTeamAction": "Eliminar equipo",
+      "rename": {
+        "editAction": "Renombrar",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "errors": {
+          "nameTaken": "Ya existe un equipo con ese nombre.",
+          "saveFailed": "No se pudo guardar. Intenta de nuevo."
+        }
+      },
+      "move": {
+        "selectPlaceholder": "Mover a...",
+        "action": "Mover",
+        "errors": {
+          "teamFull": "El equipo de destino está lleno.",
+          "teamNotFound": "El equipo de destino ya no existe.",
+          "memberNotFound": "Ese integrante ya no pertenece a un equipo."
+        }
+      },
+      "removeMember": {
+        "action": "Eliminar",
+        "confirm": {
+          "title": "¿Eliminar integrante del equipo?",
+          "description": "El integrante se queda sin equipo; el equipo permanece con los demás miembros.",
+          "cancel": "Cancelar",
+          "confirm": "Eliminar"
+        }
+      },
+      "removeTeam": {
+        "action": "Eliminar equipo",
+        "confirm": {
+          "title": "¿Eliminar equipo?",
+          "description": "Los integrantes se quedan sin equipo. Las entregas se conservan para auditoría, pero se excluyen de la clasificación.",
+          "cancel": "Cancelar",
+          "confirm": "Eliminar"
         }
       }
     }

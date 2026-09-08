@@ -17,6 +17,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as OrganizerEventConfigRouteImport } from './routes/organizer.event-config'
+import { Route as OrganizerTeamsRouteImport } from './routes/organizer.teams'
 import { Route as ProblemIdRouteImport } from './routes/problem.$id'
 import { Route as RoundsIdRouteImport } from './routes/rounds.$id'
 import { Route as OrganizerProblemsIndexRouteImport } from './routes/organizer.problems.index'
@@ -64,6 +65,11 @@ const TeamsRoute = TeamsRouteImport.update({
 const OrganizerEventConfigRoute = OrganizerEventConfigRouteImport.update({
   id: '/event-config',
   path: '/event-config',
+  getParentRoute: () => OrganizerRoute,
+} as any)
+const OrganizerTeamsRoute = OrganizerTeamsRouteImport.update({
+  id: '/teams',
+  path: '/teams',
   getParentRoute: () => OrganizerRoute,
 } as any)
 const ProblemIdRoute = ProblemIdRouteImport.update({
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
   '/organizer/event-config': typeof OrganizerEventConfigRoute
+  '/organizer/teams': typeof OrganizerTeamsRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
@@ -134,6 +141,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
   '/organizer/event-config': typeof OrganizerEventConfigRoute
+  '/organizer/teams': typeof OrganizerTeamsRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
@@ -153,6 +161,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
   '/organizer/event-config': typeof OrganizerEventConfigRoute
+  '/organizer/teams': typeof OrganizerTeamsRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/teams'
     | '/organizer/event-config'
+    | '/organizer/teams'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/problems/new'
@@ -191,6 +201,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/teams'
     | '/organizer/event-config'
+    | '/organizer/teams'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/problems/new'
@@ -209,6 +220,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/teams'
     | '/organizer/event-config'
+    | '/organizer/teams'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/problems/new'
@@ -289,6 +301,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrganizerEventConfigRouteImport
       parentRoute: typeof OrganizerRoute
     }
+    '/organizer/teams': {
+      id: '/organizer/teams'
+      path: '/teams'
+      fullPath: '/organizer/teams'
+      preLoaderRoute: typeof OrganizerTeamsRouteImport
+      parentRoute: typeof OrganizerRoute
+    }
     '/problem/$id': {
       id: '/problem/$id'
       path: '/problem/$id'
@@ -350,6 +369,7 @@ declare module '@tanstack/react-router' {
 
 interface OrganizerRouteChildren {
   OrganizerEventConfigRoute: typeof OrganizerEventConfigRoute
+  OrganizerTeamsRoute: typeof OrganizerTeamsRoute
   OrganizerProblemsNewRoute: typeof OrganizerProblemsNewRoute
   OrganizerRoundsNewRoute: typeof OrganizerRoundsNewRoute
   OrganizerProblemsIndexRoute: typeof OrganizerProblemsIndexRoute
@@ -360,6 +380,7 @@ interface OrganizerRouteChildren {
 
 const OrganizerRouteChildren: OrganizerRouteChildren = {
   OrganizerEventConfigRoute: OrganizerEventConfigRoute,
+  OrganizerTeamsRoute: OrganizerTeamsRoute,
   OrganizerProblemsNewRoute: OrganizerProblemsNewRoute,
   OrganizerRoundsNewRoute: OrganizerRoundsNewRoute,
   OrganizerProblemsIndexRoute: OrganizerProblemsIndexRoute,

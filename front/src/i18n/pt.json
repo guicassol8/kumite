@@ -56,7 +56,8 @@
     "nav": {
       "problems": "Problemas",
       "rounds": "Rodadas",
-      "eventConfig": "Configuração do evento"
+      "eventConfig": "Configuração do evento",
+      "teams": "Times"
     },
     "problems": {
       "heading": "Problemas do catálogo",
@@ -287,6 +288,62 @@
           "suffixesRequired": "Informe ao menos um sufixo de email.",
           "codeTaken": "Esse código já está em uso.",
           "saveFailed": "Não foi possível salvar. Tente novamente."
+        }
+      }
+    },
+    "teamModeration": {
+      "heading": "Moderação de times",
+      "loading": "Carregando times...",
+      "error": {
+        "message": "Não foi possível carregar os times.",
+        "retry": "Tentar novamente"
+      },
+      "frozenBadge": "Congelado",
+      "role": {
+        "participant": "Participante",
+        "organizer": "Organizador"
+      },
+      "columns": {
+        "email": "Email",
+        "university": "Universidade",
+        "role": "Papel",
+        "actions": "Ações"
+      },
+      "removeTeamAction": "Remover time",
+      "rename": {
+        "editAction": "Renomear",
+        "save": "Salvar",
+        "cancel": "Cancelar",
+        "errors": {
+          "nameTaken": "Já existe um time com esse nome.",
+          "saveFailed": "Não foi possível salvar. Tente novamente."
+        }
+      },
+      "move": {
+        "selectPlaceholder": "Mover para...",
+        "action": "Mover",
+        "errors": {
+          "teamFull": "O time de destino está cheio.",
+          "teamNotFound": "O time de destino não existe mais.",
+          "memberNotFound": "Esse integrante não pertence mais a um time."
+        }
+      },
+      "removeMember": {
+        "action": "Remover",
+        "confirm": {
+          "title": "Remover integrante do time?",
+          "description": "O integrante fica sem time; o time permanece com os demais membros.",
+          "cancel": "Cancelar",
+          "confirm": "Remover"
+        }
+      },
+      "removeTeam": {
+        "action": "Remover time",
+        "confirm": {
+          "title": "Remover time?",
+          "description": "Os integrantes ficam sem time. As submissões são preservadas para auditoria, mas excluídas do ranking.",
+          "cancel": "Cancelar",
+          "confirm": "Remover"
         }
       }
     }

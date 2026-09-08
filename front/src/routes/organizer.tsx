@@ -41,6 +41,14 @@ function OrganizerScreen() {
         >
           {t('organizer.nav.eventConfig')}
         </Link>
+        <Link
+          to="/organizer/teams"
+          data-testid="organizer-nav-teams"
+          activeProps={{ className: 'font-semibold text-foreground' }}
+          className="text-muted-foreground text-sm"
+        >
+          {t('organizer.nav.teams')}
+        </Link>
       </nav>
       <Outlet />
     </main>

@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { ShieldMinus, ShieldPlus, UserCheck, UserX } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -113,6 +113,10 @@ function OrganizerUsersScreen() {
       filters.offset,
     ],
     queryFn: () => fetchUsers(filters, debouncedQ),
+    // Every filter and page is its own query key, so without this the table
+    // unmounts on each change — blanking the rows and, worse, closing a
+    // confirmation dialog the organizer had just opened.
+    placeholderData: keepPreviousData,
   })
 
   const teams = useQuery({ queryKey: ['organizer-teams'], queryFn: fetchTeamOptions })

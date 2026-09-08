@@ -50,10 +50,9 @@
     "workspaceLabel": "Blocks area"
   },
   "organizer": {
-    "stub": {
-      "title": "Organizer area"
-    },
+    "heading": "Organizer area",
     "nav": {
+      "overview": "Overview",
       "problems": "Problems",
       "rounds": "Rounds",
       "eventConfig": "Event configuration",
@@ -350,6 +349,44 @@
         "errors": {
           "failed": "Could not remove this team. Please try again."
         }
+      }
+    },
+    "overview": {
+      "heading": "Overview",
+      "loading": "Loading the event numbers...",
+      "error": {
+        "message": "Could not load the event numbers.",
+        "retry": "Try again"
+      },
+      "signups": {
+        "title": "Signups",
+        "pucrs": "{{count}} from PUCRS",
+        "merida": "{{count}} from Mérida"
+      },
+      "teams": {
+        "title": "Teams",
+        "members": "{{inTeam}} of {{total}} signups on a team",
+        "openSlots": "{{count}} open slots",
+        "withoutTeam": "{{count}} without a team"
+      },
+      "submissions": {
+        "title": "Submissions",
+        "inActiveRound": "{{count}} in this round",
+        "inLastRound": "{{count}} in the last round"
+      },
+      "round": {
+        "title": "Round",
+        "streamOffline": "Live connection lost",
+        "manageCta": "Manage rounds",
+        "lastClosed": "Last round: {{name}}",
+        "closedAt": "Closed on {{date}}",
+        "podiumEmpty": "No team scored in this round.",
+        "podiumEntry": "#{{rank}} {{name}} · {{score}} pts",
+        "leaderboardCta": "View leaderboard",
+        "none": "No round has been created yet."
+      },
+      "shortcuts": {
+        "title": "Shortcuts"
       }
     }
   },

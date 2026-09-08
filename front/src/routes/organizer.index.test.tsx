@@ -271,6 +271,9 @@ describe('organizer overview', () => {
     expect(screen.getByTestId('overview-shortcuts-event-config').getAttribute('href')).toBe(
       '/organizer/event-config',
     )
+    expect(screen.getByTestId('overview-shortcuts-users').getAttribute('href')).toBe(
+      '/organizer/users',
+    )
   })
 
   it('offers a retry when the stats request fails', async () => {

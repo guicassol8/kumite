@@ -270,6 +270,9 @@ function OrganizerOverviewScreen() {
               >
                 <Link to="/organizer/event-config">{t('organizer.nav.eventConfig')}</Link>
               </Button>
+              <Button asChild size="sm" variant="outline" data-testid="overview-shortcuts-users">
+                <Link to="/organizer/users">{t('organizer.nav.users')}</Link>
+              </Button>
             </CardContent>
           </Card>
         </>

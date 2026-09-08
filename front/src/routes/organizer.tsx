@@ -60,6 +60,14 @@ function OrganizerScreen() {
         >
           {t('organizer.nav.teams')}
         </Link>
+        <Link
+          to="/organizer/users"
+          data-testid="organizer-nav-users"
+          activeProps={{ className: 'font-semibold text-foreground' }}
+          className="text-muted-foreground text-sm"
+        >
+          {t('organizer.nav.users')}
+        </Link>
       </nav>
       <Outlet />
     </main>

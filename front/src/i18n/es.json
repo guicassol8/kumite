@@ -56,7 +56,8 @@
       "problems": "Problemas",
       "rounds": "Rondas",
       "eventConfig": "Configuración del evento",
-      "teams": "Equipos"
+      "teams": "Equipos",
+      "users": "Usuarios"
     },
     "problems": {
       "heading": "Problemas del catálogo",

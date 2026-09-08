@@ -11,7 +11,8 @@
     "logout": "Log out",
     "organizerLink": "Organizer",
     "teamsLink": "Teams",
-    "leaderboardLink": "Leaderboard"
+    "leaderboardLink": "Leaderboard",
+    "changePassword": "Change password"
   },
   "footer": {
     "contactLabel": "Questions? Talk to the organizers:"
@@ -415,6 +416,26 @@
         },
         "errors": {
           "failed": "The action could not be completed."
+        },
+        "resetPassword": "Reset password",
+        "organizerDisabled": "Only participants can have their password reset.",
+        "reset": {
+          "title": "Reset {{email}}'s password",
+          "description": "Confirm with your organizer password. They will get a temporary password and must change it on their next sign-in.",
+          "adminPasswordLabel": "Your organizer password",
+          "submit": "Reset",
+          "cancel": "Cancel",
+          "errors": {
+            "invalid": "Wrong password, or too many attempts. Wait a few minutes and try again.",
+            "unexpected": "Could not reset the password. Please try again."
+          },
+          "result": {
+            "title": "Temporary password",
+            "warning": "Write it down now — this password is not shown again.",
+            "copy": "Copy",
+            "copied": "Copied",
+            "close": "Close"
+          }
         }
       }
     },
@@ -584,6 +605,23 @@
         "passwordMismatch": "Passwords do not match",
         "invalidOtp": "Invalid or expired code",
         "unexpected": "Could not reset the password. Please try again."
+      }
+    },
+    "changePassword": {
+      "title": "Change password",
+      "description": "Pick a new password for your account.",
+      "requiredNotice": "You signed in with a temporary password. Pick a new one to continue.",
+      "currentLabel": "Current password",
+      "newLabel": "New password",
+      "confirmLabel": "Confirm new password",
+      "submitButton": "Change password",
+      "backLink": "Back",
+      "errors": {
+        "currentRequired": "Enter your current password",
+        "invalidCurrent": "Current password is incorrect",
+        "passwordTooShort": "Password must be at least 8 characters",
+        "passwordMismatch": "Passwords do not match",
+        "unexpected": "Could not change the password. Please try again."
       }
     }
   },

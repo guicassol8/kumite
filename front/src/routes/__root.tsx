@@ -23,6 +23,19 @@ function RootComponent() {
       const state = getState()
       if (state.status === 'anonymous' && state.reason === 'expired') {
         router.navigate({ to: '/login', search: { redirect: router.state.location.href } })
+        return
+      }
+
+      // An account on an organizer-issued temporary password (#143) has to
+      // change it before anything else. The route guards cover the guarded
+      // screens, but the home page has none — and this is what actually makes
+      // "before any other screen" true, from wherever the session hydrates.
+      if (
+        state.status === 'authenticated' &&
+        state.user?.mustChangePassword &&
+        router.state.location.pathname !== '/change-password'
+      ) {
+        router.navigate({ to: '/change-password' })
       }
     })
   }, [router])

@@ -13,6 +13,7 @@ vi.mock('@/lib/api', () => ({
           demote: { $post: vi.fn() },
           deactivate: { $post: vi.fn() },
           reactivate: { $post: vi.fn() },
+          'reset-password': { $post: vi.fn() },
         },
       },
       teams: { $get: vi.fn() },
@@ -32,6 +33,7 @@ const mockedPromote = vi.mocked(api.organizer.users[':id'].promote.$post)
 const mockedDemote = vi.mocked(api.organizer.users[':id'].demote.$post)
 const mockedDeactivate = vi.mocked(api.organizer.users[':id'].deactivate.$post)
 const mockedReactivate = vi.mocked(api.organizer.users[':id'].reactivate.$post)
+const mockedResetPassword = vi.mocked(api.organizer.users[':id']['reset-password'].$post)
 
 const organizerUser: SessionUser = {
   id: 'org-1',
@@ -319,5 +321,119 @@ describe('OrganizerUsersScreen', () => {
 
     const alert = await screen.findByTestId('organizer-users-action-error-u1')
     expect(alert.textContent).toContain('própria conta')
+  })
+})
+
+describe('organizer users — password reset (#143)', () => {
+  async function openDialog() {
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u1')
+    fireEvent.click(screen.getByTestId('organizer-users-reset-password-u1'))
+    return screen.findByTestId('organizer-users-reset-password-dialog-u1')
+  }
+
+  function typeAdminPassword(value: string) {
+    fireEvent.change(screen.getByTestId('organizer-users-reset-password-admin-password-input-u1'), {
+      target: { value },
+    })
+  }
+
+  it('sends the organizer password and shows the temporary one', async () => {
+    mockedResetPassword.mockResolvedValue(
+      jsonResponse(200, { temporaryPassword: 'k7fq-3nrv-9wzt' }),
+    )
+    await openDialog()
+
+    typeAdminPassword('organizer-secret')
+    fireEvent.click(screen.getByTestId('organizer-users-reset-password-submit-u1'))
+
+    await waitFor(() => {
+      expect(mockedResetPassword).toHaveBeenCalledWith({
+        param: { id: 'u1' },
+        json: { adminPassword: 'organizer-secret' },
+      })
+    })
+    const value = await screen.findByTestId('organizer-users-reset-password-result-value-u1')
+    expect(value.textContent).toBe('k7fq-3nrv-9wzt')
+  })
+
+  it('shows one message for a 403 and no password at all', async () => {
+    mockedResetPassword.mockResolvedValue(jsonResponse(403, { error: 'invalid_admin_password' }))
+    await openDialog()
+
+    typeAdminPassword('wrong')
+    fireEvent.click(screen.getByTestId('organizer-users-reset-password-submit-u1'))
+
+    const alert = await screen.findByTestId('organizer-users-reset-password-error-u1')
+    // The API refuses to say whether it was the password or the ceiling, and
+    // the UI repeats that refusal instead of guessing.
+    expect(alert.textContent).toContain('tentativas demais')
+    expect(screen.queryByTestId('organizer-users-reset-password-result-u1')).toBeNull()
+  })
+
+  it('does not keep the temporary password around after the dialog closes', async () => {
+    mockedResetPassword.mockResolvedValue(
+      jsonResponse(200, { temporaryPassword: 'k7fq-3nrv-9wzt' }),
+    )
+    await openDialog()
+
+    typeAdminPassword('organizer-secret')
+    fireEvent.click(screen.getByTestId('organizer-users-reset-password-submit-u1'))
+    await screen.findByTestId('organizer-users-reset-password-result-value-u1')
+
+    fireEvent.click(screen.getByTestId('organizer-users-reset-password-close-u1'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('organizer-users-reset-password-result-value-u1')).toBeNull()
+    })
+
+    // Shown once means gone from the page, not merely hidden behind a closed
+    // dialog: it lives in component state and nowhere else.
+    expect(document.body.textContent).not.toContain('k7fq-3nrv-9wzt')
+
+    // And the next open starts over at step one — Radix tears the dialog down
+    // across a few frames, so the reopen has to be retried rather than fired
+    // once into a half-unmounted tree.
+    await waitFor(
+      () => {
+        fireEvent.click(screen.getByTestId('organizer-users-reset-password-u1'))
+        const input = screen.getByTestId(
+          'organizer-users-reset-password-admin-password-input-u1',
+        ) as HTMLInputElement
+        expect(input.value).toBe('')
+      },
+      { timeout: 3000 },
+    )
+  })
+
+  it('is disabled on an organizer row, with its own explanation', async () => {
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u2')
+
+    expect(
+      (screen.getByTestId('organizer-users-reset-password-u2') as HTMLButtonElement).disabled,
+    ).toBe(true)
+    expect(screen.getByTestId('organizer-users-reset-password-tooltip-u2')).toBeTruthy()
+    expect(
+      screen.getByTestId('organizer-users-reset-password-u2').getAttribute('aria-label'),
+    ).toContain('participantes')
+  })
+
+  it("is disabled on the caller's own row, under the existing self tooltip", async () => {
+    mockedUsersGet.mockResolvedValue(
+      jsonResponse(200, {
+        items: [user({ id: 'org-1', email: organizerUser.email, role: 'organizer', team: null })],
+        total: 1,
+      }),
+    )
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-org-1')
+
+    expect(
+      (screen.getByTestId('organizer-users-reset-password-org-1') as HTMLButtonElement).disabled,
+    ).toBe(true)
+    expect(screen.getByTestId('organizer-users-self-tooltip-org-1')).toBeTruthy()
+    // The self case keeps the tooltip the other two buttons already share, so
+    // the organizer-only one must not also appear on this row.
+    expect(screen.queryByTestId('organizer-users-reset-password-tooltip-org-1')).toBeNull()
   })
 })

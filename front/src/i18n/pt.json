@@ -11,7 +11,8 @@
     "logout": "Sair",
     "organizerLink": "Organizador",
     "teamsLink": "Times",
-    "leaderboardLink": "Placar"
+    "leaderboardLink": "Placar",
+    "changePassword": "Trocar senha"
   },
   "footer": {
     "contactLabel": "Dúvidas? Fale com a organização:"
@@ -415,6 +416,26 @@
         },
         "errors": {
           "failed": "Não foi possível concluir a ação."
+        },
+        "resetPassword": "Redefinir senha",
+        "organizerDisabled": "Só dá pra redefinir a senha de participantes.",
+        "reset": {
+          "title": "Redefinir a senha de {{email}}",
+          "description": "Confirme com a sua senha de organizador. A pessoa receberá uma senha temporária e terá que trocá-la no próximo acesso.",
+          "adminPasswordLabel": "Sua senha de organizador",
+          "submit": "Redefinir",
+          "cancel": "Cancelar",
+          "errors": {
+            "invalid": "Senha incorreta ou tentativas demais. Espere alguns minutos e tente de novo.",
+            "unexpected": "Não foi possível redefinir a senha. Tente novamente."
+          },
+          "result": {
+            "title": "Senha temporária",
+            "warning": "Anote agora: esta senha não aparece de novo.",
+            "copy": "Copiar",
+            "copied": "Copiado",
+            "close": "Fechar"
+          }
         }
       }
     },
@@ -584,6 +605,23 @@
         "passwordMismatch": "As senhas não coincidem",
         "invalidOtp": "Código inválido ou expirado",
         "unexpected": "Não foi possível redefinir a senha. Tente novamente."
+      }
+    },
+    "changePassword": {
+      "title": "Trocar senha",
+      "description": "Escolha uma senha nova para a sua conta.",
+      "requiredNotice": "Você entrou com uma senha temporária. Escolha uma senha nova para continuar.",
+      "currentLabel": "Senha atual",
+      "newLabel": "Nova senha",
+      "confirmLabel": "Confirmar nova senha",
+      "submitButton": "Trocar senha",
+      "backLink": "Voltar",
+      "errors": {
+        "currentRequired": "Informe a sua senha atual",
+        "invalidCurrent": "Senha atual incorreta",
+        "passwordTooShort": "A senha precisa ter pelo menos 8 caracteres",
+        "passwordMismatch": "As senhas não coincidem",
+        "unexpected": "Não foi possível trocar a senha. Tente novamente."
       }
     }
   },

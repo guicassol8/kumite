@@ -32,6 +32,13 @@ export function Header() {
             <Link to="/leaderboard" data-testid="header-leaderboard-link" className="text-sm">
               {t('header.leaderboardLink')}
             </Link>
+            <Link
+              to="/change-password"
+              data-testid="header-change-password-link"
+              className="text-sm"
+            >
+              {t('header.changePassword')}
+            </Link>
             <span data-testid="header-user-email" className="text-muted-foreground text-sm">
               {user.email}
             </span>

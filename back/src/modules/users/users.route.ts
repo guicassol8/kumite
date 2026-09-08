@@ -3,11 +3,8 @@ import { ErrorBodySchema } from '@katajs-framework/core'
 import { defineRoute } from '../../context'
 import { requireOrganizer, requireUser } from '../../middlewares/auth'
 
-import { issuePasswordResetOtp } from '../password-reset/password-reset.service'
-
 import {
   ListUsersQuerySchema,
-  NoContentSchema,
   PublicUserSchema,
   UserIdParamsSchema,
   UserListSchema,
@@ -98,19 +95,6 @@ export const reactivateUserRoute = defineRoute({
   handler: async (c) => {
     const result = await reactivateUser(c.get('db'), c.input.params.id)
     if (result.ok) return c.json(result.user, 200)
-    return c.error('not_found', 'User not found', { status: 404 })
-  },
-})
-
-export const resetUserPasswordRoute = defineRoute({
-  method: 'POST',
-  path: '/organizer/users/:id/reset-password',
-  use: [requireUser, requireOrganizer],
-  input: { params: UserIdParamsSchema },
-  output: { 204: NoContentSchema, 404: ErrorBodySchema },
-  handler: async (c) => {
-    const result = await issuePasswordResetOtp(c.get('db'), c.input.params.id)
-    if (result.ok) return c.json(undefined, 204)
     return c.error('not_found', 'User not found', { status: 404 })
   },
 })

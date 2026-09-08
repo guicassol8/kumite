@@ -56,7 +56,8 @@
       "problems": "Problems",
       "rounds": "Rounds",
       "eventConfig": "Event configuration",
-      "teams": "Teams"
+      "teams": "Teams",
+      "users": "Users"
     },
     "problems": {
       "heading": "Catalog problems",
@@ -351,6 +352,69 @@
         }
       }
     },
+    "users": {
+      "heading": "Users",
+      "loading": "Loading users...",
+      "error": {
+        "message": "We couldn't load the users.",
+        "retry": "Try again"
+      },
+      "empty": "No users match these filters.",
+      "search": {
+        "label": "Search by email",
+        "placeholder": "part of the email"
+      },
+      "filters": {
+        "all": "All",
+        "university": "University",
+        "role": "Role",
+        "team": "Team"
+      },
+      "role": {
+        "participant": "Participant",
+        "organizer": "Organizer"
+      },
+      "columns": {
+        "email": "Email",
+        "university": "University",
+        "role": "Role",
+        "team": "Team",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "noTeam": "—",
+      "status": {
+        "active": "Active",
+        "inactive": "Deactivated"
+      },
+      "pagination": {
+        "range": "{{from}}–{{to}} of {{total}}",
+        "previous": "Previous",
+        "next": "Next"
+      },
+      "actions": {
+        "promote": "Promote to organizer",
+        "demote": "Demote to participant",
+        "deactivate": "Deactivate account",
+        "reactivate": "Reactivate account",
+        "selfDisabled": "You cannot change your own account.",
+        "confirm": {
+          "demote": {
+            "title": "Demote this organizer?",
+            "description": "The account loses access to the Panel and goes back to being a participant."
+          },
+          "deactivate": {
+            "title": "Deactivate this account?",
+            "description": "They will not be able to sign in until the account is reactivated."
+          },
+          "cancel": "Cancel",
+          "confirm": "Confirm"
+        },
+        "errors": {
+          "failed": "The action could not be completed."
+        }
+      }
+    },
     "overview": {
       "heading": "Overview",
       "loading": "Loading the event numbers...",
@@ -483,6 +547,7 @@
       "emailLabel": "Email",
       "passwordLabel": "Password",
       "submitButton": "Log in",
+      "forgotPasswordLink": "I forgot my password",
       "errors": {
         "emailInvalid": "Enter a valid email",
         "passwordRequired": "Enter your password",
@@ -491,6 +556,16 @@
     },
     "resetPassword": {
       "title": "Reset password",
+      "request": {
+        "description": "Enter your account email and we'll send you a verification code.",
+        "emailLabel": "Email",
+        "submitButton": "Send code",
+        "sentMessage": "We sent a verification code to {{email}}. It expires in 15 minutes.",
+        "backButton": "Send to another email",
+        "errors": {
+          "unexpected": "We couldn't send the code. Please try again."
+        }
+      },
       "emailLabel": "Email",
       "otpLabel": "Verification code",
       "newPasswordLabel": "New password",

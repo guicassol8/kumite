@@ -2,11 +2,28 @@ import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
 
-import { CompletePasswordResetBodySchema, NoContentSchema } from './password-reset.schema'
-import { completePasswordReset } from './password-reset.service'
+import {
+  CompletePasswordResetBodySchema,
+  NoContentSchema,
+  RequestPasswordResetBodySchema,
+} from './password-reset.schema'
+import { completePasswordReset, requestPasswordReset } from './password-reset.service'
 
-// Public — no `use:` — like login/signup: the user identifies by email, not
-// a session, since the reset was triggered by an organizer, not by them.
+// Public — no `use:` — like login/signup: whoever forgot their password has
+// no session to authenticate with. Always 204, whether or not the email is
+// registered, so the route never tells an anonymous caller who has an account.
+export const requestPasswordResetRoute = defineRoute({
+  method: 'POST',
+  path: '/auth/request-password-reset',
+  input: { body: RequestPasswordResetBodySchema },
+  output: { 204: NoContentSchema },
+  handler: async (c) => {
+    await requestPasswordReset(c.get('db'), c.input.body.email)
+    return c.json(undefined, 204)
+  },
+})
+
+// Public for the same reason — the user identifies by email plus the code.
 export const completePasswordResetRoute = defineRoute({
   method: 'POST',
   path: '/auth/complete-password-reset',

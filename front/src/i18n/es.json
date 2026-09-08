@@ -56,7 +56,8 @@
       "problems": "Problemas",
       "rounds": "Rondas",
       "eventConfig": "Configuración del evento",
-      "teams": "Equipos"
+      "teams": "Equipos",
+      "users": "Usuarios"
     },
     "problems": {
       "heading": "Problemas del catálogo",
@@ -351,6 +352,69 @@
         }
       }
     },
+    "users": {
+      "heading": "Usuarios",
+      "loading": "Cargando usuarios...",
+      "error": {
+        "message": "No fue posible cargar los usuarios.",
+        "retry": "Intentar de nuevo"
+      },
+      "empty": "Ningún usuario encontrado con estos filtros.",
+      "search": {
+        "label": "Buscar por correo",
+        "placeholder": "parte del correo"
+      },
+      "filters": {
+        "all": "Todos",
+        "university": "Universidad",
+        "role": "Rol",
+        "team": "Equipo"
+      },
+      "role": {
+        "participant": "Participante",
+        "organizer": "Organizador"
+      },
+      "columns": {
+        "email": "Correo electrónico",
+        "university": "Universidad",
+        "role": "Rol",
+        "team": "Equipo",
+        "status": "Estado",
+        "actions": "Acciones"
+      },
+      "noTeam": "—",
+      "status": {
+        "active": "Activo",
+        "inactive": "Desactivado"
+      },
+      "pagination": {
+        "range": "{{from}}–{{to}} de {{total}}",
+        "previous": "Anterior",
+        "next": "Siguiente"
+      },
+      "actions": {
+        "promote": "Promover a organizador",
+        "demote": "Degradar a participante",
+        "deactivate": "Desactivar cuenta",
+        "reactivate": "Reactivar cuenta",
+        "selfDisabled": "No puedes modificar tu propia cuenta.",
+        "confirm": {
+          "demote": {
+            "title": "¿Degradar a este organizador?",
+            "description": "La cuenta pierde el acceso al Panel y vuelve a ser de participante."
+          },
+          "deactivate": {
+            "title": "¿Desactivar esta cuenta?",
+            "description": "La persona no podrá iniciar sesión hasta que se reactive la cuenta."
+          },
+          "cancel": "Cancelar",
+          "confirm": "Confirmar"
+        },
+        "errors": {
+          "failed": "No se pudo completar la acción."
+        }
+      }
+    },
     "overview": {
       "heading": "Visión general",
       "loading": "Cargando los números del evento...",
@@ -483,6 +547,7 @@
       "emailLabel": "Correo electrónico",
       "passwordLabel": "Contraseña",
       "submitButton": "Entrar",
+      "forgotPasswordLink": "Olvidé mi contraseña",
       "errors": {
         "emailInvalid": "Ingresa un correo electrónico válido",
         "passwordRequired": "Ingresa la contraseña",
@@ -491,6 +556,16 @@
     },
     "resetPassword": {
       "title": "Restablecer contraseña",
+      "request": {
+        "description": "Ingresa el correo de tu cuenta y te enviaremos un código de verificación.",
+        "emailLabel": "Correo electrónico",
+        "submitButton": "Enviar código",
+        "sentMessage": "Enviamos un código de verificación a {{email}}. Vence en 15 minutos.",
+        "backButton": "Enviar a otro correo",
+        "errors": {
+          "unexpected": "No fue posible enviar el código. Inténtalo de nuevo."
+        }
+      },
       "emailLabel": "Correo electrónico",
       "otpLabel": "Código de verificación",
       "newPasswordLabel": "Nueva contraseña",

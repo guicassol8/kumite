@@ -2,11 +2,14 @@ import { readFileSync } from 'node:fs'
 
 import { expect, type Page, test } from '@playwright/test'
 
-// Visual walkthrough for #52. Prereqs (like organizer-problems.spec.ts):
+// Visual walkthrough for #52, reshot for #53's self-service flow. Prereqs
+// (like organizer-problems.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
-// Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD in the environment.
 //
-// The happy-path test additionally needs BACK_NOTIFICATIONS_LOG: a path to a
+// Since #53 nobody but the user triggers a reset: the screen's step 1 posts
+// to /auth/request-password-reset, so no organizer credentials are needed.
+//
+// The happy-path test needs BACK_NOTIFICATIONS_LOG: a path to a
 // file the running back server's stdout is redirected to. The OTP is never
 // returned by any endpoint (no oracle, by design — see password-reset.hurl),
 // so a real browser client only ever learns it the way a real user would:
@@ -16,13 +19,20 @@ import { expect, type Page, test } from '@playwright/test'
 // the happy path skips itself rather than failing.
 const evidence = (name: string) => `e2e/evidence/52/${name}.png`
 
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
 const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
 const NOTIFICATIONS_LOG = process.env.BACK_NOTIFICATIONS_LOG ?? ''
 
 function uniqueEmail(): string {
   return `reset-e2e-${Date.now()}@edu.pucrs.br`
+}
+
+// Step 1 of the screen: ask for the code. The back answers 204 for any
+// email, so this reaches step 2 regardless of the account existing.
+async function requestCode(page: Page, email: string): Promise<void> {
+  await page.goto('/reset-password')
+  await page.getByTestId('reset-password-request-email-input').fill(email)
+  await page.getByTestId('reset-password-request-submit').click()
+  await expect(page.getByTestId('reset-password-request-sent')).toBeVisible()
 }
 
 async function fillForm(
@@ -36,7 +46,7 @@ async function fillForm(
 }
 
 test('mismatched passwords show an inline error, no request sent', async ({ page }) => {
-  await page.goto('/reset-password')
+  await requestCode(page, 'someone@edu.pucrs.br')
   await fillForm(page, {
     email: 'someone@edu.pucrs.br',
     otp: '123456',
@@ -50,9 +60,10 @@ test('mismatched passwords show an inline error, no request sent', async ({ page
 })
 
 test('a wrong/unknown OTP shows a single generic error, no field blame', async ({ page }) => {
-  await page.goto('/reset-password')
+  const unknown = `nobody-${Date.now()}@edu.pucrs.br`
+  await requestCode(page, unknown)
   await fillForm(page, {
-    email: `nobody-${Date.now()}@edu.pucrs.br`,
+    email: unknown,
     otp: '000000',
     newPassword: 'brandnewpassword',
     confirmPassword: 'brandnewpassword',
@@ -63,21 +74,8 @@ test('a wrong/unknown OTP shows a single generic error, no field blame', async (
   await page.screenshot({ path: evidence('02-invalid-otp-generic-error'), fullPage: true })
 })
 
-test.describe('organizer-triggered reset, completed with the real OTP', () => {
-  test.skip(
-    !ORGANIZER_EMAIL || !ORGANIZER_PASSWORD || !NOTIFICATIONS_LOG,
-    'ORGANIZER_EMAIL/ORGANIZER_PASSWORD/BACK_NOTIFICATIONS_LOG not set',
-  )
-
-  async function organizerAuthHeader(): Promise<Record<string, string>> {
-    const res = await fetch(`${BACK_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-    })
-    const { token } = (await res.json()) as { token: string }
-    return { authorization: `Bearer ${token}` }
-  }
+test.describe('self-service reset, completed with the real OTP', () => {
+  test.skip(!NOTIFICATIONS_LOG, 'BACK_NOTIFICATIONS_LOG not set')
 
   // The OTP only ever exists in the notification (console.log fallback here)
   // — poll the log tail for it instead of guessing a fixed delay.
@@ -95,35 +93,42 @@ test.describe('organizer-triggered reset, completed with the real OTP', () => {
     throw new Error(`expected an OTP notification for ${email} in ${NOTIFICATIONS_LOG}`)
   }
 
-  test('full flow: organizer resets, user completes it with the emailed OTP, then logs in', async ({
-    page,
-  }) => {
+  test('full flow: the user asks for a code, spends it, then logs in', async ({ page }) => {
     const email = uniqueEmail()
     const originalPassword = 'originalpass123'
     const newPassword = 'brandnewpassword456'
 
-    const signupRes = await fetch(`${BACK_URL}/auth/signup`, {
+    await fetch(`${BACK_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email, password: originalPassword, code: 'PUCRS2026' }),
     })
-    const { id: userId } = (await signupRes.json()) as { id: string }
 
-    const auth = await organizerAuthHeader()
-    await fetch(`${BACK_URL}/organizer/users/${userId}/reset-password`, {
+    await page.goto('/login')
+    await page.getByTestId('login-forgot-password-link').click()
+    await page.getByTestId('reset-password-request-email-input').fill(email)
+    await page.screenshot({ path: evidence('03-request-code'), fullPage: true })
+    await page.getByTestId('reset-password-request-submit').click()
+    await expect(page.getByTestId('reset-password-request-sent')).toBeVisible()
+    await page.screenshot({ path: evidence('04-code-sent'), fullPage: true })
+
+    // #53's security fix: issuing a code must not lock the account out —
+    // the current password stays valid until the reset actually completes.
+    const stillValid = await fetch(`${BACK_URL}/auth/login`, {
       method: 'POST',
-      headers: auth,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password: originalPassword }),
     })
+    expect(stillValid.status).toBe(200)
 
     const otp = await readOtpFromLog(email)
 
-    await page.goto('/reset-password')
     await fillForm(page, { email, otp, newPassword, confirmPassword: newPassword })
-    await page.screenshot({ path: evidence('03-reset-form-filled'), fullPage: true })
+    await page.screenshot({ path: evidence('05-reset-form-filled'), fullPage: true })
     await page.getByTestId('reset-password-submit-button').click()
 
     await expect(page.getByTestId('reset-password-success')).toBeVisible()
-    await page.screenshot({ path: evidence('04-reset-success'), fullPage: true })
+    await page.screenshot({ path: evidence('06-reset-success'), fullPage: true })
 
     await page.getByTestId('reset-password-login-link').click()
     await page.getByTestId('login-email-input').fill(email)
@@ -131,6 +136,6 @@ test.describe('organizer-triggered reset, completed with the real OTP', () => {
     await page.getByTestId('login-submit-button').click()
 
     await expect(page.getByTestId('header-user-email')).toHaveText(email)
-    await page.screenshot({ path: evidence('05-login-with-new-password'), fullPage: true })
+    await page.screenshot({ path: evidence('07-login-with-new-password'), fullPage: true })
   })
 })

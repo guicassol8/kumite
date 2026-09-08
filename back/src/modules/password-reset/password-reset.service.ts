@@ -1,5 +1,3 @@
-import { randomBytes } from 'node:crypto'
-
 import argon2 from 'argon2'
 import { eq } from 'drizzle-orm'
 
@@ -16,10 +14,10 @@ const MAX_ATTEMPTS = 5
 
 export type IssueOtpResult = { ok: true } | { ok: false; error: 'not_found' }
 
-// Generates and emails a 6-digit OTP, and immediately invalidates the old
-// password (an unusable random hash — not the OTP itself) so the account is
-// locked out until the OTP is completed. A second call for the same user
-// replaces any pending OTP.
+// Generates and emails a 6-digit OTP. The current password stays usable until
+// `completePasswordReset` succeeds — issuing must not lock anyone out, since
+// `/auth/request-password-reset` is public and takes nothing but an email.
+// A second call for the same user replaces any pending OTP.
 export async function issuePasswordResetOtp(db: Db, userId: string): Promise<IssueOtpResult> {
   const user = await findUserById(db, userId)
   if (!user) return { ok: false, error: 'not_found' }
@@ -36,15 +34,21 @@ export async function issuePasswordResetOtp(db: Db, userId: string): Promise<Iss
       set: { otpHash, expiresAt, attemptsRemaining: MAX_ATTEMPTS, createdAt: new Date() },
     })
 
-  const unusableHash = await argon2.hash(randomBytes(32).toString('hex'))
-  await db
-    .update(usersTable)
-    .set({ passwordHash: unusableHash, updatedAt: new Date() })
-    .where(eq(usersTable.id, userId))
-
   await sendPasswordResetNotice({ email: user.email, otp })
 
   return { ok: true }
+}
+
+// Self-service entry point for the public route: resolves the email to a user
+// and issues a code. An unknown email resolves exactly like a known one —
+// nothing written, nothing sent — so the endpoint is no oracle for which
+// addresses are registered. A deactivated account is served like any other;
+// login keeps refusing it regardless of the password.
+export async function requestPasswordReset(db: Db, email: string): Promise<void> {
+  const user = await findUserByEmail(db, email)
+  if (!user) return
+
+  await issuePasswordResetOtp(db, user.id)
 }
 
 export type CompletePasswordResetResult = { ok: true } | { ok: false; error: 'invalid_otp' }

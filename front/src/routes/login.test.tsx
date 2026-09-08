@@ -73,6 +73,14 @@ describe('LoginScreen', () => {
     expect(await screen.findByTestId('login-form-error')).toBeDefined()
   })
 
+  it('offers a way out to the self-service password reset', async () => {
+    renderLogin()
+    await waitFor(() => screen.getByTestId('login-email-input'))
+
+    const link = screen.getByTestId('login-forgot-password-link')
+    expect(link.getAttribute('href')).toBe('/reset-password')
+  })
+
   it('stores the session and navigates to the preserved redirect on success', async () => {
     mockedLogin.mockResolvedValue(jsonResponse(200, { token: 'tok-1' }))
     mockedMe.mockResolvedValue(jsonResponse(200, fakeUser))

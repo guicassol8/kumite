@@ -12,7 +12,7 @@ function OrganizerScreen() {
   const { t } = useTranslation()
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-8">
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-8">
       <h1 className="font-bold text-2xl" data-testid="organizer-heading">
         {t('organizer.heading')}
       </h1>
@@ -59,6 +59,14 @@ function OrganizerScreen() {
           className="text-muted-foreground text-sm"
         >
           {t('organizer.nav.teams')}
+        </Link>
+        <Link
+          to="/organizer/users"
+          data-testid="organizer-nav-users"
+          activeProps={{ className: 'font-semibold text-foreground' }}
+          className="text-muted-foreground text-sm"
+        >
+          {t('organizer.nav.users')}
         </Link>
       </nav>
       <Outlet />

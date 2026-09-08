@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -123,6 +123,13 @@ function LoginScreen() {
               >
                 {t('auth.login.submitButton')}
               </Button>
+              <Link
+                to="/reset-password"
+                data-testid="login-forgot-password-link"
+                className="text-center text-muted-foreground text-sm underline-offset-4 hover:underline"
+              >
+                {t('auth.login.forgotPasswordLink')}
+              </Link>
             </form>
           </Form>
         </CardContent>

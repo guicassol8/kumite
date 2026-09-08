@@ -1,12 +1,16 @@
 import argon2 from 'argon2'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createDb } from '../../db/client'
-import { usersTable } from '../../db/schema'
+import { passwordResetOtpsTable, usersTable } from '../../db/schema'
 import { findUserById } from '../users/users.service'
 
-import { completePasswordReset, issuePasswordResetOtp } from './password-reset.service'
+import {
+  completePasswordReset,
+  issuePasswordResetOtp,
+  requestPasswordReset,
+} from './password-reset.service'
 
 const sendPasswordResetNotice = vi.fn().mockResolvedValue(undefined)
 vi.mock('../notifications/notifications.service', () => ({
@@ -44,13 +48,13 @@ function lastOtp(): string {
 }
 
 describe('issuePasswordResetOtp', () => {
-  it('invalidates the old password immediately', async () => {
+  it('keeps the current password usable until the reset completes', async () => {
     const user = await createTestUser()
     await issuePasswordResetOtp(db, user.id)
 
     const updated = await findUserById(db, user.id)
     const stillValid = await argon2.verify(updated?.passwordHash ?? '', 'original-password')
-    expect(stillValid).toBe(false)
+    expect(stillValid).toBe(true)
   })
 
   it('sends the OTP by email', async () => {
@@ -70,6 +74,36 @@ describe('issuePasswordResetOtp', () => {
   })
 })
 
+describe('requestPasswordReset', () => {
+  it('issues and emails a code for a known email', async () => {
+    const user = await createTestUser()
+
+    await requestPasswordReset(db, user.email)
+
+    expect(sendPasswordResetNotice).toHaveBeenCalledOnce()
+    const pending = await db.select().from(passwordResetOtpsTable)
+    expect(pending).toHaveLength(1)
+    expect(pending[0]?.userId).toBe(user.id)
+  })
+
+  it('resolves silently for an unknown email — no row, no email, no oracle', async () => {
+    await expect(requestPasswordReset(db, 'nobody@example.com')).resolves.toBeUndefined()
+
+    expect(sendPasswordResetNotice).not.toHaveBeenCalled()
+    const pending = await db.select().from(passwordResetOtpsTable)
+    expect(pending).toHaveLength(0)
+  })
+
+  it('issues a code for a deactivated account too — login still refuses it', async () => {
+    const user = await createTestUser('inactive@example.com')
+    await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, user.id))
+
+    await requestPasswordReset(db, user.email)
+
+    expect(sendPasswordResetNotice).toHaveBeenCalledOnce()
+  })
+})
+
 describe('completePasswordReset', () => {
   it('sets the new password and consumes the OTP on a correct code', async () => {
     const user = await createTestUser()
@@ -86,6 +120,10 @@ describe('completePasswordReset', () => {
     const updated = await findUserById(db, user.id)
     const valid = await argon2.verify(updated?.passwordHash ?? '', 'brand-new-password')
     expect(valid).toBe(true)
+
+    // The old password stops working here, and only here.
+    const oldStillValid = await argon2.verify(updated?.passwordHash ?? '', 'original-password')
+    expect(oldStillValid).toBe(false)
 
     // Consumed: reusing the same OTP now fails.
     const reuse = await completePasswordReset(db, {

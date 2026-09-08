@@ -483,6 +483,7 @@
       "emailLabel": "Email",
       "passwordLabel": "Password",
       "submitButton": "Log in",
+      "forgotPasswordLink": "I forgot my password",
       "errors": {
         "emailInvalid": "Enter a valid email",
         "passwordRequired": "Enter your password",

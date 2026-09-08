@@ -483,6 +483,7 @@
       "emailLabel": "E-mail",
       "passwordLabel": "Senha",
       "submitButton": "Entrar",
+      "forgotPasswordLink": "Esqueci minha senha",
       "errors": {
         "emailInvalid": "Informe um e-mail válido",
         "passwordRequired": "Informe a senha",

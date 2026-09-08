@@ -309,7 +309,6 @@
         "role": "Rol",
         "actions": "Acciones"
       },
-      "removeTeamAction": "Eliminar equipo",
       "rename": {
         "editAction": "Renombrar",
         "save": "Guardar",
@@ -335,6 +334,9 @@
           "description": "El integrante se queda sin equipo; el equipo permanece con los demás miembros.",
           "cancel": "Cancelar",
           "confirm": "Eliminar"
+        },
+        "errors": {
+          "failed": "No se pudo eliminar a este integrante. Intenta de nuevo."
         }
       },
       "removeTeam": {
@@ -344,6 +346,9 @@
           "description": "Los integrantes se quedan sin equipo. Las entregas se conservan para auditoría, pero se excluyen de la clasificación.",
           "cancel": "Cancelar",
           "confirm": "Eliminar"
+        },
+        "errors": {
+          "failed": "No se pudo eliminar este equipo. Intenta de nuevo."
         }
       }
     }

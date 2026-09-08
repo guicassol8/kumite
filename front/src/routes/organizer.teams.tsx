@@ -354,14 +354,25 @@ function TeamNameHeader({ team, onRenamed }: { team: OrganizerTeam; onRenamed: (
 function RemoveMemberAction({ userId, onRemoved }: { userId: string; onRemoved: () => void }) {
   const { t } = useTranslation()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const remove = useMutation({
     mutationFn: async () => api.organizer.teams.members[':userId'].$delete({ param: { userId } }),
-    onSuccess: () => onRemoved(),
   })
 
+  async function onConfirm() {
+    setConfirmOpen(false)
+    const res = await remove.mutateAsync()
+    if (res.status === 204) {
+      setError(null)
+      onRemoved()
+      return
+    }
+    setError(t('organizer.teamModeration.removeMember.errors.failed'))
+  }
+
   return (
-    <>
+    <div className="flex flex-col gap-1">
       <Button
         type="button"
         variant="outline"
@@ -373,6 +384,11 @@ function RemoveMemberAction({ userId, onRemoved }: { userId: string; onRemoved: 
       >
         <UserMinus className="size-4" />
       </Button>
+      {error && (
+        <Alert variant="destructive" data-testid={`team-moderation-remove-member-error-${userId}`}>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent data-testid={`team-moderation-remove-member-confirm-${userId}`}>
           <AlertDialogHeader>
@@ -391,31 +407,39 @@ function RemoveMemberAction({ userId, onRemoved }: { userId: string; onRemoved: 
             </AlertDialogCancel>
             <AlertDialogAction
               data-testid={`team-moderation-remove-member-confirm-confirm-${userId}`}
-              onClick={() => {
-                remove.mutate()
-                setConfirmOpen(false)
-              }}
+              onClick={onConfirm}
             >
               {t('organizer.teamModeration.removeMember.confirm.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   )
 }
 
 function RemoveTeamAction({ teamId, onRemoved }: { teamId: string; onRemoved: () => void }) {
   const { t } = useTranslation()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const remove = useMutation({
     mutationFn: async () => api.organizer.teams[':id'].$delete({ param: { id: teamId } }),
-    onSuccess: () => onRemoved(),
   })
 
+  async function onConfirm() {
+    setConfirmOpen(false)
+    const res = await remove.mutateAsync()
+    if (res.status === 204) {
+      setError(null)
+      onRemoved()
+      return
+    }
+    setError(t('organizer.teamModeration.removeTeam.errors.failed'))
+  }
+
   return (
-    <>
+    <div className="flex flex-col gap-1">
       <Button
         type="button"
         variant="destructive"
@@ -425,6 +449,11 @@ function RemoveTeamAction({ teamId, onRemoved }: { teamId: string; onRemoved: ()
       >
         {t('organizer.teamModeration.removeTeam.action')}
       </Button>
+      {error && (
+        <Alert variant="destructive" data-testid={`team-moderation-remove-team-error-${teamId}`}>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent data-testid={`team-moderation-remove-team-confirm-${teamId}`}>
           <AlertDialogHeader>
@@ -441,16 +470,13 @@ function RemoveTeamAction({ teamId, onRemoved }: { teamId: string; onRemoved: ()
             </AlertDialogCancel>
             <AlertDialogAction
               data-testid={`team-moderation-remove-team-confirm-confirm-${teamId}`}
-              onClick={() => {
-                remove.mutate()
-                setConfirmOpen(false)
-              }}
+              onClick={onConfirm}
             >
               {t('organizer.teamModeration.removeTeam.confirm.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   )
 }

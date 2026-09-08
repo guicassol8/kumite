@@ -309,7 +309,6 @@
         "role": "Role",
         "actions": "Actions"
       },
-      "removeTeamAction": "Remove team",
       "rename": {
         "editAction": "Rename",
         "save": "Save",
@@ -335,6 +334,9 @@
           "description": "The member becomes teamless; the team stays with its remaining members.",
           "cancel": "Cancel",
           "confirm": "Remove"
+        },
+        "errors": {
+          "failed": "Could not remove this member. Please try again."
         }
       },
       "removeTeam": {
@@ -344,6 +346,9 @@
           "description": "Members become teamless. Submissions are preserved for audit but excluded from the leaderboard.",
           "cancel": "Cancel",
           "confirm": "Remove"
+        },
+        "errors": {
+          "failed": "Could not remove this team. Please try again."
         }
       }
     }

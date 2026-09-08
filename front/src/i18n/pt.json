@@ -309,7 +309,6 @@
         "role": "Papel",
         "actions": "Ações"
       },
-      "removeTeamAction": "Remover time",
       "rename": {
         "editAction": "Renomear",
         "save": "Salvar",
@@ -335,6 +334,9 @@
           "description": "O integrante fica sem time; o time permanece com os demais membros.",
           "cancel": "Cancelar",
           "confirm": "Remover"
+        },
+        "errors": {
+          "failed": "Não foi possível remover este integrante. Tente novamente."
         }
       },
       "removeTeam": {
@@ -344,6 +346,9 @@
           "description": "Os integrantes ficam sem time. As submissões são preservadas para auditoria, mas excluídas do ranking.",
           "cancel": "Cancelar",
           "confirm": "Remover"
+        },
+        "errors": {
+          "failed": "Não foi possível remover este time. Tente novamente."
         }
       }
     }

@@ -260,4 +260,38 @@ describe('OrganizerTeamsScreen', () => {
     await waitFor(() => expect(mockedTeamsDelete).toHaveBeenCalledWith({ param: { id: 'team-2' } }))
     await waitFor(() => expect(mockedTeamsGet).toHaveBeenCalledTimes(2))
   })
+
+  it('shows an inline error and does not refresh the list when removing a member fails', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedMemberDelete.mockResolvedValue(jsonResponse(404, { error: 'not_found' }))
+    renderScreen()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-member-action-u1')).toBeDefined(),
+    )
+    fireEvent.click(screen.getByTestId('team-moderation-remove-member-action-u1'))
+    fireEvent.click(await screen.findByTestId('team-moderation-remove-member-confirm-confirm-u1'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-member-error-u1')).toBeDefined(),
+    )
+    expect(mockedTeamsGet).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows an inline error and does not refresh the list when removing a team fails', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedTeamsDelete.mockResolvedValue(jsonResponse(404, { error: 'not_found' }))
+    renderScreen()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-team-action-team-2')).toBeDefined(),
+    )
+    fireEvent.click(screen.getByTestId('team-moderation-remove-team-action-team-2'))
+    fireEvent.click(await screen.findByTestId('team-moderation-remove-team-confirm-confirm-team-2'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-team-error-team-2')).toBeDefined(),
+    )
+    expect(mockedTeamsGet).toHaveBeenCalledTimes(1)
+  })
 })

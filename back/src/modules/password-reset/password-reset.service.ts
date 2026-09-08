@@ -1,5 +1,5 @@
 import argon2 from 'argon2'
-import { and, count, eq, gte, lt } from 'drizzle-orm'
+import { and, count, eq, gte, lt, sql } from 'drizzle-orm'
 
 import {
   PASSWORD_RESET_COMPLETE_MAX_PER_IP,
@@ -37,6 +37,12 @@ export type PasswordResetAttempt = {
  * "throttled" reply would hand back the account-existence oracle these routes
  * exist to deny.
  *
+ * Counting and inserting are one critical section, held by a transaction-scoped
+ * advisory lock per bucket. Without it every call of a parallel burst reads the
+ * same count before any of them has inserted, and the ceiling is bypassed by
+ * simply firing the requests at once instead of in sequence — measured on this
+ * route at 10 codes issued and 10 notices sent against a ceiling of 3.
+ *
  * `now` is injectable for the same reason as in `acquireSubmissionSlot` (#21).
  */
 export async function consumePasswordResetBudget(
@@ -47,49 +53,65 @@ export async function consumePasswordResetBudget(
   const windowStart = new Date(now - PASSWORD_RESET_WINDOW_MS)
 
   // Opportunistic purge: the log is only ever read through this window, so
-  // expired rows are dead weight and no separate timer has to exist.
+  // expired rows are dead weight and no separate timer has to exist. Kept
+  // outside the critical section below — the counts filter on `windowStart`
+  // themselves, so this only reclaims space, and it scans rows of every bucket
+  // rather than just this one's.
   await db
     .delete(passwordResetRequestsTable)
     .where(lt(passwordResetRequestsTable.createdAt, windowStart))
 
-  // No per-email ceiling on `complete`: the OTP row already caps guessing at
-  // 5 attempts, and a second ceiling here would let a third party lock the
-  // legitimate owner out of finishing their own reset.
-  if (attempt.action === 'request') {
-    const [perEmail] = await db
+  return db.transaction(async (tx) => {
+    // Advisory, transaction-scoped: released on commit, and only ever
+    // serialises callers aimed at the same address or the same IP. `request`
+    // takes the address lock before the IP one and `complete` takes only the
+    // IP one, so two waiters can never cycle into a deadlock.
+    if (attempt.action === 'request') {
+      const emailLock = `pwr-email:${attempt.action}:${attempt.emailKey}`
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${emailLock}::text))`)
+    }
+    const ipLock = `pwr-ip:${attempt.action}:${attempt.ip}`
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ipLock}::text))`)
+
+    // No per-email ceiling on `complete`: the OTP row already caps guessing at
+    // 5 attempts, and a second ceiling here would let a third party lock the
+    // legitimate owner out of finishing their own reset.
+    if (attempt.action === 'request') {
+      const [perEmail] = await tx
+        .select({ value: count() })
+        .from(passwordResetRequestsTable)
+        .where(
+          and(
+            eq(passwordResetRequestsTable.action, attempt.action),
+            eq(passwordResetRequestsTable.emailKey, attempt.emailKey),
+            gte(passwordResetRequestsTable.createdAt, windowStart),
+          ),
+        )
+      if ((perEmail?.value ?? 0) >= PASSWORD_RESET_MAX_PER_EMAIL) return false
+    }
+
+    const perIpCeiling =
+      attempt.action === 'request' ? PASSWORD_RESET_MAX_PER_IP : PASSWORD_RESET_COMPLETE_MAX_PER_IP
+    const [perIp] = await tx
       .select({ value: count() })
       .from(passwordResetRequestsTable)
       .where(
         and(
           eq(passwordResetRequestsTable.action, attempt.action),
-          eq(passwordResetRequestsTable.emailKey, attempt.emailKey),
+          eq(passwordResetRequestsTable.ip, attempt.ip),
           gte(passwordResetRequestsTable.createdAt, windowStart),
         ),
       )
-    if ((perEmail?.value ?? 0) >= PASSWORD_RESET_MAX_PER_EMAIL) return false
-  }
+    if ((perIp?.value ?? 0) >= perIpCeiling) return false
 
-  const perIpCeiling =
-    attempt.action === 'request' ? PASSWORD_RESET_MAX_PER_IP : PASSWORD_RESET_COMPLETE_MAX_PER_IP
-  const [perIp] = await db
-    .select({ value: count() })
-    .from(passwordResetRequestsTable)
-    .where(
-      and(
-        eq(passwordResetRequestsTable.action, attempt.action),
-        eq(passwordResetRequestsTable.ip, attempt.ip),
-        gte(passwordResetRequestsTable.createdAt, windowStart),
-      ),
-    )
-  if ((perIp?.value ?? 0) >= perIpCeiling) return false
-
-  await db.insert(passwordResetRequestsTable).values({
-    action: attempt.action,
-    emailKey: attempt.emailKey,
-    ip: attempt.ip,
-    createdAt: new Date(now),
+    await tx.insert(passwordResetRequestsTable).values({
+      action: attempt.action,
+      emailKey: attempt.emailKey,
+      ip: attempt.ip,
+      createdAt: new Date(now),
+    })
+    return true
   })
-  return true
 }
 
 export type IssueOtpResult = { ok: true } | { ok: false; error: 'not_found' }

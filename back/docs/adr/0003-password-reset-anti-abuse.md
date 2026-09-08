@@ -58,6 +58,22 @@ the last attempt that got *through*. Counting refusals would mean anyone who
 keeps hammering the route holds the address locked out indefinitely — the
 throttle would become the denial-of-service it exists to prevent.
 
+**Counting and inserting are one critical section**, guarded by a
+transaction-scoped Postgres advisory lock per bucket (`pg_advisory_xact_lock`
+on the hashed `action:email_key`, then on `action:ip`). Read-then-write across
+separate statements is not a throttle: every call of a parallel burst reads the
+same count before any of them has inserted, and the ceiling is then bypassed by
+firing the requests at once instead of in sequence. Measured on this route
+before the lock: 25 simultaneous requests for one address issued **10** codes
+and sent **10** notices against a ceiling of 3. The locks are advisory, so they
+cost nothing to unrelated traffic — only two callers aimed at the same address
+or the same IP ever wait on each other — and they are taken in a fixed order
+(`request` takes the address lock before the IP one, `complete` takes only the
+IP one), so two waiters can never cycle into a deadlock. The opportunistic
+purge stays *outside* the critical section: the counts filter on the window
+themselves, so it only reclaims space, and it scans every bucket's rows rather
+than just the caller's.
+
 **The client IP is the rightmost `X-Forwarded-For` entry** (`lib/client-ip.ts`),
 falling back to the socket address. Caddy appends the peer it actually saw to
 whatever header arrived; the leftmost entry, which most examples reach for, is
@@ -89,6 +105,15 @@ finishing their own reset. For the same reason, the quota is consumed *before*
 the OTP row is read, so a throttled call never decrements `attemptsRemaining`.
 
 ## Alternatives considered
+
+### Alternative E — Leave the check-then-insert unsynchronised
+
+Rejected once measured. The window is wide (15 min) and the ceilings are small,
+so an approximate limiter sounded acceptable — but the overshoot is not a
+rounding error: it is the whole mailbox-bombing protection, defeated by adding
+`&` to a shell loop. A single `pg_advisory_xact_lock` per bucket closes it
+without a schema change, a retry loop, or `SERIALIZABLE`.
+
 
 ### Alternative A — In-process `Map`, like `acquireSubmissionSlot` (#21)
 

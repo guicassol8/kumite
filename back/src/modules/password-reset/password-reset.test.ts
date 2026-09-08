@@ -205,6 +205,23 @@ describe('consumePasswordResetBudget', () => {
     ).toBe(false)
   })
 
+  // The ceilings only mean anything if they survive a burst: before the
+  // advisory lock, a parallel batch all read the same count before any of them
+  // had inserted, and 25 simultaneous calls sailed past a ceiling of 3.
+  it('holds the ceiling when the whole burst arrives at once', async () => {
+    const now = Date.now()
+
+    const accepted = await Promise.all(
+      Array.from({ length: 12 }, () =>
+        consumePasswordResetBudget(db, { action: 'request', emailKey: 'ada@example.com', ip }, now),
+      ),
+    )
+
+    expect(accepted.filter(Boolean)).toHaveLength(PASSWORD_RESET_MAX_PER_EMAIL)
+    const rows = await db.select().from(passwordResetRequestsTable)
+    expect(rows).toHaveLength(PASSWORD_RESET_MAX_PER_EMAIL)
+  })
+
   it('purges rows that fell out of the window', async () => {
     const now = Date.now()
     await db.insert(passwordResetRequestsTable).values({
@@ -285,6 +302,19 @@ describe('requestPasswordReset', () => {
     // rotate the OTP the owner is in the middle of typing in.
     const [pendingAfter] = await db.select().from(passwordResetOtpsTable)
     expect(pendingAfter?.otpHash).toBe(pendingBefore?.otpHash)
+  })
+
+  it('sends no more than the ceiling allows when the burst is parallel', async () => {
+    const user = await createTestUser()
+    const now = Date.now()
+
+    await Promise.all(
+      Array.from({ length: 12 }, () => requestPasswordReset(db, user.email, ip, now)),
+    )
+
+    // One notice per accepted request and not one more: this is the
+    // mailbox-bombing ceiling, and firing the requests at once must not lift it.
+    expect(sendPasswordResetNotice).toHaveBeenCalledTimes(PASSWORD_RESET_MAX_PER_EMAIL)
   })
 
   it('stops issuing once the IP is over its ceiling, whatever the address', async () => {
@@ -510,6 +540,7 @@ describe('completePasswordReset', () => {
   it('pays one argon2 verify on every failing path, pending code or not', async () => {
     const user = await createTestUser()
     const verify = vi.spyOn(argon2, 'verify')
+    const now = Date.now()
 
     await completePasswordReset(
       db,
@@ -535,6 +566,18 @@ describe('completePasswordReset', () => {
       db,
       { email: user.email, otp: lastOtp(), newPassword: 'brand-new-password' },
       ip,
+    )
+    expect(verify).toHaveBeenCalledTimes(1)
+
+    verify.mockClear()
+    for (let i = 0; i < PASSWORD_RESET_COMPLETE_MAX_PER_IP; i++) {
+      await consumePasswordResetBudget(db, { action: 'complete', emailKey: user.email, ip }, now)
+    }
+    await completePasswordReset(
+      db,
+      { email: user.email, otp: '123456', newPassword: 'brand-new-password' },
+      ip,
+      now,
     )
     expect(verify).toHaveBeenCalledTimes(1)
 

@@ -1,12 +1,16 @@
 import argon2 from 'argon2'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createDb } from '../../db/client'
-import { usersTable } from '../../db/schema'
+import { passwordResetOtpsTable, usersTable } from '../../db/schema'
 import { findUserById } from '../users/users.service'
 
-import { completePasswordReset, issuePasswordResetOtp } from './password-reset.service'
+import {
+  completePasswordReset,
+  issuePasswordResetOtp,
+  requestPasswordReset,
+} from './password-reset.service'
 
 const sendPasswordResetNotice = vi.fn().mockResolvedValue(undefined)
 vi.mock('../notifications/notifications.service', () => ({
@@ -67,6 +71,36 @@ describe('issuePasswordResetOtp', () => {
   it('returns not_found for an unknown user id', async () => {
     const result = await issuePasswordResetOtp(db, '00000000-0000-0000-0000-000000000000')
     expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+})
+
+describe('requestPasswordReset', () => {
+  it('issues and emails a code for a known email', async () => {
+    const user = await createTestUser()
+
+    await requestPasswordReset(db, user.email)
+
+    expect(sendPasswordResetNotice).toHaveBeenCalledOnce()
+    const pending = await db.select().from(passwordResetOtpsTable)
+    expect(pending).toHaveLength(1)
+    expect(pending[0]?.userId).toBe(user.id)
+  })
+
+  it('resolves silently for an unknown email — no row, no email, no oracle', async () => {
+    await expect(requestPasswordReset(db, 'nobody@example.com')).resolves.toBeUndefined()
+
+    expect(sendPasswordResetNotice).not.toHaveBeenCalled()
+    const pending = await db.select().from(passwordResetOtpsTable)
+    expect(pending).toHaveLength(0)
+  })
+
+  it('issues a code for a deactivated account too — login still refuses it', async () => {
+    const user = await createTestUser('inactive@example.com')
+    await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, user.id))
+
+    await requestPasswordReset(db, user.email)
+
+    expect(sendPasswordResetNotice).toHaveBeenCalledOnce()
   })
 })
 

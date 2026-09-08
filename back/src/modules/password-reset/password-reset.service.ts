@@ -39,6 +39,18 @@ export async function issuePasswordResetOtp(db: Db, userId: string): Promise<Iss
   return { ok: true }
 }
 
+// Self-service entry point for the public route: resolves the email to a user
+// and issues a code. An unknown email resolves exactly like a known one —
+// nothing written, nothing sent — so the endpoint is no oracle for which
+// addresses are registered. A deactivated account is served like any other;
+// login keeps refusing it regardless of the password.
+export async function requestPasswordReset(db: Db, email: string): Promise<void> {
+  const user = await findUserByEmail(db, email)
+  if (!user) return
+
+  await issuePasswordResetOtp(db, user.id)
+}
+
 export type CompletePasswordResetResult = { ok: true } | { ok: false; error: 'invalid_otp' }
 
 // Unknown email, no pending OTP, an expired one, and an exhausted one all

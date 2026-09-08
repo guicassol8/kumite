@@ -55,7 +55,8 @@
     },
     "nav": {
       "problems": "Problemas",
-      "rounds": "Rondas"
+      "rounds": "Rondas",
+      "eventConfig": "Configuración del evento"
     },
     "problems": {
       "heading": "Problemas del catálogo",
@@ -233,6 +234,60 @@
       "notDraft": {
         "title": "Esa ronda ya fue abierta o cerrada y ya no se puede editar.",
         "backToList": "Volver a la lista"
+      }
+    },
+    "eventConfig": {
+      "heading": "Configuración del evento",
+      "loading": "Cargando configuración...",
+      "error": {
+        "message": "No se pudo cargar la configuración.",
+        "retry": "Intentar de nuevo"
+      },
+      "teamRules": {
+        "heading": "Reglas de equipo",
+        "mixingLabel": "Bloquear la mezcla de universidades",
+        "mixingDescription": "Cuando está bloqueado, los equipos no pueden mezclar integrantes de universidades distintas.",
+        "maxTeamSizeLabel": "Tamaño máximo del equipo",
+        "saveAction": "Guardar",
+        "savedMessage": "Cambios guardados.",
+        "errors": {
+          "maxTeamSizeInvalid": "Ingresa un número entero mayor que cero.",
+          "saveFailed": "No se pudo guardar. Intenta de nuevo."
+        },
+        "mixingDialog": {
+          "titleLock": "¿Bloquear la mezcla de universidades?",
+          "titleUnlock": "¿Permitir la mezcla de universidades?",
+          "description": "Los equipos ya formados no se ven afectados: el cambio aplica solo a nuevas inscripciones y formaciones de equipo a partir de ahora.",
+          "confirm": "Confirmar",
+          "cancel": "Cancelar"
+        }
+      },
+      "codes": {
+        "heading": "Códigos del evento",
+        "columns": {
+          "university": "Universidad",
+          "code": "Código",
+          "suffixes": "Sufijos de email permitidos",
+          "active": "Activo",
+          "actions": "Acciones"
+        },
+        "activeYes": "Activo",
+        "activeNo": "Inactivo",
+        "editAction": "Editar",
+        "dialog": {
+          "title": "Editar código del evento",
+          "codeLabel": "Código",
+          "suffixesLabel": "Sufijos de email permitidos (uno por línea)",
+          "activeLabel": "Activo",
+          "save": "Guardar",
+          "cancel": "Cancelar"
+        },
+        "errors": {
+          "codeRequired": "Ingresa el código.",
+          "suffixesRequired": "Ingresa al menos un sufijo de email.",
+          "codeTaken": "Ese código ya está en uso.",
+          "saveFailed": "No se pudo guardar. Intenta de nuevo."
+        }
       }
     }
   },

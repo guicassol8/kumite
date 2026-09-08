@@ -55,7 +55,8 @@
     },
     "nav": {
       "problems": "Problems",
-      "rounds": "Rounds"
+      "rounds": "Rounds",
+      "eventConfig": "Event configuration"
     },
     "problems": {
       "heading": "Catalog problems",
@@ -233,6 +234,60 @@
       "notDraft": {
         "title": "This round has already been opened or closed and can no longer be edited.",
         "backToList": "Back to the list"
+      }
+    },
+    "eventConfig": {
+      "heading": "Event configuration",
+      "loading": "Loading configuration...",
+      "error": {
+        "message": "Could not load the configuration.",
+        "retry": "Try again"
+      },
+      "teamRules": {
+        "heading": "Team rules",
+        "mixingLabel": "Lock mixing universities",
+        "mixingDescription": "When locked, teams cannot mix members from different universities.",
+        "maxTeamSizeLabel": "Maximum team size",
+        "saveAction": "Save",
+        "savedMessage": "Changes saved.",
+        "errors": {
+          "maxTeamSizeInvalid": "Enter a whole number greater than zero.",
+          "saveFailed": "Could not save. Please try again."
+        },
+        "mixingDialog": {
+          "titleLock": "Lock mixing universities?",
+          "titleUnlock": "Allow mixing universities?",
+          "description": "Already-formed teams are unaffected: this change only applies to new signups and team formations from now on.",
+          "confirm": "Confirm",
+          "cancel": "Cancel"
+        }
+      },
+      "codes": {
+        "heading": "Event codes",
+        "columns": {
+          "university": "University",
+          "code": "Code",
+          "suffixes": "Allowed email suffixes",
+          "active": "Active",
+          "actions": "Actions"
+        },
+        "activeYes": "Active",
+        "activeNo": "Inactive",
+        "editAction": "Edit",
+        "dialog": {
+          "title": "Edit event code",
+          "codeLabel": "Code",
+          "suffixesLabel": "Allowed email suffixes (one per line)",
+          "activeLabel": "Active",
+          "save": "Save",
+          "cancel": "Cancel"
+        },
+        "errors": {
+          "codeRequired": "Enter the code.",
+          "suffixesRequired": "Enter at least one email suffix.",
+          "codeTaken": "This code is already in use.",
+          "saveFailed": "Could not save. Please try again."
+        }
       }
     }
   },

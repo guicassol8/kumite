@@ -16,6 +16,7 @@ import { Route as OrganizerRouteImport } from './routes/organizer'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TeamsRouteImport } from './routes/teams'
+import { Route as OrganizerEventConfigRouteImport } from './routes/organizer.event-config'
 import { Route as ProblemIdRouteImport } from './routes/problem.$id'
 import { Route as RoundsIdRouteImport } from './routes/rounds.$id'
 import { Route as OrganizerProblemsIndexRouteImport } from './routes/organizer.problems.index'
@@ -59,6 +60,11 @@ const TeamsRoute = TeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
   getParentRoute: () => rootRouteImport,
+} as any)
+const OrganizerEventConfigRoute = OrganizerEventConfigRouteImport.update({
+  id: '/event-config',
+  path: '/event-config',
+  getParentRoute: () => OrganizerRoute,
 } as any)
 const ProblemIdRoute = ProblemIdRouteImport.update({
   id: '/problem/$id',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
+  '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
+  '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
+  '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/teams'
+    | '/organizer/event-config'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/problems/new'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/teams'
+    | '/organizer/event-config'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/problems/new'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/teams'
+    | '/organizer/event-config'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/problems/new'
@@ -270,6 +282,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/organizer/event-config': {
+      id: '/organizer/event-config'
+      path: '/event-config'
+      fullPath: '/organizer/event-config'
+      preLoaderRoute: typeof OrganizerEventConfigRouteImport
+      parentRoute: typeof OrganizerRoute
+    }
     '/problem/$id': {
       id: '/problem/$id'
       path: '/problem/$id'
@@ -330,6 +349,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface OrganizerRouteChildren {
+  OrganizerEventConfigRoute: typeof OrganizerEventConfigRoute
   OrganizerProblemsNewRoute: typeof OrganizerProblemsNewRoute
   OrganizerRoundsNewRoute: typeof OrganizerRoundsNewRoute
   OrganizerProblemsIndexRoute: typeof OrganizerProblemsIndexRoute
@@ -339,6 +359,7 @@ interface OrganizerRouteChildren {
 }
 
 const OrganizerRouteChildren: OrganizerRouteChildren = {
+  OrganizerEventConfigRoute: OrganizerEventConfigRoute,
   OrganizerProblemsNewRoute: OrganizerProblemsNewRoute,
   OrganizerRoundsNewRoute: OrganizerRoundsNewRoute,
   OrganizerProblemsIndexRoute: OrganizerProblemsIndexRoute,

@@ -84,7 +84,10 @@ function Home() {
         const myTeamResult = closedRoundRankings[index]?.data?.teams.find(
           (team) => team.teamId === myTeamId,
         )
-        return myTeamResult
+        // getRoundRanking (#43) returns every current team for every closed
+        // round, including ones that never submitted in it (0 attempts) —
+        // only surface a result for rounds the team actually competed in.
+        return myTeamResult && myTeamResult.totalAttempts > 0
           ? ([round.id, { rank: myTeamResult.rank, totalScore: myTeamResult.totalScore }] as const)
           : null
       })

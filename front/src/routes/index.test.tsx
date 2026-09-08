@@ -344,6 +344,51 @@ describe('Home — closed rounds card (#40)', () => {
     expect(mockedRoundRanking).not.toHaveBeenCalled()
   })
 
+  it('shows nothing extra when the team never submitted in that round', async () => {
+    setSession(fakeUser, 'tok-1')
+    mockedTeams.mockResolvedValue(
+      jsonResponse(200, { maxTeamSize: 3, mixingLocked: false, myTeamId: 't1', teams: [] }),
+    )
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({
+          id: 'r9',
+          name: 'Rodada Encerrada',
+          status: 'closed',
+          closedAt: '2026-09-01T18:30:00.000Z',
+        }),
+      ]),
+    )
+    // getRoundRanking (#43) returns every current team for every closed
+    // round, even ones that never submitted in it — this is what that looks
+    // like: present in the ranking, zero attempts.
+    mockedRoundRanking.mockResolvedValue(
+      jsonResponse(200, {
+        roundId: 'r9',
+        roundName: 'Rodada Encerrada',
+        problemIds: [],
+        teams: [
+          {
+            teamId: 't1',
+            teamName: 'Blockly Busters',
+            rank: 1,
+            totalScore: 0,
+            totalAttempts: 0,
+            tiebreakTimeMs: 0,
+            problems: [],
+          },
+        ],
+      }),
+    )
+    renderHome()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('home-closed-rounds').textContent).toContain('Rodada Encerrada'),
+    )
+    await waitFor(() => expect(mockedRoundRanking).toHaveBeenCalled())
+    expect(screen.queryByTestId('home-closed-round-result-r9')).toBeNull()
+  })
+
   it("shows nothing extra while the round's ranking is still loading", async () => {
     setSession(fakeUser, 'tok-1')
     mockedTeams.mockResolvedValue(

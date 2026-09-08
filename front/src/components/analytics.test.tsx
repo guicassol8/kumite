@@ -22,16 +22,6 @@ vi.mock('@vercel/speed-insights/react', () => ({
   },
 }))
 
-vi.mock('@/lib/api', () => ({
-  api: {
-    health: { $get: vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })) },
-    teams: Object.assign(vi.fn(), {
-      $get: vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) })),
-    }),
-    me: { $get: vi.fn() },
-  },
-}))
-
 import { createRootRoute, createRoute, Outlet } from '@tanstack/react-router'
 
 import { VercelAnalytics } from './analytics'

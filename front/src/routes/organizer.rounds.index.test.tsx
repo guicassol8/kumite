@@ -129,6 +129,10 @@ describe('OrganizerRoundsList', () => {
     renderList()
 
     await waitFor(() => expect(screen.getByTestId('organizer-rounds-open-r1')).toBeDefined())
+    // #129's tabIndex is only for the disabled case (its Tooltip has content
+    // to show on focus); an enabled Abrir mustn't gain an extra, silent tab
+    // stop on its wrapper span ahead of the button itself.
+    expect(screen.getByTestId('organizer-rounds-open-hint-r1').getAttribute('tabIndex')).toBeNull()
     fireEvent.click(screen.getByTestId('organizer-rounds-open-r1'))
 
     await waitFor(() => expect(screen.getByTestId('organizer-rounds-open-confirm')).toBeDefined())

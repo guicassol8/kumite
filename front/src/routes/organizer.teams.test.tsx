@@ -241,4 +241,23 @@ describe('OrganizerTeamsScreen', () => {
     )
     await waitFor(() => expect(mockedTeamsGet).toHaveBeenCalledTimes(2))
   })
+
+  it('removes a team after confirming the dialog, even when frozen', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedTeamsDelete.mockResolvedValue(jsonResponse(204, undefined))
+    renderScreen()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-team-action-team-2')).toBeDefined(),
+    )
+    fireEvent.click(screen.getByTestId('team-moderation-remove-team-action-team-2'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-team-confirm-team-2')).toBeDefined(),
+    )
+    fireEvent.click(screen.getByTestId('team-moderation-remove-team-confirm-confirm-team-2'))
+
+    await waitFor(() => expect(mockedTeamsDelete).toHaveBeenCalledWith({ param: { id: 'team-2' } }))
+    await waitFor(() => expect(mockedTeamsGet).toHaveBeenCalledTimes(2))
+  })
 })

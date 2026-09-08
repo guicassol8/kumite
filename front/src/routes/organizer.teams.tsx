@@ -125,14 +125,7 @@ function TeamCard({
     <Card data-testid={`team-moderation-card-${team.id}`}>
       <CardHeader className="flex-row items-center justify-between gap-2">
         <TeamNameHeader team={team} onRenamed={onChanged} />
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          data-testid={`team-moderation-remove-team-action-${team.id}`}
-        >
-          {t('organizer.teamModeration.removeTeam.action')}
-        </Button>
+        <RemoveTeamAction teamId={team.id} onRemoved={onChanged} />
       </CardHeader>
       <CardContent>
         <Table data-testid={`team-moderation-members-${team.id}`}>
@@ -397,6 +390,56 @@ function RemoveMemberAction({ userId, onRemoved }: { userId: string; onRemoved: 
               }}
             >
               {t('organizer.teamModeration.removeMember.confirm.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}
+
+function RemoveTeamAction({ teamId, onRemoved }: { teamId: string; onRemoved: () => void }) {
+  const { t } = useTranslation()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const remove = useMutation({
+    mutationFn: async () => api.organizer.teams[':id'].$delete({ param: { id: teamId } }),
+    onSuccess: () => onRemoved(),
+  })
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        data-testid={`team-moderation-remove-team-action-${teamId}`}
+        onClick={() => setConfirmOpen(true)}
+      >
+        {t('organizer.teamModeration.removeTeam.action')}
+      </Button>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent data-testid={`team-moderation-remove-team-confirm-${teamId}`}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('organizer.teamModeration.removeTeam.confirm.title')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('organizer.teamModeration.removeTeam.confirm.description')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid={`team-moderation-remove-team-confirm-cancel-${teamId}`}>
+              {t('organizer.teamModeration.removeTeam.confirm.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-testid={`team-moderation-remove-team-confirm-confirm-${teamId}`}
+              onClick={() => {
+                remove.mutate()
+                setConfirmOpen(false)
+              }}
+            >
+              {t('organizer.teamModeration.removeTeam.confirm.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

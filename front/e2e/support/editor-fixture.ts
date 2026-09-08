@@ -42,7 +42,6 @@ export type EditorFixture = {
 }
 
 async function openWithRetry(roundId: string, auth: Record<string, string>): Promise<void> {
-  let lastError = 'unknown'
   for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt++) {
     const res = await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, {
       method: 'POST',
@@ -50,12 +49,18 @@ async function openWithRetry(roundId: string, auth: Record<string, string>): Pro
     })
     if (res.ok) return
     const body = (await res.json().catch(() => ({}))) as { error?: string }
-    lastError = body.error ?? `http ${res.status}`
-    // Failing loudly beats leaving the problem in a draft round, where the
-    // editor would just 404 with no explanation.
+    const error = body.error ?? `http ${res.status}`
+    // Waiting only ever helps against the contended slot. A 401, a 404 or a
+    // round that is no longer a draft answers the same way in 90s as it does
+    // now, and retrying it just buries the real cause under a timeout.
+    if (error !== 'another_round_open') {
+      throw new Error(`could not open the round: ${error} (HTTP ${res.status})`)
+    }
     if (attempt < OPEN_ATTEMPTS) await new Promise((r) => setTimeout(r, OPEN_RETRY_MS))
   }
-  throw new Error(`could not open the round after ${OPEN_ATTEMPTS} attempts: ${lastError}`)
+  throw new Error(
+    `could not open the round after ${OPEN_ATTEMPTS} attempts: another_round_open — another spec or a seeded round still holds the single open-round slot`,
+  )
 }
 
 /**

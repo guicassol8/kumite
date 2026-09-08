@@ -14,8 +14,13 @@
 # by email/logged, never returned by any endpoint). This file covers what a
 # real client actually sees: the malformed/wrong/unknown-identity paths, that
 # requesting a code answers the same 204 whether or not the email is
-# registered, and that the current password keeps working until the code is
-# actually completed.
+# registered, that going over the anti-abuse ceiling (#142: 3 requests per
+# address and 20 per IP in a 15 min window, 30 per IP on complete) answers
+# that same 204 too, and that the current password keeps working until the
+# code is actually completed.
+#
+# This file spends 5 of the per-IP request budget and ~5 of the complete one,
+# and it is the only .hurl touching these two routes.
 #
 # Creates a unique user (`password-reset-e2e@...`) — rerunning this file
 # locally without resetting the db fails the first signup on the second run.
@@ -74,6 +79,36 @@ HTTP 200
 
 # 5. Now a pending OTP exists, but a wrong 6-digit guess still fails the
 # same generic way.
+POST {{host}}/auth/complete-password-reset
+Content-Type: application/json
+{ "email": "password-reset-e2e@edu.pucrs.br", "otp": "000000", "newPassword": "somenewpassword" }
+HTTP 400
+[Asserts]
+jsonpath "$.error" == "invalid_otp"
+
+# 6. Anti-abuse (#142). The address above has now spent 1 of its 3 requests;
+# three more take it over the ceiling, and every single one still answers the
+# very same 204. Answering 429 here — or answering it only for registered
+# addresses — would hand back exactly the account-existence oracle the
+# identical 204 exists to deny.
+POST {{host}}/auth/request-password-reset
+Content-Type: application/json
+{ "email": "password-reset-e2e@edu.pucrs.br" }
+HTTP 204
+
+POST {{host}}/auth/request-password-reset
+Content-Type: application/json
+{ "email": "password-reset-e2e@edu.pucrs.br" }
+HTTP 204
+
+# The fourth is over the ceiling: no new code is issued, no email is sent, and
+# the client cannot tell any of that from the response.
+POST {{host}}/auth/request-password-reset
+Content-Type: application/json
+{ "email": "password-reset-e2e@edu.pucrs.br" }
+HTTP 204
+
+# Completing stays on its usual failure shape, throttled or not.
 POST {{host}}/auth/complete-password-reset
 Content-Type: application/json
 { "email": "password-reset-e2e@edu.pucrs.br", "otp": "000000", "newPassword": "somenewpassword" }

@@ -78,6 +78,13 @@
       "when": 1788809298096,
       "tag": "0010_typical_madame_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788893299869,
+      "tag": "0011_big_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

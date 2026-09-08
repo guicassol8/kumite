@@ -66,6 +66,29 @@ export const passwordResetOtpsTable = pgTable('password_reset_otps', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const passwordResetActionEnum = pgEnum('password_reset_action', ['request', 'complete'])
+
+// Append-only log backing the sliding-window throttle on the two public
+// password-reset routes (#142). Deliberately has no FK to `users`: the whole
+// point is to count attempts against addresses that may not exist, since
+// those are exactly the ones an enumeration sweep uses. Rows older than the
+// window are deleted opportunistically on the next request.
+export const passwordResetRequestsTable = pgTable(
+  'password_reset_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    action: passwordResetActionEnum('action').notNull(),
+    emailKey: text('email_key').notNull(),
+    ip: text('ip').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('password_reset_requests_email_idx').on(table.action, table.emailKey, table.createdAt),
+    index('password_reset_requests_ip_idx').on(table.action, table.ip, table.createdAt),
+    index('password_reset_requests_created_at_idx').on(table.createdAt),
+  ],
+)
+
 export const eventCodesTable = pgTable('event_codes', {
   code: text('code').primaryKey(),
   university: universityEnum('university').notNull(),

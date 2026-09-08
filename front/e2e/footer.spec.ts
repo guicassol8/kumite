@@ -215,6 +215,16 @@ test.describe('problem editor coexists with the footer (#144 T4)', () => {
       headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ name: `Footer E2E ${stamp}` }),
     })
+    // Only one round may be open at a time, and `db:seed` leaves its own
+    // "Round 1" open for a minute — a run started right after seeding would
+    // 409 here. Close whatever is open first so the walkthrough is repeatable.
+    const rounds = (await (await api('/organizer/rounds', { headers: auth })).json()) as {
+      id: string
+      status: string
+    }[]
+    for (const round of rounds.filter((r) => r.status === 'open')) {
+      await api(`/organizer/rounds/${round.id}/close`, { method: 'POST', headers: auth })
+    }
     await api(`/organizer/rounds/${roundId}/open`, { method: 'POST', headers: auth })
 
     // 09 — the editor screen: statement, Blockly canvas, header and footer all

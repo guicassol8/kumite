@@ -71,3 +71,29 @@ Nothing kata *must* change. Two ideas, in order of how much they'd help:
    config to fix (skip `back test` when `git diff --cached` touches no
    `back/` path). Recording it here only because the DB coupling that makes
    it expensive is a property of the kata-shaped module layout.
+
+## Review addendum (PR #147, review stage)
+
+The review of this PR reproduced the same shape from the other side, so the
+numbers are worth recording next to the implementation ones:
+
+- **`kata-docs` MCP queries: 0 again.** Nothing in the diff touched a kata
+  surface, and the review never needed one. Zero tokens spent on lookups,
+  correctly.
+- **`kata verify --strict-coverage`: 2 runs, both clean** (60 files, no
+  problems), ~1s each. It has yet to say anything about a front-only branch —
+  which is the right answer, just not a free one.
+- **Cost of the review's gate ladder: ~2×90s**, of which `back test` (422
+  tests, ~60s) is again the dominant term on a branch that changes no `back/`
+  file. One extra manual `pnpm -r test` was run purely to paste trimmed
+  output as PR evidence.
+- **New data point — evidence production also needs the database.** Producing
+  the front's visual walkthrough meant provisioning this worktree's Postgres,
+  running `db:migrate` *and* `db:seed`, and signing a participant up through
+  the API, so that a screenshot of a React route could be taken. The
+  telemetry under test never touches the DB. That is the same coupling the
+  body of this report describes, now paid a second time at review.
+
+Nothing here asks kata to change beyond suggestion (1) above; recording it so
+the per-commit and per-review cost of the DB coupling is visible as a trend
+rather than a one-off complaint.

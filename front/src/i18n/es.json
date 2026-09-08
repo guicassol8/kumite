@@ -491,6 +491,16 @@
     },
     "resetPassword": {
       "title": "Restablecer contraseña",
+      "request": {
+        "description": "Ingresa el correo de tu cuenta y te enviaremos un código de verificación.",
+        "emailLabel": "Correo electrónico",
+        "submitButton": "Enviar código",
+        "sentMessage": "Enviamos un código de verificación a {{email}}. Vence en 15 minutos.",
+        "backButton": "Enviar a otro correo",
+        "errors": {
+          "unexpected": "No fue posible enviar el código. Inténtalo de nuevo."
+        }
+      },
       "emailLabel": "Correo electrónico",
       "otpLabel": "Código de verificación",
       "newPasswordLabel": "Nueva contraseña",

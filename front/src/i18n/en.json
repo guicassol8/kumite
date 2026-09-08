@@ -491,6 +491,16 @@
     },
     "resetPassword": {
       "title": "Reset password",
+      "request": {
+        "description": "Enter your account email and we'll send you a verification code.",
+        "emailLabel": "Email",
+        "submitButton": "Send code",
+        "sentMessage": "We sent a verification code to {{email}}. It expires in 15 minutes.",
+        "backButton": "Send to another email",
+        "errors": {
+          "unexpected": "We couldn't send the code. Please try again."
+        }
+      },
       "emailLabel": "Email",
       "otpLabel": "Verification code",
       "newPasswordLabel": "New password",

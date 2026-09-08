@@ -24,11 +24,26 @@ export const Route = createFileRoute('/reset-password')({
   component: ResetPasswordScreen,
 })
 
+type RequestFormValues = {
+  email: string
+}
+
 type ResetPasswordFormValues = {
   email: string
   otp: string
   newPassword: string
   confirmPassword: string
+}
+
+function useRequestSchema() {
+  const { t, i18n } = useTranslation()
+  return useMemo(
+    () =>
+      z.object({
+        email: z.string().email(t('auth.resetPassword.errors.emailInvalid')),
+      }),
+    [t, i18n.language],
+  )
 }
 
 function useResetPasswordSchema() {
@@ -52,12 +67,41 @@ function useResetPasswordSchema() {
 
 function ResetPasswordScreen() {
   const { t } = useTranslation()
+  // Two steps in one screen: ask for a code, then spend it. `sentTo` is what
+  // step 2 echoes back — the email the code actually went to, which the user
+  // may still edit in the form below it.
+  const [sentTo, setSentTo] = useState<string | null>(null)
   const [succeeded, setSucceeded] = useState(false)
+  const requestSchema = useRequestSchema()
   const schema = useResetPasswordSchema()
+  const requestForm = useForm<RequestFormValues>({
+    resolver: zodResolver(requestSchema),
+    defaultValues: { email: '' },
+  })
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(schema),
     defaultValues: { email: '', otp: '', newPassword: '', confirmPassword: '' },
   })
+
+  async function onRequestSubmit(values: RequestFormValues) {
+    try {
+      const res = await api.auth['request-password-reset'].$post({ json: { email: values.email } })
+      if (res.status !== 204) {
+        requestForm.setError('root', {
+          message: t('auth.resetPassword.request.errors.unexpected'),
+        })
+        return
+      }
+    } catch {
+      requestForm.setError('root', { message: t('auth.resetPassword.request.errors.unexpected') })
+      return
+    }
+
+    // The back answers 204 for unregistered emails too (no oracle), so this
+    // says the code was sent, never that the account exists.
+    form.setValue('email', values.email)
+    setSentTo(values.email)
+  }
 
   async function onSubmit(values: ResetPasswordFormValues) {
     const res = await api.auth['complete-password-reset'].$post({
@@ -75,6 +119,7 @@ function ResetPasswordScreen() {
     setSucceeded(true)
   }
 
+  const requestError = requestForm.formState.errors.root?.message
   const rootError = form.formState.errors.root?.message
 
   return (
@@ -93,9 +138,54 @@ function ResetPasswordScreen() {
                 </Link>
               </Button>
             </div>
+          ) : sentTo === null ? (
+            <Form {...requestForm}>
+              <form
+                onSubmit={requestForm.handleSubmit(onRequestSubmit)}
+                className="flex flex-col gap-4"
+              >
+                <p className="text-muted-foreground text-sm">
+                  {t('auth.resetPassword.request.description')}
+                </p>
+                <FormField
+                  control={requestForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('auth.resetPassword.request.emailLabel')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          data-testid="reset-password-request-email-input"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage data-testid="reset-password-request-email-error" />
+                    </FormItem>
+                  )}
+                />
+                {requestError && (
+                  <Alert variant="destructive" data-testid="reset-password-request-error">
+                    <AlertDescription>{requestError}</AlertDescription>
+                  </Alert>
+                )}
+                <Button
+                  type="submit"
+                  data-testid="reset-password-request-submit"
+                  disabled={requestForm.formState.isSubmitting}
+                >
+                  {t('auth.resetPassword.request.submitButton')}
+                </Button>
+              </form>
+            </Form>
           ) : (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+                <Alert data-testid="reset-password-request-sent">
+                  <AlertDescription>
+                    {t('auth.resetPassword.request.sentMessage', { email: sentTo })}
+                  </AlertDescription>
+                </Alert>
                 <FormField
                   control={form.control}
                   name="email"
@@ -166,6 +256,14 @@ function ResetPasswordScreen() {
                   disabled={form.formState.isSubmitting}
                 >
                   {t('auth.resetPassword.submitButton')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  data-testid="reset-password-request-back"
+                  onClick={() => setSentTo(null)}
+                >
+                  {t('auth.resetPassword.request.backButton')}
                 </Button>
               </form>
             </Form>

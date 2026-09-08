@@ -139,4 +139,50 @@ describe('OrganizerTeamsScreen', () => {
     expect(screen.getByTestId('team-moderation-frozen-team-2')).toBeDefined()
     expect(screen.getByTestId('team-moderation-remove-team-action-team-2')).toBeDefined()
   })
+
+  it('renames a team inline and invalidates the listing', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedTeamsPatch.mockResolvedValue(jsonResponse(200, { id: 'team-1', name: 'New Name' }))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('team-moderation-rename-start-team-1'))
+    fireEvent.change(screen.getByTestId('team-moderation-rename-input-team-1'), {
+      target: { value: 'New Name' },
+    })
+
+    mockedTeamsGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        organizerTeamsList({ teams: [{ ...organizerTeamsList().teams[0], name: 'New Name' }] }),
+      ),
+    )
+    fireEvent.click(screen.getByTestId('team-moderation-rename-save-team-1'))
+
+    await waitFor(() =>
+      expect(mockedTeamsPatch).toHaveBeenCalledWith({
+        param: { id: 'team-1' },
+        json: { name: 'New Name' },
+      }),
+    )
+    await waitFor(() => expect(mockedTeamsGet).toHaveBeenCalledTimes(2))
+  })
+
+  it('maps a 409 rename conflict onto an inline field error', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedTeamsPatch.mockResolvedValue(jsonResponse(409, { error: 'name_taken' }))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('team-moderation-rename-start-team-1'))
+    fireEvent.change(screen.getByTestId('team-moderation-rename-input-team-1'), {
+      target: { value: 'Frozen Squad' },
+    })
+    fireEvent.click(screen.getByTestId('team-moderation-rename-save-team-1'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-rename-error-team-1')).toBeDefined(),
+    )
+    expect(screen.getByTestId('team-moderation-rename-input-team-1')).toBeDefined()
+  })
 })

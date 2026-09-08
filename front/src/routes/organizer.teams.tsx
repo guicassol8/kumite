@@ -1,11 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { Check, Pencil, X } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { UniversityBadge } from '@/components/teams/university-badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -28,6 +32,9 @@ async function fetchOrganizerTeams() {
   return res.json()
 }
 
+type OrganizerTeamsList = Awaited<ReturnType<typeof fetchOrganizerTeams>>
+type OrganizerTeam = OrganizerTeamsList['teams'][number]
+
 const ROLE_KEYS = {
   participant: 'organizer.teamModeration.role.participant',
   organizer: 'organizer.teamModeration.role.organizer',
@@ -35,11 +42,16 @@ const ROLE_KEYS = {
 
 function OrganizerTeamsScreen() {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
 
   const teams = useQuery({
     queryKey: ORGANIZER_TEAMS_QUERY_KEY,
     queryFn: fetchOrganizerTeams,
   })
+
+  function invalidateTeams() {
+    queryClient.invalidateQueries({ queryKey: ORGANIZER_TEAMS_QUERY_KEY })
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -68,57 +80,157 @@ function OrganizerTeamsScreen() {
       {teams.data && (
         <div className="flex flex-col gap-4">
           {teams.data.teams.map((team) => (
-            <Card key={team.id} data-testid={`team-moderation-card-${team.id}`}>
-              <CardHeader className="flex-row items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <CardTitle data-testid={`team-moderation-name-${team.id}`}>{team.name}</CardTitle>
-                  {team.frozen && (
-                    <Badge variant="secondary" data-testid={`team-moderation-frozen-${team.id}`}>
-                      {t('organizer.teamModeration.frozenBadge')}
-                    </Badge>
-                  )}
-                </div>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  data-testid={`team-moderation-remove-team-action-${team.id}`}
-                >
-                  {t('organizer.teamModeration.removeTeam.action')}
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <Table data-testid={`team-moderation-members-${team.id}`}>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('organizer.teamModeration.columns.email')}</TableHead>
-                      <TableHead>{t('organizer.teamModeration.columns.university')}</TableHead>
-                      <TableHead>{t('organizer.teamModeration.columns.role')}</TableHead>
-                      <TableHead>{t('organizer.teamModeration.columns.actions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {team.members.map((member) => (
-                      <TableRow
-                        key={member.userId}
-                        data-testid={`team-moderation-member-row-${member.userId}`}
-                      >
-                        <TableCell>{member.email}</TableCell>
-                        <TableCell>
-                          <UniversityBadge university={member.university} />
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{t(ROLE_KEYS[member.role])}</Badge>
-                        </TableCell>
-                        <TableCell />
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <TeamCard key={team.id} team={team} onChanged={invalidateTeams} />
           ))}
         </div>
+      )}
+    </div>
+  )
+}
+
+function TeamCard({ team, onChanged }: { team: OrganizerTeam; onChanged: () => void }) {
+  const { t } = useTranslation()
+
+  return (
+    <Card data-testid={`team-moderation-card-${team.id}`}>
+      <CardHeader className="flex-row items-center justify-between gap-2">
+        <TeamNameHeader team={team} onRenamed={onChanged} />
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          data-testid={`team-moderation-remove-team-action-${team.id}`}
+        >
+          {t('organizer.teamModeration.removeTeam.action')}
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <Table data-testid={`team-moderation-members-${team.id}`}>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('organizer.teamModeration.columns.email')}</TableHead>
+              <TableHead>{t('organizer.teamModeration.columns.university')}</TableHead>
+              <TableHead>{t('organizer.teamModeration.columns.role')}</TableHead>
+              <TableHead>{t('organizer.teamModeration.columns.actions')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {team.members.map((member) => (
+              <TableRow
+                key={member.userId}
+                data-testid={`team-moderation-member-row-${member.userId}`}
+              >
+                <TableCell>{member.email}</TableCell>
+                <TableCell>
+                  <UniversityBadge university={member.university} />
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">{t(ROLE_KEYS[member.role])}</Badge>
+                </TableCell>
+                <TableCell />
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+function TeamNameHeader({ team, onRenamed }: { team: OrganizerTeam; onRenamed: () => void }) {
+  const { t } = useTranslation()
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(team.name)
+  const [error, setError] = useState<string | null>(null)
+
+  const rename = useMutation({
+    mutationFn: async (name: string) =>
+      api.organizer.teams[':id'].$patch({ param: { id: team.id }, json: { name } }),
+  })
+
+  function startEditing() {
+    setValue(team.name)
+    setError(null)
+    setEditing(true)
+  }
+
+  function cancelEditing() {
+    setEditing(false)
+    setError(null)
+  }
+
+  async function save() {
+    const res = await rename.mutateAsync(value)
+    if (res.status === 200) {
+      setEditing(false)
+      setError(null)
+      onRenamed()
+      return
+    }
+    if (res.status === 409) {
+      setError(t('organizer.teamModeration.rename.errors.nameTaken'))
+      return
+    }
+    setError(t('organizer.teamModeration.rename.errors.saveFailed'))
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <CardTitle data-testid={`team-moderation-name-${team.id}`}>{team.name}</CardTitle>
+        {team.frozen && (
+          <Badge variant="secondary" data-testid={`team-moderation-frozen-${team.id}`}>
+            {t('organizer.teamModeration.frozenBadge')}
+          </Badge>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          data-testid={`team-moderation-rename-start-${team.id}`}
+          onClick={startEditing}
+          aria-label={t('organizer.teamModeration.rename.editAction')}
+        >
+          <Pencil className="size-4" />
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <Input
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          data-testid={`team-moderation-rename-input-${team.id}`}
+          className="h-8 w-48"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          data-testid={`team-moderation-rename-save-${team.id}`}
+          onClick={save}
+          aria-label={t('organizer.teamModeration.rename.save')}
+        >
+          <Check className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          data-testid={`team-moderation-rename-cancel-${team.id}`}
+          onClick={cancelEditing}
+          aria-label={t('organizer.teamModeration.rename.cancel')}
+        >
+          <X className="size-4" />
+        </Button>
+      </div>
+      {error && (
+        <Alert variant="destructive" data-testid={`team-moderation-rename-error-${team.id}`}>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
     </div>
   )

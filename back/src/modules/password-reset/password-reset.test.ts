@@ -2,12 +2,19 @@ import argon2 from 'argon2'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  PASSWORD_RESET_COMPLETE_MAX_PER_IP,
+  PASSWORD_RESET_MAX_PER_EMAIL,
+  PASSWORD_RESET_MAX_PER_IP,
+  PASSWORD_RESET_WINDOW_MS,
+} from '../../config'
 import { createDb } from '../../db/client'
-import { passwordResetOtpsTable, usersTable } from '../../db/schema'
+import { passwordResetOtpsTable, passwordResetRequestsTable, usersTable } from '../../db/schema'
 import { findUserById } from '../users/users.service'
 
 import {
   completePasswordReset,
+  consumePasswordResetBudget,
   issuePasswordResetOtp,
   requestPasswordReset,
 } from './password-reset.service'
@@ -24,6 +31,7 @@ const db = createDb()
 beforeEach(async () => {
   sendPasswordResetNotice.mockClear()
   await db.execute(sql`truncate table ${usersTable} restart identity cascade`)
+  await db.execute(sql`truncate table ${passwordResetRequestsTable}`)
 })
 
 afterAll(async () => {
@@ -71,6 +79,150 @@ describe('issuePasswordResetOtp', () => {
   it('returns not_found for an unknown user id', async () => {
     const result = await issuePasswordResetOtp(db, '00000000-0000-0000-0000-000000000000')
     expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+})
+
+describe('consumePasswordResetBudget', () => {
+  const ip = '203.0.113.9'
+
+  it('accepts up to the per-email ceiling and refuses the next one', async () => {
+    const now = Date.now()
+    for (let i = 0; i < PASSWORD_RESET_MAX_PER_EMAIL; i++) {
+      const accepted = await consumePasswordResetBudget(
+        db,
+        { action: 'request', emailKey: 'ada@example.com', ip },
+        now,
+      )
+      expect(accepted).toBe(true)
+    }
+
+    const overCeiling = await consumePasswordResetBudget(
+      db,
+      { action: 'request', emailKey: 'ada@example.com', ip },
+      now,
+    )
+    expect(overCeiling).toBe(false)
+  })
+
+  it('does not count a refused attempt, so the window drains from the last accepted one', async () => {
+    const now = Date.now()
+    for (let i = 0; i < PASSWORD_RESET_MAX_PER_EMAIL; i++) {
+      await consumePasswordResetBudget(
+        db,
+        { action: 'request', emailKey: 'ada@example.com', ip },
+        now,
+      )
+    }
+
+    // Refused ten minutes in: it must leave no trace, or hammering the route
+    // would keep pushing the window forward and lock the address out for good.
+    await consumePasswordResetBudget(
+      db,
+      { action: 'request', emailKey: 'ada@example.com', ip },
+      now + 10 * 60 * 1000,
+    )
+    const rows = await db.select().from(passwordResetRequestsTable)
+    expect(rows).toHaveLength(PASSWORD_RESET_MAX_PER_EMAIL)
+
+    const afterWindow = await consumePasswordResetBudget(
+      db,
+      { action: 'request', emailKey: 'ada@example.com', ip },
+      now + PASSWORD_RESET_WINDOW_MS + 1,
+    )
+    expect(afterWindow).toBe(true)
+  })
+
+  it('trips the per-IP ceiling even when every email is different', async () => {
+    const now = Date.now()
+    for (let i = 0; i < PASSWORD_RESET_MAX_PER_IP; i++) {
+      const accepted = await consumePasswordResetBudget(
+        db,
+        { action: 'request', emailKey: `sweep-${i}@example.com`, ip },
+        now,
+      )
+      expect(accepted).toBe(true)
+    }
+
+    const overCeiling = await consumePasswordResetBudget(
+      db,
+      { action: 'request', emailKey: 'one-more@example.com', ip },
+      now,
+    )
+    expect(overCeiling).toBe(false)
+
+    // Another client is unaffected — the ceiling is per IP, not global.
+    const otherClient = await consumePasswordResetBudget(
+      db,
+      { action: 'request', emailKey: 'one-more@example.com', ip: '198.51.100.7' },
+      now,
+    )
+    expect(otherClient).toBe(true)
+  })
+
+  it('keeps the request and complete buckets separate', async () => {
+    const now = Date.now()
+    for (let i = 0; i < PASSWORD_RESET_MAX_PER_EMAIL; i++) {
+      await consumePasswordResetBudget(
+        db,
+        { action: 'request', emailKey: 'ada@example.com', ip },
+        now,
+      )
+    }
+    expect(
+      await consumePasswordResetBudget(
+        db,
+        { action: 'request', emailKey: 'ada@example.com', ip },
+        now,
+      ),
+    ).toBe(false)
+
+    expect(
+      await consumePasswordResetBudget(
+        db,
+        { action: 'complete', emailKey: 'ada@example.com', ip },
+        now,
+      ),
+    ).toBe(true)
+  })
+
+  it('has its own, higher per-IP ceiling on complete — and no per-email one', async () => {
+    const now = Date.now()
+    for (let i = 0; i < PASSWORD_RESET_COMPLETE_MAX_PER_IP; i++) {
+      const accepted = await consumePasswordResetBudget(
+        db,
+        { action: 'complete', emailKey: 'ada@example.com', ip },
+        now,
+      )
+      expect(accepted).toBe(true)
+    }
+
+    expect(
+      await consumePasswordResetBudget(
+        db,
+        { action: 'complete', emailKey: 'ada@example.com', ip },
+        now,
+      ),
+    ).toBe(false)
+  })
+
+  it('purges rows that fell out of the window', async () => {
+    const now = Date.now()
+    await db.insert(passwordResetRequestsTable).values({
+      action: 'request',
+      emailKey: 'old@example.com',
+      ip,
+      createdAt: new Date(now - PASSWORD_RESET_WINDOW_MS - 1),
+    })
+
+    await consumePasswordResetBudget(
+      db,
+      { action: 'request', emailKey: 'ada@example.com', ip },
+      now,
+    )
+
+    const rows = await db.select().from(passwordResetRequestsTable)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.emailKey).toBe('ada@example.com')
   })
 })
 

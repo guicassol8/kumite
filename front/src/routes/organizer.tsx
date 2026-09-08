@@ -33,6 +33,14 @@ function OrganizerScreen() {
         >
           {t('organizer.nav.rounds')}
         </Link>
+        <Link
+          to="/organizer/event-config"
+          data-testid="organizer-nav-event-config"
+          activeProps={{ className: 'font-semibold text-foreground' }}
+          className="text-muted-foreground text-sm"
+        >
+          {t('organizer.nav.eventConfig')}
+        </Link>
       </nav>
       <Outlet />
     </main>

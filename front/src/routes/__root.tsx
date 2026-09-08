@@ -1,6 +1,7 @@
 import { createRootRoute, Outlet, useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
+import { Footer } from '@/components/footer'
 import { Header } from '@/components/header'
 import { ensureHydrated, getState, subscribe } from '@/lib/session'
 
@@ -29,6 +30,7 @@ function RootComponent() {
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <Header />
       <Outlet />
+      <Footer />
     </div>
   )
 }

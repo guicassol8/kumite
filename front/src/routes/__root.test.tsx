@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The home route queries the API for the viewer's team; without this the
@@ -14,6 +14,17 @@ vi.mock('@/lib/api', () => ({
     }),
     me: { $get: vi.fn() },
   },
+}))
+
+// The real collectors inject a remote script on mount. These stand-ins render a
+// marker instead, so "exactly once in the tree" is something the DOM can answer
+// no matter how often React re-renders the root.
+vi.mock('@vercel/analytics/react', () => ({
+  Analytics: () => <div data-testid="vercel-analytics-mounted" />,
+}))
+
+vi.mock('@vercel/speed-insights/react', () => ({
+  SpeedInsights: () => <div data-testid="vercel-speed-insights-mounted" />,
 }))
 
 import '@/i18n'
@@ -52,6 +63,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   clearSession('manual')
+  vi.unstubAllEnvs()
 })
 
 describe('root session bootstrap', () => {
@@ -77,5 +89,24 @@ describe('root session bootstrap', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(router.state.location.pathname).toBe('/')
+  })
+})
+
+describe('root telemetry', () => {
+  it('mounts each Vercel collector exactly once in a production build', async () => {
+    vi.stubEnv('VITE_VERCEL_ENV', 'production')
+    const router = renderApp()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+
+    expect(screen.getAllByTestId('vercel-analytics-mounted')).toHaveLength(1)
+    expect(screen.getAllByTestId('vercel-speed-insights-mounted')).toHaveLength(1)
+  })
+
+  it('mounts neither collector in dev or under test', async () => {
+    const router = renderApp()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+
+    expect(screen.queryByTestId('vercel-analytics-mounted')).toBeNull()
+    expect(screen.queryByTestId('vercel-speed-insights-mounted')).toBeNull()
   })
 })

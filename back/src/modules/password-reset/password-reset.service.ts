@@ -169,25 +169,50 @@ export async function requestPasswordReset(
 
 export type CompletePasswordResetResult = { ok: true } | { ok: false; error: 'invalid_otp' }
 
-// Unknown email, no pending OTP, an expired one, and an exhausted one all
-// return the identical `invalid_otp` shape — no oracle, mirrors login's
-// non-oracle design (auth.service.ts).
+// A hash of a code that was never issued, verified against whenever there is
+// no usable pending OTP — the counterpart of DUMMY_OTP above, so that every
+// failing path costs one argon2.verify instead of returning early.
+const DUMMY_OTP_HASH =
+  '$argon2id$v=19$m=65536,p=4,t=3$j40eFEQ4Zb1nEazULxlbmw$TtwMiaH2QjZJ24iYuib+5MY0uA918lLDiv/1pFOUI38'
+
+// Unknown email, no pending OTP, an expired one, an exhausted one and a
+// throttled caller all return the identical `invalid_otp` shape — no oracle,
+// mirrors login's non-oracle design (auth.service.ts).
 export async function completePasswordReset(
   db: Db,
   input: CompletePasswordResetBody,
+  ip: string,
+  now = Date.now(),
 ): Promise<CompletePasswordResetResult> {
-  const user = await findUserByEmail(db, input.email)
-  if (!user) return { ok: false, error: 'invalid_otp' }
+  const emailKey = input.email.toLowerCase()
 
-  const [pending] = await db
-    .select()
-    .from(passwordResetOtpsTable)
-    .where(eq(passwordResetOtpsTable.userId, user.id))
-  if (!pending || pending.expiresAt.getTime() < Date.now()) {
+  // Checked before the OTP row is even read: a throttled call must cost the
+  // legitimate owner nothing, least of all one of their 5 attempts.
+  const withinBudget = await consumePasswordResetBudget(
+    db,
+    { action: 'complete', emailKey, ip },
+    now,
+  )
+  if (!withinBudget) {
+    await argon2.verify(DUMMY_OTP_HASH, input.otp)
     return { ok: false, error: 'invalid_otp' }
   }
 
-  const valid = await argon2.verify(pending.otpHash, input.otp)
+  const user = await findUserByEmail(db, emailKey)
+  const [pending] = user
+    ? await db
+        .select()
+        .from(passwordResetOtpsTable)
+        .where(eq(passwordResetOtpsTable.userId, user.id))
+    : []
+
+  // One verify on every path, against the real hash when there is one and the
+  // dummy otherwise — an unknown address must not answer faster than a wrong
+  // code for a real one.
+  const usable = pending !== undefined && pending.expiresAt.getTime() >= now
+  const valid = await argon2.verify(usable ? pending.otpHash : DUMMY_OTP_HASH, input.otp)
+  if (!user || !usable) return { ok: false, error: 'invalid_otp' }
+
   if (!valid) {
     const remaining = pending.attemptsRemaining - 1
     if (remaining <= 0) {

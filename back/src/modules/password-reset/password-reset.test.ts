@@ -347,16 +347,22 @@ describe('requestPasswordReset', () => {
 })
 
 describe('completePasswordReset', () => {
+  const ip = '203.0.113.9'
+
   it('sets the new password and consumes the OTP on a correct code', async () => {
     const user = await createTestUser()
     await issuePasswordResetOtp(db, user.id)
     const otp = lastOtp()
 
-    const result = await completePasswordReset(db, {
-      email: user.email,
-      otp,
-      newPassword: 'brand-new-password',
-    })
+    const result = await completePasswordReset(
+      db,
+      {
+        email: user.email,
+        otp,
+        newPassword: 'brand-new-password',
+      },
+      ip,
+    )
     expect(result).toEqual({ ok: true })
 
     const updated = await findUserById(db, user.id)
@@ -368,11 +374,15 @@ describe('completePasswordReset', () => {
     expect(oldStillValid).toBe(false)
 
     // Consumed: reusing the same OTP now fails.
-    const reuse = await completePasswordReset(db, {
-      email: user.email,
-      otp,
-      newPassword: 'another-password-1',
-    })
+    const reuse = await completePasswordReset(
+      db,
+      {
+        email: user.email,
+        otp,
+        newPassword: 'another-password-1',
+      },
+      ip,
+    )
     expect(reuse).toEqual({ ok: false, error: 'invalid_otp' })
   })
 
@@ -382,11 +392,15 @@ describe('completePasswordReset', () => {
     const otp = lastOtp()
     const wrongOtp = otp === '000000' ? '111111' : '000000'
 
-    const result = await completePasswordReset(db, {
-      email: user.email,
-      otp: wrongOtp,
-      newPassword: 'brand-new-password',
-    })
+    const result = await completePasswordReset(
+      db,
+      {
+        email: user.email,
+        otp: wrongOtp,
+        newPassword: 'brand-new-password',
+      },
+      ip,
+    )
     expect(result).toEqual({ ok: false, error: 'invalid_otp' })
   })
 
@@ -397,18 +411,26 @@ describe('completePasswordReset', () => {
     const wrongOtp = otp === '000000' ? '111111' : '000000'
 
     for (let i = 0; i < 5; i++) {
-      await completePasswordReset(db, {
-        email: user.email,
-        otp: wrongOtp,
-        newPassword: 'brand-new-password',
-      })
+      await completePasswordReset(
+        db,
+        {
+          email: user.email,
+          otp: wrongOtp,
+          newPassword: 'brand-new-password',
+        },
+        ip,
+      )
     }
 
-    const result = await completePasswordReset(db, {
-      email: user.email,
-      otp,
-      newPassword: 'brand-new-password',
-    })
+    const result = await completePasswordReset(
+      db,
+      {
+        email: user.email,
+        otp,
+        newPassword: 'brand-new-password',
+      },
+      ip,
+    )
     expect(result).toEqual({ ok: false, error: 'invalid_otp' })
   })
 
@@ -421,30 +443,101 @@ describe('completePasswordReset', () => {
       sql`update password_reset_otps set expires_at = now() - interval '1 minute' where user_id = ${user.id}`,
     )
 
-    const result = await completePasswordReset(db, {
-      email: user.email,
-      otp,
-      newPassword: 'brand-new-password',
-    })
+    const result = await completePasswordReset(
+      db,
+      {
+        email: user.email,
+        otp,
+        newPassword: 'brand-new-password',
+      },
+      ip,
+    )
     expect(result).toEqual({ ok: false, error: 'invalid_otp' })
   })
 
   it('returns the same generic error for an unknown email — no oracle', async () => {
-    const result = await completePasswordReset(db, {
-      email: 'nobody@example.com',
-      otp: '123456',
-      newPassword: 'brand-new-password',
-    })
+    const result = await completePasswordReset(
+      db,
+      {
+        email: 'nobody@example.com',
+        otp: '123456',
+        newPassword: 'brand-new-password',
+      },
+      ip,
+    )
     expect(result).toEqual({ ok: false, error: 'invalid_otp' })
   })
 
   it('returns the same generic error when no reset was ever issued', async () => {
     const user = await createTestUser()
-    const result = await completePasswordReset(db, {
-      email: user.email,
-      otp: '123456',
-      newPassword: 'brand-new-password',
-    })
+    const result = await completePasswordReset(
+      db,
+      {
+        email: user.email,
+        otp: '123456',
+        newPassword: 'brand-new-password',
+      },
+      ip,
+    )
     expect(result).toEqual({ ok: false, error: 'invalid_otp' })
+  })
+  it('answers the same invalid_otp over the per-IP ceiling, without burning an attempt', async () => {
+    const user = await createTestUser()
+    await issuePasswordResetOtp(db, user.id)
+    const otp = lastOtp()
+    const now = Date.now()
+    for (let i = 0; i < PASSWORD_RESET_COMPLETE_MAX_PER_IP; i++) {
+      await consumePasswordResetBudget(db, { action: 'complete', emailKey: user.email, ip }, now)
+    }
+
+    const result = await completePasswordReset(
+      db,
+      { email: user.email, otp, newPassword: 'brand-new-password' },
+      ip,
+      now,
+    )
+    expect(result).toEqual({ ok: false, error: 'invalid_otp' })
+
+    // A throttled call must not touch the pending row: otherwise anyone could
+    // spend the owner's 5 attempts for them and lock them out of their own OTP.
+    const [pending] = await db.select().from(passwordResetOtpsTable)
+    expect(pending?.attemptsRemaining).toBe(5)
+  })
+
+  // Same parity argument as the request route: an unknown address, a user with
+  // no pending code, and an expired one must all pay one argon2.verify, or the
+  // shared invalid_otp body still tells the caller which case it hit.
+  it('pays one argon2 verify on every failing path, pending code or not', async () => {
+    const user = await createTestUser()
+    const verify = vi.spyOn(argon2, 'verify')
+
+    await completePasswordReset(
+      db,
+      { email: 'nobody@example.com', otp: '123456', newPassword: 'brand-new-password' },
+      ip,
+    )
+    expect(verify).toHaveBeenCalledTimes(1)
+
+    verify.mockClear()
+    await completePasswordReset(
+      db,
+      { email: user.email, otp: '123456', newPassword: 'brand-new-password' },
+      ip,
+    )
+    expect(verify).toHaveBeenCalledTimes(1)
+
+    verify.mockClear()
+    await issuePasswordResetOtp(db, user.id)
+    await db.execute(
+      sql`update password_reset_otps set expires_at = now() - interval '1 minute' where user_id = ${user.id}`,
+    )
+    await completePasswordReset(
+      db,
+      { email: user.email, otp: lastOtp(), newPassword: 'brand-new-password' },
+      ip,
+    )
+    expect(verify).toHaveBeenCalledTimes(1)
+
+    verify.mockRestore()
   })
 })

@@ -114,19 +114,55 @@ export async function issuePasswordResetOtp(db: Db, userId: string): Promise<Iss
       set: { otpHash, expiresAt, attemptsRemaining: MAX_ATTEMPTS, createdAt: new Date() },
     })
 
-  await sendPasswordResetNotice({ email: user.email, otp })
+  // Deliberately not awaited: SES latency lands only on the path where an
+  // account exists, which would time-leak exactly what the identical 204 is
+  // there to hide. Nothing downstream depends on the send having finished.
+  void sendPasswordResetNotice({ email: user.email, otp }).catch((error: unknown) => {
+    console.error('[password-reset] failed to send the reset notice', error)
+  })
 
   return { ok: true }
 }
+
+// A fixed hash to burn on the paths that issue nothing — an unknown address
+// or a throttled one — so all three cost one argon2 hash. Same remedy as
+// login's DUMMY_PASSWORD_HASH (auth.service.ts): without it the identical 204
+// still leaks, by arriving noticeably sooner for addresses nobody registered.
+const DUMMY_OTP = '000000'
 
 // Self-service entry point for the public route: resolves the email to a user
 // and issues a code. An unknown email resolves exactly like a known one —
 // nothing written, nothing sent — so the endpoint is no oracle for which
 // addresses are registered. A deactivated account is served like any other;
-// login keeps refusing it regardless of the password.
-export async function requestPasswordReset(db: Db, email: string): Promise<void> {
-  const user = await findUserByEmail(db, email)
-  if (!user) return
+// login keeps refusing it regardless of the password. Over the throttle
+// ceiling (#142) it also resolves the same way, which is the whole point:
+// answering differently would put the oracle back.
+export async function requestPasswordReset(
+  db: Db,
+  email: string,
+  ip: string,
+  now = Date.now(),
+): Promise<void> {
+  // `findUserByEmail` matches on `lower()`, so without normalising here
+  // `Ada@x` and `ada@x` would count against two separate buckets and the
+  // per-address ceiling would be trivially sidestepped by changing the case.
+  const emailKey = email.toLowerCase()
+
+  const withinBudget = await consumePasswordResetBudget(
+    db,
+    { action: 'request', emailKey, ip },
+    now,
+  )
+  if (!withinBudget) {
+    await argon2.hash(DUMMY_OTP)
+    return
+  }
+
+  const user = await findUserByEmail(db, emailKey)
+  if (!user) {
+    await argon2.hash(DUMMY_OTP)
+    return
+  }
 
   await issuePasswordResetOtp(db, user.id)
 }

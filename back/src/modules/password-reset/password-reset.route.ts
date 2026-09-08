@@ -1,6 +1,7 @@
 import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
+import { clientIp } from '../../lib/client-ip'
 
 import {
   CompletePasswordResetBodySchema,
@@ -18,7 +19,7 @@ export const requestPasswordResetRoute = defineRoute({
   input: { body: RequestPasswordResetBodySchema },
   output: { 204: NoContentSchema },
   handler: async (c) => {
-    await requestPasswordReset(c.get('db'), c.input.body.email)
+    await requestPasswordReset(c.get('db'), c.input.body.email, clientIp(c.raw))
     return c.json(undefined, 204)
   },
 })

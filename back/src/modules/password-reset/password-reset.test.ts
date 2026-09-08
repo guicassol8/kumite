@@ -227,10 +227,12 @@ describe('consumePasswordResetBudget', () => {
 })
 
 describe('requestPasswordReset', () => {
+  const ip = '203.0.113.9'
+
   it('issues and emails a code for a known email', async () => {
     const user = await createTestUser()
 
-    await requestPasswordReset(db, user.email)
+    await requestPasswordReset(db, user.email, ip)
 
     expect(sendPasswordResetNotice).toHaveBeenCalledOnce()
     const pending = await db.select().from(passwordResetOtpsTable)
@@ -239,7 +241,7 @@ describe('requestPasswordReset', () => {
   })
 
   it('resolves silently for an unknown email — no row, no email, no oracle', async () => {
-    await expect(requestPasswordReset(db, 'nobody@example.com')).resolves.toBeUndefined()
+    await expect(requestPasswordReset(db, 'nobody@example.com', ip)).resolves.toBeUndefined()
 
     expect(sendPasswordResetNotice).not.toHaveBeenCalled()
     const pending = await db.select().from(passwordResetOtpsTable)
@@ -250,9 +252,97 @@ describe('requestPasswordReset', () => {
     const user = await createTestUser('inactive@example.com')
     await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, user.id))
 
-    await requestPasswordReset(db, user.email)
+    await requestPasswordReset(db, user.email, ip)
 
     expect(sendPasswordResetNotice).toHaveBeenCalledOnce()
+  })
+
+  it('counts the address case-insensitively — one bucket, not one per spelling', async () => {
+    const user = await createTestUser()
+    const now = Date.now()
+
+    await requestPasswordReset(db, user.email.toUpperCase(), ip, now)
+    await requestPasswordReset(db, user.email, ip, now)
+
+    const rows = await db.select().from(passwordResetRequestsTable)
+    expect(rows).toHaveLength(2)
+    expect(new Set(rows.map((row) => row.emailKey))).toEqual(new Set([user.email]))
+  })
+
+  it('stops issuing once the address is over its ceiling', async () => {
+    const user = await createTestUser()
+    const now = Date.now()
+    for (let i = 0; i < PASSWORD_RESET_MAX_PER_EMAIL; i++) {
+      await requestPasswordReset(db, user.email, ip, now)
+    }
+    const [pendingBefore] = await db.select().from(passwordResetOtpsTable)
+    sendPasswordResetNotice.mockClear()
+
+    await requestPasswordReset(db, user.email, ip, now)
+
+    expect(sendPasswordResetNotice).not.toHaveBeenCalled()
+    // The pending code is left exactly as it was: a throttled request must not
+    // rotate the OTP the owner is in the middle of typing in.
+    const [pendingAfter] = await db.select().from(passwordResetOtpsTable)
+    expect(pendingAfter?.otpHash).toBe(pendingBefore?.otpHash)
+  })
+
+  it('stops issuing once the IP is over its ceiling, whatever the address', async () => {
+    const user = await createTestUser()
+    const now = Date.now()
+    // A sweep of unknown addresses burns the client's whole per-IP budget...
+    for (let i = 0; i < PASSWORD_RESET_MAX_PER_IP; i++) {
+      await requestPasswordReset(db, `sweep-${i}@example.com`, ip, now)
+    }
+
+    // ...so a genuine address from the same client gets nothing issued either.
+    await requestPasswordReset(db, user.email, ip, now)
+
+    expect(sendPasswordResetNotice).not.toHaveBeenCalled()
+    const pending = await db.select().from(passwordResetOtpsTable)
+    expect(pending).toHaveLength(0)
+  })
+
+  // Timing parity: the response must not separate the three paths by how much
+  // work it does. Asserting the argon2 call count is the stable form of that
+  // invariant — a wall-clock assertion would be flaky on any loaded machine.
+  it('pays exactly one argon2 hash on all three paths — known, unknown, throttled', async () => {
+    const user = await createTestUser()
+    const hash = vi.spyOn(argon2, 'hash')
+    const now = Date.now()
+
+    await requestPasswordReset(db, user.email, ip, now)
+    expect(hash).toHaveBeenCalledTimes(1)
+
+    hash.mockClear()
+    await requestPasswordReset(db, 'nobody@example.com', ip, now)
+    expect(hash).toHaveBeenCalledTimes(1)
+
+    for (let i = 1; i < PASSWORD_RESET_MAX_PER_EMAIL; i++) {
+      await requestPasswordReset(db, user.email, ip, now)
+    }
+    hash.mockClear()
+    await requestPasswordReset(db, user.email, ip, now)
+    expect(hash).toHaveBeenCalledTimes(1)
+
+    hash.mockRestore()
+  })
+
+  it('does not wait on the email send to answer', async () => {
+    const user = await createTestUser()
+    let released = (): void => {}
+    sendPasswordResetNotice.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          released = resolve
+        }),
+    )
+
+    // Resolves while the send is still pending — otherwise a slow SES call
+    // would show up as a longer response for registered addresses only.
+    await expect(requestPasswordReset(db, user.email, ip)).resolves.toBeUndefined()
+
+    released()
   })
 })
 

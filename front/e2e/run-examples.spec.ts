@@ -2,6 +2,7 @@ import { emptyWorkspaceState, ROOT_BLOCK_TYPE, somaDosPares } from '@kumite/bloc
 import { expect, type Page, test } from '@playwright/test'
 
 import {
+  EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
   seedEditorFixture,
   seedParticipantToken,
@@ -106,6 +107,7 @@ test.describe('running examples locally (#5)', () => {
   let participantToken: string
 
   test.beforeAll(async () => {
+    test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
     ;({ problemId, participantToken } = await seedEditorFixture('Run Examples'))
   })
 

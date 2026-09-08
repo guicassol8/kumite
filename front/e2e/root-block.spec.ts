@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import {
+  EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
   seedEditorFixture,
   seedParticipantToken,
@@ -48,6 +49,7 @@ test.describe('the root block and native blocks (#4)', () => {
   let participantToken: string
 
   test.beforeAll(async () => {
+    test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
     ;({ problemId, participantToken } = await seedEditorFixture('Root Block'))
   })
 

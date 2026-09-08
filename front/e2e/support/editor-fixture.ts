@@ -19,9 +19,22 @@ export const hasOrganizerCredentials = Boolean(ORGANIZER_EMAIL && ORGANIZER_PASS
 const PASSWORD = 'supersecret'
 const TOKEN_KEY = 'kumite-token'
 
-/** Opening is the one step that contends: only one round may be open at a time. */
-const OPEN_ATTEMPTS = 5
-const OPEN_RETRY_MS = 1_000
+/**
+ * Opening is the one step that contends: only one round may be open at a time.
+ * Two things can hold that slot. Another fixture, for milliseconds — it closes
+ * its round right after opening it. And a round left open by `pnpm test` or
+ * `db:seed`, which lives for a whole minute; ~90s of retries outlasts it
+ * instead of failing a suite that is about to be perfectly runnable.
+ */
+const OPEN_ATTEMPTS = 30
+const OPEN_RETRY_MS = 3_000
+
+/**
+ * `beforeAll` inherits the 30s test timeout, which is shorter than the window
+ * above — the hook would die before the retries did. Every fixture consumer
+ * raises it to this instead.
+ */
+export const EDITOR_FIXTURE_TIMEOUT_MS = 120_000
 
 export type EditorFixture = {
   problemId: string
@@ -38,9 +51,8 @@ async function openWithRetry(roundId: string, auth: Record<string, string>): Pro
     if (res.ok) return
     const body = (await res.json().catch(() => ({}))) as { error?: string }
     lastError = body.error ?? `http ${res.status}`
-    // The other holder closes its round milliseconds after opening it, so a
-    // short backoff is enough; failing loudly beats leaving the problem in a
-    // draft round, where the editor would just 404 with no explanation.
+    // Failing loudly beats leaving the problem in a draft round, where the
+    // editor would just 404 with no explanation.
     if (attempt < OPEN_ATTEMPTS) await new Promise((r) => setTimeout(r, OPEN_RETRY_MS))
   }
   throw new Error(`could not open the round after ${OPEN_ATTEMPTS} attempts: ${lastError}`)

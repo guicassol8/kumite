@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import {
+  EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
   seedEditorFixture,
   seedParticipantToken,
@@ -21,6 +22,7 @@ test.describe('the curated toolbox (#16)', () => {
   let participantToken: string
 
   test.beforeAll(async () => {
+    test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
     ;({ problemId, participantToken } = await seedEditorFixture('Curated Toolbox'))
   })
 

@@ -168,41 +168,44 @@ function Home() {
             {closedRounds.length === 0 ? (
               <span className="text-muted-foreground text-sm">{t('home.closedRounds.empty')}</span>
             ) : (
-              closedRounds.map((round) => (
-                <div key={round.id} className="flex w-full items-baseline justify-between gap-4">
-                  <div className="flex items-baseline gap-2">
-                    <Link
-                      to="/rounds/$id"
-                      params={{ id: round.id }}
-                      data-testid={`home-closed-round-${round.id}`}
-                      className="text-primary underline"
-                    >
-                      {round.name}
-                    </Link>
-                    {myResultByRoundId.get(round.id) && (
-                      <span
-                        data-testid={`home-closed-round-result-${round.id}`}
-                        className="text-muted-foreground text-sm"
+              closedRounds.map((round) => {
+                const myResult = myResultByRoundId.get(round.id)
+                return (
+                  <div key={round.id} className="flex w-full items-baseline justify-between gap-4">
+                    <div className="flex items-baseline gap-2">
+                      <Link
+                        to="/rounds/$id"
+                        params={{ id: round.id }}
+                        data-testid={`home-closed-round-${round.id}`}
+                        className="text-primary underline"
                       >
-                        {t('home.closedRounds.result', {
-                          rank: myResultByRoundId.get(round.id)?.rank,
-                          score: myResultByRoundId.get(round.id)?.totalScore,
+                        {round.name}
+                      </Link>
+                      {myResult && (
+                        <span
+                          data-testid={`home-closed-round-result-${round.id}`}
+                          className="text-muted-foreground text-sm"
+                        >
+                          {t('home.closedRounds.result', {
+                            rank: myResult.rank,
+                            score: myResult.totalScore,
+                          })}
+                        </span>
+                      )}
+                    </div>
+                    {round.closedAt && (
+                      <span className="text-muted-foreground text-sm">
+                        {t('home.closedRounds.closedAt', {
+                          date: formatDate(
+                            new Date(round.closedAt),
+                            i18n.resolvedLanguage ?? i18n.language,
+                          ),
                         })}
                       </span>
                     )}
                   </div>
-                  {round.closedAt && (
-                    <span className="text-muted-foreground text-sm">
-                      {t('home.closedRounds.closedAt', {
-                        date: formatDate(
-                          new Date(round.closedAt),
-                          i18n.resolvedLanguage ?? i18n.language,
-                        ),
-                      })}
-                    </span>
-                  )}
-                </div>
-              ))
+                )
+              })
             )}
           </CardContent>
         </Card>

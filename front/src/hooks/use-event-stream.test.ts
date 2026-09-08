@@ -140,6 +140,40 @@ describe('useEventStream', () => {
     expect(onRoundChange).not.toHaveBeenCalled()
   })
 
+  it('ranking.updated calls onRankingUpdate without touching round state', () => {
+    setSession(fakeUser, 'tok-1')
+    const onRoundChange = vi.fn()
+    const onRankingUpdate = vi.fn()
+    const { result } = renderHook(() => useEventStream(onRoundChange, onRankingUpdate))
+
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r6',
+      closesAt: new Date('2026-09-02T12:30:00.000Z'),
+    })
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date('2026-09-02T12:05:00.000Z'),
+      round: null,
+      event: { teams: [] },
+    })
+
+    expect(onRankingUpdate).toHaveBeenCalledTimes(1)
+    expect(onRoundChange).toHaveBeenCalledTimes(1)
+    expect(result.current.currentRoundId).toBe('r6')
+  })
+
+  it('does not call onRankingUpdate on a heartbeat', () => {
+    setSession(fakeUser, 'tok-1')
+    const onRankingUpdate = vi.fn()
+    renderHook(() => useEventStream(undefined, onRankingUpdate))
+
+    emit({ type: 'heartbeat', serverTime: new Date('2026-09-02T12:10:00.000Z') })
+
+    expect(onRankingUpdate).not.toHaveBeenCalled()
+  })
+
   it('disconnects on unmount', () => {
     setSession(fakeUser, 'tok-1')
     const { unmount } = renderHook(() => useEventStream())

@@ -25,11 +25,19 @@ const INITIAL_STATE: EventStreamState = {
 // `onRoundChange` fires on round.opened/round.closed so the caller can
 // invalidate the closed-rounds list query; round.extended only moves
 // closesAt on the round already tracked, no list refetch needed.
-export function useEventStream(onRoundChange?: () => void): EventStreamState {
+// `onRankingUpdate` fires on ranking.updated — published on every judged
+// submission (debounced, #44) — as a plain "something scored" signal: the
+// payload isn't read here, callers just refetch what they own (#54).
+export function useEventStream(
+  onRoundChange?: () => void,
+  onRankingUpdate?: () => void,
+): EventStreamState {
   const { status } = useSession()
   const [state, setState] = useState<EventStreamState>(INITIAL_STATE)
   const onRoundChangeRef = useRef(onRoundChange)
   onRoundChangeRef.current = onRoundChange
+  const onRankingUpdateRef = useRef(onRankingUpdate)
+  onRankingUpdateRef.current = onRankingUpdate
 
   useEffect(() => {
     if (status !== 'authenticated') {
@@ -71,6 +79,9 @@ export function useEventStream(onRoundChange?: () => void): EventStreamState {
                 : prev,
             )
             onRoundChangeRef.current?.()
+            return
+          case 'ranking.updated':
+            onRankingUpdateRef.current?.()
             return
           case 'heartbeat':
             setState((prev) => ({ ...prev, serverTime: event.serverTime }))

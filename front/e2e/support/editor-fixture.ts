@@ -1,0 +1,183 @@
+import type { Page } from '@playwright/test'
+
+// Shared setup for every spec that only needs to *view* the block editor.
+// #7 moved it behind a real problem id (`/problem/$id`), so each of those
+// specs used to repeat the same seeding by hand. The round is opened and
+// immediately closed: none of these specs submits, and a round left open would
+// hold the single-open-round slot against every other spec running in
+// parallel. A `draft` round is not an option — `getProblem` answers 404 while
+// the problem is not in a non-draft round (`problems.service.ts`).
+//
+// Playwright only collects `*.spec.ts` under `testDir`, so this file is a
+// helper, not a suite.
+
+export const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
+export const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
+export const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
+export const hasOrganizerCredentials = Boolean(ORGANIZER_EMAIL && ORGANIZER_PASSWORD)
+
+const PASSWORD = 'supersecret'
+const TOKEN_KEY = 'kumite-token'
+
+/**
+ * Opening is the one step that contends: only one round may be open at a time.
+ * Two things can hold that slot. Another fixture, for milliseconds — it closes
+ * its round right after opening it. And a round left open by `pnpm test` or
+ * `db:seed`, which lives for a whole minute; ~90s of retries outlasts it
+ * instead of failing a suite that is about to be perfectly runnable.
+ */
+const OPEN_ATTEMPTS = 30
+const OPEN_RETRY_MS = 3_000
+
+/**
+ * `beforeAll` inherits the 30s test timeout, which is shorter than the window
+ * above — the hook would die before the retries did. Every fixture consumer
+ * raises it to this instead.
+ */
+export const EDITOR_FIXTURE_TIMEOUT_MS = 120_000
+
+export type EditorFixture = {
+  problemId: string
+  participantToken: string
+}
+
+async function openWithRetry(roundId: string, auth: Record<string, string>): Promise<void> {
+  for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt++) {
+    const res = await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, {
+      method: 'POST',
+      headers: auth,
+    })
+    if (res.ok) return
+    const body = (await res.json().catch(() => ({}))) as { error?: string }
+    const error = body.error ?? `http ${res.status}`
+    // Waiting only ever helps against the contended slot. A 401, a 404 or a
+    // round that is no longer a draft answers the same way in 90s as it does
+    // now, and retrying it just buries the real cause under a timeout.
+    if (error !== 'another_round_open') {
+      throw new Error(`could not open the round: ${error} (HTTP ${res.status})`)
+    }
+    if (attempt < OPEN_ATTEMPTS) await new Promise((r) => setTimeout(r, OPEN_RETRY_MS))
+  }
+  throw new Error(
+    `could not open the round after ${OPEN_ATTEMPTS} attempts: another_round_open — another spec or a seeded round still holds the single open-round slot`,
+  )
+}
+
+/**
+ * Seeds a published "Soma dos Pares" problem inside a closed round and a
+ * participant able to open it. The three visible test cases mirror
+ * `somaDosParesProblem.examples` exactly; the hidden one only exists because
+ * publish requires it.
+ *
+ * `label` names the round and the participant, so a failing run says which
+ * spec seeded what.
+ */
+export async function seedEditorFixture(label: string): Promise<EditorFixture> {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+  const orgLogin = await fetch(`${BACK_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
+  })
+  const { token: orgToken } = (await orgLogin.json()) as { token?: string }
+  // Without this, every later request goes out as `Bearer undefined` and the
+  // suite blames the first one that answers 401 instead of the login. The
+  // usual cause is a database wiped by `pnpm test` and not re-seeded.
+  if (!orgToken) {
+    throw new Error(
+      `organizer login failed for ${ORGANIZER_EMAIL} (HTTP ${orgLogin.status}) — is the database seeded?`,
+    )
+  }
+  const auth = { authorization: `Bearer ${orgToken}` }
+
+  const created = await fetch(`${BACK_URL}/organizer/problems`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...auth },
+    body: JSON.stringify({ difficulty: 'easy' }),
+  })
+  const { id: problemId } = (await created.json()) as { id?: string }
+  // Same reason as the login guard above: without this the id travels as the
+  // literal "undefined" through PATCH, publish and the round, and the suite
+  // blames `openWithRetry` 90s later instead of the request that actually broke.
+  if (!problemId) {
+    throw new Error(`could not create the problem (HTTP ${created.status})`)
+  }
+
+  await fetch(`${BACK_URL}/organizer/problems/${problemId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...auth },
+    body: JSON.stringify({
+      translations: [
+        { locale: 'pt', title: 'Soma dos Pares', statementMd: 'Some os números pares.' },
+        { locale: 'es', title: 'Suma de Pares', statementMd: 'Suma los números pares.' },
+        { locale: 'en', title: 'Sum of Evens', statementMd: 'Sum the even numbers.' },
+      ],
+      testCases: [
+        { input: [1, 2, 3, 4], expected: 6, hidden: false },
+        { input: [5, 7, 9], expected: 0, hidden: false },
+        { input: [2, 4, 6, 8], expected: 20, hidden: false },
+        { input: [10, 11, 12], expected: 22, hidden: true },
+      ],
+    }),
+  })
+  await fetch(`${BACK_URL}/organizer/problems/${problemId}/publish`, {
+    method: 'POST',
+    headers: auth,
+  })
+
+  const roundRes = await fetch(`${BACK_URL}/organizer/rounds`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...auth },
+    body: JSON.stringify({
+      name: `${label} E2E ${Date.now()}`,
+      durationMinutes: 30,
+      problemIds: [problemId],
+    }),
+  })
+  const { id: roundId } = (await roundRes.json()) as { id?: string }
+  // See the problem guard: a missing id here would send `openWithRetry` after
+  // /organizer/rounds/undefined/open for the full ~90s before giving up.
+  if (!roundId) {
+    throw new Error(`could not create the round for problem ${problemId} (HTTP ${roundRes.status})`)
+  }
+  await openWithRetry(roundId, auth)
+  // A close that fails in silence is the one way this fixture could cause the
+  // very thing it works around: a round left open holds the single-open-round
+  // slot for its whole 30min duration (#150). Fail here instead.
+  const closed = await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, {
+    method: 'POST',
+    headers: auth,
+  })
+  if (!closed.ok) {
+    throw new Error(
+      `could not close round ${roundId} (HTTP ${closed.status}) — it now holds the open-round slot`,
+    )
+  }
+
+  const participantEmail = `${slug}-e2e-${Date.now()}@edu.pucrs.br`
+  await fetch(`${BACK_URL}/auth/signup`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: participantEmail, password: PASSWORD, code: 'PUCRS2026' }),
+  })
+  const participantLogin = await fetch(`${BACK_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: participantEmail, password: PASSWORD }),
+  })
+  const { token: participantToken } = (await participantLogin.json()) as { token: string }
+
+  return { problemId, participantToken }
+}
+
+/** Signs the page in via the stored token instead of walking the login UI. */
+export async function seedParticipantToken(page: Page, token: string): Promise<void> {
+  await page.addInitScript(
+    ([key, value]) => window.localStorage.setItem(key as string, value as string),
+    [TOKEN_KEY, token],
+  )
+}

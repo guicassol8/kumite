@@ -1,19 +1,20 @@
 import { expect, type Page, test } from '@playwright/test'
 
+import {
+  EDITOR_FIXTURE_TIMEOUT_MS,
+  hasOrganizerCredentials,
+  seedEditorFixture,
+  seedParticipantToken,
+} from './support/editor-fixture'
+
 // Visual walkthrough for #4: the protected root block, the pt-br locale of the
 // native Blockly blocks and the Variables category that can create variables.
 // #7 moved the editor behind a real problem id — this suite only needs to
-// *view* one, so `beforeAll` seeds a problem+round once (opened then
-// immediately closed, so it never holds the single-open-round slot) and every
-// test signs in via a seeded token instead of the UI.
+// *view* one, so `beforeAll` seeds a problem+round once via the shared fixture
+// and every test signs in with a seeded token instead of the UI.
 const evidence = (name: string) => `e2e/evidence/4/${name}.png`
 
 const ROOT = '[data-id="kumiteSolveRoot"]'
-
-const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
-const PASSWORD = 'supersecret'
 
 function contextMenu(page: Page) {
   return page.locator('.blocklyContextMenu')
@@ -42,79 +43,18 @@ async function dragBlockFromCategory(page: Page, category: string) {
 }
 
 test.describe('the root block and native blocks (#4)', () => {
-  test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
+  test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string
   let participantToken: string
 
   test.beforeAll(async () => {
-    const orgLogin = await fetch(`${BACK_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-    })
-    const { token: orgToken } = (await orgLogin.json()) as { token: string }
-    const auth = { authorization: `Bearer ${orgToken}` }
-
-    const created = await fetch(`${BACK_URL}/organizer/problems`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({ difficulty: 'easy' }),
-    })
-    const { id } = (await created.json()) as { id: string }
-    problemId = id
-    await fetch(`${BACK_URL}/organizer/problems/${id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({
-        translations: [
-          { locale: 'pt', title: 'Soma dos Pares', statementMd: 'Some os números pares.' },
-          { locale: 'es', title: 'Suma de Pares', statementMd: 'Suma los números pares.' },
-          { locale: 'en', title: 'Sum of Evens', statementMd: 'Sum the even numbers.' },
-        ],
-        testCases: [
-          { input: [1, 2, 3, 4], expected: 6, hidden: false },
-          { input: [5, 7, 9], expected: 0, hidden: false },
-          { input: [2, 4, 6, 8], expected: 20, hidden: false },
-          { input: [10, 11, 12], expected: 22, hidden: true },
-        ],
-      }),
-    })
-    await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST', headers: auth })
-
-    const roundRes = await fetch(`${BACK_URL}/organizer/rounds`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({
-        name: `Root Block E2E ${Date.now()}`,
-        durationMinutes: 30,
-        problemIds: [id],
-      }),
-    })
-    const { id: roundId } = (await roundRes.json()) as { id: string }
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, { method: 'POST', headers: auth })
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
-
-    const participantEmail = `root-block-e2e-${Date.now()}@edu.pucrs.br`
-    await fetch(`${BACK_URL}/auth/signup`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: participantEmail, password: PASSWORD, code: 'PUCRS2026' }),
-    })
-    const participantLogin = await fetch(`${BACK_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: participantEmail, password: PASSWORD }),
-    })
-    const { token } = (await participantLogin.json()) as { token: string }
-    participantToken = token
+    test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
+    ;({ problemId, participantToken } = await seedEditorFixture('Root Block'))
   })
 
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(
-      ([key, token]) => window.localStorage.setItem(key as string, token as string),
-      ['kumite-token', participantToken],
-    )
+    await seedParticipantToken(page, participantToken)
   })
 
   test('the native blocks speak pt-br and the root block cannot be deleted or duplicated', async ({

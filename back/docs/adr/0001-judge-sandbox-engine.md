@@ -99,7 +99,9 @@ Configuration to carry into #19 (the execution service):
   (worker body), `back/scripts/build-sandbox-worker.mjs` (compiles it) and
   `back/src/sandbox-engine.test.ts` (spawns the compiled worker,
   characterizes it) — #19 ports this logic into `src/modules/judge/` with
-  the real submission-pool lifecycle around it.
+  the real submission-pool lifecycle around it. (See the Errata at the end
+  of this ADR: that means the service surface, not where the files
+  physically live.)
 
 ## Alternatives considered
 
@@ -252,3 +254,27 @@ actually measured, per the agreed tie-break order.
   without crashing the *main* process, memory-limit without crashing the
   main process, every hostile probe blocked). Timings are printed, never
   asserted.
+
+## Errata (2026-09-09)
+
+The Decision section's last bullet says "#19 ports this logic into
+`src/modules/judge/`". Read literally, that sends the worker script into the
+module folder — which `kata verify` rejects: the `kata/schema-file-naming`
+rule accepts only the five locked suffixes inside `src/modules/<domain>/`
+(`.route.ts`, `.service.ts`, `.schema.ts`, `.test.ts`, `.hurl`), while the
+`src/` root is open to any filename (kata's `guide/project-layout.md`, "The
+`src/` root is open" / "Module directories stay locked"). The sentence means
+the **service surface** lives in `src/modules/judge/`; a file outside those
+five suffixes stays at the `src/` root.
+
+That is what #19 actually shipped:
+
+- `back/src/sandbox-engine.worker.ts` — the worker body, at the `src/` root,
+  where this ADR's own "working reference" bullet had already put it.
+- `back/src/modules/judge/judge.service.ts` — the service surface: the
+  per-submission worker lifecycle, the concurrency semaphore and the outcome
+  mapping. It imports the worker's request/reply types from
+  `../../sandbox-engine.worker`.
+
+The Decision itself is unchanged — only the reading of that one phrase is
+corrected here.

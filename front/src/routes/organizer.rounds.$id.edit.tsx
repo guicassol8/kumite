@@ -16,7 +16,11 @@ class RoundNotFoundError extends Error {}
 
 async function fetchRound(id: string) {
   const res = await api.organizer.rounds[':id'].$get({ param: { id } })
-  if (res.status === 404) throw new RoundNotFoundError()
+  // 422 alongside 404, cast included (#94) — see fetchProblem in
+  // lib/problems-query.ts. Only this read: the PATCH below keeps its own 404
+  // handling, because a 422 there means the submitted body is wrong, not that
+  // the round is gone.
+  if (res.status === 404 || (res.status as number) === 422) throw new RoundNotFoundError()
   if (res.status !== 200) throw new Error('failed to load round')
   return res.json()
 }

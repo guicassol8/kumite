@@ -232,6 +232,14 @@ describe('EditProblemScreen', () => {
     expect(screen.queryByTestId('problem-form')).toBeNull()
   })
 
+  it('shows the same not-found state for a malformed problem id (#94)', async () => {
+    mockedDetail.mockResolvedValue(jsonResponse(422, { error: 'validation_failed', issues: {} }))
+    renderEdit()
+
+    await waitFor(() => expect(screen.getByTestId('problem-form-not-found')).toBeDefined())
+    expect(screen.queryByTestId('problem-form')).toBeNull()
+  })
+
   it('shows a recoverable error and refetches on retry', async () => {
     mockedDetail.mockResolvedValueOnce(jsonResponse(500, {}))
     renderEdit()

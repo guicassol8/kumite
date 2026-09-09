@@ -39,6 +39,14 @@ describe('fetchProblem', () => {
     await expect(fetchProblem('p1', 'pt')).rejects.toBeInstanceOf(ProblemNotFoundError)
   })
 
+  it('throws ProblemNotFoundError on 422 (#94)', async () => {
+    // A malformed id in the URL is now rejected at the edge instead of 500ing;
+    // to the reader that link names no problem, same as a 404.
+    mockedGet.mockResolvedValue(jsonResponse(422, { error: 'validation_failed', issues: {} }))
+
+    await expect(fetchProblem('nao-e-uuid', 'pt')).rejects.toBeInstanceOf(ProblemNotFoundError)
+  })
+
   it('throws a generic error on any other status', async () => {
     mockedGet.mockResolvedValue(jsonResponse(500, { error: 'internal', message: 'boom' }))
 

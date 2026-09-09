@@ -19,6 +19,18 @@ const optionalNonEmptyString = () =>
 
 const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
+  // Public origin of the front, used to build absolute links inside emails
+  // (#162) — a relative path is not clickable in any email client. The
+  // trailing slash is stripped so `${APP_BASE_URL}/reset-password` never
+  // becomes `//reset-password`.
+  APP_BASE_URL: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .url()
+      .default('http://localhost:5173')
+      .transform((url) => url.replace(/\/+$/, '')),
+  ),
   DATABASE_URL: z.string().url().default('postgres://kumite:kumite@localhost:5433/kumite'),
   JWT_SECRET: z.string().min(1),
   JUDGE_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
@@ -53,6 +65,7 @@ export const env = parseEnv(EnvSchema, process.env, {
 })
 
 export const JWT_SECRET = env.JWT_SECRET
+export const APP_BASE_URL = env.APP_BASE_URL
 export const TOKEN_TTL_SECONDS = 60 * 60 * 24
 export const JUDGE_TIMEOUT_MS = env.JUDGE_TIMEOUT_MS
 export const JUDGE_MEMORY_MB = env.JUDGE_MEMORY_MB

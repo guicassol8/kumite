@@ -202,8 +202,19 @@ export async function seed(db: Db): Promise<void> {
     ])
     .onConflictDoNothing()
 
-  // mixingLocked/maxTeamSize stay on their table defaults (free mixing, 3).
-  await db.insert(eventConfigTable).values({ id: 1 }).onConflictDoNothing()
+  // Reset, not additive: the singleton event_config row is event-wide mutable
+  // state that the vitest suite and the hurl files leave dirty, so seeding is
+  // the point where it comes back to a known state. `onConflictDoNothing()`
+  // would preserve whatever ran last, which is what #161 fixed.
+  // Keep these values in sync with the `.default()`s on `eventConfigTable`.
+  const eventConfigDefaults = { mixingLocked: false, maxTeamSize: 3 }
+  await db
+    .insert(eventConfigTable)
+    .values({ id: 1, ...eventConfigDefaults })
+    .onConflictDoUpdate({
+      target: eventConfigTable.id,
+      set: { ...eventConfigDefaults, updatedAt: new Date() },
+    })
 
   await seedProblems(db)
 }

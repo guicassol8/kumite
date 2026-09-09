@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OrganizerRouteImport } from './routes/organizer'
@@ -32,6 +33,11 @@ import { Route as OrganizerRoundsIdEditRouteImport } from './routes/organizer.ro
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangePasswordRoute = ChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeaderboardRoute = LeaderboardRouteImport.update({
@@ -127,6 +133,7 @@ const OrganizerRoundsIdEditRoute = OrganizerRoundsIdEditRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/change-password': typeof ChangePasswordRoute
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
@@ -148,6 +155,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/change-password': typeof ChangePasswordRoute
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
@@ -169,6 +177,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/change-password': typeof ChangePasswordRoute
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/organizer': typeof OrganizerRouteWithChildren
@@ -192,6 +201,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/change-password'
     | '/leaderboard'
     | '/login'
     | '/organizer'
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/change-password'
     | '/leaderboard'
     | '/login'
     | '/reset-password'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/change-password'
     | '/leaderboard'
     | '/login'
     | '/organizer'
@@ -255,6 +267,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ChangePasswordRoute: typeof ChangePasswordRoute
   LeaderboardRoute: typeof LeaderboardRoute
   LoginRoute: typeof LoginRoute
   OrganizerRoute: typeof OrganizerRouteWithChildren
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/change-password': {
+      id: '/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof ChangePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leaderboard': {
@@ -435,6 +455,7 @@ const OrganizerRouteWithChildren = OrganizerRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ChangePasswordRoute: ChangePasswordRoute,
   LeaderboardRoute: LeaderboardRoute,
   LoginRoute: LoginRoute,
   OrganizerRoute: OrganizerRouteWithChildren,

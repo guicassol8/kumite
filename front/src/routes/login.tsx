@@ -73,6 +73,13 @@ function LoginScreen() {
     }
     const user = await meRes.json()
     setSession(user, token)
+    // Signing in with an organizer-issued temporary password (#143) goes
+    // straight to the change screen — `search.redirect` would only land on a
+    // page the back is going to 403 anyway.
+    if (user.mustChangePassword) {
+      navigate({ to: '/change-password' })
+      return
+    }
     navigate({ to: search.redirect ?? '/' })
   }
 

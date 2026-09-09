@@ -1,5 +1,5 @@
 import { defineRoute } from '../../context'
-import { requireOrganizer, requireUser } from '../../middlewares/auth'
+import { requireOrganizer, requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
 import { EventStatsSchema } from './stats.schema'
 import { getEventStats } from './stats.service'
@@ -9,7 +9,7 @@ import { getEventStats } from './stats.service'
 export const getEventStatsRoute = defineRoute({
   method: 'GET',
   path: '/organizer/stats',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: {},
   output: EventStatsSchema,
   handler: async (c) => getEventStats(c.get('db')),

@@ -21,23 +21,31 @@ import * as users from './modules/users/users.route'
 // namespace imports — each file's exported routes are registered in order. The
 // app-level middleware chain (ADR-0012) runs before every route; add
 // cross-cutting concerns (cors(), secureHeaders(), bodyLimit() from 'kata') here.
+// Exported, not inlined below, so src/auth-guards.test.ts can walk every
+// registered route and assert the `requirePasswordUpToDate` convention
+// (ADR-0004) without keeping a second copy of this list to drift out of date.
+// `as const` is load-bearing, not decoration: without it the array widens to a
+// union and `AppType` collapses, taking the front's whole typed RPC client down
+// with it (every `api.*` becomes `unknown`).
+export const modules = [
+  health,
+  greetings,
+  auth,
+  users,
+  passwordReset,
+  problems,
+  eventConfig,
+  eventCodes,
+  teams,
+  submissions,
+  rounds,
+  ranking,
+  stats,
+  sse,
+] as const
+
 export const app = createApp({
-  modules: [
-    health,
-    greetings,
-    auth,
-    users,
-    passwordReset,
-    problems,
-    eventConfig,
-    eventCodes,
-    teams,
-    submissions,
-    rounds,
-    ranking,
-    stats,
-    sse,
-  ],
+  modules,
   middlewares: [cors(), requestLogger],
 })
 

@@ -3,6 +3,7 @@ import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER,
   PASSWORD_RESET_COMPLETE_MAX_PER_IP,
   PASSWORD_RESET_MAX_PER_EMAIL,
   PASSWORD_RESET_MAX_PER_IP,
@@ -10,6 +11,7 @@ import {
 } from '../../config'
 import { createDb } from '../../db/client'
 import { passwordResetOtpsTable, passwordResetRequestsTable, usersTable } from '../../db/schema'
+import { login } from '../auth/auth.service'
 import { findUserById } from '../users/users.service'
 
 import {
@@ -17,6 +19,8 @@ import {
   consumePasswordResetBudget,
   issuePasswordResetOtp,
   requestPasswordReset,
+  resetPasswordByOrganizer,
+  verifyOrganizerStepUp,
 } from './password-reset.service'
 
 const sendPasswordResetNotice = vi.fn().mockResolvedValue(undefined)
@@ -582,5 +586,258 @@ describe('completePasswordReset', () => {
     expect(verify).toHaveBeenCalledTimes(1)
 
     verify.mockRestore()
+  })
+})
+
+// --- Organizer-driven reset with step-up (#143) ---
+
+const ADMIN_PASSWORD = 'organizer-secret'
+
+async function createOrganizer() {
+  const passwordHash = await argon2.hash(ADMIN_PASSWORD)
+  const [user] = await db
+    .insert(usersTable)
+    .values({
+      email: `organizer-${crypto.randomUUID()}@example.com`,
+      passwordHash,
+      role: 'organizer',
+      university: 'pucrs',
+    })
+    .returning()
+  if (!user) throw new Error('expected organizer to be created')
+  return user
+}
+
+// `email_key` carries the organizer's id for the `organizer_reset` action —
+// see the column's note in db/schema.ts and ADR-0004.
+function adminFailures(organizerId: string) {
+  return db
+    .select()
+    .from(passwordResetRequestsTable)
+    .where(eq(passwordResetRequestsTable.emailKey, organizerId))
+}
+
+describe('verifyOrganizerStepUp', () => {
+  const ip = '203.0.113.9'
+
+  async function stepUp(
+    organizer: { id: string; passwordHash: string },
+    password: string,
+    now = Date.now(),
+  ) {
+    return verifyOrganizerStepUp(
+      db,
+      { organizerId: organizer.id, passwordHash: organizer.passwordHash, password, ip },
+      now,
+    )
+  }
+
+  it("accepts the organizer's own password and records no failure", async () => {
+    const organizer = await createOrganizer()
+
+    expect(await stepUp(organizer, ADMIN_PASSWORD)).toEqual({ ok: true })
+    expect(await adminFailures(organizer.id)).toHaveLength(0)
+  })
+
+  it('refuses a wrong password and logs the attempt', async () => {
+    const organizer = await createOrganizer()
+
+    expect(await stepUp(organizer, 'not-my-password')).toEqual({
+      ok: false,
+      error: 'invalid_admin_password',
+    })
+    expect(await adminFailures(organizer.id)).toHaveLength(1)
+  })
+
+  it('refuses the correct password once the ceiling is reached', async () => {
+    const organizer = await createOrganizer()
+    const now = Date.now()
+
+    for (let i = 0; i < PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER; i++) {
+      expect(await stepUp(organizer, 'wrong', now)).toEqual({
+        ok: false,
+        error: 'invalid_admin_password',
+      })
+    }
+
+    // The real password now answers exactly like a wrong one: the spec asks
+    // for no distinction, and a different code would be a distinction.
+    expect(await stepUp(organizer, ADMIN_PASSWORD, now)).toEqual({
+      ok: false,
+      error: 'invalid_admin_password',
+    })
+  })
+
+  it('clears the window on a correct password, so a typo streak costs nothing', async () => {
+    const organizer = await createOrganizer()
+    const now = Date.now()
+
+    for (let i = 0; i < PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER - 1; i++) {
+      await stepUp(organizer, 'wrong', now)
+    }
+    expect(await stepUp(organizer, ADMIN_PASSWORD, now)).toEqual({ ok: true })
+    expect(await adminFailures(organizer.id)).toHaveLength(0)
+
+    // And the full allowance is available again right after, still inside the
+    // same window — otherwise a nervous organizer resetting several accounts
+    // in a row would lock themselves out mid-event.
+    for (let i = 0; i < PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER - 1; i++) {
+      await stepUp(organizer, 'wrong', now)
+    }
+    expect(await stepUp(organizer, ADMIN_PASSWORD, now)).toEqual({ ok: true })
+  })
+
+  it('drains after the window passes', async () => {
+    const organizer = await createOrganizer()
+    const now = Date.now()
+
+    for (let i = 0; i < PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER; i++) {
+      await stepUp(organizer, 'wrong', now)
+    }
+
+    expect(await stepUp(organizer, ADMIN_PASSWORD, now + PASSWORD_RESET_WINDOW_MS + 1)).toEqual({
+      ok: true,
+    })
+  })
+
+  it('buckets by organizer, so one exhausted organizer does not block another', async () => {
+    const exhausted = await createOrganizer()
+    const other = await createOrganizer()
+    const now = Date.now()
+
+    for (let i = 0; i < PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER; i++) {
+      await stepUp(exhausted, 'wrong', now)
+    }
+
+    expect(await stepUp(other, ADMIN_PASSWORD, now)).toEqual({ ok: true })
+  })
+
+  // Same reason as the public budget's burst test: without the advisory lock
+  // every call of a parallel batch reads the same count before any of them has
+  // inserted, and the ceiling is bypassed by firing at once instead of in turn.
+  it('holds the ceiling when the whole burst arrives at once', async () => {
+    const organizer = await createOrganizer()
+    const now = Date.now()
+
+    await Promise.all(Array.from({ length: 10 }, () => stepUp(organizer, 'wrong', now)))
+
+    expect(await adminFailures(organizer.id)).toHaveLength(PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER)
+  })
+})
+
+describe('resetPasswordByOrganizer', () => {
+  const ip = '203.0.113.9'
+
+  async function reset(organizerId: string, targetId: string, adminPassword = ADMIN_PASSWORD) {
+    return resetPasswordByOrganizer(db, { organizerId, targetId, adminPassword, ip })
+  }
+
+  it('returns a temporary password, flags the account and invalidates the old one', async () => {
+    const organizer = await createOrganizer()
+    const target = await createTestUser()
+
+    const result = await reset(organizer.id, target.id)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('unreachable')
+    expect(result.temporaryPassword).toMatch(/^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/)
+
+    const updated = await findUserById(db, target.id)
+    expect(updated?.mustChangePassword).toBe(true)
+    expect(await argon2.verify(updated?.passwordHash ?? '', result.temporaryPassword)).toBe(true)
+    expect(await argon2.verify(updated?.passwordHash ?? '', 'original-password')).toBe(false)
+  })
+
+  it('drops the pending OTP, so a code issued before the reset is dead', async () => {
+    const organizer = await createOrganizer()
+    const target = await createTestUser()
+    await issuePasswordResetOtp(db, target.id)
+
+    await reset(organizer.id, target.id)
+
+    const otps = await db
+      .select()
+      .from(passwordResetOtpsTable)
+      .where(eq(passwordResetOtpsTable.userId, target.id))
+    expect(otps).toHaveLength(0)
+  })
+
+  it('changes nothing when the admin password is wrong', async () => {
+    const organizer = await createOrganizer()
+    const target = await createTestUser()
+
+    expect(await reset(organizer.id, target.id, 'not-my-password')).toEqual({
+      ok: false,
+      error: 'invalid_admin_password',
+    })
+
+    const unchanged = await findUserById(db, target.id)
+    expect(unchanged?.passwordHash).toBe(target.passwordHash)
+    expect(unchanged?.mustChangePassword).toBe(false)
+  })
+
+  it('refuses an organizer target, cutting lateral escalation', async () => {
+    const organizer = await createOrganizer()
+    const otherOrganizer = await createOrganizer()
+
+    expect(await reset(organizer.id, otherOrganizer.id)).toEqual({
+      ok: false,
+      error: 'target_not_participant',
+    })
+
+    const unchanged = await findUserById(db, otherOrganizer.id)
+    expect(unchanged?.passwordHash).toBe(otherOrganizer.passwordHash)
+  })
+
+  it('refuses the caller resetting themselves', async () => {
+    const organizer = await createOrganizer()
+
+    expect(await reset(organizer.id, organizer.id)).toEqual({
+      ok: false,
+      error: 'target_not_participant',
+    })
+  })
+
+  it('reports not_found for an unknown target', async () => {
+    const organizer = await createOrganizer()
+
+    expect(await reset(organizer.id, '00000000-0000-0000-0000-000000000000')).toEqual({
+      ok: false,
+      error: 'not_found',
+    })
+  })
+
+  it('serves a deactivated participant — login keeps refusing them regardless', async () => {
+    const organizer = await createOrganizer()
+    const target = await createTestUser()
+    await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, target.id))
+
+    expect((await reset(organizer.id, target.id)).ok).toBe(true)
+  })
+
+  // Step-up runs before the target is even looked at: a hijacked session must
+  // not be able to probe who exists before knowing the organizer's password.
+  it('answers invalid_admin_password, not not_found, for an unknown target', async () => {
+    const organizer = await createOrganizer()
+
+    expect(
+      await reset(organizer.id, '00000000-0000-0000-0000-000000000000', 'not-my-password'),
+    ).toEqual({ ok: false, error: 'invalid_admin_password' })
+  })
+
+  it('gives the participant a password that actually logs in', async () => {
+    const organizer = await createOrganizer()
+    const target = await createTestUser()
+
+    const result = await reset(organizer.id, target.id)
+    if (!result.ok) throw new Error('expected the reset to succeed')
+
+    expect(
+      await login(db, { email: target.email, password: result.temporaryPassword }),
+    ).toMatchObject({ ok: true })
+    expect(await login(db, { email: target.email, password: 'original-password' })).toEqual({
+      ok: false,
+      error: 'invalid_credentials',
+    })
   })
 })

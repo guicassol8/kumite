@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ShieldMinus, ShieldPlus, UserCheck, UserX } from 'lucide-react'
+import { KeyRound, ShieldMinus, ShieldPlus, UserCheck, UserX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -18,8 +18,17 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PasswordInput } from '@/components/ui/password-input'
 import {
   Select,
   SelectContent,
@@ -348,7 +357,7 @@ function UserRowActions({
   user,
   isSelf,
 }: {
-  user: { id: string; role: Role; active: boolean }
+  user: { id: string; email: string; role: Role; active: boolean }
   isSelf: boolean
 }) {
   const { t } = useTranslation()
@@ -405,6 +414,7 @@ function UserRowActions({
                 disabled={isSelf}
                 onActivate={() => onActivate(statusAction)}
               />
+              <ResetPasswordAction user={user} isSelf={isSelf} />
             </span>
           </TooltipTrigger>
           {isSelf && <TooltipContent>{t('organizer.users.actions.selfDisabled')}</TooltipContent>}
@@ -487,5 +497,226 @@ function RowActionButton({
     >
       <Icon className="size-4" />
     </Button>
+  )
+}
+
+// The on-site reset (#143). A Dialog, not an AlertDialog: it needs a password
+// field and a second state, neither of which the confirm dialog above allows.
+function ResetPasswordAction({
+  user,
+  isSelf,
+}: {
+  user: { id: string; email: string; role: Role }
+  isSelf: boolean
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [adminPassword, setAdminPassword] = useState('')
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Never another organizer, and never yourself — the API refuses both, and
+  // the button says so rather than letting the click fail.
+  const isOrganizer = user.role === 'organizer'
+  const disabled = isSelf || isOrganizer
+
+  const run = useMutation({
+    mutationFn: (password: string) =>
+      api.organizer.users[':id']['reset-password'].$post({
+        param: { id: user.id },
+        json: { adminPassword: password },
+      }),
+  })
+
+  // The single close path — the footer buttons route through this too, not
+  // through `setOpen(false)`, or they would skip the wipe below and the next
+  // open would still be showing the last temporary password.
+  function close() {
+    setOpen(false)
+    // Always back to step one with an empty field: the temporary password
+    // lives in this state and nowhere else — not localStorage, not the query
+    // cache — so closing is what actually makes "shown once" true.
+    setAdminPassword('')
+    setTemporaryPassword(null)
+    setCopied(false)
+    setError(null)
+  }
+
+  async function submit() {
+    setError(null)
+    try {
+      const res = await run.mutateAsync(adminPassword)
+      if (res.status === 200) {
+        const body = await res.json()
+        setTemporaryPassword(body.temporaryPassword)
+        setAdminPassword('')
+        return
+      }
+      // A wrong password and an exhausted step-up ceiling are one message
+      // here because they are one response there — the API refuses to say
+      // which, and repeating that refusal is the point.
+      setError(
+        t(
+          res.status === 403
+            ? 'organizer.users.actions.reset.errors.invalid'
+            : 'organizer.users.actions.reset.errors.unexpected',
+        ),
+      )
+    } catch {
+      setError(t('organizer.users.actions.reset.errors.unexpected'))
+    }
+  }
+
+  async function copy() {
+    if (!temporaryPassword) return
+    try {
+      await navigator.clipboard.writeText(temporaryPassword)
+      setCopied(true)
+    } catch {
+      // No clipboard API over plain http://ip:port, which is exactly how the
+      // venue laptops reach this. The password stays on screen and selectable.
+    }
+  }
+
+  const button = (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      className="size-8"
+      disabled={disabled}
+      data-testid={`organizer-users-reset-password-${user.id}`}
+      aria-label={
+        isOrganizer && !isSelf
+          ? t('organizer.users.actions.organizerDisabled')
+          : t('organizer.users.actions.resetPassword')
+      }
+      onClick={() => setOpen(true)}
+    >
+      <KeyRound className="size-4" />
+    </Button>
+  )
+
+  return (
+    <>
+      {isOrganizer && !isSelf ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                data-testid={`organizer-users-reset-password-tooltip-${user.id}`}
+                tabIndex={0}
+                className="flex rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                {button}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{t('organizer.users.actions.organizerDisabled')}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : (
+        button
+      )}
+
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (next) setOpen(true)
+          else close()
+        }}
+      >
+        <DialogContent data-testid={`organizer-users-reset-password-dialog-${user.id}`}>
+          {temporaryPassword === null ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {t('organizer.users.actions.reset.title', { email: user.email })}
+                </DialogTitle>
+                <DialogDescription>
+                  {t('organizer.users.actions.reset.description')}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={`reset-admin-password-${user.id}`}>
+                  {t('organizer.users.actions.reset.adminPasswordLabel')}
+                </Label>
+                <PasswordInput
+                  id={`reset-admin-password-${user.id}`}
+                  value={adminPassword}
+                  data-testid={`organizer-users-reset-password-admin-password-input-${user.id}`}
+                  onChange={(event) => setAdminPassword(event.target.value)}
+                />
+              </div>
+              {error && (
+                <Alert
+                  variant="destructive"
+                  data-testid={`organizer-users-reset-password-error-${user.id}`}
+                >
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid={`organizer-users-reset-password-cancel-${user.id}`}
+                  onClick={close}
+                >
+                  {t('organizer.users.actions.reset.cancel')}
+                </Button>
+                <Button
+                  type="button"
+                  disabled={adminPassword.length === 0 || run.isPending}
+                  data-testid={`organizer-users-reset-password-submit-${user.id}`}
+                  onClick={() => void submit()}
+                >
+                  {t('organizer.users.actions.reset.submit')}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <div
+              className="flex flex-col gap-4"
+              data-testid={`organizer-users-reset-password-result-${user.id}`}
+            >
+              <DialogHeader>
+                <DialogTitle>{t('organizer.users.actions.reset.result.title')}</DialogTitle>
+                <DialogDescription>
+                  {t('organizer.users.actions.reset.result.warning')}
+                </DialogDescription>
+              </DialogHeader>
+              <output
+                className="rounded-md border bg-muted p-4 text-center font-mono text-lg tracking-wider"
+                data-testid={`organizer-users-reset-password-result-value-${user.id}`}
+              >
+                {temporaryPassword}
+              </output>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid={`organizer-users-reset-password-copy-${user.id}`}
+                  onClick={() => void copy()}
+                >
+                  {t(
+                    copied
+                      ? 'organizer.users.actions.reset.result.copied'
+                      : 'organizer.users.actions.reset.result.copy',
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  data-testid={`organizer-users-reset-password-close-${user.id}`}
+                  onClick={close}
+                >
+                  {t('organizer.users.actions.reset.result.close')}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

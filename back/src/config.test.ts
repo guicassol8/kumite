@@ -39,3 +39,38 @@ describe('config AWS_* env vars', () => {
     expect(AWS_REGION).toBe('us-east-1')
   })
 })
+
+describe('config PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER (#143)', () => {
+  const originalEnv = { ...process.env }
+  const required = {
+    JWT_SECRET: 'test-secret',
+    DATABASE_URL: 'postgres://kumite:kumite@localhost:5433/kumite',
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    process.env = { ...originalEnv, ...required }
+  })
+
+  afterEach(() => {
+    process.env = { ...originalEnv }
+    vi.resetModules()
+  })
+
+  it('defaults to 5 wrong admin passwords per organizer', async () => {
+    process.env.PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER = undefined
+    delete process.env.PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER
+
+    const { PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER } = await import('./config')
+
+    expect(PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER).toBe(5)
+  })
+
+  it('is overridable by env', async () => {
+    process.env.PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER = '2'
+
+    const { PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER } = await import('./config')
+
+    expect(PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER).toBe(2)
+  })
+})

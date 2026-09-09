@@ -1,7 +1,7 @@
 import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
-import { requireOrganizer, requireUser } from '../../middlewares/auth'
+import { requireOrganizer, requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
 import {
   CreateProblemBodySchema,
@@ -31,7 +31,7 @@ import {
 export const createProblemRoute = defineRoute({
   method: 'POST',
   path: '/organizer/problems',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { body: CreateProblemBodySchema },
   output: { 201: ProblemDetailSchema },
   handler: async (c) => {
@@ -43,7 +43,7 @@ export const createProblemRoute = defineRoute({
 export const listProblemsRoute = defineRoute({
   method: 'GET',
   path: '/organizer/problems',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: {},
   output: ProblemSummaryListSchema,
   handler: async (c) => listProblems(c.get('db')),
@@ -52,7 +52,7 @@ export const listProblemsRoute = defineRoute({
 export const getProblemRoute = defineRoute({
   method: 'GET',
   path: '/organizer/problems/:id',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: ProblemIdParamsSchema },
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -65,7 +65,7 @@ export const getProblemRoute = defineRoute({
 export const updateProblemRoute = defineRoute({
   method: 'PATCH',
   path: '/organizer/problems/:id',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: ProblemIdParamsSchema, body: UpdateProblemBodySchema },
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -78,7 +78,7 @@ export const updateProblemRoute = defineRoute({
 export const publishProblemRoute = defineRoute({
   method: 'POST',
   path: '/organizer/problems/:id/publish',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: ProblemIdParamsSchema },
   output: {
     200: ProblemDetailSchema,
@@ -121,7 +121,7 @@ function reasonMessage(reason: 'missing_visible' | 'missing_hidden' | 'missing_b
 export const archiveProblemRoute = defineRoute({
   method: 'POST',
   path: '/organizer/problems/:id/archive',
-  use: [requireUser, requireOrganizer],
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: ProblemIdParamsSchema },
   output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -138,7 +138,7 @@ export const archiveProblemRoute = defineRoute({
 export const getParticipantProblemRoute = defineRoute({
   method: 'GET',
   path: '/problems/:id',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: { params: ParticipantProblemParamsSchema, query: ParticipantProblemQuerySchema },
   output: { 200: ParticipantProblemSchema, 404: ErrorBodySchema },
   handler: async (c) => {

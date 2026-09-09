@@ -1,10 +1,17 @@
 import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
+import { requireUser } from '../../middlewares/auth'
+import { NoContentSchema } from '../password-reset/password-reset.schema'
 import { PublicUserSchema } from '../users/users.schema'
 
-import { LoginBodySchema, LoginResponseSchema, SignupBodySchema } from './auth.schema'
-import { login, signup } from './auth.service'
+import {
+  ChangePasswordBodySchema,
+  LoginBodySchema,
+  LoginResponseSchema,
+  SignupBodySchema,
+} from './auth.schema'
+import { changePassword, login, signup } from './auth.service'
 
 export const signupRoute = defineRoute({
   method: 'POST',
@@ -40,5 +47,23 @@ export const loginRoute = defineRoute({
     if (result.ok) return c.json({ token: result.token }, 200)
 
     return c.error('invalid_credentials', 'Invalid email or password', { status: 401 })
+  },
+})
+
+// The other route deliberately outside `requirePasswordUpToDate` (ADR-0004):
+// it is the only way out of the forced-change state, so guarding it would
+// leave a reset account with nothing it is allowed to do. `requireUser` alone
+// still means you can only ever change your own password.
+export const changePasswordRoute = defineRoute({
+  method: 'POST',
+  path: '/auth/change-password',
+  use: [requireUser],
+  input: { body: ChangePasswordBodySchema },
+  output: { 204: NoContentSchema, 401: ErrorBodySchema },
+  handler: async (c) => {
+    const result = await changePassword(c.get('db'), c.get('currentUser').id, c.input.body)
+    if (result.ok) return c.json(undefined, 204)
+
+    return c.error('invalid_credentials', 'Invalid current password', { status: 401 })
   },
 })

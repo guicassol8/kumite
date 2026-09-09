@@ -37,6 +37,9 @@ src/
 - Schemas live in `<domain>.schema.ts`, never inline in `.route.ts`.
 - Every route declares `input` and `output` schemas.
 - DI: `c.get('key')` only compiles if `'key'` is in `defineContext`.
+- Every authenticated route uses `use: [requireUser, requirePasswordUpToDate, ...]`.
+  The two exemptions and the test that enforces the rule live in
+  `src/auth-guards.test.ts` — see ADR-0004.
 
 ## Prohibitions
 - Do not edit lint or framework configs to silence errors. Fix the code.

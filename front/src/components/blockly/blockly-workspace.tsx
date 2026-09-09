@@ -33,6 +33,12 @@ export type BlocklyWorkspaceProps = {
 }
 
 const defaultOptions: Partial<Blockly.BlocklyOptions> = {
+  // Blockly's own default is https://static.blockly.com/media/, which would put
+  // the editor's sprites, cursors and sounds behind a third-party CDN on the
+  // one screen the whole event runs on. `public/blockly-media/` is the copy
+  // that ships inside the package — blockly-media.test.ts fails if the two
+  // drift apart on an upgrade.
+  media: '/blockly-media/',
   renderer: 'zelos',
   trashcan: true,
   zoom: { controls: true, wheel: true, startScale: 0.9, minScale: 0.4, maxScale: 2 },

@@ -11,7 +11,8 @@
     "logout": "Salir",
     "organizerLink": "Organizador",
     "teamsLink": "Equipos",
-    "leaderboardLink": "Marcador"
+    "leaderboardLink": "Marcador",
+    "changePassword": "Cambiar contraseña"
   },
   "footer": {
     "contactLabel": "¿Dudas? Habla con la organización:"
@@ -415,6 +416,26 @@
         },
         "errors": {
           "failed": "No se pudo completar la acción."
+        },
+        "resetPassword": "Restablecer contraseña",
+        "organizerDisabled": "Solo se puede restablecer la contraseña de participantes.",
+        "reset": {
+          "title": "Restablecer la contraseña de {{email}}",
+          "description": "Confirma con tu contraseña de organizador. La persona recibirá una contraseña temporal y deberá cambiarla en su próximo acceso.",
+          "adminPasswordLabel": "Tu contraseña de organizador",
+          "submit": "Restablecer",
+          "cancel": "Cancelar",
+          "errors": {
+            "invalid": "Contraseña incorrecta o demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+            "unexpected": "No se pudo restablecer la contraseña. Inténtalo de nuevo."
+          },
+          "result": {
+            "title": "Contraseña temporal",
+            "warning": "Anótala ahora: esta contraseña no se muestra otra vez.",
+            "copy": "Copiar",
+            "copied": "Copiado",
+            "close": "Cerrar"
+          }
         }
       }
     },
@@ -584,6 +605,23 @@
         "passwordMismatch": "Las contraseñas no coinciden",
         "invalidOtp": "Código inválido o expirado",
         "unexpected": "No se pudo restablecer la contraseña. Intenta de nuevo."
+      }
+    },
+    "changePassword": {
+      "title": "Cambiar contraseña",
+      "description": "Elige una contraseña nueva para tu cuenta.",
+      "requiredNotice": "Entraste con una contraseña temporal. Elige una contraseña nueva para continuar.",
+      "currentLabel": "Contraseña actual",
+      "newLabel": "Nueva contraseña",
+      "confirmLabel": "Confirmar nueva contraseña",
+      "submitButton": "Cambiar contraseña",
+      "backLink": "Volver",
+      "errors": {
+        "currentRequired": "Escribe tu contraseña actual",
+        "invalidCurrent": "Contraseña actual incorrecta",
+        "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
+        "passwordMismatch": "Las contraseñas no coinciden",
+        "unexpected": "No se pudo cambiar la contraseña. Inténtalo de nuevo."
       }
     }
   },

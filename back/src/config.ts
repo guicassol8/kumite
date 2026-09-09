@@ -29,6 +29,10 @@ const EnvSchema = z.object({
   PASSWORD_RESET_MAX_PER_EMAIL: z.coerce.number().int().positive().default(3),
   PASSWORD_RESET_MAX_PER_IP: z.coerce.number().int().positive().default(20),
   PASSWORD_RESET_COMPLETE_MAX_PER_IP: z.coerce.number().int().positive().default(30),
+  // Organizer step-up (#143): wrong admin passwords tolerated per organizer
+  // inside the same PASSWORD_RESET_WINDOW_MS. Keyed by the acting organizer,
+  // not by IP — the session is already authenticated.
+  PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER: z.coerce.number().int().positive().default(5),
   // All optional: SES email sending (notifications.service.ts) falls back to
   // console.log when any of these is missing — keeps CI's hurl job (no AWS
   // secrets available) and local dev/test green with zero AWS config.
@@ -54,6 +58,7 @@ export const PASSWORD_RESET_WINDOW_MS = env.PASSWORD_RESET_WINDOW_MS
 export const PASSWORD_RESET_MAX_PER_EMAIL = env.PASSWORD_RESET_MAX_PER_EMAIL
 export const PASSWORD_RESET_MAX_PER_IP = env.PASSWORD_RESET_MAX_PER_IP
 export const PASSWORD_RESET_COMPLETE_MAX_PER_IP = env.PASSWORD_RESET_COMPLETE_MAX_PER_IP
+export const PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER = env.PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER
 export const AWS_REGION = env.AWS_REGION
 export const AWS_ACCESS_KEY_ID = env.AWS_ACCESS_KEY_ID
 export const AWS_SECRET_ACCESS_KEY = env.AWS_SECRET_ACCESS_KEY

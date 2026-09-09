@@ -1,7 +1,7 @@
 import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
-import { requireUser } from '../../middlewares/auth'
+import { requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
 import { EventRankingSchema, RoundRankingParamsSchema, RoundRankingSchema } from './ranking.schema'
 import { getEventRanking, getRoundRanking } from './ranking.service'
@@ -14,7 +14,7 @@ import { getEventRanking, getRoundRanking } from './ranking.service'
 export const getRoundRankingRoute = defineRoute({
   method: 'GET',
   path: '/rounds/:id/ranking',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: { params: RoundRankingParamsSchema },
   output: { 200: RoundRankingSchema, 404: ErrorBodySchema },
   handler: async (c) => {
@@ -27,7 +27,7 @@ export const getRoundRankingRoute = defineRoute({
 export const getEventRankingRoute = defineRoute({
   method: 'GET',
   path: '/ranking',
-  use: [requireUser],
+  use: [requireUser, requirePasswordUpToDate],
   input: {},
   output: EventRankingSchema,
   handler: async (c) => getEventRanking(c.get('db')),

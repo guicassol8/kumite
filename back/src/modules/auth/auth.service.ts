@@ -1,13 +1,15 @@
 import { signJwt } from '@katajs-framework/core/jwt'
 import argon2 from 'argon2'
+import { eq } from 'drizzle-orm'
 
 import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
 import type { Db } from '../../db/client'
+import { passwordResetOtpsTable, usersTable } from '../../db/schema'
 import { findEventCode } from '../event-codes/event-codes.service'
 import type { PublicUser } from '../users/users.schema'
-import { createUser, findUserByEmail } from '../users/users.service'
+import { createUser, findUserByEmail, findUserById } from '../users/users.service'
 
-import type { LoginBody, SignupBody } from './auth.schema'
+import type { ChangePasswordBody, LoginBody, SignupBody } from './auth.schema'
 
 export type SignupResult =
   | { ok: true; user: PublicUser }
@@ -62,4 +64,41 @@ export async function login(db: Db, input: LoginBody): Promise<LoginResult> {
     { secret: JWT_SECRET, subject: user.id, expiresInSeconds: TOKEN_TTL_SECONDS },
   )
   return { ok: true, token }
+}
+
+export type ChangePasswordResult = { ok: true } | { ok: false; error: 'invalid_credentials' }
+
+/**
+ * Self-service password change for an already-authenticated user (#143).
+ *
+ * It is both the way out of the forced-change state an organizer reset puts an
+ * account in and an ordinary "change my password" — same function, same rules.
+ * The current password is always required, forced flow included: otherwise a
+ * lab machine left logged in would be enough to take the account over
+ * permanently, which is the very thing the reset flow is trying to prevent.
+ *
+ * Clearing `mustChangePassword` is what lifts the `requirePasswordUpToDate`
+ * block, and a pending OTP is dropped so a code issued before the change
+ * cannot be redeemed afterwards to overwrite the password just chosen.
+ */
+export async function changePassword(
+  db: Db,
+  userId: string,
+  input: ChangePasswordBody,
+): Promise<ChangePasswordResult> {
+  const user = await findUserById(db, userId)
+  const valid = await argon2.verify(
+    user?.passwordHash ?? DUMMY_PASSWORD_HASH,
+    input.currentPassword,
+  )
+  if (!user || !valid) return { ok: false, error: 'invalid_credentials' }
+
+  const passwordHash = await argon2.hash(input.newPassword)
+  await db
+    .update(usersTable)
+    .set({ passwordHash, mustChangePassword: false, updatedAt: new Date() })
+    .where(eq(usersTable.id, user.id))
+  await db.delete(passwordResetOtpsTable).where(eq(passwordResetOtpsTable.userId, user.id))
+
+  return { ok: true }
 }

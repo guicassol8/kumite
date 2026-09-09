@@ -2,6 +2,7 @@ import argon2 from 'argon2'
 import { and, count, eq, gte, lt, sql } from 'drizzle-orm'
 
 import {
+  PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER,
   PASSWORD_RESET_COMPLETE_MAX_PER_IP,
   PASSWORD_RESET_MAX_PER_EMAIL,
   PASSWORD_RESET_MAX_PER_IP,
@@ -9,7 +10,7 @@ import {
 } from '../../config'
 import type { Db } from '../../db/client'
 import { passwordResetOtpsTable, passwordResetRequestsTable, usersTable } from '../../db/schema'
-import { generateOtp } from '../../lib/random'
+import { generateOtp, generateTemporaryPassword } from '../../lib/random'
 import { sendPasswordResetNotice } from '../notifications/notifications.service'
 import { findUserByEmail, findUserById } from '../users/users.service'
 
@@ -18,7 +19,7 @@ import type { CompletePasswordResetBody } from './password-reset.schema'
 const OTP_TTL_MS = 15 * 60 * 1000
 const MAX_ATTEMPTS = 5
 
-export type PasswordResetAction = 'request' | 'complete'
+export type PasswordResetAction = 'request' | 'complete' | 'organizer_reset'
 
 export type PasswordResetAttempt = {
   action: PasswordResetAction
@@ -256,4 +257,170 @@ export async function completePasswordReset(
   await db.delete(passwordResetOtpsTable).where(eq(passwordResetOtpsTable.userId, user.id))
 
   return { ok: true }
+}
+
+// --- Organizer-driven reset (#143) ---
+
+// Burned when the step-up is refused before the real hash is ever consulted,
+// so the throttled path costs the same argon2.verify as a merely wrong
+// password. The spec asks for "the same 403, no distinction" — and answering
+// several hundred milliseconds sooner is a distinction, one that tells an
+// attacker exactly when to back off and come back after the window.
+const DUMMY_ADMIN_PASSWORD_HASH =
+  '$argon2id$v=19$m=65536,p=4,t=3$PGqDaii+IbTUz1dqPWYhoA$TB1dtm8qwEDANaCU8mwyeZvTLHEBuGymYZ35z+gLYOI'
+
+export type StepUpResult = { ok: true } | { ok: false; error: 'invalid_admin_password' }
+
+export type OrganizerStepUp = {
+  organizerId: string
+  passwordHash: string
+  password: string
+  ip: string
+}
+
+/**
+ * Re-authenticates the acting organizer before a destructive action, with a
+ * ceiling of its own (#143).
+ *
+ * The route it protects takes over a participant's account, so a session
+ * cookie alone must not be enough — the organizer types their own password
+ * again. That in turn makes the route a brute-force oracle against that
+ * password, hence the ceiling: at most
+ * `PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER` failures per organizer inside
+ * `PASSWORD_RESET_WINDOW_MS`.
+ *
+ * Only failures are counted and a correct password clears them, so an
+ * organizer who fat-fingers their password twice and then gets it right walks
+ * away with a clean window — the ceiling exists for someone guessing, not for
+ * someone typing. The bucket is keyed by organizer id rather than IP: the
+ * caller is already authenticated, so the account is the thing worth
+ * protecting, and every organizer at the event shares one venue NAT anyway.
+ *
+ * Reuses `password_reset_requests` under the `organizer_reset` action, where
+ * `email_key` holds the organizer's id (see db/schema.ts and ADR-0004), and
+ * the same advisory-lock discipline as `consumePasswordResetBudget`: counting
+ * and inserting are one critical section, or a parallel burst walks straight
+ * past the ceiling.
+ */
+export async function verifyOrganizerStepUp(
+  db: Db,
+  input: OrganizerStepUp,
+  now = Date.now(),
+): Promise<StepUpResult> {
+  const windowStart = new Date(now - PASSWORD_RESET_WINDOW_MS)
+
+  // Opportunistic purge, outside the critical section — same rationale as in
+  // `consumePasswordResetBudget`: the counts filter on `windowStart` anyway,
+  // so this only reclaims space.
+  await db
+    .delete(passwordResetRequestsTable)
+    .where(lt(passwordResetRequestsTable.createdAt, windowStart))
+
+  return db.transaction(async (tx) => {
+    const lockKey = `pwr-admin:${input.organizerId}`
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}::text))`)
+
+    const [failures] = await tx
+      .select({ value: count() })
+      .from(passwordResetRequestsTable)
+      .where(
+        and(
+          eq(passwordResetRequestsTable.action, 'organizer_reset'),
+          eq(passwordResetRequestsTable.emailKey, input.organizerId),
+          gte(passwordResetRequestsTable.createdAt, windowStart),
+        ),
+      )
+
+    if ((failures?.value ?? 0) >= PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER) {
+      await argon2.verify(DUMMY_ADMIN_PASSWORD_HASH, input.password)
+      return { ok: false, error: 'invalid_admin_password' }
+    }
+
+    if (!(await argon2.verify(input.passwordHash, input.password))) {
+      await tx.insert(passwordResetRequestsTable).values({
+        action: 'organizer_reset',
+        emailKey: input.organizerId,
+        ip: input.ip,
+        createdAt: new Date(now),
+      })
+      return { ok: false, error: 'invalid_admin_password' }
+    }
+
+    await tx
+      .delete(passwordResetRequestsTable)
+      .where(
+        and(
+          eq(passwordResetRequestsTable.action, 'organizer_reset'),
+          eq(passwordResetRequestsTable.emailKey, input.organizerId),
+        ),
+      )
+    return { ok: true }
+  })
+}
+
+export type OrganizerResetResult =
+  | { ok: true; temporaryPassword: string }
+  | { ok: false; error: 'invalid_admin_password' | 'target_not_participant' | 'not_found' }
+
+export type OrganizerResetInput = {
+  organizerId: string
+  targetId: string
+  adminPassword: string
+  ip: string
+}
+
+/**
+ * The manual valve for the one case no self-service flow covers: a participant
+ * standing at the desk who cannot reach their inbox (#143). The organizer
+ * confirms with their own password, gets a temporary password back exactly
+ * once, and dictates it; the account is flagged so the participant has to
+ * choose a real one before doing anything else.
+ *
+ * Order matters. The step-up runs *before* the target is looked at, so a
+ * hijacked organizer session cannot use the route as an existence probe while
+ * still guessing the password. Only participants are valid targets, and never
+ * the caller themselves: a compromised organizer account must not be a lever
+ * for taking over the other organizers.
+ *
+ * Nothing is e-mailed — the whole premise is that the participant has no
+ * access to their mailbox — and any OTP they had pending is dropped, so a code
+ * issued before the reset cannot be used to overwrite the new password after.
+ */
+export async function resetPasswordByOrganizer(
+  db: Db,
+  input: OrganizerResetInput,
+  now = Date.now(),
+): Promise<OrganizerResetResult> {
+  // `currentUser` is a PublicUser and carries no hash, so the acting organizer
+  // is re-read here rather than passed down from the route.
+  const organizer = await findUserById(db, input.organizerId)
+  if (!organizer) return { ok: false, error: 'invalid_admin_password' }
+
+  const stepUp = await verifyOrganizerStepUp(
+    db,
+    {
+      organizerId: organizer.id,
+      passwordHash: organizer.passwordHash,
+      password: input.adminPassword,
+      ip: input.ip,
+    },
+    now,
+  )
+  if (!stepUp.ok) return { ok: false, error: 'invalid_admin_password' }
+
+  if (input.targetId === organizer.id) return { ok: false, error: 'target_not_participant' }
+
+  const target = await findUserById(db, input.targetId)
+  if (!target) return { ok: false, error: 'not_found' }
+  if (target.role !== 'participant') return { ok: false, error: 'target_not_participant' }
+
+  const temporaryPassword = generateTemporaryPassword()
+  const passwordHash = await argon2.hash(temporaryPassword)
+  await db
+    .update(usersTable)
+    .set({ passwordHash, mustChangePassword: true, updatedAt: new Date() })
+    .where(eq(usersTable.id, target.id))
+  await db.delete(passwordResetOtpsTable).where(eq(passwordResetOtpsTable.userId, target.id))
+
+  return { ok: true, temporaryPassword }
 }

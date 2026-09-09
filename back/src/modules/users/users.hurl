@@ -220,3 +220,151 @@ HTTP 422
 [Asserts]
 jsonpath "$.error" == "validation_failed"
 jsonpath "$.issues.query" exists
+
+# --- Organizer password reset with step-up (#143) ---
+#
+# The 5-failures-per-organizer step-up ceiling is deliberately NOT exercised
+# here: once tripped it persists for PASSWORD_RESET_WINDOW_MS (15 min) and
+# would block every later reset by the same organizer in this file. Only one
+# wrong password is spent below, and the correct ones after it clear the
+# organizer's window. The ceiling is covered in password-reset.test.ts, where
+# `now` is injectable — same split password-reset.hurl already makes for the
+# per-IP budget.
+
+# 15. A fresh participant to reset — the earlier target is reused by the
+# checks above and must keep its password.
+POST {{host}}/auth/signup
+Content-Type: application/json
+{ "email": "users-e2e-reset@edu.pucrs.br", "password": "originalpass", "code": "PUCRS2026" }
+HTTP 201
+[Captures]
+reset_target_id: jsonpath "$.id"
+
+# 16. No token -> 401. Participant token -> 403.
+POST {{host}}/organizer/users/{{reset_target_id}}/reset-password
+Content-Type: application/json
+{ "adminPassword": "{{organizer_password}}" }
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
+POST {{host}}/organizer/users/{{reset_target_id}}/reset-password
+Authorization: Bearer {{target_token}}
+Content-Type: application/json
+{ "adminPassword": "{{organizer_password}}" }
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "forbidden"
+
+# 17. Missing adminPassword -> kata's validation envelope, before any effect.
+POST {{host}}/organizer/users/{{reset_target_id}}/reset-password
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{}
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+
+# 18. Wrong admin password -> 403, and the target's own password still works.
+POST {{host}}/organizer/users/{{reset_target_id}}/reset-password
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "adminPassword": "definitely-not-the-organizer-password" }
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "invalid_admin_password"
+jsonpath "$.temporaryPassword" not exists
+
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "users-e2e-reset@edu.pucrs.br", "password": "originalpass" }
+HTTP 200
+
+# 19. Targeting an organizer (here: themselves) -> 403, no lateral escalation.
+POST {{host}}/organizer/users/{{organizer_id}}/reset-password
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "adminPassword": "{{organizer_password}}" }
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "cannot_reset_organizer"
+
+# 20. Unknown target, with the right admin password -> 404.
+POST {{host}}/organizer/users/00000000-0000-0000-0000-000000000000/reset-password
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "adminPassword": "{{organizer_password}}" }
+HTTP 404
+[Asserts]
+jsonpath "$.error" == "not_found"
+
+# 21. Happy path -> the temporary password comes back exactly once.
+POST {{host}}/organizer/users/{{reset_target_id}}/reset-password
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "adminPassword": "{{organizer_password}}" }
+HTTP 200
+[Asserts]
+jsonpath "$.temporaryPassword" matches "^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$"
+[Captures]
+temporary_password: jsonpath "$.temporaryPassword"
+
+# 22. The old password is dead; the temporary one logs in.
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "users-e2e-reset@edu.pucrs.br", "password": "originalpass" }
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "invalid_credentials"
+
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "users-e2e-reset@edu.pucrs.br", "password": "{{temporary_password}}" }
+HTTP 200
+[Captures]
+reset_token: jsonpath "$.token"
+
+# 23. That session is boxed in: everything answers 403 except the two escape
+# hatches (ADR-0004).
+GET {{host}}/teams
+Authorization: Bearer {{reset_token}}
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "password_change_required"
+
+GET {{host}}/me
+Authorization: Bearer {{reset_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.mustChangePassword" == true
+
+# 24. A wrong current password does not lift the block.
+POST {{host}}/auth/change-password
+Authorization: Bearer {{reset_token}}
+Content-Type: application/json
+{ "currentPassword": "not-the-temporary-one", "newPassword": "brand-new-password" }
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "invalid_credentials"
+
+# 25. Changing it clears the flag and restores normal access on the same token.
+POST {{host}}/auth/change-password
+Authorization: Bearer {{reset_token}}
+Content-Type: application/json
+{ "currentPassword": "{{temporary_password}}", "newPassword": "brand-new-password" }
+HTTP 204
+
+GET {{host}}/me
+Authorization: Bearer {{reset_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.mustChangePassword" == false
+
+GET {{host}}/teams
+Authorization: Bearer {{reset_token}}
+HTTP 200
+
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "users-e2e-reset@edu.pucrs.br", "password": "brand-new-password" }
+HTTP 200

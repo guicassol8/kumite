@@ -38,6 +38,7 @@ const fakeUser: SessionUser = {
   role: 'participant',
   university: 'pucrs',
   active: true,
+  mustChangePassword: false,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 }
@@ -86,6 +87,28 @@ describe('root session bootstrap', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
 
     clearSession('manual')
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(router.state.location.pathname).toBe('/')
+  })
+
+  // The home route has no guard of its own, so this subscription is what
+  // actually makes "before any other screen" true after an organizer reset
+  // (#143) — the route guards are the second line, for deep links.
+  it('sends an account on a temporary password to /change-password', async () => {
+    const router = renderApp()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+
+    setSession({ ...fakeUser, mustChangePassword: true }, 'tok-1')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/change-password'))
+  })
+
+  it('leaves an unflagged session where it is', async () => {
+    const router = renderApp()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+
+    setSession(fakeUser, 'tok-1')
 
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(router.state.location.pathname).toBe('/')

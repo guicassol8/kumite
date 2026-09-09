@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // config.ts parses process.env at import time, so every case here needs a
 // fresh module instance (vi.resetModules) after mutating process.env.
-describe('config AWS_* env vars', () => {
+describe('config SES_* env vars', () => {
   const originalEnv = { ...process.env }
   const required = {
     JWT_SECRET: 'test-secret',
@@ -20,23 +20,23 @@ describe('config AWS_* env vars', () => {
   })
 
   it('treats an explicitly blank value (as in .env.example) as unset, not invalid', async () => {
-    process.env.AWS_REGION = ''
-    process.env.AWS_ACCESS_KEY_ID = ''
-    process.env.AWS_SECRET_ACCESS_KEY = ''
+    process.env.SES_REGION = ''
+    process.env.SES_ACCESS_KEY_ID = ''
+    process.env.SES_SECRET_ACCESS_KEY = ''
 
-    const { AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY } = await import('./config')
+    const { SES_REGION, SES_ACCESS_KEY_ID, SES_SECRET_ACCESS_KEY } = await import('./config')
 
-    expect(AWS_REGION).toBeUndefined()
-    expect(AWS_ACCESS_KEY_ID).toBeUndefined()
-    expect(AWS_SECRET_ACCESS_KEY).toBeUndefined()
+    expect(SES_REGION).toBeUndefined()
+    expect(SES_ACCESS_KEY_ID).toBeUndefined()
+    expect(SES_SECRET_ACCESS_KEY).toBeUndefined()
   })
 
   it('keeps a real value when set', async () => {
-    process.env.AWS_REGION = 'us-east-1'
+    process.env.SES_REGION = 'us-east-1'
 
-    const { AWS_REGION } = await import('./config')
+    const { SES_REGION } = await import('./config')
 
-    expect(AWS_REGION).toBe('us-east-1')
+    expect(SES_REGION).toBe('us-east-1')
   })
 })
 

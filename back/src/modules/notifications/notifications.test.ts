@@ -14,7 +14,7 @@ vi.mock('@aws-sdk/client-ses', () => ({
   },
 }))
 
-describe('notifications.service sendPasswordResetNotice (no AWS config)', () => {
+describe('notifications.service sendPasswordResetNotice (no SES config)', () => {
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined)
   })
@@ -23,7 +23,7 @@ describe('notifications.service sendPasswordResetNotice (no AWS config)', () => 
     vi.restoreAllMocks()
   })
 
-  it('falls back to console.log when AWS_* env vars are unset', async () => {
+  it('falls back to console.log when SES_* env vars are unset', async () => {
     const { sendPasswordResetNotice } = await import('./notifications.service')
 
     await sendPasswordResetNotice({ email: 'ada@example.com', otp: '123456' })
@@ -36,15 +36,15 @@ describe('notifications.service sendPasswordResetNotice (no AWS config)', () => 
   })
 })
 
-describe('notifications.service sendPasswordResetNotice (AWS configured)', () => {
+describe('notifications.service sendPasswordResetNotice (SES configured)', () => {
   const originalEnv = { ...process.env }
 
   beforeEach(() => {
     mockSend.mockClear()
     vi.resetModules()
-    process.env.AWS_REGION = 'us-east-1'
-    process.env.AWS_ACCESS_KEY_ID = 'test-key'
-    process.env.AWS_SECRET_ACCESS_KEY = 'test-secret'
+    process.env.SES_REGION = 'us-east-1'
+    process.env.SES_ACCESS_KEY_ID = 'test-key'
+    process.env.SES_SECRET_ACCESS_KEY = 'test-secret'
     process.env.SES_FROM_EMAIL = 'Kumite <noreply@example.com>'
   })
 
@@ -53,7 +53,7 @@ describe('notifications.service sendPasswordResetNotice (AWS configured)', () =>
     vi.resetModules()
   })
 
-  it('sends via SES when AWS_* config is present', async () => {
+  it('sends via SES when SES_* config is present', async () => {
     const { sendPasswordResetNotice } = await import('./notifications.service')
 
     await sendPasswordResetNotice({ email: 'ada@example.com', otp: '654321' })

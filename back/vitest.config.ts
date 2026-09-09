@@ -7,5 +7,8 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     fileParallelism: false,
+    // Strips the SES credentials from process.env before anything imports
+    // config.ts — see the file's own comment.
+    setupFiles: ['./vitest.setup.ts'],
   },
 })

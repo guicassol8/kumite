@@ -71,18 +71,26 @@ describe('ListUsersQuerySchema', () => {
   })
 
   it('accepts optional filters', () => {
+    const teamId = '3f2504e0-4f89-41d3-9a0c-0305e82c3301'
     const result = ListUsersQuerySchema.parse({
       q: 'ada',
       role: 'organizer',
       university: 'pucrs',
-      teamId: 'team-1',
+      teamId,
     })
     expect(result).toMatchObject({
       q: 'ada',
       role: 'organizer',
       university: 'pucrs',
-      teamId: 'team-1',
+      teamId,
     })
+  })
+
+  it('rejects a teamId that is not a uuid (#94)', () => {
+    // The column is a Postgres uuid: a malformed filter used to reach the
+    // driver and come back as a 500 instead of the route's 422.
+    expect(ListUsersQuerySchema.safeParse({ teamId: 'team-1' }).success).toBe(false)
+    expect(ListUsersQuerySchema.safeParse({ teamId: '' }).success).toBe(false)
   })
 })
 

@@ -110,6 +110,14 @@ describe('EditRoundScreen', () => {
     expect(screen.queryByTestId('round-form')).toBeNull()
   })
 
+  it('shows the same not-found state for a malformed round id (#94)', async () => {
+    mockedDetail.mockResolvedValue(jsonResponse(422, { error: 'validation_failed' }))
+    renderEdit()
+
+    await waitFor(() => expect(screen.getByTestId('round-form-not-found')).toBeDefined())
+    expect(screen.queryByTestId('round-form')).toBeNull()
+  })
+
   it('blocks editing with an explanation when the round is no longer a draft', async () => {
     mockedDetail.mockResolvedValue(jsonResponse(200, { ...draftRound, status: 'open' }))
     renderEdit()

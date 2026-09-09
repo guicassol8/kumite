@@ -203,3 +203,20 @@ Authorization: Bearer {{organizer_token}}
 HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
+
+# 14. A malformed id, on the other hand, never reaches the lookup: it's a 422
+# from the params schema instead of the driver-level 500 it used to be (#94).
+# Same for a malformed teamId in the listing query.
+POST {{host}}/organizer/users/nao-e-uuid/promote
+Authorization: Bearer {{organizer_token}}
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.params" exists
+
+GET {{host}}/organizer/users?teamId=nao-e-uuid
+Authorization: Bearer {{organizer_token}}
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.query" exists

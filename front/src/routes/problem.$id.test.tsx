@@ -104,6 +104,14 @@ describe('ProblemScreen', () => {
     expect(await screen.findByTestId('problem-not-found')).toBeDefined()
   })
 
+  it('renders the same not-found state for a malformed problem id (#94)', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(422, { error: 'validation_failed', issues: {} }))
+
+    renderProblem()
+
+    expect(await screen.findByTestId('problem-not-found')).toBeDefined()
+  })
+
   it('loads the statement and examples on a happy load', async () => {
     mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
 

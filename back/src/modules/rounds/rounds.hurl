@@ -363,3 +363,22 @@ Authorization: Bearer {{organizer_token}}
 HTTP 200
 [Asserts]
 jsonpath "$.status" == "closed"
+
+# 13. A malformed round id -> 422 from the params schema, never a db error
+# (#94). Same for a malformed problem id inside the create body. Neither
+# request creates a row, so the counts asserted above stay valid.
+GET {{host}}/organizer/rounds/nao-e-uuid
+Authorization: Bearer {{organizer_token}}
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.params" exists
+
+POST {{host}}/organizer/rounds
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "name": "Rodada invalida", "durationMinutes": 30, "problemIds": ["nao-e-uuid"] }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.body" exists

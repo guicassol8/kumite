@@ -124,6 +124,14 @@ describe('RoundDetailScreen', () => {
     expect(await screen.findByTestId('round-detail-not-found')).toBeDefined()
   })
 
+  it('renders the same not-found state for a malformed round id (#94)', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(422, { error: 'validation_failed', issues: {} }))
+
+    renderRound()
+
+    expect(await screen.findByTestId('round-detail-not-found')).toBeDefined()
+  })
+
   it('hides every score and shows the live countdown for an open round tracked by the event stream', async () => {
     mockedGet.mockResolvedValue(jsonResponse(200, roundDetail()))
 

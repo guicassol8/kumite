@@ -231,3 +231,11 @@ jsonpath "$.teams[1].teamName" == "Ranking E2E Time B"
 jsonpath "$.teams[1].rounds[?(@.roundId=='{{round_id}}')].score" == 50
 jsonpath "$.teams[2].teamName" == "Ranking E2E Time C"
 jsonpath "$.teams[2].rounds[?(@.roundId=='{{round_id}}')].score" == 0
+
+# 9. A malformed round id -> 422 from the params schema, never a db error (#94).
+GET {{host}}/rounds/nao-e-uuid/ranking
+Authorization: Bearer {{token_a}}
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.params" exists

@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { JsonValueSchema } from '../../lib/json'
 import { LocaleSchema } from '../../lib/locale'
+import { UuidSchema } from '../../lib/uuid'
 
 import { BestSubmissionSchema } from '../submissions/submissions.schema'
 
@@ -48,7 +49,7 @@ export const CreateProblemBodySchema = z.object({
 })
 
 export const ProblemIdParamsSchema = z.object({
-  id: z.string(),
+  id: UuidSchema,
 })
 
 export const TranslationInputSchema = z.object({
@@ -113,7 +114,7 @@ export type ProblemSummary = z.infer<typeof ProblemSummarySchema>
 // --- Participant read DTOs (#11) ---
 
 export const ParticipantProblemParamsSchema = z.object({
-  id: z.string().uuid(),
+  id: UuidSchema,
 })
 
 // Optional query param: no `?locale=` means pt. An unsupported value fails

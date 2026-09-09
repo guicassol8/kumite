@@ -11,6 +11,10 @@ const frontPort = process.env.FRONT_PORT ?? '5173'
 
 export default defineConfig({
   testDir: './e2e',
+  // Closes any round a previous run left open, once, before the workers start
+  // — the single open-round slot is global, and a leftover would otherwise
+  // 409 every spec that needs to open one (#150).
+  globalSetup: './e2e/support/global-setup.ts',
   // Injecting Blockly is the slowest thing every spec blocks on, and the 5s
   // default only holds on an idle machine.
   expect: { timeout: 30_000 },

@@ -1,16 +1,24 @@
 import { somaDosPares } from '@kumite/blocks'
-import { expect, type Page, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+import {
+  BACK_URL,
+  closeRound,
+  createRound,
+  expect,
+  ORGANIZER_EMAIL,
+  ORGANIZER_PASSWORD,
+  organizerAuthHeader,
+  test,
+} from './support/rounds'
 
 // Visual walkthrough for #7: the editor wired to the real catalog and judge,
 // replacing the old hardcoded-demo screen. Prereqs (like round-screen.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
-// Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD, and no round already open in the
-// shared dev db.
+// Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD. The single open-round slot is
+// handled by `roundSlot` (#150), which also closes this round again when the
+// test fails before step 05.
 const evidence = (name: string) => `e2e/evidence/7/${name}.png`
-
-const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -20,20 +28,6 @@ const roundName = `Rodada Problema E2E ${stamp}`
 
 test.describe('problem screen (#7)', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
-
-  let organizerToken: string | undefined
-  async function organizerAuthHeader(): Promise<Record<string, string>> {
-    if (!organizerToken) {
-      const res = await fetch(`${BACK_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-      })
-      const { token } = (await res.json()) as { token: string }
-      organizerToken = token
-    }
-    return { authorization: `Bearer ${organizerToken}` }
-  }
 
   // Test cases mirror somaDosParesProblem.examples exactly, plus one hidden
   // case so publish succeeds: the canonical `somaDosPares` block fixture (sum
@@ -65,27 +59,6 @@ test.describe('problem screen (#7)', () => {
     })
     await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST', headers: auth })
     return id
-  }
-
-  async function apiCreateRound(problemIds: string[]): Promise<string> {
-    const auth = await organizerAuthHeader()
-    const res = await fetch(`${BACK_URL}/organizer/rounds`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({ name: roundName, durationMinutes: 30, problemIds }),
-    })
-    const { id } = (await res.json()) as { id: string }
-    return id
-  }
-
-  async function apiOpenRound(roundId: string): Promise<void> {
-    const auth = await organizerAuthHeader()
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, { method: 'POST', headers: auth })
-  }
-
-  async function apiCloseRound(roundId: string): Promise<void> {
-    const auth = await organizerAuthHeader()
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
   }
 
   async function signupThroughUi(page: Page, email: string): Promise<void> {
@@ -124,16 +97,22 @@ test.describe('problem screen (#7)', () => {
 
   test('loads the problem from the catalog, submits through the judge, and goes read-only once the round closes', async ({
     page,
+    roundSlot,
   }) => {
+    const auth = await organizerAuthHeader()
     const problemId = await apiCreatePublishedProblem()
-    const roundId = await apiCreateRound([problemId])
+    const roundId = await createRound(auth, {
+      name: roundName,
+      durationMinutes: 30,
+      problemIds: [problemId],
+    })
     await seedWorkspace(page, problemId)
 
     // 01 — sign up, create a team, then open the round live while the home
     // screen is up (same live-round proof as round-screen.spec.ts).
     await signupThroughUi(page, participantEmail)
     await apiCreateTeam(await participantToken(page))
-    await apiOpenRound(roundId)
+    await roundSlot.open(auth, roundId)
     await expect(page.getByTestId('home-round-card')).toContainText(roundName, {
       timeout: 15_000,
     })
@@ -172,7 +151,7 @@ test.describe('problem screen (#7)', () => {
 
     // 05 — closing the round and reloading flips the screen to the read-only
     // closed state, with the team's best score instead of a submit button.
-    await apiCloseRound(roundId)
+    await closeRound(auth, roundId)
     await page.reload()
     await expect(page.getByTestId('problem-closed-notice')).toBeVisible()
     await expect(page.getByTestId('problem-closed-best-score')).toBeVisible()

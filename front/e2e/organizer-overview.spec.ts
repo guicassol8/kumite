@@ -1,13 +1,21 @@
-import { expect, type Page, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+import {
+  BACK_URL,
+  closeRound,
+  createRound,
+  expect,
+  ORGANIZER_EMAIL,
+  ORGANIZER_PASSWORD,
+  organizerAuthHeader,
+  test,
+  withRoundLock,
+} from './support/rounds'
 
 // Visual walkthrough for #54. Prereqs (like organizer-rounds.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
 // Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD in the environment.
 const evidence = (name: string) => `e2e/evidence/54/${name}.png`
-
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
-const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
 
 // Signups and team names are unique event-wide and the dev DB is shared
 // across worktrees and reruns (same reasoning as organizer-team-moderation),
@@ -24,20 +32,6 @@ test.describe('organizer overview', () => {
     await page.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
     await page.getByTestId('login-submit-button').click()
     await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
-  }
-
-  let organizerToken: string | undefined
-  async function organizerAuthHeader(): Promise<Record<string, string>> {
-    if (!organizerToken) {
-      const res = await fetch(`${BACK_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-      })
-      const { token } = (await res.json()) as { token: string }
-      organizerToken = token
-    }
-    return { authorization: `Bearer ${organizerToken}` }
   }
 
   // The overview's first criterion is about real numbers, so the walkthrough
@@ -126,31 +120,18 @@ test.describe('organizer overview', () => {
   }
 
   async function seedRound(name: string, problemId: string): Promise<string> {
+    return createRound(await organizerAuthHeader(), {
+      name,
+      durationMinutes: 20,
+      problemIds: [problemId],
+    })
+  }
+
+  test('shows the event numbers, the live round and the last closed round', async ({
+    page,
+    roundSlot,
+  }) => {
     const auth = await organizerAuthHeader()
-    const res = await fetch(`${BACK_URL}/organizer/rounds`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({ name, durationMinutes: 20, problemIds: [problemId] }),
-    })
-    const { id } = (await res.json()) as { id: string }
-    return id
-  }
-
-  async function openRound(id: string) {
-    await fetch(`${BACK_URL}/organizer/rounds/${id}/open`, {
-      method: 'POST',
-      headers: await organizerAuthHeader(),
-    })
-  }
-
-  async function closeRound(id: string) {
-    await fetch(`${BACK_URL}/organizer/rounds/${id}/close`, {
-      method: 'POST',
-      headers: await organizerAuthHeader(),
-    })
-  }
-
-  test('shows the event numbers, the live round and the last closed round', async ({ page }) => {
     await loginAsOrganizer(page)
     const problemId = await seedPublishedProblem('Soma de dois números')
 
@@ -164,8 +145,25 @@ test.describe('organizer overview', () => {
     const teamId = await apiCreateTeam(pucrsA, `Overview Squad ${stamp}`)
     await apiJoinTeam(pucrsB, teamId)
 
-    // 01 — the overview is the panel index: the three counter cards plus
-    // "Visão geral" active in the nav (Acceptance #1).
+    // 01/02 — the counters are event-wide totals, so they only ever read 3
+    // inscritos / 1 time on a database this suite has not run against before
+    // (#150). Steps 01 and 02 assert the card wiring against a fixed payload;
+    // step 03 onwards goes back to the live API. The shape below is the one
+    // `organizer.index.test.tsx` covers against the real schema.
+    const statsApiUrl = `${BACK_URL}/organizer/stats`
+    await page.route(statsApiUrl, (route) => {
+      if (route.request().method() !== 'GET') return route.continue()
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          participants: { total: 3, pucrs: 2, merida: 1, inTeam: 2, withoutTeam: 1 },
+          teams: { total: 1, openSlots: 1, maxTeamSize: 3 },
+          submissions: { total: 0, inRound: null },
+          round: { active: null, lastClosed: null },
+        }),
+      })
+    })
     await page.goto('/organizer')
     await expect(page.getByTestId('overview-heading')).toBeVisible()
     await expect(page.getByTestId('overview-signups-total')).toHaveText('3')
@@ -180,12 +178,14 @@ test.describe('organizer overview', () => {
     // 02 — with no round announced yet, the round card says so.
     await expect(page.getByTestId('overview-round-none')).toBeVisible()
     await page.screenshot({ path: evidence('02-round-card-empty'), fullPage: true })
+    await page.unroute(statsApiUrl)
+    await page.reload()
 
     // 03 — an open round: the card names it and runs the countdown, pushed
     // live over /sse without a reload (Acceptance #2).
-    const roundId = await seedRound('Rodada Overview', problemId)
-    await openRound(roundId)
-    await expect(page.getByTestId('overview-round-name')).toContainText('Rodada Overview')
+    const roundId = await seedRound(`Rodada Overview ${stamp}`, problemId)
+    await roundSlot.open(auth, roundId)
+    await expect(page.getByTestId('overview-round-name')).toContainText(`Rodada Overview ${stamp}`)
     await expect(page.getByTestId('round-countdown')).toBeVisible()
     await page.screenshot({ path: evidence('03-round-open-timer'), fullPage: true })
 
@@ -193,23 +193,37 @@ test.describe('organizer overview', () => {
     // the judged submission is announced as ranking.updated over /sse and the
     // card counts up on its own — the live half of Acceptance #2.
     await expect(page.getByTestId('overview-submissions-in-round')).toContainText('0 nesta rodada')
+    // The total is event-wide and counts every earlier run's submissions too,
+    // so it is asserted as a delta. `inRound` above is already scoped to the
+    // round this spec just opened, and stays absolute.
+    const submissionsTotal = page.getByTestId('overview-submissions-total')
+    const totalBefore = Number((await submissionsTotal.textContent()) ?? '0')
     await apiSubmitSolution(pucrsA, problemId, roundId)
     await expect(page.getByTestId('overview-submissions-in-round')).toContainText('1 nesta rodada')
-    await expect(page.getByTestId('overview-submissions-total')).toHaveText('1')
+    await expect(submissionsTotal).toHaveText(String(totalBefore + 1))
     await page.screenshot({ path: evidence('04-submissions-in-round'), fullPage: true })
 
     // 05 — once closed, the card falls back to the last closed round, its
     // closing time and the podium of the teams that actually attempted it
-    // (Acceptance #3).
-    await closeRound(roundId)
-    await expect(page.getByTestId('overview-round-name')).toContainText('Rodada Overview')
-    await expect(page.getByTestId('overview-round-closed-at')).toBeVisible()
-    await expect(page.getByTestId('overview-round-podium')).toContainText(`Overview Squad ${stamp}`)
-    // The count keeps the same number, now labelled as the last round's.
-    await expect(page.getByTestId('overview-submissions-in-round')).toContainText(
-      '1 na última rodada',
-    )
-    await page.screenshot({ path: evidence('05-last-closed-round'), fullPage: true })
+    // (Acceptance #3). "The last closed round" is event-wide, so the close and
+    // the read of the card are one critical section: another worker closing a
+    // round in between would put its own name, podium and count on this card
+    // (#150).
+    await withRoundLock(async () => {
+      await closeRound(auth, roundId)
+      await expect(page.getByTestId('overview-round-name')).toContainText(
+        `Rodada Overview ${stamp}`,
+      )
+      await expect(page.getByTestId('overview-round-closed-at')).toBeVisible()
+      await expect(page.getByTestId('overview-round-podium')).toContainText(
+        `Overview Squad ${stamp}`,
+      )
+      // The count keeps the same number, now labelled as the last round's.
+      await expect(page.getByTestId('overview-submissions-in-round')).toContainText(
+        '1 na última rodada',
+      )
+      await page.screenshot({ path: evidence('05-last-closed-round'), fullPage: true })
+    })
 
     // 06 — the shortcuts card reaches the other panel screens.
     await page.getByTestId('overview-shortcuts-rounds').click()

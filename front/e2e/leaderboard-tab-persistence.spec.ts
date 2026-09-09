@@ -1,4 +1,17 @@
-import { expect, type Page, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+import {
+  BACK_URL,
+  closeRound,
+  createRound,
+  expect,
+  ORGANIZER_EMAIL,
+  ORGANIZER_PASSWORD,
+  organizerAuthHeader,
+  test,
+  withRoundLock,
+} from './support/rounds'
+import { createTeamThroughUi } from './support/teams-ui'
 
 // Visual walkthrough for #111. Prereqs (like leaderboard.spec.ts / #45):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
@@ -9,13 +22,11 @@ import { expect, type Page, test } from '@playwright/test'
 // silently overrode whatever tab the participant had picked by hand.
 //
 // `test.describe.serial` matters here: the two tests build on shared,
-// increasing round state in the same DB (the first test needs no round to
-// have EVER existed yet, and leaves one closed for the second).
+// increasing round state in the same DB — the second deliberately starts from
+// the round the first leaves closed. What the first test can no longer assume
+// is that NO round has ever existed: that is true of a database exactly once,
+// so step 01 stubs the rounds list instead (#150).
 const evidence = (name: string) => `e2e/evidence/111/${name}.png`
-
-const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -23,20 +34,6 @@ const stamp = Date.now()
 test.describe
   .serial('leaderboard tab selection persists across round open/close (#111)', () => {
     test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
-
-    let organizerToken: string | undefined
-    async function organizerAuthHeader(): Promise<Record<string, string>> {
-      if (!organizerToken) {
-        const res = await fetch(`${BACK_URL}/auth/login`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-        })
-        const { token } = (await res.json()) as { token: string }
-        organizerToken = token
-      }
-      return { authorization: `Bearer ${organizerToken}` }
-    }
 
     async function apiCreatePublishedProblem(): Promise<string> {
       const auth = await organizerAuthHeader()
@@ -66,30 +63,10 @@ test.describe
     }
 
     async function apiCreateRound(name: string, problemId: string): Promise<string> {
-      const auth = await organizerAuthHeader()
-      const res = await fetch(`${BACK_URL}/organizer/rounds`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', ...auth },
-        body: JSON.stringify({ name, durationMinutes: 30, problemIds: [problemId] }),
-      })
-      const { id } = (await res.json()) as { id: string }
-      return id
-    }
-
-    async function apiOpenRound(roundId: string): Promise<void> {
-      const auth = await organizerAuthHeader()
-      const res = await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, {
-        method: 'POST',
-        headers: auth,
-      })
-      if (!res.ok) throw new Error(`failed to open round: ${res.status} ${await res.text()}`)
-    }
-
-    async function apiCloseRound(roundId: string): Promise<void> {
-      const auth = await organizerAuthHeader()
-      await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, {
-        method: 'POST',
-        headers: auth,
+      return createRound(await organizerAuthHeader(), {
+        name,
+        durationMinutes: 30,
+        problemIds: [problemId],
       })
     }
 
@@ -103,22 +80,30 @@ test.describe
       await expect(page.getByTestId('header-user-email')).toHaveText(email)
     }
 
-    async function createTeamThroughUi(page: Page, name: string): Promise<void> {
+    async function goToTeamsAndCreate(page: Page, name: string): Promise<void> {
       await page.getByTestId('header-teams-link').click()
-      await page.getByTestId('teams-create-open').click()
-      await page.getByTestId('teams-create-name-input').fill(name)
-      await page.getByTestId('teams-create-submit').click()
-      await expect(page.getByTestId('my-team-panel')).toBeVisible()
+      await createTeamThroughUi(page, name)
     }
 
     test('keeps the manually selected "Geral" tab when a round opens and flips the default to "Rodada"', async ({
       page,
+      roundSlot,
     }) => {
+      const auth = await organizerAuthHeader()
       await signupThroughUi(page, `leaderboard-tab-e2e-${stamp}-a@edu.pucrs.br`)
-      await createTeamThroughUi(page, `Placar Tab E2E A ${stamp}`)
+      await goToTeamsAndCreate(page, `Placar Tab E2E A ${stamp}`)
 
       // 01 — no round has ever existed: the default tab is "Rodada" (empty
-      // state), matching today's behavior (Acceptance #2).
+      // state), matching today's behavior (Acceptance #2). Stubbed, since a
+      // database that has run this suite once already has rounds in it.
+      const roundsApiUrl = `${BACK_URL}/rounds`
+      await page.route(roundsApiUrl, (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+        } else {
+          route.continue()
+        }
+      })
       await page.getByTestId('header-leaderboard-link').click()
       await expect(page).toHaveURL(/\/leaderboard$/)
       await expect(page.getByTestId('leaderboard-empty-no-round')).toBeVisible()
@@ -127,6 +112,7 @@ test.describe
         'active',
       )
       await page.screenshot({ path: evidence('01-sem-rodada-padrao-rodada'), fullPage: true })
+      await page.unroute(roundsApiUrl)
 
       // 02 — manually switch to "Geral" — a genuine value change, since the
       // default here is "Rodada".
@@ -150,7 +136,7 @@ test.describe
       const rankingFetched = page.waitForResponse(
         (res) => res.url().includes(`/rounds/${roundId}/ranking`) && res.ok(),
       )
-      await apiOpenRound(roundId)
+      await roundSlot.open(auth, roundId)
       await rankingFetched
       await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute(
         'data-state',
@@ -161,14 +147,16 @@ test.describe
 
       // Close this round so the next test starts from "one round already
       // closed, none active" (test.describe.serial shares this DB).
-      await apiCloseRound(roundId)
+      await closeRound(auth, roundId)
     })
 
     test('keeps the manually selected "Rodada" tab when a round closes and flips the default to "Geral"', async ({
       page,
+      roundSlot,
     }) => {
+      const auth = await organizerAuthHeader()
       await signupThroughUi(page, `leaderboard-tab-e2e-${stamp}-b@edu.pucrs.br`)
-      await createTeamThroughUi(page, `Placar Tab E2E B ${stamp}`)
+      await goToTeamsAndCreate(page, `Placar Tab E2E B ${stamp}`)
 
       // 04 — a round has already closed (left by the previous test): the
       // default tab is "Geral".
@@ -198,15 +186,21 @@ test.describe
       const roundName = `Rodada 111b ${stamp}`
       const problemId = await apiCreatePublishedProblem()
       const roundId = await apiCreateRound(roundName, problemId)
-      await apiOpenRound(roundId)
-      await apiCloseRound(roundId)
-      await expect(page.getByTestId('leaderboard-last-closed-label')).toContainText(roundName, {
-        timeout: 15_000,
+      // Opened outside the close lock on purpose: opening waits for whoever
+      // holds the open-round slot to close, and that close needs this lock.
+      await roundSlot.open(auth, roundId)
+      // The label is event-wide, so the close and the read of it are one
+      // critical section — see leaderboard.spec.ts step 05 (#150).
+      await withRoundLock(async () => {
+        await closeRound(auth, roundId)
+        await expect(page.getByTestId('leaderboard-last-closed-label')).toContainText(roundName, {
+          timeout: 15_000,
+        })
+        await expect(page.getByTestId('leaderboard-tab-round')).toHaveAttribute(
+          'data-state',
+          'active',
+        )
       })
-      await expect(page.getByTestId('leaderboard-tab-round')).toHaveAttribute(
-        'data-state',
-        'active',
-      )
       await page.waitForTimeout(200)
       await page.screenshot({ path: evidence('06-rodada-fecha-selecao-permanece'), fullPage: true })
     })

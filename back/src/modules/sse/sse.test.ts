@@ -459,4 +459,50 @@ describe('GET /sse', () => {
 
     await frames.cancel()
   })
+
+  it('delivers an event published while the initial snapshot is still being built', async () => {
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email: `sse-${crypto.randomUUID()}@example.com`,
+        passwordHash: 'hash',
+        role: 'participant',
+        university: 'pucrs',
+      })
+      .returning()
+    if (!user) throw new Error('expected fixture')
+    const token = await tokenFor(user)
+
+    const res = await app.request('/sse', { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.body) throw new Error('expected a streamed body')
+    const frames = createFrameReader(res.body)
+
+    // Published with no tick in between, unlike the test above: the handler is
+    // still inside `buildStateSyncEvent`, two queries away from having anything
+    // written. Subscribing only after the snapshot dropped this event on the
+    // floor, and a `round.opened` lost here never came back — the home screen
+    // learns the current round from `state.sync` or `round.opened` and from
+    // nothing else, so the participant stayed on "waiting for the next round"
+    // until a reload (#150).
+    const closesAt = new Date(Date.now() + 60_000)
+    k.resolve('sseBus').publish({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'round-opened-mid-snapshot',
+      closesAt,
+    })
+
+    // The two initial frames still come first, in order...
+    expect(await frames.next()).toContain('event: state.sync')
+    expect(await frames.next()).toContain('event: ranking.updated')
+
+    // ...and only then the buffered one, rather than never.
+    const buffered = await frames.next()
+    expect(buffered).toContain('event: round.opened')
+    expect(JSON.parse(buffered.split('data: ')[1] ?? '')).toMatchObject({
+      roundId: 'round-opened-mid-snapshot',
+    })
+
+    await frames.cancel()
+  })
 })

@@ -1,21 +1,30 @@
 import { somaDosPares } from '@kumite/blocks'
-import { expect, type Page, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+import {
+  BACK_URL,
+  closeRound,
+  createRound,
+  expect,
+  ORGANIZER_EMAIL,
+  ORGANIZER_PASSWORD,
+  organizerAuthHeader,
+  test,
+  withRoundLock,
+} from './support/rounds'
+import { createTeamThroughUi } from './support/teams-ui'
 
 // Visual walkthrough for #40. Prereqs (like teams.spec.ts / organizer-problems.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
 // Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD — the whole flow hinges on the
 // organizer opening/closing a round via the API to prove the home screen
 // updates live over SSE (#38), so the suite skips itself without them.
-// Also needs no round already open in the shared dev db (a fresh
-// `pnpm db:seed` never opens one) — apiOpenRound below would otherwise fail
-// with another_round_open and every assertion after it would time out.
+// The single open-round slot is handled by `roundSlot` (#150): it waits for
+// whoever holds it, names them when the wait runs out, and closes this spec's
+// rounds again even when the test fails halfway through.
 const evidence = (name: string) => `e2e/evidence/40/${name}.png`
 // Visual walkthrough for #104 (the team's rank/score on a closed round).
 const evidence104 = (name: string) => `e2e/evidence/104/${name}.png`
-
-const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -27,20 +36,6 @@ const resultRoundName = `Rodada Resultado E2E ${stamp}`
 
 test.describe('home (#40)', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
-
-  let organizerToken: string | undefined
-  async function organizerAuthHeader(): Promise<Record<string, string>> {
-    if (!organizerToken) {
-      const res = await fetch(`${BACK_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-      })
-      const { token } = (await res.json()) as { token: string }
-      organizerToken = token
-    }
-    return { authorization: `Bearer ${organizerToken}` }
-  }
 
   async function apiCreatePublishedProblem(): Promise<string> {
     const auth = await organizerAuthHeader()
@@ -102,24 +97,11 @@ test.describe('home (#40)', () => {
   }
 
   async function apiCreateRound(problemId: string, name: string = roundName): Promise<string> {
-    const auth = await organizerAuthHeader()
-    const res = await fetch(`${BACK_URL}/organizer/rounds`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({ name, durationMinutes: 30, problemIds: [problemId] }),
+    return createRound(await organizerAuthHeader(), {
+      name,
+      durationMinutes: 30,
+      problemIds: [problemId],
     })
-    const { id } = (await res.json()) as { id: string }
-    return id
-  }
-
-  async function apiOpenRound(roundId: string): Promise<void> {
-    const auth = await organizerAuthHeader()
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, { method: 'POST', headers: auth })
-  }
-
-  async function apiCloseRound(roundId: string): Promise<void> {
-    const auth = await organizerAuthHeader()
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
   }
 
   const identityWorkspace = {
@@ -171,7 +153,9 @@ test.describe('home (#40)', () => {
   test('reflects the event live: waiting, an open round, its close, and organizer shortcuts', async ({
     page,
     browser,
+    roundSlot,
   }) => {
+    const auth = await organizerAuthHeader()
     // 01 — a fresh participant with no team, no open round: waiting copy + join CTA.
     await signupThroughUi(page, participantEmail)
     await expect(page.getByTestId('home-round-card')).toContainText('Aguardando a próxima rodada.')
@@ -182,23 +166,28 @@ test.describe('home (#40)', () => {
     // the SSE push (#38) must update the card without a reload (Acceptance #4).
     const problemId = await apiCreatePublishedProblem()
     const roundId = await apiCreateRound(problemId)
-    await apiOpenRound(roundId)
+    await roundSlot.open(auth, roundId)
     await expect(page.getByTestId('home-round-card')).toContainText(roundName, {
       timeout: 15_000,
     })
     await expect(page.getByTestId('round-countdown')).toBeVisible()
     await page.screenshot({ path: evidence('02-rodada-aberta-ao-vivo'), fullPage: true })
 
-    // 03 — closing it live moves it into the closed-rounds list, no score shown.
-    await apiCloseRound(roundId)
-    await expect(page.getByTestId('home-round-card')).toContainText(
-      'Aguardando a próxima rodada.',
-      { timeout: 15_000 },
-    )
-    const closedCard = page.getByTestId('home-closed-rounds')
-    await expect(closedCard).toContainText(roundName)
-    await expect(closedCard).not.toContainText(/\d+\s*(pts|pontos|points)/i)
-    await page.screenshot({ path: evidence('03-rodada-encerrada'), fullPage: true })
+    // 03 — closing it live moves it into the closed-rounds list, no score
+    // shown. Under the lock: "Aguardando a próxima rodada" is a statement about
+    // the whole event, and the slot this close frees is one another worker can
+    // take the instant it is free (#150).
+    await withRoundLock(async () => {
+      await closeRound(auth, roundId)
+      await expect(page.getByTestId('home-round-card')).toContainText(
+        'Aguardando a próxima rodada.',
+        { timeout: 15_000 },
+      )
+      const closedCard = page.getByTestId('home-closed-rounds')
+      await expect(closedCard).toContainText(roundName)
+      await expect(closedCard).not.toContainText(/\d+\s*(pts|pontos|points)/i)
+      await page.screenshot({ path: evidence('03-rodada-encerrada'), fullPage: true })
+    })
 
     // 04 — a separate organizer session sees the /organizer/problems shortcut.
     const organizerContext = await browser.newContext()
@@ -215,24 +204,23 @@ test.describe('home (#40)', () => {
 
   test('shows the signed-in team its rank and score once the round closes (#104)', async ({
     page,
+    roundSlot,
   }) => {
+    const auth = await organizerAuthHeader()
     // 01 — a participant with a team submits a solution while the round is open.
     await signupThroughUi(page, resultParticipantEmail)
     await page.getByTestId('header-teams-link').click()
-    await page.getByTestId('teams-create-open').click()
-    await page.getByTestId('teams-create-name-input').fill(resultTeamName)
-    await page.getByTestId('teams-create-submit').click()
-    await expect(page.getByTestId('my-team-panel')).toBeVisible()
+    await createTeamThroughUi(page, resultTeamName)
 
     const problemId = await apiCreateSomaDosParesProblem()
     const roundId = await apiCreateRound(problemId, resultRoundName)
-    await apiOpenRound(roundId)
+    await roundSlot.open(auth, roundId)
     const token = await loginToken(resultParticipantEmail)
     await apiSubmitSolution(token, problemId, roundId, somaDosPares)
 
     // 02 — closing the round while this page stays open (SSE, no reload) reveals
     // the team's rank and score next to the round's name (Acceptance).
-    await apiCloseRound(roundId)
+    await closeRound(auth, roundId)
     await page.goto('/')
     const resultBadge = page.getByTestId(`home-closed-round-result-${roundId}`)
     await expect(resultBadge).toContainText('#1 · 100 pts', { timeout: 15_000 })

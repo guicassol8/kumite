@@ -1,5 +1,15 @@
 import type { Page } from '@playwright/test'
 
+import {
+  BACK_URL,
+  closeRound,
+  createRound,
+  ORGANIZER_EMAIL,
+  ORGANIZER_PASSWORD,
+  openRoundWithRetry,
+  organizerAuthHeader,
+} from './rounds'
+
 // Shared setup for every spec that only needs to *view* the block editor.
 // #7 moved it behind a real problem id (`/problem/$id`), so each of those
 // specs used to repeat the same seeding by hand. The round is opened and
@@ -8,59 +18,29 @@ import type { Page } from '@playwright/test'
 // parallel. A `draft` round is not an option — `getProblem` answers 404 while
 // the problem is not in a non-draft round (`problems.service.ts`).
 //
+// The round lifecycle itself lives in `./rounds` (#150) — this file only
+// composes it.
+//
 // Playwright only collects `*.spec.ts` under `testDir`, so this file is a
 // helper, not a suite.
 
-export const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
-export const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-export const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
-export const hasOrganizerCredentials = Boolean(ORGANIZER_EMAIL && ORGANIZER_PASSWORD)
+export { BACK_URL, hasOrganizerCredentials, ORGANIZER_EMAIL, ORGANIZER_PASSWORD } from './rounds'
 
 const PASSWORD = 'supersecret'
 const TOKEN_KEY = 'kumite-token'
 
 /**
- * Opening is the one step that contends: only one round may be open at a time.
- * Two things can hold that slot. Another fixture, for milliseconds — it closes
- * its round right after opening it. And a round left open by `pnpm test` or
- * `db:seed`, which lives for a whole minute; ~90s of retries outlasts it
- * instead of failing a suite that is about to be perfectly runnable.
+ * `beforeAll` inherits the 30s test timeout, which is shorter than the open
+ * retry window — the hook would die before the retries did. Every fixture
+ * consumer raises it to this instead. 60s covers the ~20s of retries in
+ * `openRoundWithRetry` plus the six requests around them; it used to be 120s,
+ * back when that window was ~90s.
  */
-const OPEN_ATTEMPTS = 30
-const OPEN_RETRY_MS = 3_000
-
-/**
- * `beforeAll` inherits the 30s test timeout, which is shorter than the window
- * above — the hook would die before the retries did. Every fixture consumer
- * raises it to this instead.
- */
-export const EDITOR_FIXTURE_TIMEOUT_MS = 120_000
+export const EDITOR_FIXTURE_TIMEOUT_MS = 60_000
 
 export type EditorFixture = {
   problemId: string
   participantToken: string
-}
-
-async function openWithRetry(roundId: string, auth: Record<string, string>): Promise<void> {
-  for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt++) {
-    const res = await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, {
-      method: 'POST',
-      headers: auth,
-    })
-    if (res.ok) return
-    const body = (await res.json().catch(() => ({}))) as { error?: string }
-    const error = body.error ?? `http ${res.status}`
-    // Waiting only ever helps against the contended slot. A 401, a 404 or a
-    // round that is no longer a draft answers the same way in 90s as it does
-    // now, and retrying it just buries the real cause under a timeout.
-    if (error !== 'another_round_open') {
-      throw new Error(`could not open the round: ${error} (HTTP ${res.status})`)
-    }
-    if (attempt < OPEN_ATTEMPTS) await new Promise((r) => setTimeout(r, OPEN_RETRY_MS))
-  }
-  throw new Error(
-    `could not open the round after ${OPEN_ATTEMPTS} attempts: another_round_open — another spec or a seeded round still holds the single open-round slot`,
-  )
 }
 
 /**
@@ -78,21 +58,7 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
 
-  const orgLogin = await fetch(`${BACK_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-  })
-  const { token: orgToken } = (await orgLogin.json()) as { token?: string }
-  // Without this, every later request goes out as `Bearer undefined` and the
-  // suite blames the first one that answers 401 instead of the login. The
-  // usual cause is a database wiped by `pnpm test` and not re-seeded.
-  if (!orgToken) {
-    throw new Error(
-      `organizer login failed for ${ORGANIZER_EMAIL} (HTTP ${orgLogin.status}) — is the database seeded?`,
-    )
-  }
-  const auth = { authorization: `Bearer ${orgToken}` }
+  const auth = await organizerAuthHeader()
 
   const created = await fetch(`${BACK_URL}/organizer/problems`, {
     method: 'POST',
@@ -100,9 +66,9 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
     body: JSON.stringify({ difficulty: 'easy' }),
   })
   const { id: problemId } = (await created.json()) as { id?: string }
-  // Same reason as the login guard above: without this the id travels as the
-  // literal "undefined" through PATCH, publish and the round, and the suite
-  // blames `openWithRetry` 90s later instead of the request that actually broke.
+  // Without this the id travels as the literal "undefined" through PATCH,
+  // publish and the round, and the suite blames the round open a full retry
+  // window later instead of the request that actually broke.
   if (!problemId) {
     throw new Error(`could not create the problem (HTTP ${created.status})`)
   }
@@ -129,34 +95,18 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
     headers: auth,
   })
 
-  const roundRes = await fetch(`${BACK_URL}/organizer/rounds`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...auth },
-    body: JSON.stringify({
-      name: `${label} E2E ${Date.now()}`,
-      durationMinutes: 30,
-      problemIds: [problemId],
-    }),
+  const roundId = await createRound(auth, {
+    name: `${label} E2E ${Date.now()}`,
+    durationMinutes: 30,
+    problemIds: [problemId],
   })
-  const { id: roundId } = (await roundRes.json()) as { id?: string }
-  // See the problem guard: a missing id here would send `openWithRetry` after
-  // /organizer/rounds/undefined/open for the full ~90s before giving up.
-  if (!roundId) {
-    throw new Error(`could not create the round for problem ${problemId} (HTTP ${roundRes.status})`)
-  }
-  await openWithRetry(roundId, auth)
-  // A close that fails in silence is the one way this fixture could cause the
-  // very thing it works around: a round left open holds the single-open-round
-  // slot for its whole 30min duration (#150). Fail here instead.
-  const closed = await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, {
-    method: 'POST',
-    headers: auth,
-  })
-  if (!closed.ok) {
-    throw new Error(
-      `could not close round ${roundId} (HTTP ${closed.status}) — it now holds the open-round slot`,
-    )
-  }
+  // `roundSlot` (support/rounds.ts) is a per-test fixture and this runs in
+  // `beforeAll`, where Playwright offers no test fixtures — so the safety here
+  // is that nothing may sit between these two lines. A round left open holds
+  // the single-open-round slot for its whole 30min duration (#150), and
+  // `closeRound` throws instead of failing in silence.
+  await openRoundWithRetry(auth, roundId)
+  await closeRound(auth, roundId)
 
   const participantEmail = `${slug}-e2e-${Date.now()}@edu.pucrs.br`
   await fetch(`${BACK_URL}/auth/signup`, {

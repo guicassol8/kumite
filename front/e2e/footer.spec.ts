@@ -1,4 +1,12 @@
-import { expect, test } from '@playwright/test'
+import {
+  BACK_URL,
+  createRound,
+  expect,
+  ORGANIZER_EMAIL,
+  ORGANIZER_PASSWORD,
+  organizerAuthHeader,
+  test,
+} from './support/rounds'
 
 // The footer is the event's only contact channel, so these specs cover what the
 // component test cannot: that it survives real routing and that it actually
@@ -48,9 +56,6 @@ test.describe('global footer', () => {
 // Visual walkthrough for #144, one screenshot per acceptance criterion.
 const evidence = (name: string) => `e2e/evidence/144/${name}.png`
 
-const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
 
@@ -141,20 +146,6 @@ test.describe('global footer — visual walkthrough (#144)', () => {
 test.describe('problem editor coexists with the footer (#144 T4)', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
-  let organizerToken: string | undefined
-  async function organizerAuthHeader(): Promise<Record<string, string>> {
-    if (!organizerToken) {
-      const res = await fetch(`${BACK_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-      })
-      const { token } = (await res.json()) as { token: string }
-      organizerToken = token
-    }
-    return { authorization: `Bearer ${organizerToken}` }
-  }
-
   /** Setup that fails loudly: a silently-ignored 4xx here would surface later
    * as an unexplained "could not load the problem" on the screen under test. */
   async function api(path: string, init: RequestInit): Promise<Response> {
@@ -165,7 +156,7 @@ test.describe('problem editor coexists with the footer (#144 T4)', () => {
     return res
   }
 
-  test('keeps header, editor and footer inside one viewport', async ({ page }) => {
+  test('keeps header, editor and footer inside one viewport', async ({ page, roundSlot }) => {
     const auth = await organizerAuthHeader()
     const created = await api('/organizer/problems', {
       method: 'POST',
@@ -189,16 +180,11 @@ test.describe('problem editor coexists with the footer (#144 T4)', () => {
       }),
     })
     await api(`/organizer/problems/${problemId}/publish`, { method: 'POST', headers: auth })
-    const roundRes = await api('/organizer/rounds', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({
-        name: `Rodada Footer E2E ${stamp}`,
-        durationMinutes: 30,
-        problemIds: [problemId],
-      }),
+    const roundId = await createRound(auth, {
+      name: `Rodada Footer E2E ${stamp}`,
+      durationMinutes: 30,
+      problemIds: [problemId],
     })
-    const { id: roundId } = (await roundRes.json()) as { id: string }
 
     const email = `footer-editor-e2e-${stamp}@edu.pucrs.br`
     await page.goto('/signup')
@@ -215,17 +201,12 @@ test.describe('problem editor coexists with the footer (#144 T4)', () => {
       headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ name: `Footer E2E ${stamp}` }),
     })
-    // Only one round may be open at a time, and `db:seed` leaves its own
-    // "Round 1" open for a minute — a run started right after seeding would
-    // 409 here. Close whatever is open first so the walkthrough is repeatable.
-    const rounds = (await (await api('/organizer/rounds', { headers: auth })).json()) as {
-      id: string
-      status: string
-    }[]
-    for (const round of rounds.filter((r) => r.status === 'open')) {
-      await api(`/organizer/rounds/${round.id}/close`, { method: 'POST', headers: auth })
-    }
-    await api(`/organizer/rounds/${roundId}/open`, { method: 'POST', headers: auth })
+    // This used to close every open round first. With `workers: 2` that was a
+    // race that killed whichever spec was mid-run (#150): the leftovers are now
+    // cleared once by `globalSetup`, before any worker starts, and contention
+    // with a live spec is waited out by `roundSlot` instead of resolved by
+    // force.
+    await roundSlot.open(auth, roundId)
 
     // 09 — the editor screen: statement, Blockly canvas, header and footer all
     // laid out inside the viewport, with nothing overlapping.
@@ -248,7 +229,5 @@ test.describe('problem editor coexists with the footer (#144 T4)', () => {
     // The editor kept real height — it did not collapse to nothing.
     expect(mainBox.height).toBeGreaterThan(200)
     await page.screenshot({ path: evidence('09-editor-com-header-e-footer') })
-
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
   })
 })

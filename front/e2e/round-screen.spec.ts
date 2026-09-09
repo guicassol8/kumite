@@ -1,16 +1,24 @@
-import { expect, type Page, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+import {
+  BACK_URL,
+  closeRound,
+  createRound,
+  expect,
+  ORGANIZER_EMAIL,
+  ORGANIZER_PASSWORD,
+  organizerAuthHeader,
+  test,
+} from './support/rounds'
 
 // Visual walkthrough for #39. Prereqs (like home.spec.ts / teams.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
 // Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD — the flow hinges on the
 // organizer opening/closing a round via the API to prove the round screen
-// updates live over SSE. Also needs no round already open in the shared dev
-// db, same caveat as home.spec.ts.
+// updates live over SSE. The single open-round slot is handled by `roundSlot`
+// (#150): it waits for whoever holds it, names them if the wait runs out, and
+// closes this round again even when the test below fails halfway.
 const evidence = (name: string) => `e2e/evidence/39/${name}.png`
-
-const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -19,20 +27,6 @@ const roundName = `Rodada Detalhe E2E ${stamp}`
 
 test.describe('round screen (#39)', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
-
-  let organizerToken: string | undefined
-  async function organizerAuthHeader(): Promise<Record<string, string>> {
-    if (!organizerToken) {
-      const res = await fetch(`${BACK_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-      })
-      const { token } = (await res.json()) as { token: string }
-      organizerToken = token
-    }
-    return { authorization: `Bearer ${organizerToken}` }
-  }
 
   async function apiCreatePublishedProblem(
     difficulty: 'easy' | 'medium',
@@ -64,27 +58,6 @@ test.describe('round screen (#39)', () => {
     return id
   }
 
-  async function apiCreateRound(problemIds: string[]): Promise<string> {
-    const auth = await organizerAuthHeader()
-    const res = await fetch(`${BACK_URL}/organizer/rounds`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({ name: roundName, durationMinutes: 30, problemIds }),
-    })
-    const { id } = (await res.json()) as { id: string }
-    return id
-  }
-
-  async function apiOpenRound(roundId: string): Promise<void> {
-    const auth = await organizerAuthHeader()
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, { method: 'POST', headers: auth })
-  }
-
-  async function apiCloseRound(roundId: string): Promise<void> {
-    const auth = await organizerAuthHeader()
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
-  }
-
   async function signupThroughUi(page: Page, email: string): Promise<void> {
     await page.goto('/signup')
     await page.getByTestId('signup-email-input').fill(email)
@@ -97,7 +70,9 @@ test.describe('round screen (#39)', () => {
 
   test('shows the problems table live, then flips to the closed read-only state without a stale notice on reload', async ({
     page,
+    roundSlot,
   }) => {
+    const auth = await organizerAuthHeader()
     const problemAId = await apiCreatePublishedProblem('easy', {
       pt: 'Soma',
       es: 'Suma',
@@ -108,11 +83,15 @@ test.describe('round screen (#39)', () => {
       es: 'Producto',
       en: 'Product',
     })
-    const roundId = await apiCreateRound([problemAId, problemBId])
+    const roundId = await createRound(auth, {
+      name: roundName,
+      durationMinutes: 30,
+      problemIds: [problemAId, problemBId],
+    })
 
     // 01 — sign up, then open the round live while the home screen is up.
     await signupThroughUi(page, participantEmail)
-    await apiOpenRound(roundId)
+    await roundSlot.open(auth, roundId)
     await expect(page.getByTestId('home-round-card')).toContainText(roundName, {
       timeout: 15_000,
     })
@@ -133,7 +112,7 @@ test.describe('round screen (#39)', () => {
 
     // 03 — closing it live flips the screen into the closed/read-only state
     // with the just-closed notice, no reload.
-    await apiCloseRound(roundId)
+    await closeRound(auth, roundId)
     await expect(page.getByTestId('round-detail-status-badge')).toContainText('Encerrada', {
       timeout: 15_000,
     })

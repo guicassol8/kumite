@@ -88,6 +88,12 @@ test.describe('organizer team moderation', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   test('walks through rename, move, remove member, and remove team', async ({ page }) => {
+    // Eight full-page screenshots in one walkthrough: 14s to 31s across five
+    // runs of the full suite, against a 30s default. It was not stuck — it was
+    // simply out of budget, and died on whichever screenshot it had reached,
+    // making two consecutive suite runs disagree (#150 review).
+    test.slow()
+
     // Fixtures via the real API — same reasoning as teams.spec.ts: these
     // teammates only need to exist, driving five more browsers through
     // signup would add nothing to the evidence.

@@ -94,6 +94,7 @@ Never commit these. Two files, both under `~/kumite`:
 `docker-compose.prod.yml` overrides it to point at the `db` service):
 ```
 JWT_SECRET=<generate: node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))">
+APP_BASE_URL=https://kumite.ligadealgoritmos.com
 ORGANIZER_EMAIL=<real organizer email>
 ORGANIZER_PASSWORD=<real organizer password, >=8 chars>
 SES_REGION=us-east-1
@@ -104,6 +105,12 @@ SES_FROM_EMAIL=Liga de Algoritmos - PUCRS <contato@ligadealgoritmos.com>
 `SES_REGION` must be the region of step 5, and `SES_FROM_EMAIL` the identity
 verified there. `SES_FROM_EMAIL` is optional — the value above is already the
 default in `back/src/config.ts`; set it only if the sender changes.
+
+`APP_BASE_URL` is the public front URL (the Vercel deploy of step 10) and is
+what the password-reset email turns into a clickable link
+(`${APP_BASE_URL}/reset-password`, #162). Leave it out and the email still
+sends, pointing everyone at `http://localhost:5173` — the default — so this
+one fails silently too.
 
 Miss any one of the three SES credentials and the failure is silent: the back
 falls back to logging the OTP inside the container and

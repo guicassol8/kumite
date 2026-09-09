@@ -118,3 +118,52 @@ describe('config env validation failure (#97)', () => {
     expect(message).not.toContain('not-a-url')
   })
 })
+
+describe('config APP_BASE_URL (#162)', () => {
+  const originalEnv = { ...process.env }
+  const required = {
+    JWT_SECRET: 'test-secret',
+    DATABASE_URL: 'postgres://kumite:kumite@localhost:5433/kumite',
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    process.env = { ...originalEnv, ...required }
+    delete process.env.APP_BASE_URL
+  })
+
+  afterEach(() => {
+    process.env = { ...originalEnv }
+    vi.resetModules()
+  })
+
+  it('defaults to the local front origin when unset', async () => {
+    const { APP_BASE_URL } = await import('./config')
+
+    expect(APP_BASE_URL).toBe('http://localhost:5173')
+  })
+
+  it('keeps a real value when set', async () => {
+    process.env.APP_BASE_URL = 'https://kumite.ligadealgoritmos.com'
+
+    const { APP_BASE_URL } = await import('./config')
+
+    expect(APP_BASE_URL).toBe('https://kumite.ligadealgoritmos.com')
+  })
+
+  it('strips the trailing slash so the link never becomes //reset-password', async () => {
+    process.env.APP_BASE_URL = 'https://kumite.ligadealgoritmos.com/'
+
+    const { APP_BASE_URL } = await import('./config')
+
+    expect(APP_BASE_URL).toBe('https://kumite.ligadealgoritmos.com')
+  })
+
+  it('treats an explicitly blank value (as in .env.example) as unset, not invalid', async () => {
+    process.env.APP_BASE_URL = ''
+
+    const { APP_BASE_URL } = await import('./config')
+
+    expect(APP_BASE_URL).toBe('http://localhost:5173')
+  })
+})

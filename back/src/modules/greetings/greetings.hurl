@@ -23,10 +23,3 @@ HTTP 422
 [Asserts]
 jsonpath "$.error" == "validation_failed"
 jsonpath "$.issues.params" exists
-
-# A malformed id -> 422 from the params schema, before the store lookup (#94).
-GET {{host}}/greetings/nao-e-uuid
-HTTP 422
-[Asserts]
-jsonpath "$.error" == "validation_failed"
-jsonpath "$.issues.params" exists

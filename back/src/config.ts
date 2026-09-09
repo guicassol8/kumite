@@ -8,7 +8,7 @@ try {
   // no .env file — fine, rely on the actual environment
 }
 
-// Treats an explicitly blank env var (`AWS_REGION=` in .env, as documented in
+// Treats an explicitly blank env var (`SES_REGION=` in .env, as documented in
 // .env.example) the same as an unset one — z's own `.optional()` only skips
 // `undefined`, not `''`, and would otherwise fail EnvSchema.parse() for
 // anyone following .env.example's own setup instructions verbatim.
@@ -36,9 +36,9 @@ const EnvSchema = z.object({
   // All optional: SES email sending (notifications.service.ts) falls back to
   // console.log when any of these is missing — keeps CI's hurl job (no AWS
   // secrets available) and local dev/test green with zero AWS config.
-  AWS_REGION: optionalNonEmptyString(),
-  AWS_ACCESS_KEY_ID: optionalNonEmptyString(),
-  AWS_SECRET_ACCESS_KEY: optionalNonEmptyString(),
+  SES_REGION: optionalNonEmptyString(),
+  SES_ACCESS_KEY_ID: optionalNonEmptyString(),
+  SES_SECRET_ACCESS_KEY: optionalNonEmptyString(),
   SES_FROM_EMAIL: z
     .string()
     .min(1)
@@ -59,7 +59,7 @@ export const PASSWORD_RESET_MAX_PER_EMAIL = env.PASSWORD_RESET_MAX_PER_EMAIL
 export const PASSWORD_RESET_MAX_PER_IP = env.PASSWORD_RESET_MAX_PER_IP
 export const PASSWORD_RESET_COMPLETE_MAX_PER_IP = env.PASSWORD_RESET_COMPLETE_MAX_PER_IP
 export const PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER = env.PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER
-export const AWS_REGION = env.AWS_REGION
-export const AWS_ACCESS_KEY_ID = env.AWS_ACCESS_KEY_ID
-export const AWS_SECRET_ACCESS_KEY = env.AWS_SECRET_ACCESS_KEY
+export const SES_REGION = env.SES_REGION
+export const SES_ACCESS_KEY_ID = env.SES_ACCESS_KEY_ID
+export const SES_SECRET_ACCESS_KEY = env.SES_SECRET_ACCESS_KEY
 export const SES_FROM_EMAIL = env.SES_FROM_EMAIL

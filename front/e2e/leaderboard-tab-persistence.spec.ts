@@ -9,6 +9,7 @@ import {
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
+  withRoundLock,
 } from './support/rounds'
 import { createTeamThroughUi } from './support/teams-ui'
 
@@ -185,15 +186,21 @@ test.describe
       const roundName = `Rodada 111b ${stamp}`
       const problemId = await apiCreatePublishedProblem()
       const roundId = await apiCreateRound(roundName, problemId)
+      // Opened outside the close lock on purpose: opening waits for whoever
+      // holds the open-round slot to close, and that close needs this lock.
       await roundSlot.open(auth, roundId)
-      await closeRound(auth, roundId)
-      await expect(page.getByTestId('leaderboard-last-closed-label')).toContainText(roundName, {
-        timeout: 15_000,
+      // The label is event-wide, so the close and the read of it are one
+      // critical section — see leaderboard.spec.ts step 05 (#150).
+      await withRoundLock(async () => {
+        await closeRound(auth, roundId)
+        await expect(page.getByTestId('leaderboard-last-closed-label')).toContainText(roundName, {
+          timeout: 15_000,
+        })
+        await expect(page.getByTestId('leaderboard-tab-round')).toHaveAttribute(
+          'data-state',
+          'active',
+        )
       })
-      await expect(page.getByTestId('leaderboard-tab-round')).toHaveAttribute(
-        'data-state',
-        'active',
-      )
       await page.waitForTimeout(200)
       await page.screenshot({ path: evidence('06-rodada-fecha-selecao-permanece'), fullPage: true })
     })

@@ -1,4 +1,10 @@
-import { BACK_URL, closeAnyOpenRound, hasOrganizerCredentials, organizerAuthHeader } from './rounds'
+import {
+  BACK_URL,
+  clearRoundLock,
+  closeAnyOpenRound,
+  hasOrganizerCredentials,
+  organizerAuthHeader,
+} from './rounds'
 
 // Runs once, before any worker starts (#150).
 //
@@ -29,6 +35,10 @@ async function waitForBack(): Promise<boolean> {
 }
 
 export default async function globalSetup(): Promise<void> {
+  // A run killed while a worker held the round-close lock leaves the file
+  // behind; the next run would then wait `LOCK_STALE_MS` on its first close.
+  await clearRoundLock()
+
   // Same rule as the `test.skip` guards in the specs: without credentials every
   // round-touching spec skips itself, so there is nothing to clean up.
   if (!hasOrganizerCredentials) return

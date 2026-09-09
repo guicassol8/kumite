@@ -9,6 +9,7 @@ import {
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
+  withRoundLock,
 } from './support/rounds'
 import { createTeamThroughUi } from './support/teams-ui'
 
@@ -201,25 +202,34 @@ test.describe('leaderboard (#45)', () => {
     // reload. The live `round.closed` push must refetch the rounds list on
     // its own; "Geral" (already selected from step 04) keeps working
     // uninterrupted through that.
-    await closeRound(auth, roundId)
-    await expect(page.getByTestId('leaderboard-tabs')).toBeVisible()
-    await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute(
-      'data-state',
-      'active',
-      { timeout: 15_000 },
-    )
-    await page.screenshot({ path: evidence('05-geral-por-padrao'), fullPage: true })
+    //
+    // Held under the close lock through step 06: "última rodada encerrada" is
+    // event-wide, so a round closed by another worker in between would take
+    // the label over and this spec would read a name it never chose (#150).
+    await withRoundLock(async () => {
+      await closeRound(auth, roundId)
+      await expect(page.getByTestId('leaderboard-tabs')).toBeVisible()
+      await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute(
+        'data-state',
+        'active',
+        { timeout: 15_000 },
+      )
+      await page.screenshot({ path: evidence('05-geral-por-padrao'), fullPage: true })
 
-    // 06 — switching to "Rodada" (still no reload) falls back to the round
-    // that just closed, labeled as such (Acceptance #2). This is exactly the
-    // live path a prior review found broken: without `round.closed` also
-    // refetching the rounds list, this label never appeared — only a reload
-    // (which this spec used to do) masked the gap.
-    await page.getByTestId('leaderboard-tab-round').click()
-    await expect(page.getByTestId('leaderboard-last-closed-label')).toContainText(roundName, {
-      timeout: 15_000,
+      // 06 — switching to "Rodada" (still no reload) falls back to the round
+      // that just closed, labeled as such (Acceptance #2). This is exactly the
+      // live path a prior review found broken: without `round.closed` also
+      // refetching the rounds list, this label never appeared — only a reload
+      // (which this spec used to do) masked the gap.
+      await page.getByTestId('leaderboard-tab-round').click()
+      await expect(page.getByTestId('leaderboard-last-closed-label')).toContainText(roundName, {
+        timeout: 15_000,
+      })
+      await expect(page.getByTestId('leaderboard-tab-round')).toHaveAttribute(
+        'data-state',
+        'active',
+      )
     })
-    await expect(page.getByTestId('leaderboard-tab-round')).toHaveAttribute('data-state', 'active')
     await page.waitForTimeout(200) // let the tab pill's CSS transition settle, see #04 above
     await page.screenshot({ path: evidence('06-ultima-rodada-encerrada'), fullPage: true })
   })

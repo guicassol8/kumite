@@ -10,6 +10,7 @@ import {
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
+  withRoundLock,
 } from './support/rounds'
 import { createTeamThroughUi } from './support/teams-ui'
 
@@ -172,16 +173,21 @@ test.describe('home (#40)', () => {
     await expect(page.getByTestId('round-countdown')).toBeVisible()
     await page.screenshot({ path: evidence('02-rodada-aberta-ao-vivo'), fullPage: true })
 
-    // 03 — closing it live moves it into the closed-rounds list, no score shown.
-    await closeRound(auth, roundId)
-    await expect(page.getByTestId('home-round-card')).toContainText(
-      'Aguardando a próxima rodada.',
-      { timeout: 15_000 },
-    )
-    const closedCard = page.getByTestId('home-closed-rounds')
-    await expect(closedCard).toContainText(roundName)
-    await expect(closedCard).not.toContainText(/\d+\s*(pts|pontos|points)/i)
-    await page.screenshot({ path: evidence('03-rodada-encerrada'), fullPage: true })
+    // 03 — closing it live moves it into the closed-rounds list, no score
+    // shown. Under the lock: "Aguardando a próxima rodada" is a statement about
+    // the whole event, and the slot this close frees is one another worker can
+    // take the instant it is free (#150).
+    await withRoundLock(async () => {
+      await closeRound(auth, roundId)
+      await expect(page.getByTestId('home-round-card')).toContainText(
+        'Aguardando a próxima rodada.',
+        { timeout: 15_000 },
+      )
+      const closedCard = page.getByTestId('home-closed-rounds')
+      await expect(closedCard).toContainText(roundName)
+      await expect(closedCard).not.toContainText(/\d+\s*(pts|pontos|points)/i)
+      await page.screenshot({ path: evidence('03-rodada-encerrada'), fullPage: true })
+    })
 
     // 04 — a separate organizer session sees the /organizer/problems shortcut.
     const organizerContext = await browser.newContext()

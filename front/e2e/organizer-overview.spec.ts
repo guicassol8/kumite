@@ -9,6 +9,7 @@ import {
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
+  withRoundLock,
 } from './support/rounds'
 
 // Visual walkthrough for #54. Prereqs (like organizer-rounds.spec.ts):
@@ -204,16 +205,25 @@ test.describe('organizer overview', () => {
 
     // 05 — once closed, the card falls back to the last closed round, its
     // closing time and the podium of the teams that actually attempted it
-    // (Acceptance #3).
-    await closeRound(auth, roundId)
-    await expect(page.getByTestId('overview-round-name')).toContainText(`Rodada Overview ${stamp}`)
-    await expect(page.getByTestId('overview-round-closed-at')).toBeVisible()
-    await expect(page.getByTestId('overview-round-podium')).toContainText(`Overview Squad ${stamp}`)
-    // The count keeps the same number, now labelled as the last round's.
-    await expect(page.getByTestId('overview-submissions-in-round')).toContainText(
-      '1 na última rodada',
-    )
-    await page.screenshot({ path: evidence('05-last-closed-round'), fullPage: true })
+    // (Acceptance #3). "The last closed round" is event-wide, so the close and
+    // the read of the card are one critical section: another worker closing a
+    // round in between would put its own name, podium and count on this card
+    // (#150).
+    await withRoundLock(async () => {
+      await closeRound(auth, roundId)
+      await expect(page.getByTestId('overview-round-name')).toContainText(
+        `Rodada Overview ${stamp}`,
+      )
+      await expect(page.getByTestId('overview-round-closed-at')).toBeVisible()
+      await expect(page.getByTestId('overview-round-podium')).toContainText(
+        `Overview Squad ${stamp}`,
+      )
+      // The count keeps the same number, now labelled as the last round's.
+      await expect(page.getByTestId('overview-submissions-in-round')).toContainText(
+        '1 na última rodada',
+      )
+      await page.screenshot({ path: evidence('05-last-closed-round'), fullPage: true })
+    })
 
     // 06 — the shortcuts card reaches the other panel screens.
     await page.getByTestId('overview-shortcuts-rounds').click()

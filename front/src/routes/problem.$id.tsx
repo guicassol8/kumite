@@ -174,8 +174,10 @@ function ProblemScreen() {
         className={cn(
           'overflow-auto md:max-h-none md:w-96 md:shrink-0',
           // Stacked layout only: the side column on md+ owns a whole column
-          // and never competes with the band for height.
-          hasResults ? 'max-h-36' : 'max-h-64',
+          // and never competes with the band for height. On a short phone it
+          // gives up a second slice, because the band has nowhere else to
+          // take height from.
+          hasResults ? 'max-h-36 short:max-h-20' : 'max-h-64',
         )}
       >
         <CardHeader>
@@ -211,7 +213,15 @@ function ProblemScreen() {
         className="flex min-h-0 min-w-0 grow basis-0 flex-col gap-4"
       >
         {isClosed && (
-          <Alert data-testid="problem-closed-notice" className="shrink-0">
+          <Alert
+            data-testid="problem-closed-notice"
+            className={cn(
+              'shrink-0',
+              // Three lines of static text cost as much as a readable results
+              // band. On a short phone it scrolls inside itself instead.
+              hasResults && 'short:max-h-16 short:overflow-auto',
+            )}
+          >
             <AlertDescription className="flex flex-col gap-1">
               <span>{t('problem.closedRound.notice')}</span>
               {data.bestSubmission ? (
@@ -255,7 +265,15 @@ function ProblemScreen() {
           </Alert>
         )}
 
-        <div className="min-h-44 min-w-0 grow basis-0 overflow-hidden rounded-md border">
+        <div
+          className={cn(
+            'min-w-0 grow basis-0 overflow-hidden rounded-md border',
+            // The floor that keeps the editor usable. Once results are on
+            // screen the participant is reading, not dragging, so on a short
+            // phone the canvas lends the band part of it.
+            hasResults ? 'min-h-44 short:min-h-32' : 'min-h-44',
+          )}
+        >
           <BlocklyWorkspace
             ref={workspaceRef}
             toolbox={toolbox}

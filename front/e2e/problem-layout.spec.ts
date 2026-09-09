@@ -192,6 +192,36 @@ test.describe('/problem/$id — barra ancorada, rodada encerrada (#155)', () => 
     await expectNoPageScroll(page)
     await page.screenshot({ path: evidence('08-mobile-estreito-faixa-rolavel') })
   })
+
+  // The band is the only child of the panel that may shrink, so on a phone
+  // shorter than a flagship it used to absorb the whole deficit and collapse to
+  // 0px — clicking Executar looked like it did nothing all over again, which is
+  // the very bug #155 exists to kill. Below 700px tall the statement, the
+  // closed-round notice and the canvas each lend it a slice.
+  test('mantém a faixa utilizável numa tela baixa (360x640)', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 })
+    await page.goto(`/problem/${problemId}`)
+    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+
+    await page.getByTestId('problem-run-button').click()
+    await expect(page.getByTestId('problem-results-band')).toBeVisible()
+    await expect(page.getByTestId('problem-results-summary')).toHaveText('3/3 casos')
+
+    const band = await boxOf(page, 'problem-results-band')
+    const canvas = await boxOf(page, 'blockly-workspace')
+    const bar = await boxOf(page, 'problem-actions-bar')
+    // Room for the "Resultados" header plus the top of the first case: the 0px
+    // collapse and the 27px sliver that the first cut of this fix left both
+    // fail here.
+    expect(band.height).toBeGreaterThan(60)
+    // ...while the canvas stays an editor rather than a strip.
+    expect(canvas.height).toBeGreaterThan(120)
+    // And nothing was bought by pushing the bar or the page out of frame.
+    expect(bar.y + bar.height).toBeLessThanOrEqual(641)
+    await expectNoPageScroll(page)
+    await expectFooterBelowMain(page)
+    await page.screenshot({ path: evidence('09-mobile-baixo-faixa-utilizavel') })
+  })
 })
 
 test.describe('/problem/$id — barra ancorada, rodada aberta (#155)', () => {

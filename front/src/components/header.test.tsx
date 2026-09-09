@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import '@/i18n'
+import i18n from '@/i18n'
 
 import { clearSession, getState, type SessionUser, setSession } from '@/lib/session'
 import { routeTree } from '@/routeTree.gen'
@@ -37,9 +37,12 @@ beforeEach(() => {
   clearSession('manual')
 })
 
-afterEach(() => {
+afterEach(async () => {
   cleanup()
   clearSession('manual')
+  // i18n is a module singleton: a test that switches language would otherwise
+  // leak English/Spanish into every PT assertion that follows.
+  await i18n.changeLanguage('pt')
 })
 
 describe('Header', () => {
@@ -115,5 +118,123 @@ describe('Header', () => {
     expect(getState().status).toBe('anonymous')
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
     await waitFor(() => expect(screen.getByTestId('header-login-link')).toBeDefined())
+  })
+})
+
+// TanStack Router tags the matching Link with a bare `active` class. Nothing
+// in the stylesheet defines `.active`, so it is an inert marker — drop it to
+// compare the classes that actually paint the wordmark.
+function styleClassesOf(el: HTMLElement) {
+  return [...el.classList].filter((c) => c !== 'active').sort()
+}
+
+describe('Header home link', () => {
+  it('renders the wordmark as a link to the home page while anonymous', async () => {
+    renderHeader('/login')
+
+    const link = await screen.findByTestId('header-home-link')
+    expect(link.tagName).toBe('A')
+    expect(link.getAttribute('href')).toBe('/')
+    expect(link.getAttribute('aria-label')).toBe('kumite — página inicial')
+    expect(link.textContent).toBe('kumite')
+  })
+
+  it('navigates to the home page through the router when clicked', async () => {
+    const router = renderHeader('/login')
+    const link = await screen.findByTestId('header-home-link')
+
+    fireEvent.click(link)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  })
+
+  it('shows the same home link to an authenticated participant', async () => {
+    setSession(fakeUser, 'tok-1')
+    const router = renderHeader('/teams')
+
+    const link = await screen.findByTestId('header-home-link')
+    expect(link.getAttribute('href')).toBe('/')
+
+    fireEvent.click(link)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  })
+
+  it('shows the same home link to an organizer', async () => {
+    setSession({ ...fakeUser, role: 'organizer' }, 'tok-1')
+    const router = renderHeader('/organizer/problems')
+
+    const link = await screen.findByTestId('header-home-link')
+    expect(link.getAttribute('href')).toBe('/')
+
+    fireEvent.click(link)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  })
+
+  it('stays on the home page, with no special visual state, when already there', async () => {
+    const router = renderHeader('/')
+    const link = await screen.findByTestId('header-home-link')
+    const classesOnHome = styleClassesOf(link)
+
+    fireEvent.click(link)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    const stillThere = screen.getByTestId('header-home-link')
+    expect(styleClassesOf(stillThere)).toEqual(classesOnHome)
+    // The router's own current-page semantics stay on; nothing else changes.
+    expect(stillThere.getAttribute('aria-current')).toBe('page')
+  })
+
+  it('keeps the same look on the home page as anywhere else', async () => {
+    renderHeader('/')
+    const onHome = styleClassesOf(await screen.findByTestId('header-home-link'))
+    cleanup()
+
+    renderHeader('/login')
+    const elsewhere = styleClassesOf(await screen.findByTestId('header-home-link'))
+
+    // Only the router's own current-page semantics differ; the wordmark itself
+    // never gains a styling class of its own.
+    expect(onHome).toEqual(elsewhere)
+    expect(screen.getByTestId('header-home-link').getAttribute('aria-current')).toBeNull()
+  })
+
+  it('translates the accessible label into the active language', async () => {
+    renderHeader('/login')
+    await screen.findByTestId('header-home-link')
+
+    await i18n.changeLanguage('es')
+    await waitFor(() =>
+      expect(screen.getByTestId('header-home-link').getAttribute('aria-label')).toBe(
+        'kumite — página de inicio',
+      ),
+    )
+
+    await i18n.changeLanguage('en')
+    await waitFor(() =>
+      expect(screen.getByTestId('header-home-link').getAttribute('aria-label')).toBe(
+        'kumite — home',
+      ),
+    )
+
+    expect(screen.getByTestId('header-home-link').textContent).toBe('kumite')
+  })
+
+  it('navigates without asking for confirmation', async () => {
+    const confirmSpy = vi.fn(() => true)
+    vi.stubGlobal('confirm', confirmSpy)
+
+    try {
+      const router = renderHeader('/login')
+      const link = await screen.findByTestId('header-home-link')
+
+      fireEvent.click(link)
+
+      await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+      expect(confirmSpy).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

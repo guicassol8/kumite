@@ -13,7 +13,14 @@ export function Header() {
 
   return (
     <header data-testid="app-header" className="flex items-center justify-between border-b p-4">
-      <span className="font-bold text-xl tracking-tight">kumite</span>
+      <Link
+        to="/"
+        data-testid="header-home-link"
+        aria-label={t('header.homeLink')}
+        className="rounded-md font-bold text-xl tracking-tight outline-none transition-opacity hover:opacity-80 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        kumite
+      </Link>
       <div className="flex items-center gap-4">
         {status === 'authenticated' && user ? (
           <>

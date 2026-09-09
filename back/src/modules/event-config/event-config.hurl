@@ -8,8 +8,13 @@
 #   pnpm start           # in another terminal
 #   pnpm hurl            # reads ORGANIZER_EMAIL / ORGANIZER_PASSWORD from the environment
 #
-# Idempotent: the final steps PATCH the config back to its seeded defaults, so
-# this file can be rerun without resetting the db.
+# Idempotent, and order-independent: `event_config` is a single event-wide row
+# that every hurl file shares, so this file arranges its own state up front
+# (step 0e) instead of trusting whoever ran before it in the glob order. The
+# final PATCH (step 5) still restores the defaults, but it only runs on the
+# happy path — hurl has no teardown hook, so an assert that fails midway
+# aborts the file and leaves the row dirty. The arrange is what makes reruns
+# safe; the restore is a courtesy to the files that order after this one.
 
 # 0a. Sign up + log in a participant.
 POST {{host}}/auth/signup
@@ -53,7 +58,19 @@ HTTP 403
 [Asserts]
 jsonpath "$.error" == "forbidden"
 
-# 1. GET -> the seeded defaults.
+# 0e. Arrange: force the event-wide config to the defaults, whatever the file
+# that ran before this one left behind. That `db:seed` writes these same
+# values is proven in db/seed.test.ts, not here.
+PATCH {{host}}/organizer/event-config
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "mixingLocked": false, "maxTeamSize": 3 }
+HTTP 200
+[Asserts]
+jsonpath "$.mixingLocked" == false
+jsonpath "$.maxTeamSize" == 3
+
+# 1. GET -> reflects the current config, arranged just above.
 GET {{host}}/organizer/event-config
 Authorization: Bearer {{organizer_token}}
 HTTP 200

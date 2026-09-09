@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { parseEnv } from './lib/env'
+
 // Load .env into process.env when present (Node >= 20.12). In production the
 // real environment wins and no file is required.
 try {
@@ -45,7 +47,10 @@ const EnvSchema = z.object({
     .default('Liga de Algoritmos - PUCRS <contato@ligadealgoritmos.com>'),
 })
 
-export const env = EnvSchema.parse(process.env)
+export const env = parseEnv(EnvSchema, process.env, {
+  subject: 'back/ environment',
+  hint: 'See back/.env.example for every value and which ones are required.',
+})
 
 export const JWT_SECRET = env.JWT_SECRET
 export const TOKEN_TTL_SECONDS = 60 * 60 * 24

@@ -2,6 +2,7 @@ import argon2 from 'argon2'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
+import { parseEnv } from '../lib/env'
 import type { Difficulty, TestCase, TranslationInput } from '../modules/problems/problems.schema'
 import { createProblem, publishProblem, updateProblem } from '../modules/problems/problems.service'
 import type { Db } from './client'
@@ -171,7 +172,10 @@ const SeedEnvSchema = z.object({
 })
 
 export async function seed(db: Db): Promise<void> {
-  const { ORGANIZER_EMAIL, ORGANIZER_PASSWORD } = SeedEnvSchema.parse(process.env)
+  const { ORGANIZER_EMAIL, ORGANIZER_PASSWORD } = parseEnv(SeedEnvSchema, process.env, {
+    subject: 'pnpm db:seed environment',
+    hint: 'ORGANIZER_EMAIL and ORGANIZER_PASSWORD are required by db:seed only — see back/.env.example.',
+  })
 
   const passwordHash = await argon2.hash(ORGANIZER_PASSWORD)
   // No target: the only unique constraints on `users` are the id PK (a fresh

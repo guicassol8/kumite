@@ -74,6 +74,22 @@ describe('seed', () => {
     ).rejects.toThrow()
   })
 
+  // The organizer credentials are read on seed()'s first line, before any
+  // query — a missing one must name itself instead of dumping a ZodError (#97).
+  it('names the missing organizer variable and writes nothing', async () => {
+    delete process.env.ORGANIZER_EMAIL
+
+    try {
+      await expect(seed(db)).rejects.toThrow(/ORGANIZER_EMAIL: required, but not set/)
+      await expect(seed(db)).rejects.toThrow(/back\/\.env\.example/)
+      expect(await db.select().from(usersTable)).toHaveLength(0)
+    } finally {
+      // beforeEach rewrites it, but an early failure above must not leak the
+      // hole into the rest of the file.
+      process.env['ORGANIZER_EMAIL'] = ORGANIZER_EMAIL
+    }
+  })
+
   it('stays idempotent when run twice', async () => {
     await seed(db)
     await seed(db)

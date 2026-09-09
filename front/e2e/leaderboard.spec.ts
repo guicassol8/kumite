@@ -1,17 +1,26 @@
-import { expect, type Page, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+
+import {
+  BACK_URL,
+  closeRound,
+  createRound,
+  expect,
+  ORGANIZER_EMAIL,
+  ORGANIZER_PASSWORD,
+  organizerAuthHeader,
+  test,
+} from './support/rounds'
+import { createTeamThroughUi } from './support/teams-ui'
 
 // Visual walkthrough for #45. Prereqs (like home.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
 // Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD — the flow hinges on the organizer
 // opening a round and a team submitting via the API, to prove the grid
-// updates live over SSE (#44) without a reload. Also needs no round already
-// open in the shared dev db (a fresh `pnpm db:seed` never opens one).
+// updates live over SSE (#44) without a reload. The single open-round slot is
+// handled by `roundSlot` (#150), which also closes this round again when the
+// test fails before step 05.
 const evidence = (name: string) => `e2e/evidence/45/${name}.png`
 const evidence46 = (name: string) => `e2e/evidence/46/${name}.png`
-
-const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
-const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -21,20 +30,6 @@ const roundName = `Rodada Placar ${stamp}`
 
 test.describe('leaderboard (#45)', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
-
-  let organizerToken: string | undefined
-  async function organizerAuthHeader(): Promise<Record<string, string>> {
-    if (!organizerToken) {
-      const res = await fetch(`${BACK_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: ORGANIZER_EMAIL, password: ORGANIZER_PASSWORD }),
-      })
-      const { token } = (await res.json()) as { token: string }
-      organizerToken = token
-    }
-    return { authorization: `Bearer ${organizerToken}` }
-  }
 
   async function apiCreatePublishedProblem(): Promise<string> {
     const auth = await organizerAuthHeader()
@@ -61,31 +56,6 @@ test.describe('leaderboard (#45)', () => {
     })
     await fetch(`${BACK_URL}/organizer/problems/${id}/publish`, { method: 'POST', headers: auth })
     return id
-  }
-
-  async function apiCreateRound(problemId: string): Promise<string> {
-    const auth = await organizerAuthHeader()
-    const res = await fetch(`${BACK_URL}/organizer/rounds`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...auth },
-      body: JSON.stringify({ name: roundName, durationMinutes: 30, problemIds: [problemId] }),
-    })
-    const { id } = (await res.json()) as { id: string }
-    return id
-  }
-
-  async function apiOpenRound(roundId: string): Promise<void> {
-    const auth = await organizerAuthHeader()
-    const res = await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, {
-      method: 'POST',
-      headers: auth,
-    })
-    if (!res.ok) throw new Error(`failed to open round: ${res.status} ${await res.text()}`)
-  }
-
-  async function apiCloseRound(roundId: string): Promise<void> {
-    const auth = await organizerAuthHeader()
-    await fetch(`${BACK_URL}/organizer/rounds/${roundId}/close`, { method: 'POST', headers: auth })
   }
 
   async function apiSubmitSolution(token: string, problemId: string, roundId: string) {
@@ -133,27 +103,43 @@ test.describe('leaderboard (#45)', () => {
 
   test('updates the grid live, highlights my team, and switches round/overall scope', async ({
     page,
+    roundSlot,
   }) => {
+    const auth = await organizerAuthHeader()
+
     // 01 — a fresh participant with a team, no active round yet: the overall
-    // tab (no round has ever existed) with a dedicated empty state.
+    // tab with a dedicated empty state. `leaderboard-empty-no-round` means "no
+    // round has ever existed", true of a given database exactly once, so the
+    // rounds list is stubbed (it is `fetchRounds` in src/lib/rounds-query.ts
+    // that feeds this state) — #150.
     await signupThroughUi(page, participantEmail)
     await page.getByTestId('header-teams-link').click()
-    await page.getByTestId('teams-create-open').click()
-    await page.getByTestId('teams-create-name-input').fill(teamName)
-    await page.getByTestId('teams-create-submit').click()
-    await expect(page.getByTestId('my-team-panel')).toBeVisible()
+    await createTeamThroughUi(page, teamName)
 
+    const roundsApiUrl = `${BACK_URL}/rounds`
+    await page.route(roundsApiUrl, (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+      } else {
+        route.continue()
+      }
+    })
     await page.getByTestId('header-leaderboard-link').click()
     await expect(page).toHaveURL(/\/leaderboard$/)
     await expect(page.getByTestId('leaderboard-empty-no-round')).toBeVisible()
     await page.screenshot({ path: evidence('01-placar-sem-rodada'), fullPage: true })
+    await page.unroute(roundsApiUrl)
 
     // 02 — the organizer opens a round with a problem while this page stays
     // open; the SSE push (#44) must update the grid without a reload
     // (Acceptance #1), and my team's row is marked.
     const problemId = await apiCreatePublishedProblem()
-    const roundId = await apiCreateRound(problemId)
-    await apiOpenRound(roundId)
+    const roundId = await createRound(auth, {
+      name: roundName,
+      durationMinutes: 30,
+      problemIds: [problemId],
+    })
+    await roundSlot.open(auth, roundId)
 
     await expect(page.getByTestId('leaderboard-table')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByTestId('leaderboard-your-team-badge')).toBeVisible()
@@ -215,7 +201,7 @@ test.describe('leaderboard (#45)', () => {
     // reload. The live `round.closed` push must refetch the rounds list on
     // its own; "Geral" (already selected from step 04) keeps working
     // uninterrupted through that.
-    await apiCloseRound(roundId)
+    await closeRound(auth, roundId)
     await expect(page.getByTestId('leaderboard-tabs')).toBeVisible()
     await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute(
       'data-state',

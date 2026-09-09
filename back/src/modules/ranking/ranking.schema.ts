@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { UuidSchema } from '../../lib/uuid'
+
 export const RankingProblemEntrySchema = z.object({
   problemId: z.string(),
   score: z.number().int().nonnegative(),
@@ -24,7 +26,7 @@ export const RoundRankingSchema = z.object({
 })
 
 export const RoundRankingParamsSchema = z.object({
-  id: z.string(),
+  id: UuidSchema,
 })
 
 export const EventRankingRoundEntrySchema = z.object({

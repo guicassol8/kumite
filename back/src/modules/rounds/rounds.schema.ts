@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { LocaleSchema } from '../../lib/locale'
+import { UuidSchema } from '../../lib/uuid'
 
 import { DifficultySchema } from '../problems/problems.schema'
 
@@ -49,7 +50,7 @@ export const CreateRoundBodySchema = z
   .object({
     name: z.string().min(1).max(120),
     durationMinutes: z.number().int().positive(),
-    problemIds: z.array(z.string()),
+    problemIds: z.array(UuidSchema),
   })
   .superRefine((body, ctx) => rejectDuplicateProblemIds(body.problemIds, ctx))
 
@@ -57,7 +58,7 @@ export const UpdateRoundBodySchema = z
   .object({
     name: z.string().min(1).max(120).optional(),
     durationMinutes: z.number().int().positive().optional(),
-    problemIds: z.array(z.string()).optional(),
+    problemIds: z.array(UuidSchema).optional(),
   })
   .superRefine((body, ctx) => {
     if (!body.problemIds) return
@@ -65,7 +66,7 @@ export const UpdateRoundBodySchema = z
   })
 
 export const RoundIdParamsSchema = z.object({
-  id: z.string(),
+  id: UuidSchema,
 })
 
 export const ExtendRoundBodySchema = z.object({

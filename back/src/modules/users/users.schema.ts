@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { UuidSchema } from '../../lib/uuid'
+
 // Mirrors the `users` drizzle table (db/schema.ts).
 export const RoleSchema = z.enum(['participant', 'organizer'])
 export const UniversitySchema = z.enum(['pucrs', 'merida'])
@@ -44,7 +46,9 @@ export const ListUsersQuerySchema = z.object({
   q: z.string().optional(),
   role: RoleSchema.optional(),
   university: UniversitySchema.optional(),
-  teamId: z.string().optional(),
+  // Strict on purpose: `?teamId=` with an empty value is a 422, not a filter
+  // silently ignored. The front omits the key entirely when it means "all".
+  teamId: UuidSchema.optional(),
   limit: z.coerce.number().int().positive().max(100).default(20),
   offset: z.coerce.number().int().nonnegative().default(0),
 })
@@ -67,10 +71,11 @@ export const UserListSchema = z.object({
   total: z.number().int(),
 })
 
-// Plain string, like ProblemIdParamsSchema — not .uuid(), so an unknown id
-// still 404s instead of failing input validation.
+// UuidSchema, like ProblemIdParamsSchema: a malformed id can't match any row,
+// so the 422 lands before the lookup instead of turning into a driver-level
+// 500 — an unknown *well-formed* id still gets its 404 from the handler (#94).
 export const UserIdParamsSchema = z.object({
-  id: z.string(),
+  id: UuidSchema,
 })
 
 export type ListUsersQuery = z.infer<typeof ListUsersQuerySchema>

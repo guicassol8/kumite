@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { JsonValueSchema } from '../../lib/json'
 import { LocaleSchema } from '../../lib/locale'
+import { UuidSchema } from '../../lib/uuid'
 
 import { WorkspaceSchema } from '../judge/judge.schema'
 
@@ -45,11 +46,11 @@ export type BestSubmission = z.infer<typeof BestSubmissionSchema>
 // --- Submission pipeline DTOs (#21) ---
 
 export const SubmitSolutionBodySchema = z.object({
-  problemId: z.string().uuid(),
+  problemId: UuidSchema,
   // The round the participant believes is open and contains this problem
   // (#37) — a stale or mismatched id is rejected server-side, the client's
   // timer is never the authority.
-  roundId: z.string().uuid(),
+  roundId: UuidSchema,
   // Reused from the judge module so the route validates exactly what codegen
   // will accept — never a second definition of the workspace shape.
   workspace: WorkspaceSchema,

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { UuidSchema } from '../../lib/uuid'
+
 // All Zod schemas for a domain live here, never inline in the route (ADR-0005) —
 // the route imports them by name. Export the z.infer types alongside so a single
 // import pulls both the runtime validator and the compile-time type.
@@ -8,7 +10,7 @@ export const CreateGreetingBodySchema = z.object({
 })
 
 export const GreetingParamsSchema = z.object({
-  id: z.string(),
+  id: UuidSchema,
 })
 
 export const GreetingSchema = z.object({

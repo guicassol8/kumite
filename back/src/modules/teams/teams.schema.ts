@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { UuidSchema } from '../../lib/uuid'
+
 import { RoleSchema, UniversitySchema } from '../users/users.schema'
 
 // Mirrors the `teams` drizzle table (db/schema.ts).
@@ -32,7 +34,7 @@ export const CreateTeamBodySchema = z.object({
 })
 
 export const JoinTeamParamsSchema = z.object({
-  id: z.string(),
+  id: UuidSchema,
 })
 
 export const TeamMemberViewSchema = z.object({
@@ -74,7 +76,7 @@ export const NoContentSchema = z.void()
 // --- Organizer moderation DTOs (#50) ---
 
 export const RenameTeamParamsSchema = z.object({
-  id: z.string(),
+  id: UuidSchema,
 })
 
 export const RenameTeamBodySchema = z.object({
@@ -82,19 +84,19 @@ export const RenameTeamBodySchema = z.object({
 })
 
 export const MoveMemberParamsSchema = z.object({
-  userId: z.string(),
+  userId: UuidSchema,
 })
 
 export const MoveMemberBodySchema = z.object({
-  teamId: z.string(),
+  teamId: UuidSchema,
 })
 
 export const RemoveMemberParamsSchema = z.object({
-  userId: z.string(),
+  userId: UuidSchema,
 })
 
 export const RemoveTeamParamsSchema = z.object({
-  id: z.string(),
+  id: UuidSchema,
 })
 
 // --- Organizer listing DTOs (#51) ---

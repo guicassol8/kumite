@@ -87,6 +87,8 @@ describe('notifications.service sendPasswordResetNotice (no SES config)', () => 
     vi.restoreAllMocks()
   })
 
+  // This path is what keeps local dev and CI's hurl job green with no AWS
+  // secret at all — the richer HTML body (#162) must not have started a send.
   it('falls back to console.log when SES_* env vars are unset', async () => {
     const { sendPasswordResetNotice } = await import('./notifications.service')
 
@@ -97,17 +99,6 @@ describe('notifications.service sendPasswordResetNotice (no SES config)', () => 
     const [line] = vi.mocked(console.log).mock.calls[0] ?? []
     expect(line).toContain('ada@example.com')
     expect(line).toContain('123456')
-  })
-
-  // The credential-less path is what keeps local dev and CI's hurl job green
-  // with no AWS secret at all — the richer body must not have started a send.
-  it('still sends nothing through SES when the credentials are missing', async () => {
-    const { sendPasswordResetNotice } = await import('./notifications.service')
-
-    await sendPasswordResetNotice({ email: 'ada@example.com', otp: '123456' })
-
-    expect(mockSend).not.toHaveBeenCalled()
-    expect(console.log).toHaveBeenCalledOnce()
   })
 })
 

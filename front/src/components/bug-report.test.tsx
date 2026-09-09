@@ -26,6 +26,7 @@ function jsonResponse(status: number, body: unknown): any {
 
 const fakeUser: SessionUser = {
   id: 'u1',
+  name: 'Ada Lovelace',
   email: 'ada@edu.pucrs.br',
   role: 'participant',
   university: 'pucrs',

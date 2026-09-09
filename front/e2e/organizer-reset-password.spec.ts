@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { ORGANIZER_NAME } from './support/rounds'
 
 // Visual walkthrough for #143: the on-site reset an organizer performs for a
 // participant who cannot reach their inbox. Prereqs (like organizer-users.spec.ts):
@@ -31,7 +32,7 @@ async function apiSignupAndLogin(email: string, code: string): Promise<string> {
   await fetch(`${BACK_URL}/auth/signup`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: PASSWORD, code }),
+    body: JSON.stringify({ name: 'E2E Participante', email, password: PASSWORD, code }),
   })
   return apiLogin(email, PASSWORD)
 }
@@ -67,7 +68,7 @@ test.describe('organizer-driven password reset', () => {
 
     try {
       await loginThroughUi(organizerPage, ORGANIZER_EMAIL, ORGANIZER_PASSWORD)
-      await expect(organizerPage.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
+      await expect(organizerPage.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
 
       await organizerPage.goto('/organizer/users')
       await organizerPage.getByTestId('organizer-users-search-input').fill(participantEmail)

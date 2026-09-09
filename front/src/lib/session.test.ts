@@ -12,6 +12,7 @@ const mockedGetMe = vi.mocked(api.me.$get)
 const fakeUser: SessionUser = {
   id: 'u1',
   email: 'ada@edu.pucrs.br',
+  name: 'Ada',
   role: 'participant',
   university: 'pucrs',
   active: true,

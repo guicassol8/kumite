@@ -287,7 +287,12 @@ test.describe('/problem/$id — barra ancorada, rodada aberta (#155)', () => {
     await api('/auth/signup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password: PASSWORD, code: 'PUCRS2026' }),
+      body: JSON.stringify({
+        name: 'E2E Participante',
+        email,
+        password: PASSWORD,
+        code: 'PUCRS2026',
+      }),
     })
     const login = await api('/auth/login', {
       method: 'POST',

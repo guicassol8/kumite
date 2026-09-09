@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { E2E_PARTICIPANT_NAME, ORGANIZER_NAME } from './support/rounds'
 
 // Visual walkthrough for #28. Prereqs (like auth.hurl):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
@@ -15,13 +16,14 @@ function uniqueEmail(): string {
 }
 
 async function fillSignupForm(page: import('@playwright/test').Page, email: string) {
+  await page.getByTestId('signup-name-input').fill('E2E Participante')
   await page.getByTestId('signup-email-input').fill(email)
   await page.getByTestId('signup-password-input').fill('supersecret')
   await page.getByTestId('signup-confirm-password-input').fill('supersecret')
   await page.getByTestId('signup-code-input').fill('PUCRS2026')
 }
 
-test('signup happy path auto-logs in and shows the email in the header', async ({ page }) => {
+test('signup happy path auto-logs in and shows the name in the header', async ({ page }) => {
   const email = uniqueEmail()
   await page.goto('/signup')
   await fillSignupForm(page, email)
@@ -29,7 +31,7 @@ test('signup happy path auto-logs in and shows the email in the header', async (
 
   await page.getByTestId('signup-submit-button').click()
 
-  await expect(page.getByTestId('header-user-email')).toHaveText(email)
+  await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
   await page.screenshot({ path: evidence('02-signup-auto-logged-in'), fullPage: true })
 })
 
@@ -48,7 +50,7 @@ test('login with the wrong password shows a single generic error', async ({ page
   await page.goto('/signup')
   await fillSignupForm(page, email)
   await page.getByTestId('signup-submit-button').click()
-  await expect(page.getByTestId('header-user-email')).toHaveText(email)
+  await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
   await page.getByTestId('header-logout-button').click()
 
   await page.goto('/login')
@@ -82,7 +84,7 @@ test('a fresh participant hitting /organizer is redirected home with the forbidd
   await page.goto('/signup')
   await fillSignupForm(page, email)
   await page.getByTestId('signup-submit-button').click()
-  await expect(page.getByTestId('header-user-email')).toHaveText(email)
+  await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
 
   await page.goto('/organizer')
 
@@ -101,7 +103,7 @@ test.describe('seeded organizer account', () => {
     await page.getByTestId('login-email-input').fill(ORGANIZER_EMAIL)
     await page.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
     await page.getByTestId('login-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
+    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
 
     await page.goto('/organizer')
     await expect(page.getByTestId('organizer-heading')).toBeVisible()

@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, or, sql } from 'drizzle-orm'
 
 import type { Db } from '../../db/client'
 import { teamMembersTable, teamsTable, usersTable } from '../../db/schema'
@@ -29,6 +29,7 @@ export async function findUserById(db: Db, id: string): Promise<User | null> {
 const userSummaryColumns = {
   id: usersTable.id,
   email: usersTable.email,
+  name: usersTable.name,
   role: usersTable.role,
   university: usersTable.university,
   active: usersTable.active,
@@ -41,6 +42,7 @@ const userSummaryColumns = {
 type UserSummaryRow = {
   id: string
   email: string
+  name: string | null
   role: User['role']
   university: User['university']
   active: boolean
@@ -54,6 +56,7 @@ function toUserSummary(row: UserSummaryRow): UserSummary {
   return {
     id: row.id,
     email: row.email,
+    name: row.name,
     role: row.role,
     university: row.university,
     active: row.active,
@@ -73,12 +76,20 @@ async function getUserSummary(db: Db, userId: string): Promise<UserSummary | nul
   return row ? toUserSummary(row) : null
 }
 
-// Email-fragment search only (see the #52 plan's scope note) — case
-// insensitive substring match, plus optional role/university/team filters.
+// One search box matched against name OR email (#122) — case insensitive
+// substring match, plus optional role/university/team filters. The two sides
+// are OR'd inside a single condition so they stay AND'd to the other filters;
+// a null name simply never matches (`null like …` is null, not true).
 export async function listUsers(db: Db, filters: ListUsersQuery): Promise<UserList> {
   const conditions = []
   if (filters.q) {
-    conditions.push(sql`lower(${usersTable.email}) like lower(${`%${filters.q}%`})`)
+    const pattern = `%${filters.q}%`
+    conditions.push(
+      or(
+        sql`lower(${usersTable.email}) like lower(${pattern})`,
+        sql`lower(${usersTable.name}) like lower(${pattern})`,
+      ),
+    )
   }
   if (filters.role) conditions.push(eq(usersTable.role, filters.role))
   if (filters.university) conditions.push(eq(usersTable.university, filters.university))

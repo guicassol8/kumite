@@ -9,6 +9,9 @@ export const UniversitySchema = z.enum(['pucrs', 'merida'])
 export const UserSchema = z.object({
   id: z.string(),
   email: z.string().email(),
+  // Nullable for accounts predating #122 — the signup requirement is enforced
+  // by SignupBodySchema, so every account created since carries one.
+  name: z.string().nullable(),
   passwordHash: z.string(),
   role: RoleSchema,
   university: UniversitySchema,
@@ -46,8 +49,8 @@ export type NewUser = Omit<User, 'id' | 'active' | 'mustChangePassword' | 'creat
 // --- Organizer admin DTOs (#52) ---
 
 export const ListUsersQuerySchema = z.object({
-  // Email-fragment search only — see the plan's scope note on #52 for why
-  // name search isn't here (split into a separate discovered-work issue, #122).
+  // One box, matched against name OR email fragment (#122). Free text, so no
+  // UuidSchema here — that convention (#152) is for ids, not for search.
   q: z.string().optional(),
   role: RoleSchema.optional(),
   university: UniversitySchema.optional(),
@@ -63,6 +66,7 @@ export const TeamRefSchema = z.object({ id: z.string(), name: z.string() })
 export const UserSummarySchema = z.object({
   id: z.string(),
   email: z.string(),
+  name: z.string().nullable(),
   role: RoleSchema,
   university: UniversitySchema,
   active: z.boolean(),

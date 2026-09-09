@@ -1,6 +1,7 @@
 import {
   BACK_URL,
   createRound,
+  E2E_PARTICIPANT_NAME,
   expect,
   ORGANIZER_EMAIL,
   ORGANIZER_PASSWORD,
@@ -123,12 +124,13 @@ test.describe('global footer — visual walkthrough (#144)', () => {
     // 08 — the other session state: signed up and logged in, same footer.
     const email = `footer-e2e-${stamp}@edu.pucrs.br`
     await page.goto('/signup')
+    await page.getByTestId('signup-name-input').fill('E2E Participante')
     await page.getByTestId('signup-email-input').fill(email)
     await page.getByTestId('signup-password-input').fill(PASSWORD)
     await page.getByTestId('signup-confirm-password-input').fill(PASSWORD)
     await page.getByTestId('signup-code-input').fill('PUCRS2026')
     await page.getByTestId('signup-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(email)
+    await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
 
     await expect(page.getByTestId('app-footer')).toBeVisible()
     await expect(page.getByTestId('footer-contact-email')).toHaveAttribute(
@@ -188,12 +190,13 @@ test.describe('problem editor coexists with the footer (#144 T4)', () => {
 
     const email = `footer-editor-e2e-${stamp}@edu.pucrs.br`
     await page.goto('/signup')
+    await page.getByTestId('signup-name-input').fill('E2E Participante')
     await page.getByTestId('signup-email-input').fill(email)
     await page.getByTestId('signup-password-input').fill(PASSWORD)
     await page.getByTestId('signup-confirm-password-input').fill(PASSWORD)
     await page.getByTestId('signup-code-input').fill('PUCRS2026')
     await page.getByTestId('signup-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(email)
+    await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
 
     const token = await page.evaluate(() => window.localStorage.getItem('kumite-token'))
     await api('/teams', {

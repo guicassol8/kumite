@@ -39,9 +39,11 @@ export const JoinTeamParamsSchema = z.object({
 
 export const TeamMemberViewSchema = z.object({
   university: UniversitySchema,
-  // Only filled in for the members of the viewer's own team — the public
-  // listing stays anonymous (flag + university only).
+  // Both identity fields are only filled in for the members of the viewer's
+  // own team — the public listing stays anonymous (flag + university only).
+  // `name` is null for accounts that predate #122 even inside your own team.
   email: z.string().email().nullable(),
+  name: z.string().nullable(),
 })
 
 // Why the reason is computed server-side: the composition rules (max size,
@@ -108,6 +110,9 @@ export const RemoveTeamParamsSchema = z.object({
 export const OrganizerTeamMemberSchema = z.object({
   userId: z.string(),
   email: z.string().email(),
+  // No viewer gating here, unlike TeamMemberViewSchema: moderation already
+  // sees real identities. Null only for accounts predating #122.
+  name: z.string().nullable(),
   university: UniversitySchema,
   role: RoleSchema,
 })

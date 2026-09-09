@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { ORGANIZER_NAME } from './support/rounds'
 
 // Visual walkthrough for #12. Prereqs (like auth.hurl / auth.spec.ts):
 //   docker compose up -d && pnpm db:migrate
@@ -22,7 +23,7 @@ test.describe('organizer problems list', () => {
     await page.getByTestId('login-email-input').fill(ORGANIZER_EMAIL)
     await page.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
     await page.getByTestId('login-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
+    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
   }
 
   // The seed calls below hit /organizer/problems* directly (no UI), so they

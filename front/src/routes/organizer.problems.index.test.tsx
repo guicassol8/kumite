@@ -26,6 +26,7 @@ const mockedArchive = vi.mocked(api.organizer.problems[':id'].archive.$post)
 const organizerUser: SessionUser = {
   id: 'u1',
   email: 'org@edu.pucrs.br',
+  name: 'Org',
   role: 'organizer',
   university: 'pucrs',
   active: true,

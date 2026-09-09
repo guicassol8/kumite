@@ -197,7 +197,18 @@ function TeamsScreen() {
                   className="flex items-center gap-2 text-sm"
                 >
                   <UniversityBadge university={member.university} />
-                  <span>{member.email}</span>
+                  {/* Name in front, email secondary; a member without a name
+                      (account predating #122) shows the email alone instead of
+                      a dangling dash. The "you" marker still compares emails —
+                      that is the unique identifier, a name is not. */}
+                  {member.name ? (
+                    <>
+                      <span>{member.name}</span>
+                      <span className="text-muted-foreground">{member.email}</span>
+                    </>
+                  ) : (
+                    <span>{member.email}</span>
+                  )}
                   {member.email === user?.email && (
                     <span className="text-muted-foreground">{t('teams.myTeam.you')}</span>
                   )}

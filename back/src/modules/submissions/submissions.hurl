@@ -19,7 +19,7 @@
 #    now requires one (#32).
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "submissions-e2e@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Silvia Submissao", "email": "submissions-e2e@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -38,7 +38,7 @@ HTTP 201
 # 0a. A second, teamless participant (asserted at step 2 below).
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "submissions-e2e-noteam@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Sem Equipe", "email": "submissions-e2e-noteam@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -52,7 +52,7 @@ noteam_token: jsonpath "$.token"
 #     cooldown — used to prove a closed round blocks submissions (step 9).
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "submissions-e2e-closed@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Rodada Fechada", "email": "submissions-e2e-closed@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login

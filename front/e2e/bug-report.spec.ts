@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { E2E_PARTICIPANT_NAME } from './support/rounds'
 
 // Visual walkthrough for #145, one screenshot per acceptance criterion.
 //
@@ -205,12 +206,13 @@ test.describe('bug report — visual walkthrough (#145)', () => {
   test('prefills the email from the session, and keeps it editable', async ({ page }) => {
     const email = `bug-report-e2e-${stamp}@edu.pucrs.br`
     await page.goto('/signup')
+    await page.getByTestId('signup-name-input').fill(E2E_PARTICIPANT_NAME)
     await page.getByTestId('signup-email-input').fill(email)
     await page.getByTestId('signup-password-input').fill(PASSWORD)
     await page.getByTestId('signup-confirm-password-input').fill(PASSWORD)
     await page.getByTestId('signup-code-input').fill('PUCRS2026')
     await page.getByTestId('signup-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(email)
+    await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
 
     // 13 — the trigger is there for an authenticated participant too.
     await expect(page.getByTestId('bug-report-trigger')).toBeVisible()

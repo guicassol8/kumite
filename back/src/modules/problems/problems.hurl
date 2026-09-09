@@ -14,7 +14,7 @@
 # 0. Sign up + log in the participant that reads the problem.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "problems-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Paula Problemas", "email": "problems-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login

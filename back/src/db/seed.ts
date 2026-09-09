@@ -171,6 +171,10 @@ const SeedEnvSchema = z.object({
   ORGANIZER_PASSWORD: z.string().min(8),
 })
 
+// Fixed, not an env var (#122): the VPS and CI already run db:seed with the
+// two variables above, and a third required one would break them.
+const ORGANIZER_NAME = 'Organização kumite'
+
 export async function seed(db: Db): Promise<void> {
   const { ORGANIZER_EMAIL, ORGANIZER_PASSWORD } = parseEnv(SeedEnvSchema, process.env, {
     subject: 'pnpm db:seed environment',
@@ -184,6 +188,7 @@ export async function seed(db: Db): Promise<void> {
     .insert(usersTable)
     .values({
       email: ORGANIZER_EMAIL.toLowerCase(),
+      name: ORGANIZER_NAME,
       passwordHash,
       role: 'organizer',
       university: 'pucrs',

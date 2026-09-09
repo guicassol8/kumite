@@ -15,7 +15,7 @@
 #    below with different scores; Team C never submits at all.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "ranking-e2e-a@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Rafael Ranking", "email": "ranking-e2e-a@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -33,7 +33,7 @@ HTTP 201
 
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "ranking-e2e-b@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Bianca Ranking", "email": "ranking-e2e-b@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -51,7 +51,7 @@ HTTP 201
 
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "ranking-e2e-c@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Caio Ranking", "email": "ranking-e2e-c@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login

@@ -112,7 +112,12 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
   await fetch(`${BACK_URL}/auth/signup`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: participantEmail, password: PASSWORD, code: 'PUCRS2026' }),
+    body: JSON.stringify({
+      name: 'E2E Participante',
+      email: participantEmail,
+      password: PASSWORD,
+      code: 'PUCRS2026',
+    }),
   })
   const participantLogin = await fetch(`${BACK_URL}/auth/login`, {
     method: 'POST',

@@ -5,8 +5,10 @@ import {
   BACK_URL,
   closeRound,
   createRound,
+  E2E_PARTICIPANT_NAME,
   expect,
   ORGANIZER_EMAIL,
+  ORGANIZER_NAME,
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
@@ -142,12 +144,13 @@ test.describe('home (#40)', () => {
 
   async function signupThroughUi(page: Page, email: string): Promise<void> {
     await page.goto('/signup')
+    await page.getByTestId('signup-name-input').fill('E2E Participante')
     await page.getByTestId('signup-email-input').fill(email)
     await page.getByTestId('signup-password-input').fill(PASSWORD)
     await page.getByTestId('signup-confirm-password-input').fill(PASSWORD)
     await page.getByTestId('signup-code-input').fill('PUCRS2026')
     await page.getByTestId('signup-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(email)
+    await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
   }
 
   test('reflects the event live: waiting, an open round, its close, and organizer shortcuts', async ({
@@ -196,7 +199,7 @@ test.describe('home (#40)', () => {
     await organizerPage.getByTestId('login-email-input').fill(ORGANIZER_EMAIL)
     await organizerPage.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
     await organizerPage.getByTestId('login-submit-button').click()
-    await expect(organizerPage.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
+    await expect(organizerPage.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
     await expect(organizerPage.getByTestId('home-organizer-shortcuts')).toBeVisible()
     await organizerPage.screenshot({ path: evidence('04-atalhos-organizador'), fullPage: true })
     await organizerContext.close()

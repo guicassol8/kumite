@@ -37,6 +37,8 @@ export async function signup(db: Db, input: SignupBody): Promise<SignupResult> {
   const passwordHash = await argon2.hash(input.password)
   const user = await createUser(db, {
     email: input.email.toLowerCase(),
+    // Already trimmed by SignupBodySchema.
+    name: input.name,
     passwordHash,
     role: 'participant',
     university: eventCode.university,

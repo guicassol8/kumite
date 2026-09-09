@@ -38,11 +38,64 @@ afterAll(async () => {
 describe('SignupBodySchema', () => {
   it('rejects a password under 8 characters', () => {
     const result = SignupBodySchema.safeParse({
+      name: 'Ada Lovelace',
       email: 'ada@pucrs.br',
       password: 'short1',
       code: 'PUCRS2026',
     })
     expect(result.success).toBe(false)
+  })
+
+  it('rejects a signup with no name at all (#122)', () => {
+    const result = SignupBodySchema.safeParse({
+      email: 'ada@pucrs.br',
+      password: 'supersecret',
+      code: 'PUCRS2026',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a name shorter than 2 characters, whitespace not counting', () => {
+    for (const name of ['A', ' A ', '  ']) {
+      const result = SignupBodySchema.safeParse({
+        name,
+        email: 'ada@pucrs.br',
+        password: 'supersecret',
+        code: 'PUCRS2026',
+      })
+      expect(result.success, `expected ${JSON.stringify(name)} to be rejected`).toBe(false)
+    }
+  })
+
+  it('rejects a name longer than 80 characters', () => {
+    const result = SignupBodySchema.safeParse({
+      name: 'a'.repeat(81),
+      email: 'ada@pucrs.br',
+      password: 'supersecret',
+      code: 'PUCRS2026',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  // No charset rule on purpose (#122, decision 2): accents, spaces and
+  // compound names are ordinary, not something to reject.
+  it('accepts accents, spaces and an 80-character name, trimming the edges', () => {
+    const result = SignupBodySchema.safeParse({
+      name: '  José María de la Cruz  ',
+      email: 'ada@pucrs.br',
+      password: 'supersecret',
+      code: 'PUCRS2026',
+    })
+    if (!result.success) throw new Error('expected the name to be accepted')
+    expect(result.data.name).toBe('José María de la Cruz')
+    expect(
+      SignupBodySchema.safeParse({
+        name: 'a'.repeat(80),
+        email: 'ada@pucrs.br',
+        password: 'supersecret',
+        code: 'PUCRS2026',
+      }).success,
+    ).toBe(true)
   })
 })
 
@@ -56,6 +109,7 @@ describe('LoginBodySchema', () => {
 describe('auth.service signup', () => {
   it('creates a participant in the university from a valid code and matching domain', async () => {
     const result = await signup(db, {
+      name: 'Ada Lovelace',
       email: 'ada@edu.pucrs.br',
       password: 'supersecret',
       code: 'PUCRS2026',
@@ -69,6 +123,7 @@ describe('auth.service signup', () => {
 
   it('rejects an unknown code without revealing valid codes', async () => {
     const result = await signup(db, {
+      name: 'Ada Lovelace',
       email: 'ada@edu.pucrs.br',
       password: 'supersecret',
       code: 'DOES-NOT-EXIST',
@@ -81,6 +136,7 @@ describe('auth.service signup', () => {
     // Matching email domain on purpose: `active: false` is the only thing
     // standing between this signup and success.
     const result = await signup(db, {
+      name: 'Ada Lovelace',
       email: 'ada@merida.edu.mx',
       password: 'supersecret',
       code: 'INACTIVE2026',
@@ -91,6 +147,7 @@ describe('auth.service signup', () => {
 
   it('rejects a domain outside the code university allowed suffixes', async () => {
     const result = await signup(db, {
+      name: 'Ada Lovelace',
       email: 'ada@merida.edu.mx',
       password: 'supersecret',
       code: 'PUCRS2026',
@@ -103,6 +160,7 @@ describe('auth.service signup', () => {
 
   it('rejects a domain that merely contains the suffix as a substring', async () => {
     const result = await signup(db, {
+      name: 'Ada Lovelace',
       email: 'ada@evilpucrs.br',
       password: 'supersecret',
       code: 'PUCRS2026',
@@ -112,8 +170,14 @@ describe('auth.service signup', () => {
   })
 
   it('rejects a duplicate email that only differs by case', async () => {
-    await signup(db, { email: 'ada@edu.pucrs.br', password: 'supersecret', code: 'PUCRS2026' })
+    await signup(db, {
+      name: 'Ada Lovelace',
+      email: 'ada@edu.pucrs.br',
+      password: 'supersecret',
+      code: 'PUCRS2026',
+    })
     const result = await signup(db, {
+      name: 'Ada Lovelace',
       email: 'Ada@Edu.Pucrs.br',
       password: 'anotherpass',
       code: 'PUCRS2026',
@@ -121,11 +185,44 @@ describe('auth.service signup', () => {
 
     expect(result).toEqual({ ok: false, error: 'signup_failed' })
   })
+
+  it('persists the name already trimmed by the schema and echoes it back (#122)', async () => {
+    const parsed = SignupBodySchema.parse({
+      name: '  Ada  ',
+      email: 'ada@edu.pucrs.br',
+      password: 'supersecret',
+      code: 'PUCRS2026',
+    })
+
+    const result = await signup(db, parsed)
+    if (!result.ok) throw new Error('expected ok')
+    expect(result.user.name).toBe('Ada')
+    expect((await findUserById(db, result.user.id))?.name).toBe('Ada')
+  })
 })
 
 describe('auth.service login', () => {
+  // Acceptance: an account created before the #122 migration has name = null
+  // and must keep authenticating — the requirement lives in the signup schema,
+  // not in the column.
+  it('authenticates an account that predates the name column', async () => {
+    const signedUp = await signup(db, {
+      name: 'Ada Lovelace',
+      email: 'ada@edu.pucrs.br',
+      password: 'supersecret',
+      code: 'PUCRS2026',
+    })
+    if (!signedUp.ok) throw new Error('expected signup to succeed')
+    await db.update(usersTable).set({ name: null }).where(eq(usersTable.id, signedUp.user.id))
+
+    const result = await login(db, { email: 'ada@edu.pucrs.br', password: 'supersecret' })
+    expect(result.ok).toBe(true)
+    expect((await findUserById(db, signedUp.user.id))?.name).toBeNull()
+  })
+
   it('issues a token with sub, role, university and a 24h TTL for correct credentials', async () => {
     const signedUp = await signup(db, {
+      name: 'Ada Lovelace',
       email: 'ada@edu.pucrs.br',
       password: 'supersecret',
       code: 'PUCRS2026',
@@ -148,7 +245,12 @@ describe('auth.service login', () => {
   })
 
   it('rejects a wrong password', async () => {
-    await signup(db, { email: 'ada@edu.pucrs.br', password: 'supersecret', code: 'PUCRS2026' })
+    await signup(db, {
+      name: 'Ada Lovelace',
+      email: 'ada@edu.pucrs.br',
+      password: 'supersecret',
+      code: 'PUCRS2026',
+    })
 
     const result = await login(db, { email: 'ada@edu.pucrs.br', password: 'wrong-password' })
     expect(result).toEqual({ ok: false, error: 'invalid_credentials' })
@@ -160,7 +262,12 @@ describe('auth.service login', () => {
   })
 
   it('rejects correct credentials for a deactivated account with the same shape', async () => {
-    await signup(db, { email: 'ada@edu.pucrs.br', password: 'supersecret', code: 'PUCRS2026' })
+    await signup(db, {
+      name: 'Ada Lovelace',
+      email: 'ada@edu.pucrs.br',
+      password: 'supersecret',
+      code: 'PUCRS2026',
+    })
     await db
       .update(usersTable)
       .set({ active: false })
@@ -194,6 +301,7 @@ describe('ChangePasswordBodySchema', () => {
 describe('auth.service changePassword', () => {
   async function createParticipant(password = 'supersecret') {
     const result = await signup(db, {
+      name: 'Ada Lovelace',
       email: 'ada@edu.pucrs.br',
       password,
       code: 'PUCRS2026',

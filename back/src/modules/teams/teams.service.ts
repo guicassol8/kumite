@@ -47,6 +47,8 @@ export async function listTeams(db: Db, viewerId: string): Promise<TeamsList> {
       teamFirstSubmittedAt: teamsTable.firstSubmittedAt,
       university: usersTable.university,
       email: usersTable.email,
+      // `userName`, not `name`: `teamName` above is the team's.
+      userName: usersTable.name,
     })
     .from(teamsTable)
     .leftJoin(teamMembersTable, eq(teamMembersTable.teamId, teamsTable.id))
@@ -72,6 +74,7 @@ export async function listTeams(db: Db, viewerId: string): Promise<TeamsList> {
       team.members.push({
         university: row.university,
         email: row.teamId === myTeamId ? row.email : null,
+        name: row.teamId === myTeamId ? row.userName : null,
       })
     }
   }
@@ -105,6 +108,7 @@ export async function listOrganizerTeams(db: Db): Promise<OrganizerTeamsList> {
       teamFirstSubmittedAt: teamsTable.firstSubmittedAt,
       userId: usersTable.id,
       email: usersTable.email,
+      userName: usersTable.name,
       university: usersTable.university,
       role: usersTable.role,
     })
@@ -131,6 +135,9 @@ export async function listOrganizerTeams(db: Db): Promise<OrganizerTeamsList> {
       team.members.push({
         userId: row.userId,
         email: row.email,
+        // Outside the guard above on purpose: a null name is a legacy account,
+        // not a missing join row.
+        name: row.userName,
         university: row.university,
         role: row.role,
       })

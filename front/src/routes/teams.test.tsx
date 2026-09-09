@@ -29,6 +29,7 @@ const mockedJoin = vi.mocked(api.teams[':id'].join.$post)
 const participant: SessionUser = {
   id: 'u1',
   email: 'ada@edu.pucrs.br',
+  name: 'Ada',
   role: 'participant',
   university: 'pucrs',
   active: true,
@@ -49,7 +50,7 @@ function jsonResponse(status: number, body: unknown): any {
   return { ok: status >= 200 && status < 300, status, json: async () => body }
 }
 
-type Member = { university: 'pucrs' | 'merida'; email: string | null }
+type Member = { university: 'pucrs' | 'merida'; email: string | null; name: string | null }
 type Team = {
   id: string
   name: string
@@ -63,7 +64,7 @@ function team(overrides: Partial<Team> = {}): Team {
   return {
     id: 't1',
     name: 'Blockly Busters',
-    members: [{ university: 'pucrs', email: null }],
+    members: [{ university: 'pucrs', email: null, name: null }],
     slotsAvailable: 2,
     frozen: false,
     joinBlockedReason: null,
@@ -118,8 +119,8 @@ describe('TeamsScreen — listing', () => {
           teams: [
             team({
               members: [
-                { university: 'pucrs', email: null },
-                { university: 'merida', email: null },
+                { university: 'pucrs', email: null, name: null },
+                { university: 'merida', email: null, name: null },
               ],
               slotsAvailable: 1,
             }),
@@ -219,8 +220,9 @@ describe('TeamsScreen — my team panel', () => {
       teams: [
         team({
           members: [
-            { university: 'pucrs', email: participant.email },
-            { university: 'merida', email: 'grace@merida.edu.mx' },
+            { university: 'pucrs', email: participant.email, name: 'Ada Lovelace' },
+            // No name: a teammate whose account predates #122.
+            { university: 'merida', email: 'grace@merida.edu.mx', name: null },
           ],
           slotsAvailable: 1,
         }),
@@ -242,8 +244,12 @@ describe('TeamsScreen — my team panel', () => {
     await waitFor(() => expect(screen.getByTestId('my-team-panel')).toBeDefined())
     expect(screen.getByTestId('my-team-name').textContent).toContain('Blockly Busters')
     expect(screen.getByTestId('my-team-member-0').textContent).toContain(participant.email)
+    // Name in front of the email for whoever has one (#122)…
+    expect(screen.getByTestId('my-team-member-0').textContent).toContain('Ada Lovelace')
     expect(screen.getByTestId('my-team-member-0').textContent).toContain('(você)')
+    // …and the email alone for the teammate that has none.
     expect(screen.getByTestId('my-team-member-1').textContent).toContain('grace@merida.edu.mx')
+    expect(screen.getByTestId('my-team-member-1').textContent).not.toContain('—')
     expect(screen.getByTestId('my-team-member-1').textContent).not.toContain('(você)')
   })
 

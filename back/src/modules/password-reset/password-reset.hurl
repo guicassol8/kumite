@@ -29,7 +29,7 @@
 # 0. Sign up the target.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "password-reset-e2e@edu.pucrs.br", "password": "originalpass", "code": "PUCRS2026" }
+{ "name": "Rita Recuperada", "email": "password-reset-e2e@edu.pucrs.br", "password": "originalpass", "code": "PUCRS2026" }
 HTTP 201
 
 # 1. Malformed body: short OTP / short password -> kata's validation envelope.

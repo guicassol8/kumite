@@ -4,6 +4,7 @@ import {
   BACK_URL,
   expect,
   ORGANIZER_EMAIL,
+  ORGANIZER_NAME,
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
@@ -30,7 +31,7 @@ test.describe('organizer rounds', () => {
     await page.getByTestId('login-email-input').fill(ORGANIZER_EMAIL)
     await page.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
     await page.getByTestId('login-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
+    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
   }
 
   async function seedPublishedProblem(title: string): Promise<string> {

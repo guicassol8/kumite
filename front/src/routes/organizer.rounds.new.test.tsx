@@ -32,6 +32,7 @@ const mockedCreate = vi.mocked(api.organizer.rounds.$post)
 const organizerUser: SessionUser = {
   id: 'u1',
   email: 'org@edu.pucrs.br',
+  name: 'Org',
   role: 'organizer',
   university: 'pucrs',
   active: true,

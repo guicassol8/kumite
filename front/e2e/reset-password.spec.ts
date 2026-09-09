@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 
 import { expect, type Page, test } from '@playwright/test'
+import { E2E_PARTICIPANT_NAME } from './support/rounds'
 
 // Visual walkthrough for #52, reshot for #53's self-service flow. Prereqs
 // (like organizer-problems.spec.ts):
@@ -101,7 +102,12 @@ test.describe('self-service reset, completed with the real OTP', () => {
     await fetch(`${BACK_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password: originalPassword, code: 'PUCRS2026' }),
+      body: JSON.stringify({
+        name: 'E2E Participante',
+        email,
+        password: originalPassword,
+        code: 'PUCRS2026',
+      }),
     })
 
     await page.goto('/login')
@@ -135,7 +141,7 @@ test.describe('self-service reset, completed with the real OTP', () => {
     await page.getByTestId('login-password-input').fill(newPassword)
     await page.getByTestId('login-submit-button').click()
 
-    await expect(page.getByTestId('header-user-email')).toHaveText(email)
+    await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
     await page.screenshot({ path: evidence('07-login-with-new-password'), fullPage: true })
   })
 })

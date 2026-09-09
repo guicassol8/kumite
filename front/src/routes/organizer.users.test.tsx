@@ -38,6 +38,7 @@ const mockedResetPassword = vi.mocked(api.organizer.users[':id']['reset-password
 const organizerUser: SessionUser = {
   id: 'org-1',
   email: 'org@edu.pucrs.br',
+  name: 'Org',
   role: 'organizer',
   university: 'pucrs',
   active: true,
@@ -55,6 +56,7 @@ function user(overrides: Record<string, unknown> = {}) {
   return {
     id: 'u1',
     email: 'ada@edu.pucrs.br',
+    name: 'Ada Lovelace',
     role: 'participant',
     university: 'pucrs',
     active: true,
@@ -68,9 +70,11 @@ function user(overrides: Record<string, unknown> = {}) {
 const defaultList = {
   items: [
     user(),
+    // No name: an account created before the #122 migration.
     user({
       id: 'u2',
       email: 'grace@merida.edu.mx',
+      name: null,
       university: 'merida',
       role: 'organizer',
       team: null,
@@ -155,6 +159,19 @@ describe('OrganizerUsersScreen', () => {
     expect(screen.getByTestId('organizer-users-row-u1').textContent).toContain('ada@edu.pucrs.br')
     expect(screen.getByTestId('organizer-users-row-u1').textContent).toContain('Blockly Busters')
     expect(screen.getByTestId('organizer-users-row-u2').textContent).toContain('—')
+  })
+
+  it('renders the name column, with a dash for an account that has none (#122)', async () => {
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-users-row-u1')).toBeDefined())
+    expect(screen.getByTestId('organizer-users-row-u1').textContent).toContain('Ada Lovelace')
+    // u2 has name: null and a team: null — the dash covers both cells, so the
+    // check that matters is that the email is still the only identity shown.
+    const legacyRow = screen.getByTestId('organizer-users-row-u2')
+    expect(legacyRow.textContent).toContain('grace@merida.edu.mx')
+    expect(legacyRow.querySelectorAll('td')[0]?.textContent).toBe('—')
+    expect(screen.getByText('Nome')).toBeDefined()
   })
 
   it('marks a deactivated user with a badge', async () => {

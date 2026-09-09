@@ -6,6 +6,7 @@
     "en": "English"
   },
   "header": {
+    "homeLink": "kumite — página inicial",
     "login": "Entrar",
     "signup": "Cadastrar",
     "logout": "Sair",

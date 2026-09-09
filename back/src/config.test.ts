@@ -96,7 +96,6 @@ describe('config env validation failure (#97)', () => {
   })
 
   it('names the missing variable and points at .env.example instead of dumping a ZodError', async () => {
-    process.env.JWT_SECRET = undefined
     delete process.env.JWT_SECRET
 
     await expect(import('./config')).rejects.toThrow(/JWT_SECRET: required, but not set/)

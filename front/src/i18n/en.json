@@ -18,6 +18,36 @@
   "footer": {
     "contactLabel": "Questions? Talk to the organizers:"
   },
+  "bugReport": {
+    "trigger": "Report a bug",
+    "title": "Report a bug",
+    "intro": "Tell us what happened. We send it straight to the organizers, along with the page you are on.",
+    "descriptionLabel": "What happened?",
+    "descriptionPlaceholder": "e.g. I clicked submit on problem 3 and nothing happened",
+    "counter": "{{current}}/{{max}}",
+    "emailLabel": "Your email (optional)",
+    "emailPlaceholder": "you@edu.pucrs.br",
+    "emailHelp": "Only so the organizers can reply. Leave it blank to report anonymously.",
+    "submit": "Send report",
+    "submitting": "Sending…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "success": {
+      "title": "Report sent",
+      "body": "Thanks! The organizers got your report and will take a look."
+    },
+    "errors": {
+      "validation": "We could not send it: check the description and the email.",
+      "throttled": "You just sent a report. Wait a minute before sending another one.",
+      "unexpected": "We could not send the report right now.",
+      "contactFallback": "If you prefer, write directly to {{email}}."
+    },
+    "validation": {
+      "descriptionRequired": "Write what happened.",
+      "descriptionTooLong": "The report must be at most {{max}} characters.",
+      "emailInvalid": "Enter a valid email or leave the field blank."
+    }
+  },
   "home": {
     "tagline": "PUCRS × Mérida — block programming showdown",
     "apiStatus": "API status",

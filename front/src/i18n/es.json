@@ -18,6 +18,36 @@
   "footer": {
     "contactLabel": "¿Dudas? Habla con la organización:"
   },
+  "bugReport": {
+    "trigger": "Reportar error",
+    "title": "Reportar un error",
+    "intro": "Cuéntanos qué pasó. Lo enviamos directo a la organización junto con la página en la que estás.",
+    "descriptionLabel": "¿Qué pasó?",
+    "descriptionPlaceholder": "Ej.: hice clic en enviar en el ejercicio 3 y no pasó nada",
+    "counter": "{{current}}/{{max}}",
+    "emailLabel": "Tu correo (opcional)",
+    "emailPlaceholder": "tu@edu.pucrs.br",
+    "emailHelp": "Solo para que la organización pueda responderte. Déjalo en blanco para reportar sin identificarte.",
+    "submit": "Enviar reporte",
+    "submitting": "Enviando…",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "success": {
+      "title": "Reporte enviado",
+      "body": "¡Gracias! La organización recibió tu reporte y lo va a revisar."
+    },
+    "errors": {
+      "validation": "No pudimos enviarlo: revisa la descripción y el correo.",
+      "throttled": "Acabas de enviar un reporte. Espera un minuto antes de enviar otro.",
+      "unexpected": "No pudimos enviar el reporte ahora.",
+      "contactFallback": "Si prefieres, escribe directo a {{email}}."
+    },
+    "validation": {
+      "descriptionRequired": "Escribe qué pasó.",
+      "descriptionTooLong": "El reporte debe tener como máximo {{max}} caracteres.",
+      "emailInvalid": "Escribe un correo válido o deja el campo en blanco."
+    }
+  },
   "home": {
     "tagline": "PUCRS × Mérida — programación con bloques",
     "apiStatus": "Estado de la API",

@@ -18,7 +18,6 @@ export function Footer() {
           {CONTACT_EMAIL}
         </a>
       </p>
-      {/* O gatilho de reportar bug (issue irmã) entra aqui. */}
     </footer>
   )
 }

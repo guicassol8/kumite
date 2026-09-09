@@ -74,15 +74,32 @@ describe('seed', () => {
     ).rejects.toThrow()
   })
 
+  it('resets a mutated event_config row back to the defaults', async () => {
+    // Exactly the state the vitest suite leaves behind: the singleton row
+    // exists and holds whatever the last test wrote to it.
+    await db.insert(eventConfigTable).values({ id: 1, mixingLocked: true, maxTeamSize: 6 })
+
+    await seed(db)
+
+    const eventConfig = await db.select().from(eventConfigTable)
+    expect(eventConfig).toHaveLength(1)
+    expect(eventConfig[0]?.mixingLocked).toBe(false)
+    expect(eventConfig[0]?.maxTeamSize).toBe(3)
+  })
+
   it('stays idempotent when run twice', async () => {
     await seed(db)
     await seed(db)
 
     expect(await db.select().from(usersTable)).toHaveLength(1)
     expect(await db.select().from(eventCodesTable)).toHaveLength(2)
-    expect(await db.select().from(eventConfigTable)).toHaveLength(1)
     expect(await db.select().from(problemsTable)).toHaveLength(4)
     expect(await db.select().from(problemTranslationsTable)).toHaveLength(12)
+
+    const eventConfig = await db.select().from(eventConfigTable)
+    expect(eventConfig).toHaveLength(1)
+    expect(eventConfig[0]?.mixingLocked).toBe(false)
+    expect(eventConfig[0]?.maxTeamSize).toBe(3)
   })
 })
 

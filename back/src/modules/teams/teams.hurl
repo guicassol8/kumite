@@ -1,10 +1,14 @@
 # API E2E for the participant teams module. Prereqs, in order:
 #   docker compose up -d
 #   pnpm db:migrate
-#   pnpm db:seed        # seeds PUCRS2026 / MERIDA2026 event codes, default
-#                       # event_config (mixingLocked: false, maxTeamSize: 3)
+#   pnpm db:seed        # seeds PUCRS2026 / MERIDA2026 event codes
 #   pnpm start          # in another terminal
 #   pnpm hurl
+#
+# `event_config` is event-wide state shared by every hurl file and by the
+# vitest suite, so this file arranges its own (step 0e) instead of trusting
+# that whoever ran before it in the glob order cleaned up — hurl has no
+# teardown hook, so a file that fails midway leaves the row dirty.
 #
 # Creates unique users (`teams-e2e-*@...`) — rerunning this file locally
 # without resetting the db fails the first signup on the second run. Reset
@@ -70,6 +74,25 @@ Content-Type: application/json
 HTTP 200
 [Captures]
 fourth_token: jsonpath "$.token"
+
+# 0e. Log in the seeded organizer and arrange the event-wide config, so the
+# maxTeamSize/slotsAvailable asserts below hold whatever ran before this file.
+# `organizer_token` is captured here once and reused by the moderation steps.
+POST {{host}}/auth/login
+Content-Type: application/json
+{ "email": "{{organizer_email}}", "password": "{{organizer_password}}" }
+HTTP 200
+[Captures]
+organizer_token: jsonpath "$.token"
+
+PATCH {{host}}/organizer/event-config
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "mixingLocked": false, "maxTeamSize": 3 }
+HTTP 200
+[Asserts]
+jsonpath "$.mixingLocked" == false
+jsonpath "$.maxTeamSize" == 3
 
 # 1. Create -> 201, creator already a member.
 POST {{host}}/teams
@@ -202,13 +225,8 @@ jsonpath "$.error" == "unauthorized"
 # State so far: team_id ("Blockly Busters") has cross + rival as members
 # (creator left it in step 9) — 2/3, one open slot.
 
-# 15. Log in the seeded organizer.
-POST {{host}}/auth/login
-Content-Type: application/json
-{ "email": "{{organizer_email}}", "password": "{{organizer_password}}" }
-HTTP 200
-[Captures]
-organizer_token: jsonpath "$.token"
+# 15. The organizer is already logged in — `organizer_token` was captured in
+# step 0e, together with the event-config arrange.
 
 # 16a. Capture the 4th user's own id (needed as a :userId path param below).
 GET {{host}}/me

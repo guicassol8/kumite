@@ -2,6 +2,7 @@ import { createRootRoute, Outlet, useRouter } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
 import { VercelAnalytics } from '@/components/analytics'
+import { BugReport } from '@/components/bug-report'
 import { Footer } from '@/components/footer'
 import { Header } from '@/components/header'
 import { ensureHydrated, getState, subscribe } from '@/lib/session'
@@ -46,6 +47,9 @@ function RootComponent() {
       <Header />
       <Outlet />
       <Footer />
+      {/* Mounted at the root, so the trigger exists on every route and the
+          draft survives closing the dialog (#145). */}
+      <BugReport />
     </div>
   )
 }

@@ -86,6 +86,14 @@ only send *to* verified addresses — the participants sign up with arbitrary
 e-mails, so every reset OTP would silently fail. AWS takes up to a business
 day or so to answer, which is why this step is not a day-before task.
 
+**e. While still in the sandbox, verify the bug-report inbox too.** The
+sandbox restricts *recipients*, not just senders, and in-app bug reports
+(#145) are sent **to** `BUG_REPORT_TO_EMAIL` — `ligadealgoritmos@gmail.com` by
+default. Until item d is granted, create an email-address identity for that
+inbox as well (SES → Identities → the address, then click the link AWS mails
+to it), otherwise every report fails at send time and the participant sees a
+502 in the dialog. Once production access is granted this stops mattering.
+
 ## 6. Hand-create the env files on the VPS
 
 Never commit these. Two files, both under `~/kumite`:
@@ -101,10 +109,14 @@ SES_REGION=us-east-1
 SES_ACCESS_KEY_ID=<the IAM access key from step 5c>
 SES_SECRET_ACCESS_KEY=<its secret>
 SES_FROM_EMAIL=Liga de Algoritmos - PUCRS <contato@ligadealgoritmos.com>
+BUG_REPORT_TO_EMAIL=ligadealgoritmos@gmail.com
 ```
 `SES_REGION` must be the region of step 5, and `SES_FROM_EMAIL` the identity
 verified there. `SES_FROM_EMAIL` is optional — the value above is already the
-default in `back/src/config.ts`; set it only if the sender changes.
+default in `back/src/config.ts`; set it only if the sender changes. So is
+`BUG_REPORT_TO_EMAIL`, the inbox that receives in-app bug reports (#145) —
+listed here because it is the one address a *recipient*-side sandbox
+restriction applies to (step 5e).
 
 `APP_BASE_URL` is the public front URL (the Vercel deploy of step 10) and is
 what the password-reset email turns into a clickable link
@@ -120,7 +132,8 @@ resets a password and nothing looks broken. Confirm with
 a `[notifications] password reset OTP for ...` line means SES is *not*
 configured.
 
-Every remaining back setting (`JUDGE_*`, `SUBMISSION_*`, `PASSWORD_RESET_*`)
+Every remaining back setting (`JUDGE_*`, `SUBMISSION_*`, `PASSWORD_RESET_*`,
+`BUG_REPORT_COOLDOWN_MS`)
 has a default and only needs an entry to override it — they are documented in
 `back/.env.example`.
 

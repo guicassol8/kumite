@@ -57,6 +57,11 @@ const EnvSchema = z.object({
     .string()
     .min(1)
     .default('Liga de Algoritmos - PUCRS <contato@ligadealgoritmos.com>'),
+  // In-app bug reports (src/modules/bug-reports, #145). The inbox that
+  // receives them, and the per-IP cooldown that keeps POST /bug-reports —
+  // a public, unauthenticated route — from being a free mail relay.
+  BUG_REPORT_TO_EMAIL: z.string().min(1).default('ligadealgoritmos@gmail.com'),
+  BUG_REPORT_COOLDOWN_MS: z.coerce.number().int().nonnegative().default(60000),
 })
 
 export const env = parseEnv(EnvSchema, process.env, {
@@ -81,3 +86,5 @@ export const SES_REGION = env.SES_REGION
 export const SES_ACCESS_KEY_ID = env.SES_ACCESS_KEY_ID
 export const SES_SECRET_ACCESS_KEY = env.SES_SECRET_ACCESS_KEY
 export const SES_FROM_EMAIL = env.SES_FROM_EMAIL
+export const BUG_REPORT_TO_EMAIL = env.BUG_REPORT_TO_EMAIL
+export const BUG_REPORT_COOLDOWN_MS = env.BUG_REPORT_COOLDOWN_MS

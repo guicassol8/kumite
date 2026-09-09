@@ -167,3 +167,53 @@ describe('config APP_BASE_URL (#162)', () => {
     expect(APP_BASE_URL).toBe('http://localhost:5173')
   })
 })
+
+describe('config BUG_REPORT_* (#145)', () => {
+  const originalEnv = { ...process.env }
+  const required = {
+    JWT_SECRET: 'test-secret',
+    DATABASE_URL: 'postgres://kumite:kumite@localhost:5433/kumite',
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    process.env = { ...originalEnv, ...required }
+    delete process.env.BUG_REPORT_TO_EMAIL
+    delete process.env.BUG_REPORT_COOLDOWN_MS
+  })
+
+  afterEach(() => {
+    process.env = { ...originalEnv }
+    vi.resetModules()
+  })
+
+  it('defaults the destination to the Liga inbox', async () => {
+    const { BUG_REPORT_TO_EMAIL } = await import('./config')
+
+    expect(BUG_REPORT_TO_EMAIL).toBe('ligadealgoritmos@gmail.com')
+  })
+
+  it('keeps a real destination when set', async () => {
+    process.env.BUG_REPORT_TO_EMAIL = 'bugs@example.com'
+
+    const { BUG_REPORT_TO_EMAIL } = await import('./config')
+
+    expect(BUG_REPORT_TO_EMAIL).toBe('bugs@example.com')
+  })
+
+  it('defaults the per-IP cooldown to 60 seconds', async () => {
+    const { BUG_REPORT_COOLDOWN_MS } = await import('./config')
+
+    expect(BUG_REPORT_COOLDOWN_MS).toBe(60000)
+  })
+
+  // 0 is a legitimate value (a load test, or an organizer replaying a report),
+  // which is why the schema is nonnegative rather than positive.
+  it('is overridable by env, including 0 to disable the cooldown', async () => {
+    process.env.BUG_REPORT_COOLDOWN_MS = '0'
+
+    const { BUG_REPORT_COOLDOWN_MS } = await import('./config')
+
+    expect(BUG_REPORT_COOLDOWN_MS).toBe(0)
+  })
+})

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 // config.ts parses process.env at import time, so every case here needs a
 // fresh module instance (vi.resetModules) after mutating process.env.
@@ -72,5 +73,49 @@ describe('config PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER (#143)', () => {
     const { PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER } = await import('./config')
 
     expect(PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER).toBe(2)
+  })
+})
+
+describe('config env validation failure (#97)', () => {
+  const originalEnv = { ...process.env }
+
+  beforeEach(() => {
+    vi.resetModules()
+    process.env = { ...originalEnv }
+    // config.ts calls loadEnvFile(), which fills in every name absent from
+    // process.env — without this stub a developer's back/.env would put
+    // JWT_SECRET back and the case would pass for the wrong reason locally
+    // while still failing in CI, where no .env exists.
+    vi.spyOn(process, 'loadEnvFile').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    process.env = { ...originalEnv }
+    vi.resetModules()
+  })
+
+  it('names the missing variable and points at .env.example instead of dumping a ZodError', async () => {
+    process.env.JWT_SECRET = undefined
+    delete process.env.JWT_SECRET
+
+    await expect(import('./config')).rejects.toThrow(/JWT_SECRET: required, but not set/)
+    await expect(import('./config')).rejects.toThrow(/back\/\.env\.example/)
+  })
+
+  it('lists every offending variable at once, not just the first', async () => {
+    delete process.env.JWT_SECRET
+    process.env.DATABASE_URL = 'not-a-url'
+
+    const error = await import('./config').catch((thrown: unknown) => thrown)
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error).not.toBeInstanceOf(z.ZodError)
+    const { message } = error as Error
+    expect(message).toContain('2 variables missing or invalid')
+    expect(message).toContain('JWT_SECRET: required, but not set')
+    expect(message).toContain('DATABASE_URL: Invalid url')
+    // The malformed value may carry a password — it must never be echoed.
+    expect(message).not.toContain('not-a-url')
   })
 })

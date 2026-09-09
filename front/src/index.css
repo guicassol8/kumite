@@ -2,6 +2,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Phones shorter than a modern flagship (360x640 and down). /problem/$id has
+   to fit statement, round notice, canvas, results band and the action bar
+   between a fixed header and footer; below this height something has to give
+   or the results band collapses to nothing (#155). */
+@custom-variant short (@media (max-height: 700px));
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);

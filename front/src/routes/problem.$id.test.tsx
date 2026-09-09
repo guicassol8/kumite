@@ -290,4 +290,65 @@ describe('ProblemScreen', () => {
     expect(await screen.findByTestId('problem-closed-never-submitted')).toBeDefined()
     expect(screen.queryByTestId('problem-submit-button')).toBeNull()
   })
+
+  // #155: the anchored layout. jsdom measures nothing, so these only pin the
+  // skeleton the CSS depends on — the actual "inside the viewport" proof is the
+  // Playwright walkthrough in `e2e/problem-layout.spec.ts`.
+  it('keeps run, clear and submit inside the anchored actions bar', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+
+    renderProblem()
+
+    const bar = await screen.findByTestId('problem-actions-bar')
+    expect(bar.contains(screen.getByTestId('problem-run-button'))).toBe(true)
+    expect(bar.contains(screen.getByTestId('problem-clear-button'))).toBe(true)
+    expect(bar.contains(screen.getByTestId('problem-submit-button'))).toBe(true)
+  })
+
+  it('renders the run results and the verdict inside the results band', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+    mockedSubmit.mockResolvedValue(
+      jsonResponse(201, {
+        submissionId: 's1',
+        attemptNumber: 1,
+        score: 20,
+        maxScore: 20,
+        cases: [{ hidden: false, index: 0, outcome: 'passed', expected: 6, actual: 6, ms: 3 }],
+      }),
+    )
+
+    renderProblem()
+    await screen.findByTestId('problem-run-button')
+    expect(screen.queryByTestId('problem-results-band')).toBeNull()
+
+    // The seeded workspace holds only the root block, so the run settles into
+    // the "empty solution" notice without ever reaching a worker.
+    fireEvent.click(screen.getByTestId('problem-run-button'))
+    const band = await screen.findByTestId('problem-results-band')
+    expect(band.contains(await screen.findByTestId('problem-results-panel'))).toBe(true)
+
+    fireEvent.click(screen.getByTestId('problem-submit-button'))
+    expect(band.contains(await screen.findByTestId('problem-verdict-panel'))).toBe(true)
+  })
+
+  it('stacks the notice above the canvas and the actions bar below the results band', async () => {
+    mockedGet.mockResolvedValue(
+      jsonResponse(200, participantProblem({ roundStatus: 'closed', roundId: null })),
+    )
+
+    renderProblem()
+    const notice = await screen.findByTestId('problem-closed-notice')
+    const canvas = screen.getByTestId('blockly-workspace')
+    expect(notice.compareDocumentPosition(canvas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('problem-run-button'))
+    const band = await screen.findByTestId('problem-results-band')
+    // The bar is the last thing in the panel: that is what pins it to the
+    // bottom edge instead of letting the results push it off screen.
+    expect(canvas.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      band.compareDocumentPosition(screen.getByTestId('problem-actions-bar')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
 })

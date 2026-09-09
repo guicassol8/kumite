@@ -23,10 +23,7 @@ export function SubmissionResultPanel({ result }: SubmissionResultPanelProps) {
   const { t } = useTranslation()
 
   return (
-    <Card
-      data-testid="problem-verdict-panel"
-      className="max-h-64 shrink-0 gap-3 overflow-auto py-4"
-    >
+    <Card data-testid="problem-verdict-panel" className="shrink-0 gap-3 py-4">
       <CardHeader className="flex-row items-center gap-2">
         <CardTitle>{t('problem.verdict.title')}</CardTitle>
         <span data-testid="problem-verdict-summary" className="text-muted-foreground text-sm">

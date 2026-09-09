@@ -50,10 +50,7 @@ export function ExampleResults({ examples, outcomes, notice, timeoutMs }: Exampl
   const allPassed = examples.length > 0 && passed === examples.length
 
   return (
-    <Card
-      data-testid="problem-results-panel"
-      className="max-h-64 shrink-0 gap-3 overflow-auto py-4"
-    >
+    <Card data-testid="problem-results-panel" className="shrink-0 gap-3 py-4">
       <CardHeader className="flex-row items-center gap-2">
         <CardTitle>{t('problem.results.title')}</CardTitle>
         <span

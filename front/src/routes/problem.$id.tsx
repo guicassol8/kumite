@@ -25,6 +25,7 @@ import { api } from '@/lib/api'
 import { workspaceOptions } from '@/lib/blockly-setup'
 import { fetchProblem, ProblemNotFoundError, problemQueryKey } from '@/lib/problems-query'
 import { requireAuth } from '@/lib/route-guards'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/problem/$id')({
   beforeLoad: requireAuth,
@@ -161,13 +162,23 @@ function ProblemScreen() {
 
   const data = problem.data
   const isClosed = data.roundStatus === 'closed'
+  // Drives both the results band and how much room the statement gives up
+  // for it on the stacked (mobile) layout.
+  const hasResults = runState.status !== 'idle' || verdict !== null
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:flex-row">
+    <main className="flex min-h-0 grow basis-0 flex-col gap-4 overflow-hidden p-4 md:flex-row">
       <Card
         data-testid="problem-statement-panel"
         aria-label={t('problem.statementLabel')}
-        className="max-h-64 shrink-0 overflow-auto md:max-h-none md:w-96"
+        className={cn(
+          'overflow-auto md:max-h-none md:w-96 md:shrink-0',
+          // Stacked layout only: the side column on md+ owns a whole column
+          // and never competes with the band for height. On a short phone it
+          // gives up a second slice, because the band has nowhere else to
+          // take height from.
+          hasResults ? 'max-h-36 short:max-h-20' : 'max-h-64',
+        )}
       >
         <CardHeader>
           <CardTitle>{data.title}</CardTitle>
@@ -199,10 +210,18 @@ function ProblemScreen() {
       </Card>
       <div
         data-testid="problem-workspace-panel"
-        className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+        className="flex min-h-0 min-w-0 grow basis-0 flex-col gap-4"
       >
         {isClosed && (
-          <Alert data-testid="problem-closed-notice">
+          <Alert
+            data-testid="problem-closed-notice"
+            className={cn(
+              'shrink-0',
+              // Three lines of static text cost as much as a readable results
+              // band. On a short phone it scrolls inside itself instead.
+              hasResults && 'short:max-h-16 short:overflow-auto',
+            )}
+          >
             <AlertDescription className="flex flex-col gap-1">
               <span>{t('problem.closedRound.notice')}</span>
               {data.bestSubmission ? (
@@ -225,6 +244,7 @@ function ProblemScreen() {
         {submitBanner && (
           <Alert
             variant="destructive"
+            className="shrink-0"
             data-testid={
               'key' in submitBanner && submitBanner.key === 'problem.submitError.cooldown'
                 ? 'problem-cooldown-banner'
@@ -245,7 +265,15 @@ function ProblemScreen() {
           </Alert>
         )}
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border">
+        <div
+          className={cn(
+            'min-w-0 grow basis-0 overflow-hidden rounded-md border',
+            // The floor that keeps the editor usable. Once results are on
+            // screen the participant is reading, not dragging, so on a short
+            // phone the canvas lends the band part of it.
+            hasResults ? 'min-h-44 short:min-h-32' : 'min-h-44',
+          )}
+        >
           <BlocklyWorkspace
             ref={workspaceRef}
             toolbox={toolbox}
@@ -258,7 +286,30 @@ function ProblemScreen() {
             onReady={onWorkspaceReady}
           />
         </div>
-        <div className="flex items-center gap-2">
+        {hasResults && (
+          // The one scrollable strip of the panel: results grow into it and it
+          // gives way (up to 45% of the panel) instead of pushing the bar off
+          // screen (#155).
+          <div
+            data-testid="problem-results-band"
+            className="flex max-h-[45%] min-h-0 shrink flex-col gap-4 overflow-auto"
+          >
+            {runState.status !== 'idle' && (
+              <ExampleResults
+                examples={examples}
+                outcomes={outcomesOf(runState)}
+                notice={noticeFor(runState)}
+              />
+            )}
+            {verdict && <SubmissionResultPanel result={verdict} />}
+          </div>
+        )}
+        {/* Last in the panel and never shrinking: that is what keeps Executar,
+            Limpar and Enviar on screen whatever the results do. */}
+        <div
+          data-testid="problem-actions-bar"
+          className="flex shrink-0 items-center gap-2 border-t pt-4"
+        >
           <Button
             type="button"
             data-testid="problem-run-button"
@@ -297,14 +348,6 @@ function ProblemScreen() {
             </Button>
           )}
         </div>
-        {runState.status !== 'idle' && (
-          <ExampleResults
-            examples={examples}
-            outcomes={outcomesOf(runState)}
-            notice={noticeFor(runState)}
-          />
-        )}
-        {verdict && <SubmissionResultPanel result={verdict} />}
       </div>
     </main>
   )

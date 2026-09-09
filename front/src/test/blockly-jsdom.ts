@@ -2,6 +2,20 @@
 // the moment a workspace mounts. These are the smallest shims that let a REAL
 // Blockly workspace be injected under vitest — nothing here fakes Blockly.
 
+// Injecting a workspace also preloads Blockly's four sound files with `fetch`.
+// A browser resolves those root-relative URLs against the page origin; the
+// global fetch under vitest is Node's, which has no base URL and rejects them
+// as ERR_INVALID_URL — dozens of unhandled rejections that fail the run with
+// every test still passing. Answer them with empty audio here: no assertion
+// depends on a sound decoding, and this keeps the suite off the network.
+const realFetch = globalThis.fetch
+globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+  const url =
+    typeof input === 'string' ? input : input instanceof URL ? input.href : (input as Request).url
+  if (url.startsWith('/blockly-media/')) return Promise.resolve(new Response(new ArrayBuffer(0)))
+  return realFetch(input, init)
+}) as typeof fetch
+
 if (!globalThis.ResizeObserver) {
   globalThis.ResizeObserver = class ResizeObserver {
     observe() {}

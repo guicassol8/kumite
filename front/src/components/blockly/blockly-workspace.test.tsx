@@ -72,6 +72,17 @@ describe('BlocklyWorkspace', () => {
     expect(screen.getByText('Matemática')).toBeDefined()
   })
 
+  it('serves its media from the app itself, never a third-party CDN', () => {
+    let pathToMedia: string | undefined
+    renderWorkspace({
+      onReady: (workspace) => {
+        pathToMedia = workspace.options.pathToMedia
+      },
+    })
+
+    expect(pathToMedia).toBe('/blockly-media/')
+  })
+
   it('labels the workspace for screen readers', () => {
     renderWorkspace()
 

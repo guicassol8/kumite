@@ -163,7 +163,7 @@ function ProblemScreen() {
   const isClosed = data.roundStatus === 'closed'
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:flex-row">
+    <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 md:flex-row">
       <Card
         data-testid="problem-statement-panel"
         aria-label={t('problem.statementLabel')}
@@ -202,7 +202,7 @@ function ProblemScreen() {
         className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
       >
         {isClosed && (
-          <Alert data-testid="problem-closed-notice">
+          <Alert data-testid="problem-closed-notice" className="shrink-0">
             <AlertDescription className="flex flex-col gap-1">
               <span>{t('problem.closedRound.notice')}</span>
               {data.bestSubmission ? (
@@ -225,6 +225,7 @@ function ProblemScreen() {
         {submitBanner && (
           <Alert
             variant="destructive"
+            className="shrink-0"
             data-testid={
               'key' in submitBanner && submitBanner.key === 'problem.submitError.cooldown'
                 ? 'problem-cooldown-banner'
@@ -258,7 +259,30 @@ function ProblemScreen() {
             onReady={onWorkspaceReady}
           />
         </div>
-        <div className="flex items-center gap-2">
+        {(runState.status !== 'idle' || verdict) && (
+          // The one scrollable strip of the panel: results grow into it and it
+          // gives way (up to 45% of the panel) instead of pushing the bar off
+          // screen (#155).
+          <div
+            data-testid="problem-results-band"
+            className="flex max-h-[45%] min-h-0 flex-col gap-4 overflow-auto"
+          >
+            {runState.status !== 'idle' && (
+              <ExampleResults
+                examples={examples}
+                outcomes={outcomesOf(runState)}
+                notice={noticeFor(runState)}
+              />
+            )}
+            {verdict && <SubmissionResultPanel result={verdict} />}
+          </div>
+        )}
+        {/* Last in the panel and never shrinking: that is what keeps Executar,
+            Limpar and Enviar on screen whatever the results do. */}
+        <div
+          data-testid="problem-actions-bar"
+          className="flex shrink-0 items-center gap-2 border-t pt-4"
+        >
           <Button
             type="button"
             data-testid="problem-run-button"
@@ -297,14 +321,6 @@ function ProblemScreen() {
             </Button>
           )}
         </div>
-        {runState.status !== 'idle' && (
-          <ExampleResults
-            examples={examples}
-            outcomes={outcomesOf(runState)}
-            notice={noticeFor(runState)}
-          />
-        )}
-        {verdict && <SubmissionResultPanel result={verdict} />}
       </div>
     </main>
   )

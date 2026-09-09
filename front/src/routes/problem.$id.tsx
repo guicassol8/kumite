@@ -25,6 +25,7 @@ import { api } from '@/lib/api'
 import { workspaceOptions } from '@/lib/blockly-setup'
 import { fetchProblem, ProblemNotFoundError, problemQueryKey } from '@/lib/problems-query'
 import { requireAuth } from '@/lib/route-guards'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/problem/$id')({
   beforeLoad: requireAuth,
@@ -161,13 +162,21 @@ function ProblemScreen() {
 
   const data = problem.data
   const isClosed = data.roundStatus === 'closed'
+  // Drives both the results band and how much room the statement gives up
+  // for it on the stacked (mobile) layout.
+  const hasResults = runState.status !== 'idle' || verdict !== null
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 md:flex-row">
+    <main className="flex min-h-0 grow basis-0 flex-col gap-4 overflow-hidden p-4 md:flex-row">
       <Card
         data-testid="problem-statement-panel"
         aria-label={t('problem.statementLabel')}
-        className="max-h-64 shrink-0 overflow-auto md:max-h-none md:w-96"
+        className={cn(
+          'overflow-auto md:max-h-none md:w-96 md:shrink-0',
+          // Stacked layout only: the side column on md+ owns a whole column
+          // and never competes with the band for height.
+          hasResults ? 'max-h-36' : 'max-h-64',
+        )}
       >
         <CardHeader>
           <CardTitle>{data.title}</CardTitle>
@@ -199,7 +208,7 @@ function ProblemScreen() {
       </Card>
       <div
         data-testid="problem-workspace-panel"
-        className="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
+        className="flex min-h-0 min-w-0 grow basis-0 flex-col gap-4"
       >
         {isClosed && (
           <Alert data-testid="problem-closed-notice" className="shrink-0">
@@ -246,7 +255,7 @@ function ProblemScreen() {
           </Alert>
         )}
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border">
+        <div className="min-h-44 min-w-0 grow basis-0 overflow-hidden rounded-md border">
           <BlocklyWorkspace
             ref={workspaceRef}
             toolbox={toolbox}
@@ -259,13 +268,13 @@ function ProblemScreen() {
             onReady={onWorkspaceReady}
           />
         </div>
-        {(runState.status !== 'idle' || verdict) && (
+        {hasResults && (
           // The one scrollable strip of the panel: results grow into it and it
           // gives way (up to 45% of the panel) instead of pushing the bar off
           // screen (#155).
           <div
             data-testid="problem-results-band"
-            className="flex max-h-[45%] min-h-0 flex-col gap-4 overflow-auto"
+            className="flex max-h-[45%] min-h-0 shrink flex-col gap-4 overflow-auto"
           >
             {runState.status !== 'idle' && (
               <ExampleResults

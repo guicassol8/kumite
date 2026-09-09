@@ -2,9 +2,10 @@ import { expect, type Page, test } from '@playwright/test'
 
 // Visual walkthrough for #33. Prereqs (like auth.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
-// The 01 screenshot needs an empty `teams` table — this suite does not
-// truncate it itself, since the dev DB is shared across worktrees. Reset with:
-//   psql ... -c 'truncate table team_members, teams restart identity cascade'
+// The 01 screenshot used to need a genuinely empty `teams` table, which is true
+// exactly once per database — every later run tripped over this suite's own
+// team. It is stubbed now, and the team name carries a stamp so a second run
+// does not collide with the first (#150).
 // The organizer read-only test additionally needs ORGANIZER_EMAIL /
 // ORGANIZER_PASSWORD (the same pair `pnpm db:seed` consumes) and skips itself
 // when they are not set.
@@ -14,14 +15,14 @@ const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
 const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
 
-const TEAM_NAME = 'Blockly Busters'
 const PASSWORD = 'supersecret'
 
 const stamp = Date.now()
+const TEAM_NAME = `Blockly Busters ${stamp}`
 const emails = {
   owner: `teams-e2e-owner-${stamp}@edu.pucrs.br`,
   mate: `teams-e2e-mate-${stamp}@merida.edu.mx`,
-  filler: `teams-e2e-filler-${stamp}@edu.pucrs.br`,
+  filler: (index: number) => `teams-e2e-filler-${index}-${stamp}@edu.pucrs.br`,
   outsider: `teams-e2e-outsider-${stamp}@edu.pucrs.br`,
 }
 
@@ -56,6 +57,18 @@ async function apiMyTeamId(token: string): Promise<string> {
   return myTeamId
 }
 
+/**
+ * `maxTeamSize` is event-wide, mutable config (`organizer-event-config.spec.ts`
+ * writes it), so its value is whatever the last run left behind — not the
+ * schema default of 3. Step 05 needs a genuinely full team, so it reads the
+ * ceiling instead of assuming one (#150).
+ */
+async function apiMaxTeamSize(token: string): Promise<number> {
+  const res = await fetch(`${BACK_URL}/teams`, { headers: { Authorization: `Bearer ${token}` } })
+  const { maxTeamSize } = (await res.json()) as { maxTeamSize: number }
+  return maxTeamSize
+}
+
 async function signupThroughUi(page: Page, email: string, code: string): Promise<void> {
   await page.goto('/signup')
   await page.getByTestId('signup-email-input').fill(email)
@@ -75,7 +88,21 @@ async function loginThroughUi(page: Page, email: string, password: string): Prom
 }
 
 test('walks a participant through creating, filling, and leaving a team', async ({ page }) => {
-  // 01 — a participant with no teams anywhere sees the empty state.
+  // 01 — a participant with no teams anywhere sees the empty state. Stubbed:
+  // the real table is only empty on a database no run has touched yet. Scoped
+  // to the back's origin, same as the frozen-state stub in step 07.
+  const listApiUrl = `${BACK_URL}/teams`
+  await page.route(listApiUrl, (route) => {
+    if (route.request().method() === 'GET') {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ maxTeamSize: 3, mixingLocked: false, myTeamId: null, teams: [] }),
+      })
+    } else {
+      route.continue()
+    }
+  })
   await signupThroughUi(page, emails.owner, 'PUCRS2026')
   await page.getByTestId('header-teams-link').click()
   await expect(page.getByTestId('teams-empty')).toBeVisible()
@@ -87,6 +114,7 @@ test('walks a participant through creating, filling, and leaving a team', async 
   await page.getByTestId('teams-create-name-input').fill(TEAM_NAME)
   await page.screenshot({ path: evidence('02-dialog-criar'), fullPage: true })
 
+  await page.unroute(listApiUrl)
   await page.getByTestId('teams-create-submit').click()
   await expect(page.getByTestId('my-team-panel')).toBeVisible()
 
@@ -104,9 +132,13 @@ test('walks a participant through creating, filling, and leaving a team', async 
   await expect(panel).toContainText('Mérida')
   await page.screenshot({ path: evidence('03-meu-time-com-membro'), fullPage: true })
 
-  // Fill the last slot (3/3 by default) so the outsider below hits team_full.
-  const fillerToken = await apiSignupAndLogin(emails.filler, 'PUCRS2026')
-  await apiJoinTeam(fillerToken, teamId)
+  // Fill every remaining slot so the outsider below hits team_full. The owner
+  // and the mate already hold two of them.
+  const maxTeamSize = await apiMaxTeamSize(ownerToken)
+  for (let filler = 0; filler < maxTeamSize - 2; filler++) {
+    const fillerToken = await apiSignupAndLogin(emails.filler(filler), 'PUCRS2026')
+    await apiJoinTeam(fillerToken, teamId)
+  }
 
   // 04 — a second participant reusing the name gets it on the name field.
   await page.getByTestId('header-logout-button').click()
@@ -121,7 +153,7 @@ test('walks a participant through creating, filling, and leaving a team', async 
   // 05 — and Join on the now-full team is disabled, with the reason next to it.
   await page.getByTestId('teams-create-cancel').click()
   const row = page.getByTestId(`teams-row-${teamId}`)
-  await expect(row).toContainText('0/3')
+  await expect(row).toContainText(`0/${maxTeamSize}`)
   await expect(page.getByTestId(`teams-join-${teamId}`)).toBeDisabled()
   await expect(row).toContainText('Time cheio')
   await page.screenshot({ path: evidence('05-time-cheio-entrar-desabilitado'), fullPage: true })
@@ -148,7 +180,7 @@ test('walks a participant through creating, filling, and leaving a team', async 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        maxTeamSize: 3,
+        maxTeamSize,
         mixingLocked: false,
         myTeamId: teamId,
         teams: [

@@ -459,3 +459,22 @@ GET {{host}}/organizer/teams
 HTTP 401
 [Asserts]
 jsonpath "$.error" == "unauthorized"
+
+# 47. A malformed team id -> 422 from the params schema, never a db error
+# (#94). Same for a malformed destination team id inside the move body —
+# neither request moves anyone, so step 44's membership assertions hold.
+POST {{host}}/teams/nao-e-uuid/join
+Authorization: Bearer {{rival_token}}
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.params" exists
+
+POST {{host}}/organizer/teams/members/{{rival_id}}/move
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "teamId": "nao-e-uuid" }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.body" exists

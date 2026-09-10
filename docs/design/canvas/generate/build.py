@@ -1,10 +1,12 @@
 import json, os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CANVAS = os.path.normpath(os.path.join(HERE, ".."))  # docs/design/canvas
 from screens import editor, login, signup_mobile, teams
 from screens2 import leaderboard, telao, organizer, home
 from identity import logo_board, palette_board, type_board, components_board, blockly_board
 
-OUT = "kumite-identidade"
-os.makedirs(OUT, exist_ok=True)
+OUT = CANVAS
 
 files = {
     "Main.dc.html": editor(False),
@@ -26,7 +28,8 @@ for name, html in files.items():
     with open(os.path.join(OUT, name), "w") as f:
         f.write(html)
 
-H = json.load(open("heights.json")) if os.path.exists("heights.json") else {}
+HEIGHTS = os.path.join(HERE, "heights.json")
+H = json.load(open(HEIGHTS)) if os.path.exists(HEIGHTS) else {}
 def h(name, default): return int(H.get(name, default) * 1.05 / 10 + 1) * 10
 ROW2 = max(h("Simbolo", 760), h("Paleta", 900)) + 120
 ROW3 = ROW2 + max(h("Tipografia", 820), h("Blockly", 700)) + 120
@@ -61,4 +64,5 @@ canvas = {
 }
 with open(os.path.join(OUT, "canvas.json"), "w") as f:
     json.dump(canvas, f, ensure_ascii=False, indent=2)
-print("built", len(files), "artboards")
+    f.write("\n")
+print("built", len(files), "artboards in", OUT)

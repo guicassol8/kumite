@@ -1,15 +1,20 @@
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
-const { chromium } = require('/home/guicassol/Projetos/semana-academica/node_modules/.pnpm/playwright@1.62.1/node_modules/playwright');
 const path = require('node:path');
 const fs = require('node:fs');
-const dir = path.resolve('kumite-identidade');
-const out = path.resolve('shots'); fs.mkdirSync(out, { recursive: true });
+const here = path.dirname(fileURLToPath(import.meta.url));
+// Playwright vem do front/ (já instalado para o e2e), resolvido a partir do package.json dele.
+const { chromium } = createRequire(path.resolve(here, '../../../../front/package.json'))('@playwright/test');
+const dir = path.resolve(here, '..');                 // docs/design/canvas
+const out = path.resolve(here, '../../screens');     // docs/design/screens
+const heightsFile = path.join(here, 'heights.json');
+fs.mkdirSync(out, { recursive: true });
 const sizes = { 'CadastroCelular': [390, 844], 'Telao': [1440, 810] };
 const flowing = ['Simbolo', 'Paleta', 'Tipografia', 'Componentes', 'Blockly'];
 const only = process.argv.slice(2);
 const browser = await chromium.launch();
-const heights = fs.existsSync('heights.json') ? JSON.parse(fs.readFileSync('heights.json', 'utf8')) : {};
+const heights = fs.existsSync(heightsFile) ? JSON.parse(fs.readFileSync(heightsFile, 'utf8')) : {};
 for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.dc.html'))) {
   const stem = f.replace('.dc.html', '');
   if (only.length && !only.includes(stem)) continue;
@@ -23,5 +28,5 @@ for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.dc.html'))) {
   await page.close();
 }
 await browser.close();
-fs.writeFileSync('heights.json', JSON.stringify(heights, null, 2));
+fs.writeFileSync(heightsFile, JSON.stringify(heights, null, 2) + '\n');
 console.log('heights', heights);

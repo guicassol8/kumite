@@ -5,7 +5,8 @@ from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.transformPen import TransformPen
 import os
 
-OUT = "docs-draft/logo"
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.normpath(os.path.join(HERE, "..", "..", "logo"))  # docs/design/logo
 os.makedirs(OUT, exist_ok=True)
 RED, INK, PAPER, DARKBG, LIGHTBG = "#DD2824", "#1C1716", "#F3F1EF", "#120F0D", "#FCFAF7"
 MARK_PATH = "M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z"
@@ -23,7 +24,7 @@ def svg(w, h, body, bg=None, title="kumite"):
             f'  {rect}{body}\n</svg>\n')
 
 # ---- wordmark outlines ----
-font = TTFont("fonts/barlow-condensed-600.ttf")
+font = TTFont(os.path.join(HERE, "fonts", "barlow-condensed-600.ttf"))  # não versionado: baixe do Google Fonts
 upem = font["head"].unitsPerEm
 cmap = font.getBestCmap()
 glyphs = font.getGlyphSet()

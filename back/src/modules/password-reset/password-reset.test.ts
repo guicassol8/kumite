@@ -59,6 +59,21 @@ function lastOtp(): string {
   return otp
 }
 
+// Some requestPasswordReset tests fire enough sweep calls that the real
+// argon2.hash cost (paid on the dummy/unknown path) risks crossing the
+// default testTimeout on a loaded machine — and a timed-out test leaves
+// in-flight hash calls that inflate the *next* test's spy count. Stubbing
+// the hash cost out removes the mechanism instead of just raising the
+// threshold; it never touches the real argon2.hash used by the parity test.
+async function withFastArgon2Hash<T>(run: () => Promise<T>): Promise<T> {
+  const hash = vi.spyOn(argon2, 'hash').mockResolvedValue('stubbed-hash')
+  try {
+    return await run()
+  } finally {
+    hash.mockRestore()
+  }
+}
+
 describe('issuePasswordResetOtp', () => {
   it('keeps the current password usable until the reset completes', async () => {
     const user = await createTestUser()
@@ -309,32 +324,36 @@ describe('requestPasswordReset', () => {
   })
 
   it('sends no more than the ceiling allows when the burst is parallel', async () => {
-    const user = await createTestUser()
-    const now = Date.now()
+    await withFastArgon2Hash(async () => {
+      const user = await createTestUser()
+      const now = Date.now()
 
-    await Promise.all(
-      Array.from({ length: 12 }, () => requestPasswordReset(db, user.email, ip, now)),
-    )
+      await Promise.all(
+        Array.from({ length: 12 }, () => requestPasswordReset(db, user.email, ip, now)),
+      )
 
-    // One notice per accepted request and not one more: this is the
-    // mailbox-bombing ceiling, and firing the requests at once must not lift it.
-    expect(sendPasswordResetNotice).toHaveBeenCalledTimes(PASSWORD_RESET_MAX_PER_EMAIL)
+      // One notice per accepted request and not one more: this is the
+      // mailbox-bombing ceiling, and firing the requests at once must not lift it.
+      expect(sendPasswordResetNotice).toHaveBeenCalledTimes(PASSWORD_RESET_MAX_PER_EMAIL)
+    })
   })
 
   it('stops issuing once the IP is over its ceiling, whatever the address', async () => {
-    const user = await createTestUser()
-    const now = Date.now()
-    // A sweep of unknown addresses burns the client's whole per-IP budget...
-    for (let i = 0; i < PASSWORD_RESET_MAX_PER_IP; i++) {
-      await requestPasswordReset(db, `sweep-${i}@example.com`, ip, now)
-    }
+    await withFastArgon2Hash(async () => {
+      const user = await createTestUser()
+      const now = Date.now()
+      // A sweep of unknown addresses burns the client's whole per-IP budget...
+      for (let i = 0; i < PASSWORD_RESET_MAX_PER_IP; i++) {
+        await requestPasswordReset(db, `sweep-${i}@example.com`, ip, now)
+      }
 
-    // ...so a genuine address from the same client gets nothing issued either.
-    await requestPasswordReset(db, user.email, ip, now)
+      // ...so a genuine address from the same client gets nothing issued either.
+      await requestPasswordReset(db, user.email, ip, now)
 
-    expect(sendPasswordResetNotice).not.toHaveBeenCalled()
-    const pending = await db.select().from(passwordResetOtpsTable)
-    expect(pending).toHaveLength(0)
+      expect(sendPasswordResetNotice).not.toHaveBeenCalled()
+      const pending = await db.select().from(passwordResetOtpsTable)
+      expect(pending).toHaveLength(0)
+    })
   })
 
   // Timing parity: the response must not separate the three paths by how much

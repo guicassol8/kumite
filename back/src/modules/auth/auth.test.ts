@@ -18,12 +18,14 @@ const db = createDb()
 
 beforeEach(async () => {
   await db.execute(sql`truncate table ${usersTable}, ${eventCodesTable} restart identity cascade`)
+  // One row per university, as `event_codes_university_idx` requires (#125):
+  // the inactive fixture is merida's row, not a second pucrs one.
   await db.insert(eventCodesTable).values([
     { code: 'PUCRS2026', university: 'pucrs', allowedEmailSuffixes: ['edu.pucrs.br', 'pucrs.br'] },
     {
       code: 'INACTIVE2026',
-      university: 'pucrs',
-      allowedEmailSuffixes: ['pucrs.br'],
+      university: 'merida',
+      allowedEmailSuffixes: ['merida.edu.mx'],
       active: false,
     },
   ])
@@ -76,8 +78,10 @@ describe('auth.service signup', () => {
   })
 
   it('rejects an inactive code the same way as an unknown one', async () => {
+    // Matching email domain on purpose: `active: false` is the only thing
+    // standing between this signup and success.
     const result = await signup(db, {
-      email: 'ada@pucrs.br',
+      email: 'ada@merida.edu.mx',
       password: 'supersecret',
       code: 'INACTIVE2026',
     })

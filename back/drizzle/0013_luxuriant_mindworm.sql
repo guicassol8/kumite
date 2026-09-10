@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "event_codes_university_idx" ON "event_codes" USING btree ("university");

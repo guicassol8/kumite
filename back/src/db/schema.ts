@@ -104,14 +104,23 @@ export const passwordResetRequestsTable = pgTable(
   ],
 )
 
-export const eventCodesTable = pgTable('event_codes', {
-  code: text('code').primaryKey(),
-  university: universityEnum('university').notNull(),
-  allowedEmailSuffixes: text('allowed_email_suffixes').array().notNull(),
-  active: boolean('active').notNull().default(true),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const eventCodesTable = pgTable(
+  'event_codes',
+  {
+    code: text('code').primaryKey(),
+    university: universityEnum('university').notNull(),
+    allowedEmailSuffixes: text('allowed_email_suffixes').array().notNull(),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Exatamente uma linha por universidade: updateEventCode e
+    // findEventCode (event-codes.service.ts) assumem isso, que até #125 era
+    // só convenção do seed.
+    uniqueIndex('event_codes_university_idx').on(table.university),
+  ],
+)
 
 export const problemsTable = pgTable('problems', {
   id: uuid('id').primaryKey().defaultRandom(),

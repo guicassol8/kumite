@@ -1,4 +1,5 @@
 import { eq, sql } from 'drizzle-orm'
+import postgres from 'postgres'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
@@ -9,8 +10,8 @@ import { findEventCode, listEventCodes, updateEventCode } from './event-codes.se
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #24 migration must already be applied. One row per university, mirroring
 // the real seed (db/seed.ts) — updateEventCode's single-row-per-university
-// assumption relies on this convention (no DB-level unique constraint on
-// `university` yet — see #48's "Discovered from #48" follow-up).
+// assumption is enforced by the `event_codes_university_idx` unique index
+// (#125), not just by this convention.
 const db = createDb()
 
 beforeEach(async () => {
@@ -109,5 +110,24 @@ describe('event-codes.service updateEventCode', () => {
       ok: false,
       error: 'code_taken',
     })
+  })
+})
+
+describe('event_codes university uniqueness', () => {
+  it('rejects a second row for a university that already has one', async () => {
+    const error = await db
+      .insert(eventCodesTable)
+      .values({ code: 'PUCRS2027', university: 'pucrs', allowedEmailSuffixes: ['pucrs.br'] })
+      .then(
+        () => null,
+        (caught: unknown) => caught,
+      )
+
+    // Not a bare rejects.toThrow(): the Acceptance is specifically a unique
+    // constraint violation, so narrow the cause exactly like updateEventCode
+    // does for event_codes_pkey.
+    const cause = error instanceof Error ? error.cause : undefined
+    expect(cause).toBeInstanceOf(postgres.PostgresError)
+    expect((cause as postgres.PostgresError).constraint_name).toBe('event_codes_university_idx')
   })
 })

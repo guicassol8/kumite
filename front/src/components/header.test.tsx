@@ -1,12 +1,18 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from '@tanstack/react-router'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Header } from '@/components/header'
 import i18n from '@/i18n'
 
 import { clearSession, getState, type SessionUser, setSession } from '@/lib/session'
-import { routeTree } from '@/routeTree.gen'
 
 const fakeUser: SessionUser = {
   id: 'u1',
@@ -19,17 +25,43 @@ const fakeUser: SessionUser = {
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 }
 
+// The header is exercised against a route tree of its own, not `routeTree.gen`
+// (#168). Mounting the real tree pulled in whole screens — the home page alone
+// fires several authenticated queries plus the SSE stream — so the test spent
+// its time on other people's components and, worse, on the network: a real 401
+// dropped the session and bounced the router to /login mid-assertion, which is
+// what made this file depend on its position in the suite.
+//
+// Every destination the header links to needs a route here: TanStack Router
+// resolves `<Link to>` against the tree, and a missing path breaks the `href`.
+// Nothing asserted below — pathname, `aria-current`, the Link classes — needs
+// the real screens.
+const rootRoute = createRootRoute({
+  component: () => (
+    <>
+      <Header />
+      <Outlet />
+    </>
+  ),
+})
+const routeTree = rootRoute.addChildren(
+  [
+    '/',
+    '/login',
+    '/signup',
+    '/teams',
+    '/leaderboard',
+    '/change-password',
+    '/organizer/problems',
+  ].map((path) => createRoute({ getParentRoute: () => rootRoute, path, component: () => null })),
+)
+
 function renderHeader(initialEntry = '/login') {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [initialEntry] }),
   })
-  const queryClient = new QueryClient()
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  )
+  render(<RouterProvider router={router} />)
   return router
 }
 

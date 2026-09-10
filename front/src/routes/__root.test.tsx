@@ -16,6 +16,13 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+// `sse-client.ts` calls `fetch` directly, outside the RPC client — the
+// `@/lib/api` mock above never sees it. The home route mounts `useEventStream`,
+// so without this the stream hits a real server (#168).
+vi.mock('@/lib/sse-client', () => ({
+  connectEventStream: vi.fn(() => () => {}),
+}))
+
 // The real collectors inject a remote script on mount. These stand-ins render a
 // marker instead, so "exactly once in the tree" is something the DOM can answer
 // no matter how often React re-renders the root.
@@ -109,6 +116,25 @@ describe('root session bootstrap', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
 
     setSession(fakeUser, 'tok-1')
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(router.state.location.pathname).toBe('/')
+  })
+
+  // #168 asked whether this effect needs a guard against steering a router
+  // that is already unmounted — the thing that turns a stray 401 into a ghost
+  // navigation. It does not, and this pins why: the effect's body is
+  // `return subscribe(...)`, so the subscription IS the cleanup. React drops
+  // the listener on unmount and a later expiry reaches nobody, which is why
+  // no defensive check was added to production code. Delete that `return` and
+  // this test goes red.
+  it('stops listening once unmounted: an expiry after teardown steers nothing', async () => {
+    setSession(fakeUser, 'tok-1')
+    const router = renderApp()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+
+    cleanup()
+    clearSession('expired')
 
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(router.state.location.pathname).toBe('/')

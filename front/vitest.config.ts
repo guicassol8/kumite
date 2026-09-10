@@ -13,6 +13,9 @@ export default defineConfig({
     setupFiles: [
       './src/test/i18n-jsdom.ts',
       './src/test/web-storage-jsdom.ts',
+      // Before blockly-jsdom on purpose: its fetch shim wraps the guard, so
+      // the sound preloads it answers itself never reach it (#168).
+      './src/test/network-guard-jsdom.ts',
       './src/test/blockly-jsdom.ts',
       './src/test/router-jsdom.ts',
       './src/test/radix-select-jsdom.ts',

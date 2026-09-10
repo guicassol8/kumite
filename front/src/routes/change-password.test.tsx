@@ -14,6 +14,13 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+// `sse-client.ts` calls `fetch` directly, outside the RPC client — the
+// `@/lib/api` mock above never sees it. Reaching `/` mounts `useEventStream`,
+// so without this the stream hits a real server (#168).
+vi.mock('@/lib/sse-client', () => ({
+  connectEventStream: vi.fn(() => () => {}),
+}))
+
 import '@/i18n'
 
 import { api } from '@/lib/api'

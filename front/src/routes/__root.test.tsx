@@ -16,6 +16,13 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+// `sse-client.ts` calls `fetch` directly, outside the RPC client — the
+// `@/lib/api` mock above never sees it. The home route mounts `useEventStream`,
+// so without this the stream hits a real server (#168).
+vi.mock('@/lib/sse-client', () => ({
+  connectEventStream: vi.fn(() => () => {}),
+}))
+
 // The real collectors inject a remote script on mount. These stand-ins render a
 // marker instead, so "exactly once in the tree" is something the DOM can answer
 // no matter how often React re-renders the root.

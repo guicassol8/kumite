@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Editor de problema</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <style>
+:root {
+  --background: #FCFAF7;
+  --background2: #F2F0EC;
+  --card: #FFFFFF;
+  --foreground: #1C1716;
+  --foreground2: #2A2523;
+  --muted: #69615D;
+  --border: #E1DDDA;
+  --primary: #1C1716;
+  --primary-fg: #FCFAF7;
+  --brand: #DD2824;
+  --brand-text: #DD2824;
+  --brand-hover: #CE2320;
+  --brand-soft: #FBE5E1;
+  --brand-fg: #FFFFFF;
+  --destructive: #C1133A;
+  --destructive-soft: #FBE7EC;
+  --success: #008433;
+  --success-soft: #E3F5EA;
+  --warning: #ECAA0B;
+  --warning-text: #A06700;
+  --warning-soft: #FBF1D6;
+  --chrome: #1C1716;
+  --chrome-fg: #F3F1EF;
+  --chrome-muted: #9D9792;
+  --chrome-border: #312D2C;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --font-body: 'Barlow', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 6px;
+}
+.dark {
+  --background: #120F0D;
+  --background2: #1B1716;
+  --card: #1B1716;
+  --foreground: #F3F1EF;
+  --foreground2: #E6E2DE;
+  --muted: #9D9792;
+  --border: #312D2C;
+  --primary: #F3F1EF;
+  --primary-fg: #1C1716;
+  --brand: #DD2824;
+  --brand-text: #F45246;
+  --brand-hover: #CE2320;
+  --brand-soft: #3A1A18;
+  --brand-fg: #FFFFFF;
+  --destructive: #E8496A;
+  --destructive-soft: #3A1520;
+  --success: #3DBA6A;
+  --success-soft: #12301C;
+  --warning: #F5C044;
+  --warning-text: #F5C044;
+  --warning-soft: #3A2E10;
+  --chrome: #0E0C0B;
+  --chrome-fg: #F3F1EF;
+  --chrome-muted: #9D9792;
+  --chrome-border: #312D2C;
+}
+html, body { height: 100%; }
+body { margin: 0; font-family: var(--font-body); color: var(--foreground); background: var(--background); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; } a:hover { color: var(--brand-text); }
+* { box-sizing: border-box; }
+.screen { width: 100%; min-height: 100%; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); }
+.display { font-family: var(--font-display); }
+.h1 { font-family: var(--font-display); font-weight: 700; font-size: 36px; line-height: 1; letter-spacing: 0.01em; text-transform: uppercase; margin: 0; }
+.h2 { font-family: var(--font-display); font-weight: 600; font-size: 24px; line-height: 1.1; margin: 0; }
+.h3 { font-family: var(--font-display); font-weight: 600; font-size: 19px; line-height: 1.15; margin: 0; }
+.eyebrow { font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.mono { font-family: var(--font-mono); font-size: 13px; }
+.num { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: var(--radius); font-family: var(--font-body); font-weight: 500; font-size: 14px; line-height: 1; border: 1px solid transparent; white-space: nowrap; cursor: pointer; }
+.btn-sm { height: 30px; padding: 0 10px; font-size: 13px; }
+.btn-lg { height: 44px; padding: 0 20px; font-size: 15px; }
+.btn-primary { background: var(--primary); color: var(--primary-fg); }
+.btn-brand { background: var(--brand); color: var(--brand-fg); }
+.btn-outline { background: transparent; color: var(--foreground); border-color: var(--border); }
+.btn-ghost { background: transparent; color: var(--foreground); }
+.btn-destructive { background: transparent; color: var(--destructive); border-color: var(--destructive); }
+.btn-chrome { background: transparent; color: var(--chrome-fg); border-color: var(--chrome-border); }
+.btn svg { width: 16px; height: 16px; }
+.input { height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--foreground); font-family: var(--font-body); font-size: 14px; display: flex; align-items: center; }
+.input-lg { height: 44px; }
+.label { font-size: 13px; font-weight: 500; color: var(--foreground); }
+.badge { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; line-height: 1; border: 1px solid var(--border); color: var(--foreground); background: transparent; white-space: nowrap; }
+.badge-solid { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.badge-brand { background: var(--brand); color: var(--brand-fg); border-color: var(--brand); }
+.badge-success { color: var(--success); border-color: var(--success); }
+.badge-muted { color: var(--muted); }
+.badge-uni { font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; height: 20px; padding: 0 6px; border-radius: 4px; }
+.dot { width: 8px; height: 8px; border-radius: 999px; background: var(--brand); display: inline-block; }
+.live { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-text); }
+.table { width: 100%; border-collapse: collapse; }
+.table th { text-align: left; font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.table td { padding: 12px 12px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+.table tr:last-child td { border-bottom: 0; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); padding: 2px; gap: 2px; background: var(--background2); }
+.seg span { padding: 0 10px; height: 26px; display: inline-flex; align-items: center; border-radius: 4px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.seg span.on { background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.seg.chrome { border-color: var(--chrome-border); background: transparent; }
+.seg.chrome span { color: var(--chrome-muted); }
+.seg.chrome span.on { background: var(--chrome-fg); color: var(--chrome); box-shadow: none; }
+.tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); }
+.tabs span { padding: 10px 0 12px; font-size: 14px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs span.on { color: var(--foreground); border-bottom-color: var(--brand-text); }
+.alert { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 14px; }
+.alert svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.alert-error { border-color: var(--destructive); } .alert-error svg { color: var(--destructive); }
+.alert-success { border-color: var(--success); } .alert-success svg { color: var(--success); }
+.chrome-bar { background: var(--chrome); color: var(--chrome-fg); border-bottom: 1px solid var(--chrome-border); }
+.chrome-bar a { color: var(--chrome-fg); }
+.chrome-bar .muted { color: var(--chrome-muted); }
+.footer { background: var(--chrome); color: var(--chrome-muted); border-top: 1px solid var(--chrome-border); font-size: 13px; }
+.footer a { color: var(--chrome-fg); text-decoration: underline; text-underline-offset: 3px; }
+.swatch { border-radius: 8px; border: 1px solid rgba(0,0,0,.06); }
+.kbd { font-family: var(--font-mono); font-size: 12px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--background2); }
+
+.ws { position: relative; flex: 1; min-height: 0; background-color: var(--background2); background-image: radial-gradient(var(--border) 1.2px, transparent 1.2px); background-size: 20px 20px; border-radius: 0 8px 8px 0; overflow: hidden; }
+.blk { display: inline-flex; flex-direction: column; align-items: stretch; border-radius: 5px; color: #fff; font-size: 13px; font-weight: 500; font-family: var(--font-body); box-shadow: inset 0 -2px 0 rgba(0,0,0,.18); }
+.blk-row { display: flex; align-items: center; gap: 6px; padding: 6px 10px; white-space: nowrap; }
+.blk-mouth { margin: 0 0 0 16px; padding: 4px 10px 4px 8px; background: var(--background2); border-radius: 0 0 0 4px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.blk-foot { height: 10px; }
+.fld { display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,.92); color: #1C1716; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 500; }
+.val { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 500; color: #fff; box-shadow: inset 0 -2px 0 rgba(0,0,0,.18); }
+.cat { display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 0; font-size: 14px; font-weight: 500; color: var(--foreground); }
+.cat i { display: block; width: 4px; height: 20px; border-radius: 2px; }
+.zbtn { width: 32px; height: 32px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--muted); }
+</style>
+</helmet>
+<div class="screen " style="">
+<header class="chrome-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 56px; padding: 0 24px; flex: none;"><div style="display: flex; align-items: center; gap: 28px;"><div style="display: flex; align-items: center; gap: 8px;"><svg width="26" height="26" viewBox="0 0 64 64" fill="none" aria-hidden="true" ><path d="M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z" fill="var(--brand)" stroke="var(--brand)" stroke-width="3" stroke-linejoin="round"></path><path d="M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z" fill="var(--chrome-fg)" stroke="var(--chrome-fg)" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"></path></svg><span style="font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: -0.01em; line-height: 1; color: var(--chrome-fg);">kumite</span></div><nav style="display: flex; align-items: center; gap: 20px;"><a href="#" style="font-size: 14px; font-weight: 500;">Times</a><a href="#" style="font-size: 14px; font-weight: 500;">Placar</a></nav></div><div style="display: flex; align-items: center; gap: 16px;"><div style="display: flex; align-items: center; gap: 10px; padding: 0 12px; height: 32px; border: 1px solid var(--chrome-border); border-radius: 6px;"><span class="live"><span class="dot"></span>Rodada 2</span><span class="num" style="font-weight: 600; font-size: 18px; color: var(--chrome-fg); letter-spacing: 0.02em;">41:07</span></div><span class="muted" style="font-size: 13px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ana Souza</span><a href="#" class="btn btn-sm btn-chrome"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9"></path></svg>Sair</a><div class="seg chrome"><span class="on">PT</span><span>ES</span><span>EN</span></div><span style="display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; border: 1px solid var(--chrome-border); border-radius: 6px; color: var(--chrome-fg);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></div></header><main style="flex: 1; min-height: 0; display: flex; gap: 16px; padding: 16px 24px;"><aside class="card" style="width: 320px; flex: none; display: flex; flex-direction: column; min-height: 0;"><div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 16px 12px 12px 20px;"><div style="display: flex; flex-direction: column; gap: 8px;"><div style="display: flex; align-items: center; gap: 8px;"><span class="badge badge-success">Fácil</span><span class="badge">100 pts</span><span class="badge badge-muted">Problema A</span></div><h2 class="h2">Soma dos Pares</h2></div><span class="zbtn" style="width: 28px; height: 28px; border-radius: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></span></div><div style="padding: 0 20px 20px; display: flex; flex-direction: column; gap: 16px; overflow: auto; font-size: 14px;"><p style="margin: 0;">Receba uma lista de números inteiros e devolva a soma dos que são pares. Se não houver nenhum par, devolva 0.</p><div style="display: flex; flex-direction: column; gap: 8px;"><span class="eyebrow">Casos de exemplo</span><div style="display: grid; grid-template-columns: repeat(1, minmax(0, 1fr)); gap: 6px;"><div style="display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--background);"><span class="mono">[1, 2, 3, 4]</span><span class="mono" style="color: var(--brand-text);">→ 6</span></div><div style="display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--background);"><span class="mono">[5, 7, 9]</span><span class="mono" style="color: var(--brand-text);">→ 0</span></div><div style="display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--background);"><span class="mono">[2, 4, 6, 8]</span><span class="mono" style="color: var(--brand-text);">→ 20</span></div></div></div></div></aside><section style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; min-height: 0;"><div class="card" style="flex: 1; min-height: 0; display: flex; overflow: hidden;"><div style="width: 148px; flex: none; padding: 8px 0 8px 12px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--card); border-radius: 8px 0 0 8px;"><div class="eyebrow" style="padding: 4px 0 8px;">Blocos</div><div class="cat"><i style="background: #2A75BA;"></i>Lógica</div><div class="cat"><i style="background: #298646;"></i>Laços</div><div class="cat"><i style="background: #6B64BA;"></i>Matemática</div><div class="cat"><i style="background: #008282;"></i>Texto</div><div class="cat"><i style="background: #8E57A5;"></i>Listas</div><div class="cat"><i style="background: #A76700;"></i>Variáveis</div></div><div class="ws"><div style="position: absolute; left: 48px; top: 40px;"><div class="blk" style="background: #2A2523; color: #F3F1EF;"><div class="blk-row" style="font-family: var(--font-display); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; padding-bottom: 4px;">resolver <span class="muted" style="font-family: var(--font-body); font-weight: 400; font-size: 12px; color: #9D9792;">( entrada )</span></div><div class="blk-mouth"><div class="blk" style="background: #A76700;"><div class="blk-row">definir <span class="fld">soma<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1C1716" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span> para <span class="val" style="background: #6B64BA;">0</span></div></div><div class="blk" style="background: #298646;"><div class="blk-row">para cada item <span class="fld">numero<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1C1716" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span> na lista <span class="val" style="background: #DD2824;">entrada</span></div><div class="blk-mouth"><div class="blk" style="background: #2A75BA;"><div class="blk-row">se <span class="val" style="background: #6B64BA;">resto da divisão de <span class="val" style="background: #A76700;">numero<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span> ÷ <span class="val" style="background: #6B64BA;">2</span></span> <span class="fld">=<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1C1716" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span> <span class="val" style="background: #6B64BA;">0</span></div><div class="blk-mouth"><div class="blk" style="background: #A76700;"><div class="blk-row">definir <span class="fld">soma<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1C1716" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span> para <span class="val" style="background: #6B64BA;"><span class="val" style="background: #A76700;">soma<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span> <span class="fld">+<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1C1716" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span> <span class="val" style="background: #A76700;">numero<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></span></div></div></div><div class="blk-foot"></div></div></div><div class="blk-foot"></div></div></div><div class="blk-row" style="padding-top: 8px;">retornar <span class="val" style="background: #A76700;">soma<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></div></div></div><div style="position: absolute; right: 16px; top: 16px; display: flex; flex-direction: column; gap: 6px;"><span class="zbtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></span><span class="zbtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></span><span class="zbtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg></span></div><div style="position: absolute; right: 16px; bottom: 16px;"><span class="zbtn" style="width: 40px; height: 40px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg></span></div></div></div><div class="card" style="flex: none; display: flex; flex-direction: column; max-height: 190px; overflow: hidden;"><div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px;"><div style="display: flex; align-items: center; gap: 10px;"><span class="h3">Resultados</span><span class="badge badge-success">3/3 casos</span></div><span class="zbtn" style="width: 28px; height: 28px; border-radius: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></span></div><div style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg><span style="font-weight: 500; width: 56px;">Caso 1</span><span class="mono muted">[1, 2, 3, 4]</span><span class="muted" style="margin-left: auto; font-size: 13px;">esperado <span class="mono" style="color: var(--foreground);">6</span></span><span class="muted" style="font-size: 13px;">obtido <span class="mono" style="color: var(--foreground);">6</span></span></div><div style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg><span style="font-weight: 500; width: 56px;">Caso 2</span><span class="mono muted">[5, 7, 9]</span><span class="muted" style="margin-left: auto; font-size: 13px;">esperado <span class="mono" style="color: var(--foreground);">0</span></span><span class="muted" style="font-size: 13px;">obtido <span class="mono" style="color: var(--foreground);">0</span></span></div><div style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--border);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg><span style="font-weight: 500; width: 56px;">Caso 3</span><span class="mono muted">[2, 4, 6, 8]</span><span class="muted" style="margin-left: auto; font-size: 13px;">esperado <span class="mono" style="color: var(--foreground);">20</span></span><span class="muted" style="font-size: 13px;">obtido <span class="mono" style="color: var(--foreground);">20</span></span></div></div><div style="flex: none; display: flex; align-items: center; gap: 8px; padding-top: 4px;"><span class="btn btn-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5v14l11-7z"></path></svg>Executar</span><span class="btn btn-ghost" style="color: var(--destructive);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>Limpar blocos</span><span style="margin-left: auto;" class="muted small">Última execução há 5 s</span><span class="btn btn-brand"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"></path></svg>Submeter</span></div></section></main><footer class="footer" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px; flex: none; margin-top: auto;"><span>Dúvidas? Fale com a organização: <a href="#">ligadealgoritmos@gmail.com</a></span><span style="display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 64 64" fill="none" aria-hidden="true" ><path d="M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z" fill="var(--brand)" stroke="var(--brand)" stroke-width="3" stroke-linejoin="round"></path><path d="M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z" fill="var(--chrome-fg)" stroke="var(--chrome-fg)" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"></path></svg><span style="font-family: var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; font-size: 12px; font-weight: 600; color: var(--chrome-muted);">PUCRS × Mérida 2026</span></span></footer>
+</div>
+</x-dc>
+</body>
+</html>

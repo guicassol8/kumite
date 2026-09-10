@@ -20,7 +20,9 @@ TanStack Router (file-based) + TanStack Query · i18next · zod ^3.
   `pnpm dlx shadcn@latest add <name>` from `front/`); app components in
   `src/components/`.
 - Styling: Tailwind utilities + the tokens in `src/index.css`. No inline
-  `style`, no new CSS files.
+  `style`, no new CSS files. The tokens come from `docs/design/tokens/`
+  (identity spec: `docs/design/identity.md`) — change them there first, then
+  mirror in `index.css`.
 - i18n: every user-visible string goes through `useTranslation()` and the key
   is added to ALL of `src/i18n/{pt,es,en}.json` — the catalog parity test
   fails the suite otherwise.

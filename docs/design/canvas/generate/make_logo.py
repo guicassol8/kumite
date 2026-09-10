@@ -1,0 +1,107 @@
+"""Generate the kumite logo SVG set: mark, outlined wordmark (Barlow Condensed 600), lockups."""
+from fontTools.ttLib import TTFont
+from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.pens.boundsPen import BoundsPen
+from fontTools.pens.transformPen import TransformPen
+import os
+
+OUT = "docs-draft/logo"
+os.makedirs(OUT, exist_ok=True)
+RED, INK, PAPER, DARKBG, LIGHTBG = "#DD2824", "#1C1716", "#F3F1EF", "#120F0D", "#FCFAF7"
+MARK_PATH = "M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z"
+
+def mark_paths(left, right, dx=0, dy=0, scale=1.0):
+    t = f'translate({dx} {dy}) scale({scale})' if (dx or dy or scale != 1) else ''
+    g_open = f'<g transform="{t}">' if t else '<g>'
+    return (f'{g_open}<path d="{MARK_PATH}" fill="{left}" stroke="{left}" stroke-width="3" stroke-linejoin="round"/>'
+            f'<path d="{MARK_PATH}" fill="{right}" stroke="{right}" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"/></g>')
+
+def svg(w, h, body, bg=None, title="kumite"):
+    rect = f'<rect width="{w}" height="{h}" fill="{bg}"/>' if bg else ''
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}" fill="none" role="img" aria-label="{title}">\n'
+            f'  <!-- kumite · gerado por docs/design/canvas/generate/make_logo.py — símbolo em grade 64, wordmark Barlow Condensed 600 contornado -->\n'
+            f'  {rect}{body}\n</svg>\n')
+
+# ---- wordmark outlines ----
+font = TTFont("fonts/barlow-condensed-600.ttf")
+upem = font["head"].unitsPerEm
+cmap = font.getBestCmap()
+glyphs = font.getGlyphSet()
+hmtx = font["hmtx"]
+TEXT = "kumite"
+TRACKING = -0.01  # em
+
+def wordmark_path(size):
+    """Return (path_d, width, ymin, ymax) for TEXT at font-size `size` px, baseline at y=0, y-down."""
+    s = size / upem
+    pen = SVGPathPen(glyphs)
+    bpen = BoundsPen(glyphs)
+    x = 0.0
+    for ch in TEXT:
+        gname = cmap[ord(ch)]
+        adv = hmtx[gname][0]
+        tp = TransformPen(pen, (s, 0, 0, -s, x, 0))
+        glyphs[gname].draw(tp)
+        tb = TransformPen(bpen, (s, 0, 0, -s, x, 0))
+        glyphs[gname].draw(tb)
+        x += adv * s + TRACKING * size
+    xmin, ymin, xmax, ymax = bpen.bounds
+    return pen.getCommands(), xmin, xmax, ymin, ymax
+
+# Standalone wordmark at 100px font-size, tight viewBox with 4px padding
+d, xmin, xmax, ymin, ymax = wordmark_path(100)
+pad = 4
+W = round(xmax - xmin + 2 * pad, 2); H = round(ymax - ymin + 2 * pad, 2)
+body = f'<path transform="translate({round(pad - xmin, 3)} {round(pad - ymin, 3)})" d="{d}" fill="{INK}"/>'
+open(f"{OUT}/kumite-wordmark.svg", "w").write(svg(W, H, body, title="kumite"))
+open(f"{OUT}/kumite-wordmark-paper.svg", "w").write(svg(W, H, body.replace(INK, PAPER), title="kumite"))
+print("wordmark", W, H, "ascender/descender", round(ymin, 1), round(ymax, 1))
+
+# ---- marks ----
+open(f"{OUT}/kumite-mark.svg", "w").write(svg(64, 64, mark_paths(RED, INK)))
+open(f"{OUT}/kumite-mark-dark.svg", "w").write(svg(64, 64, mark_paths(RED, PAPER)))
+open(f"{OUT}/kumite-mark-mono-ink.svg", "w").write(svg(64, 64, mark_paths(INK, INK)))
+open(f"{OUT}/kumite-mark-mono-red.svg", "w").write(svg(64, 64, mark_paths(RED, RED)))
+open(f"{OUT}/kumite-mark-mono-paper.svg", "w").write(svg(64, 64, mark_paths(PAPER, PAPER)))
+# app icon: red rounded square, paper + ink blocks
+open(f"{OUT}/kumite-app-icon.svg", "w").write(svg(512, 512,
+    f'<rect width="512" height="512" rx="112" fill="{RED}"/>' + mark_paths(PAPER, INK, dx=96, dy=96, scale=5)))
+# favicon: mark on transparent (browser tab), plus a dark-safe variant handled by prefers-color-scheme in the same file
+open(f"{OUT}/favicon.svg", "w").write(
+    f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">\n'
+    f'  <style>.r{{fill:{INK};stroke:{INK}}} @media (prefers-color-scheme: dark){{.r{{fill:{PAPER};stroke:{PAPER}}}}}</style>\n'
+    f'  <path d="{MARK_PATH}" fill="{RED}" stroke="{RED}" stroke-width="3" stroke-linejoin="round"/>\n'
+    f'  <path class="r" d="{MARK_PATH}" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"/>\n</svg>\n')
+
+# ---- lockups: mark 64 + gap 20 + wordmark at 55px, vertically centered on the mark ----
+FS = 55
+d, xmin, xmax, ymin, ymax = wordmark_path(FS)
+text_h = ymax - ymin
+tx = 64 + 20 - xmin
+ty = 32 - (ymin + ymax) / 2   # center the glyph box on the mark's center line
+LW = round(64 + 20 + (xmax - xmin), 2)
+def lockup(left, right, ink, bg=None, padx=0, pady=0):
+    w = round(LW + 2 * padx, 2); h = 64 + 2 * pady
+    body = (f'<g transform="translate({padx} {pady})">' + mark_paths(left, right) +
+            f'<path transform="translate({round(tx, 3)} {round(ty, 3)})" d="{d}" fill="{ink}"/></g>')
+    return svg(w, h, body, bg=bg)
+open(f"{OUT}/kumite-lockup-horizontal.svg", "w").write(lockup(RED, INK, INK))
+open(f"{OUT}/kumite-lockup-horizontal-dark.svg", "w").write(lockup(RED, PAPER, PAPER))
+open(f"{OUT}/kumite-lockup-horizontal-on-paper.svg", "w").write(lockup(RED, INK, INK, bg=LIGHTBG, padx=32, pady=24))
+open(f"{OUT}/kumite-lockup-horizontal-on-ink.svg", "w").write(lockup(RED, PAPER, PAPER, bg=INK, padx=32, pady=24))
+# stacked: mark 64 centered above wordmark at 48px
+FS2 = 48
+d2, x2min, x2max, y2min, y2max = wordmark_path(FS2)
+tw = x2max - x2min
+SW = round(max(64, tw) + 2 * 8, 2)
+mark_dx = (SW - 64) / 2
+text_dx = (SW - tw) / 2 - x2min
+text_dy = 64 + 14 - y2min
+SH = round(64 + 14 + (y2max - y2min) + 8, 2)
+def stacked(left, right, ink, bg=None):
+    body = mark_paths(left, right, dx=round(mark_dx, 3)) + f'<path transform="translate({round(text_dx, 3)} {round(text_dy, 3)})" d="{d2}" fill="{ink}"/>'
+    return svg(SW, SH, body, bg=bg)
+open(f"{OUT}/kumite-lockup-stacked.svg", "w").write(stacked(RED, INK, INK))
+open(f"{OUT}/kumite-lockup-stacked-dark.svg", "w").write(stacked(RED, PAPER, PAPER))
+print("lockup", LW, "stacked", SW, SH)
+print(sorted(os.listdir(OUT)))

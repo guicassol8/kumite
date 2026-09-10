@@ -1,0 +1,191 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "$description": "kumite — tokens da identidade visual (variante A · Hinomaru), formato W3C Design Tokens 2025.10. Fonte da verdade: este arquivo; tokens.css é derivado à mão até a fundação (#216) adotar Style Dictionary.",
+  "color": {
+    "$type": "color",
+    "primitive": {
+      "paper": { "$value": "#FCFAF7", "$description": "papel — oklch(0.985 0.004 75)" },
+      "paper-2": { "$value": "#F2F0EC", "$description": "papel 2 — oklch(0.955 0.006 75)" },
+      "white": { "$value": "#FFFFFF" },
+      "paper-text": {
+        "$value": "#F3F1EF",
+        "$description": "texto claro sobre carvão — oklch(0.96 0.004 75)"
+      },
+      "ink": { "$value": "#1C1716", "$description": "tinta — oklch(0.21 0.008 40)" },
+      "ink-2": { "$value": "#2A2523", "$description": "tinta 2 — oklch(0.27 0.008 40)" },
+      "ink-border": { "$value": "#312D2C", "$description": "oklch(0.30 0.006 40)" },
+      "charcoal-deep": {
+        "$value": "#0E0C0B",
+        "$description": "chrome no escuro — oklch(0.14 0.005 40)"
+      },
+      "charcoal": { "$value": "#120F0D", "$description": "fundo escuro — oklch(0.17 0.006 40)" },
+      "charcoal-card": {
+        "$value": "#1B1716",
+        "$description": "cartão escuro — oklch(0.21 0.006 40)"
+      },
+      "gray-warm": { "$value": "#69615D", "$description": "oklch(0.50 0.012 50)" },
+      "gray-warm-light": { "$value": "#9D9792", "$description": "oklch(0.68 0.010 60)" },
+      "border-warm": { "$value": "#E1DDDA", "$description": "oklch(0.90 0.006 60)" },
+      "red-600": { "$value": "#DD2824", "$description": "vermelho faixa — oklch(0.58 0.215 28)" },
+      "red-700": { "$value": "#CE2320", "$description": "oklch(0.55 0.205 28)" },
+      "red-400": { "$value": "#F45246", "$description": "oklch(0.66 0.200 28)" },
+      "red-50": { "$value": "#FBE5E1", "$description": "oklch(0.95 0.025 28)" },
+      "red-950": { "$value": "#3A1A18", "$description": "oklch(0.28 0.060 28)" },
+      "crimson-600": { "$value": "#C1133A", "$description": "erro — oklch(0.52 0.200 18)" },
+      "crimson-400": { "$value": "#E8496A", "$description": "oklch(0.62 0.190 18)" },
+      "green-600": { "$value": "#008433", "$description": "oklch(0.53 0.160 150)" },
+      "green-400": { "$value": "#3DBA6A", "$description": "oklch(0.70 0.160 150)" },
+      "amber-400": {
+        "$value": "#ECAA0B",
+        "$description": "oklch(0.78 0.160 80) — nunca como texto no claro"
+      },
+      "amber-700": { "$value": "#A06700", "$description": "oklch(0.56 0.130 75)" },
+      "amber-300": { "$value": "#F5C044", "$description": "oklch(0.84 0.150 85)" }
+    },
+    "light": {
+      "$description": "modo claro (padrão)",
+      "background": { "$value": "{color.primitive.paper}" },
+      "background-2": { "$value": "{color.primitive.paper-2}" },
+      "card": { "$value": "{color.primitive.white}" },
+      "foreground": { "$value": "{color.primitive.ink}" },
+      "muted-foreground": { "$value": "{color.primitive.gray-warm}" },
+      "border": { "$value": "{color.primitive.border-warm}" },
+      "primary": { "$value": "{color.primitive.ink}", "$description": "botão primário" },
+      "primary-foreground": { "$value": "{color.primitive.paper}" },
+      "brand": {
+        "$value": "{color.primitive.red-600}",
+        "$description": "preenchimento: Submeter, Abrir rodada, badge Seu time, símbolo"
+      },
+      "brand-text": {
+        "$value": "{color.primitive.red-600}",
+        "$description": "texto: ao vivo, timer, #1, × do pôster"
+      },
+      "brand-hover": { "$value": "{color.primitive.red-700}" },
+      "brand-soft": {
+        "$value": "{color.primitive.red-50}",
+        "$description": "linha do seu time, anel de foco"
+      },
+      "brand-foreground": { "$value": "{color.primitive.white}" },
+      "destructive": {
+        "$value": "{color.primitive.crimson-600}",
+        "$description": "erro e ação destrutiva — sempre contorno + texto, nunca preenchimento"
+      },
+      "success": { "$value": "{color.primitive.green-600}" },
+      "warning": {
+        "$value": "{color.primitive.amber-400}",
+        "$description": "só ícone, borda e preenchimento"
+      },
+      "warning-text": { "$value": "{color.primitive.amber-700}" },
+      "chrome": { "$value": "{color.primitive.ink}", "$description": "header e rodapé" },
+      "chrome-foreground": { "$value": "{color.primitive.paper-text}" },
+      "chrome-muted": { "$value": "{color.primitive.gray-warm-light}" },
+      "chrome-border": { "$value": "{color.primitive.ink-border}" }
+    },
+    "dark": {
+      "$description": "modo escuro (classe .dark)",
+      "background": { "$value": "{color.primitive.charcoal}" },
+      "background-2": { "$value": "{color.primitive.charcoal-card}" },
+      "card": { "$value": "{color.primitive.charcoal-card}" },
+      "foreground": { "$value": "{color.primitive.paper-text}" },
+      "muted-foreground": { "$value": "{color.primitive.gray-warm-light}" },
+      "border": { "$value": "{color.primitive.ink-border}" },
+      "primary": { "$value": "{color.primitive.paper-text}" },
+      "primary-foreground": { "$value": "{color.primitive.ink}" },
+      "brand": { "$value": "{color.primitive.red-600}" },
+      "brand-text": { "$value": "{color.primitive.red-400}" },
+      "brand-hover": { "$value": "{color.primitive.red-700}" },
+      "brand-soft": { "$value": "{color.primitive.red-950}" },
+      "brand-foreground": { "$value": "{color.primitive.white}" },
+      "destructive": { "$value": "{color.primitive.crimson-400}" },
+      "success": { "$value": "{color.primitive.green-400}" },
+      "warning": { "$value": "{color.primitive.amber-300}" },
+      "warning-text": { "$value": "{color.primitive.amber-300}" },
+      "chrome": { "$value": "{color.primitive.charcoal-deep}" },
+      "chrome-foreground": { "$value": "{color.primitive.paper-text}" },
+      "chrome-muted": { "$value": "{color.primitive.gray-warm-light}" },
+      "chrome-border": { "$value": "{color.primitive.ink-border}" }
+    },
+    "block": {
+      "$description": "@kumite/blocks blockStyles — oklch L≈0,55 · C≈0,13, matiz por categoria; texto branco ≥ 4,5:1 em todos",
+      "logic": { "$value": "#2A75BA" },
+      "loops": { "$value": "#298646" },
+      "math": { "$value": "#6B64BA" },
+      "text": { "$value": "#008282" },
+      "lists": { "$value": "#8E57A5" },
+      "variables": { "$value": "#A76700" },
+      "root": {
+        "$value": "{color.primitive.ink-2}",
+        "$description": "bloco resolver, texto paper-text"
+      },
+      "input": {
+        "$value": "{color.primitive.red-600}",
+        "$description": "bloco entrada — o único vermelho do canvas"
+      }
+    }
+  },
+  "font": {
+    "family": {
+      "$type": "fontFamily",
+      "display": {
+        "$value": ["Barlow Condensed", "Arial Narrow", "Roboto Condensed", "sans-serif"],
+        "$description": "títulos, placar, timer, wordmark, eyebrows"
+      },
+      "sans": {
+        "$value": ["Barlow", "Inter", "system-ui", "sans-serif"],
+        "$description": "corpo, formulários, tabelas, botões"
+      },
+      "mono": {
+        "$value": ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        "$description": "JSON, casos de teste, códigos"
+      }
+    },
+    "weight": {
+      "$type": "fontWeight",
+      "display-medium": { "$value": 500 },
+      "display-semibold": { "$value": 600 },
+      "display-bold": { "$value": 700 },
+      "display-black": { "$value": 800 },
+      "sans-regular": { "$value": 400 },
+      "sans-medium": { "$value": 500 },
+      "sans-semibold": { "$value": 600 }
+    },
+    "size": {
+      "$type": "dimension",
+      "telao": { "$value": { "value": 84, "unit": "px" } },
+      "h1": { "$value": { "value": 36, "unit": "px" } },
+      "stat": { "$value": { "value": 44, "unit": "px" } },
+      "h2": { "$value": { "value": 24, "unit": "px" } },
+      "h3": { "$value": { "value": 19, "unit": "px" } },
+      "body": { "$value": { "value": 15, "unit": "px" } },
+      "ui": { "$value": { "value": 14, "unit": "px" } },
+      "small": { "$value": { "value": 13, "unit": "px" } },
+      "eyebrow": { "$value": { "value": 13, "unit": "px" } },
+      "mono": { "$value": { "value": 13, "unit": "px" } }
+    }
+  },
+  "radius": {
+    "$type": "dimension",
+    "control": {
+      "$value": { "value": 6, "unit": "px" },
+      "$description": "botões, inputs, badges retangulares"
+    },
+    "card": { "$value": { "value": 8, "unit": "px" } },
+    "pill": { "$value": { "value": 999, "unit": "px" } }
+  },
+  "size": {
+    "$type": "dimension",
+    "control": {
+      "$value": { "value": 36, "unit": "px" },
+      "$description": "altura padrão de botão e input"
+    },
+    "control-touch": {
+      "$value": { "value": 44, "unit": "px" },
+      "$description": "telas de toque e formulários de autenticação"
+    },
+    "header": { "$value": { "value": 56, "unit": "px" } },
+    "mark-min": {
+      "$value": { "value": 16, "unit": "px" },
+      "$description": "tamanho mínimo do símbolo"
+    }
+  }
+}

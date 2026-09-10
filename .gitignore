@@ -11,3 +11,6 @@ data/
 front/test-results/
 front/playwright-report/
 front/blob-report/
+
+# Python bytecode from docs/design/canvas/generate
+__pycache__/

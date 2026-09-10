@@ -1,0 +1,113 @@
+/* kumite — tokens da identidade visual (variante A · Hinomaru).
+   Fonte da verdade: docs/design/identity.md. Este arquivo é o bloco pronto
+   para substituir o tema neutro de front/src/index.css (issue de fundação).
+   Valores em oklch com o hex sRGB equivalente ao lado. */
+
+:root {
+  --radius: 0.375rem;                                   /* 6px — mais seco que os 10px atuais */
+
+  /* superfícies */
+  --background: oklch(0.985 0.004 75);                  /* #FCFAF7 papel */
+  --foreground: oklch(0.21 0.008 40);                   /* #1C1716 tinta */
+  --card: oklch(1 0 0);                                 /* #FFFFFF cartão */
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --muted: oklch(0.955 0.006 75);                       /* #F2F0EC papel 2 */
+  --muted-foreground: oklch(0.50 0.012 50);             /* #69615D cinza texto */
+  --border: oklch(0.90 0.006 60);                       /* #E1DDDA hairline */
+  --input: var(--border);
+
+  /* ações */
+  --primary: var(--foreground);                         /* botão primário = tinta */
+  --primary-foreground: var(--background);
+  --secondary: var(--muted);
+  --secondary-foreground: var(--foreground);
+  --accent: var(--muted);
+  --accent-foreground: var(--foreground);
+
+  /* marca — vermelho faixa. Preenchimento: Submeter, Abrir rodada, ao vivo, #1, foco. */
+  --brand: oklch(0.58 0.215 28);                        /* #DD2824 — 4,77:1 com texto branco, 4,58:1 sobre papel */
+  --brand-text: var(--brand);                           /* texto/timer/ao vivo sobre o fundo (no escuro é mais claro) */
+  --brand-hover: oklch(0.55 0.205 28);                  /* #CE2320 */
+  --brand-soft: oklch(0.95 0.025 28);                   /* #FBE5E1 — linha do seu time, anel de foco */
+  --brand-foreground: oklch(1 0 0);
+  --ring: var(--brand);
+
+  /* semânticos — erro nunca é preenchimento: contorno + ícone + texto */
+  --destructive: oklch(0.52 0.200 18);                  /* #C1133A crimson (matiz 18°, distinto da marca em 28°) */
+  --destructive-foreground: oklch(1 0 0);
+  --success: oklch(0.53 0.160 150);                     /* #008433 — passa como texto (4,64:1) */
+  --warning: oklch(0.78 0.160 80);                      /* #ECAA0B — só ícone, borda e preenchimento (1,95:1 como texto: nunca) */
+  --warning-text: oklch(0.56 0.130 75);                 /* #A06700 — âmbar para texto no claro (4,55:1) */
+
+  /* chrome — header e rodapé são carvão nos dois modos */
+  --chrome: var(--foreground);                          /* #1C1716 */
+  --chrome-foreground: oklch(0.96 0.004 75);            /* #F3F1EF */
+  --chrome-muted: oklch(0.68 0.010 60);                 /* #9D9792 */
+  --chrome-border: oklch(0.30 0.006 40);                /* #312D2C */
+}
+
+.dark {
+  --background: oklch(0.17 0.006 40);                   /* #120F0D */
+  --foreground: oklch(0.96 0.004 75);                   /* #F3F1EF */
+  --card: oklch(0.21 0.006 40);                         /* #1B1716 */
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --muted: var(--card);
+  --muted-foreground: oklch(0.68 0.010 60);             /* #9D9792 */
+  --border: oklch(0.30 0.006 40);                       /* #312D2C */
+  --input: var(--border);
+
+  --primary: var(--foreground);                         /* botão primário = papel */
+  --primary-foreground: oklch(0.21 0.008 40);
+  --secondary: var(--card);
+  --secondary-foreground: var(--foreground);
+  --accent: var(--card);
+  --accent-foreground: var(--foreground);
+
+  --brand: oklch(0.58 0.215 28);                        /* #DD2824 — preenchimento igual ao claro (texto branco 4,77:1) */
+  --brand-text: oklch(0.66 0.200 28);                   /* #F45246 — texto, timer e ao vivo sobre o fundo escuro (5,58:1) */
+  --brand-hover: oklch(0.55 0.205 28);                  /* #CE2320 */
+  --brand-soft: oklch(0.28 0.060 28);                   /* #3A1A18 */
+  --ring: var(--brand);
+
+  --destructive: oklch(0.62 0.190 18);                  /* #E8496A */
+  --success: oklch(0.70 0.160 150);                     /* #3DBA6A */
+  --warning: oklch(0.84 0.150 85);                      /* #F5C044 */
+  --warning-text: var(--warning);                       /* no escuro o âmbar já passa como texto (11:1) */
+
+  --chrome: oklch(0.14 0.005 40);                       /* #0E0C0B — um passo mais escuro que o fundo */
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-text: var(--brand-text);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --color-chrome: var(--chrome);
+  --color-chrome-foreground: var(--chrome-foreground);
+  --color-chrome-muted: var(--chrome-muted);
+  --color-chrome-border: var(--chrome-border);
+
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --font-sans: 'Barlow', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Blockly — @kumite/blocks blockStyles (oklch L 0,55 · C 0,13, matizes por categoria) */
+:root {
+  --block-logic: #2A75BA;      /* oklch(0.55 0.13 250) */
+  --block-loops: #298646;      /* oklch(0.55 0.13 150) */
+  --block-math: #6B64BA;       /* oklch(0.55 0.13 285) */
+  --block-text: #008282;       /* oklch(0.54 0.11 195) — texto branco 4,65:1 */
+  --block-lists: #8E57A5;      /* oklch(0.55 0.13 315) */
+  --block-variables: #A76700;  /* oklch(0.57 0.13 70) — sai do rosa 330°, vizinho do vermelho; texto branco 4,58:1 */
+  --block-root: #2A2523;       /* bloco resolver: tinta 2, texto papel */
+  --block-input: #DD2824;      /* bloco entrada: o único vermelho do canvas */
+}

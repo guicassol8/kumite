@@ -5,7 +5,7 @@ from `CLAUDE.md`; Codex reads it natively.
 
 kumite is the competitive block-programming platform for the PUCRS × Mérida
 event. Product: `docs/product.md` · Stack decisions: `docs/tech-stack.md` ·
-Task workflow: `docs/workflow.md`.
+Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
 
 ## Map
 
@@ -16,6 +16,11 @@ Task workflow: `docs/workflow.md`.
   curated toolbox, JS generators) used by both `front/` (editor) and `back/`
   (headless codegen). The one sanctioned runtime cross-package exception
   (approved 2026-08-25, #16).
+- `docs/design/` — visual identity, versioned and account-independent: spec
+  (`identity.md`), tokens (W3C DTCG JSON + derived CSS), logo (SVG source, PNG
+  built by `logo/export.sh`), image-generation prompts, canvas source files and
+  a PNG per screen. Source of truth for the redesign epic (#214): screens follow
+  the tokens, never the other way around.
 - `.claude/skills/` — the five task-workflow skills
   (create → pick → plan → implement → review). Each ends by printing the next
   step's command for a fresh chat — chain in `docs/workflow.md`.

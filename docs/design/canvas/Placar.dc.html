@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <title>Placar</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <style>
+:root {
+  --background: #FCFAF7;
+  --background2: #F2F0EC;
+  --card: #FFFFFF;
+  --foreground: #1C1716;
+  --foreground2: #2A2523;
+  --muted: #69615D;
+  --border: #E1DDDA;
+  --primary: #1C1716;
+  --primary-fg: #FCFAF7;
+  --brand: #DD2824;
+  --brand-text: #DD2824;
+  --brand-hover: #CE2320;
+  --brand-soft: #FBE5E1;
+  --brand-fg: #FFFFFF;
+  --destructive: #C1133A;
+  --destructive-soft: #FBE7EC;
+  --success: #008433;
+  --success-soft: #E3F5EA;
+  --warning: #ECAA0B;
+  --warning-text: #A06700;
+  --warning-soft: #FBF1D6;
+  --chrome: #1C1716;
+  --chrome-fg: #F3F1EF;
+  --chrome-muted: #9D9792;
+  --chrome-border: #312D2C;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --font-body: 'Barlow', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius: 6px;
+}
+.dark {
+  --background: #120F0D;
+  --background2: #1B1716;
+  --card: #1B1716;
+  --foreground: #F3F1EF;
+  --foreground2: #E6E2DE;
+  --muted: #9D9792;
+  --border: #312D2C;
+  --primary: #F3F1EF;
+  --primary-fg: #1C1716;
+  --brand: #DD2824;
+  --brand-text: #F45246;
+  --brand-hover: #CE2320;
+  --brand-soft: #3A1A18;
+  --brand-fg: #FFFFFF;
+  --destructive: #E8496A;
+  --destructive-soft: #3A1520;
+  --success: #3DBA6A;
+  --success-soft: #12301C;
+  --warning: #F5C044;
+  --warning-text: #F5C044;
+  --warning-soft: #3A2E10;
+  --chrome: #0E0C0B;
+  --chrome-fg: #F3F1EF;
+  --chrome-muted: #9D9792;
+  --chrome-border: #312D2C;
+}
+html, body { height: 100%; }
+body { margin: 0; font-family: var(--font-body); color: var(--foreground); background: var(--background); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; } a:hover { color: var(--brand-text); }
+* { box-sizing: border-box; }
+.screen { width: 100%; min-height: 100%; display: flex; flex-direction: column; background: var(--background); color: var(--foreground); }
+.display { font-family: var(--font-display); }
+.h1 { font-family: var(--font-display); font-weight: 700; font-size: 36px; line-height: 1; letter-spacing: 0.01em; text-transform: uppercase; margin: 0; }
+.h2 { font-family: var(--font-display); font-weight: 600; font-size: 24px; line-height: 1.1; margin: 0; }
+.h3 { font-family: var(--font-display); font-weight: 600; font-size: 19px; line-height: 1.15; margin: 0; }
+.eyebrow { font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.mono { font-family: var(--font-mono); font-size: 13px; }
+.num { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: var(--radius); font-family: var(--font-body); font-weight: 500; font-size: 14px; line-height: 1; border: 1px solid transparent; white-space: nowrap; cursor: pointer; }
+.btn-sm { height: 30px; padding: 0 10px; font-size: 13px; }
+.btn-lg { height: 44px; padding: 0 20px; font-size: 15px; }
+.btn-primary { background: var(--primary); color: var(--primary-fg); }
+.btn-brand { background: var(--brand); color: var(--brand-fg); }
+.btn-outline { background: transparent; color: var(--foreground); border-color: var(--border); }
+.btn-ghost { background: transparent; color: var(--foreground); }
+.btn-destructive { background: transparent; color: var(--destructive); border-color: var(--destructive); }
+.btn-chrome { background: transparent; color: var(--chrome-fg); border-color: var(--chrome-border); }
+.btn svg { width: 16px; height: 16px; }
+.input { height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--foreground); font-family: var(--font-body); font-size: 14px; display: flex; align-items: center; }
+.input-lg { height: 44px; }
+.label { font-size: 13px; font-weight: 500; color: var(--foreground); }
+.badge { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; line-height: 1; border: 1px solid var(--border); color: var(--foreground); background: transparent; white-space: nowrap; }
+.badge-solid { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.badge-brand { background: var(--brand); color: var(--brand-fg); border-color: var(--brand); }
+.badge-success { color: var(--success); border-color: var(--success); }
+.badge-muted { color: var(--muted); }
+.badge-uni { font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; height: 20px; padding: 0 6px; border-radius: 4px; }
+.dot { width: 8px; height: 8px; border-radius: 999px; background: var(--brand); display: inline-block; }
+.live { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-text); }
+.table { width: 100%; border-collapse: collapse; }
+.table th { text-align: left; font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.table td { padding: 12px 12px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+.table tr:last-child td { border-bottom: 0; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); padding: 2px; gap: 2px; background: var(--background2); }
+.seg span { padding: 0 10px; height: 26px; display: inline-flex; align-items: center; border-radius: 4px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.seg span.on { background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.seg.chrome { border-color: var(--chrome-border); background: transparent; }
+.seg.chrome span { color: var(--chrome-muted); }
+.seg.chrome span.on { background: var(--chrome-fg); color: var(--chrome); box-shadow: none; }
+.tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--border); }
+.tabs span { padding: 10px 0 12px; font-size: 14px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs span.on { color: var(--foreground); border-bottom-color: var(--brand-text); }
+.alert { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); font-size: 14px; }
+.alert svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.alert-error { border-color: var(--destructive); } .alert-error svg { color: var(--destructive); }
+.alert-success { border-color: var(--success); } .alert-success svg { color: var(--success); }
+.chrome-bar { background: var(--chrome); color: var(--chrome-fg); border-bottom: 1px solid var(--chrome-border); }
+.chrome-bar a { color: var(--chrome-fg); }
+.chrome-bar .muted { color: var(--chrome-muted); }
+.footer { background: var(--chrome); color: var(--chrome-muted); border-top: 1px solid var(--chrome-border); font-size: 13px; }
+.footer a { color: var(--chrome-fg); text-decoration: underline; text-underline-offset: 3px; }
+.swatch { border-radius: 8px; border: 1px solid rgba(0,0,0,.06); }
+.kbd { font-family: var(--font-mono); font-size: 12px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--background2); }
+</style>
+</helmet>
+<div class="screen " style="">
+<header class="chrome-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 56px; padding: 0 24px; flex: none;"><div style="display: flex; align-items: center; gap: 28px;"><div style="display: flex; align-items: center; gap: 8px;"><svg width="26" height="26" viewBox="0 0 64 64" fill="none" aria-hidden="true" ><path d="M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z" fill="var(--brand)" stroke="var(--brand)" stroke-width="3" stroke-linejoin="round"></path><path d="M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z" fill="var(--chrome-fg)" stroke="var(--chrome-fg)" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"></path></svg><span style="font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: -0.01em; line-height: 1; color: var(--chrome-fg);">kumite</span></div><nav style="display: flex; align-items: center; gap: 20px;"><a href="#" style="font-size: 14px; font-weight: 500;">Times</a><a href="#" style="font-size: 14px; font-weight: 500;">Placar</a></nav></div><div style="display: flex; align-items: center; gap: 16px;"><div style="display: flex; align-items: center; gap: 10px; padding: 0 12px; height: 32px; border: 1px solid var(--chrome-border); border-radius: 6px;"><span class="live"><span class="dot"></span>Rodada 2</span><span class="num" style="font-weight: 600; font-size: 18px; color: var(--chrome-fg); letter-spacing: 0.02em;">41:07</span></div><span class="muted" style="font-size: 13px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Ana Souza</span><a href="#" class="btn btn-sm btn-chrome"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5v16h5M14 8l4 4-4 4M18 12H9"></path></svg>Sair</a><div class="seg chrome"><span class="on">PT</span><span>ES</span><span>EN</span></div><span style="display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; border: 1px solid var(--chrome-border); border-radius: 6px; color: var(--chrome-fg);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></span></div></header><main style="flex: 1; padding: 32px 24px; display: flex; justify-content: center;"><div style="width: 100%; max-width: 1040px; display: flex; flex-direction: column; gap: 20px;"><div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap;"><div style="display: flex; align-items: center; gap: 20px;"><h1 class="h1">Placar</h1><div class="seg"><span class="on">Rodada</span><span>Geral</span></div></div><div style="display: flex; align-items: center; gap: 12px;"><span class="live"><span class="dot"></span>Ao vivo · Rodada 2</span><span class="num" style="font-weight: 600; font-size: 24px; letter-spacing: 0.02em;">41:07</span><span class="btn btn-outline"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg>Modo telão</span></div></div><div class="card" style="overflow: hidden;"><table class="table" style="table-layout: fixed;"><colgroup><col style="width: 64px;"><col><col style="width: 90px;"><col style="width: 90px;"><col style="width: 90px;"><col style="width: 110px;"></colgroup><thead><tr><th>#</th><th>Time</th><th>A</th><th>B</th><th>C</th><th>Total</th></tr></thead><tbody><tr><td><span class="num" style="font-weight: 700; font-size: 20px; color: var(--brand);">1</span></td><td style="font-weight: 500; font-size: 15px;"><span style="display: inline-flex; align-items: center; gap: 10px;">Los Recursivos<span class="badge badge-uni">Mérida</span></span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">100</span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">100</span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">150</span></td><td><span class="num" style="font-weight: 700; font-size: 20px;">350</span></td></tr><tr style="background: var(--brand-soft);"><td><span class="num" style="font-weight: 700; font-size: 20px; color: var(--foreground);">2</span></td><td style="font-weight: 500; font-size: 15px;"><span style="display: inline-flex; align-items: center; gap: 10px;">Byte Fighters<span class="badge badge-uni">PUCRS</span> <span class="badge badge-brand" style="margin-left: 10px;">Seu time</span></span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">100</span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">100</span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">100</span></td><td><span class="num" style="font-weight: 700; font-size: 20px;">300</span></td></tr><tr><td><span class="num" style="font-weight: 700; font-size: 20px; color: var(--foreground);">3</span></td><td style="font-weight: 500; font-size: 15px;"><span style="display: inline-flex; align-items: center; gap: 10px;">Kernel Panic<span class="badge badge-uni">PUCRS</span></span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">100</span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">60</span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">100</span></td><td><span class="num" style="font-weight: 700; font-size: 20px;">260</span></td></tr><tr><td><span class="num" style="font-weight: 700; font-size: 20px; color: var(--muted);">4</span></td><td style="font-weight: 500; font-size: 15px;"><span style="display: inline-flex; align-items: center; gap: 10px;">Pila de Ideas<span class="badge badge-uni">Mérida</span></span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">100</span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">100</span></td><td><span class="muted" style="font-size: 16px;">—</span></td><td><span class="num" style="font-weight: 700; font-size: 20px;">200</span></td></tr><tr><td><span class="num" style="font-weight: 700; font-size: 20px; color: var(--muted);">5</span></td><td style="font-weight: 500; font-size: 15px;"><span style="display: inline-flex; align-items: center; gap: 10px;">Tupi Code<span class="badge badge-uni">PUCRS</span></span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">80</span></td><td><span class="muted" style="font-size: 16px;">—</span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">0</span></td><td><span class="num" style="font-weight: 700; font-size: 20px;">80</span></td></tr><tr><td><span class="num" style="font-weight: 700; font-size: 20px; color: var(--muted);">6</span></td><td style="font-weight: 500; font-size: 15px;"><span style="display: inline-flex; align-items: center; gap: 10px;">Mérida Devs<span class="badge badge-uni">Mérida</span></span></td><td><span class="num" style="font-weight: 600; font-size: 16px;">40</span></td><td><span class="muted" style="font-size: 16px;">—</span></td><td><span class="muted" style="font-size: 16px;">—</span></td><td><span class="num" style="font-weight: 700; font-size: 20px;">40</span></td></tr></tbody></table></div><div style="display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 13px;" class="muted"><span><b style="color: var(--foreground); font-family: var(--font-display); font-size: 14px;">A</b> Soma dos Pares</span><span><b style="color: var(--foreground); font-family: var(--font-display); font-size: 14px;">B</b> Maior Valor da Lista</span><span><b style="color: var(--foreground); font-family: var(--font-display); font-size: 14px;">C</b> Contar Números Negativos</span><span style="margin-left: auto;">— sem submissão · 0 zerou</span></div></div></main><footer class="footer" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px; flex: none; margin-top: auto;"><span>Dúvidas? Fale com a organização: <a href="#">ligadealgoritmos@gmail.com</a></span><span style="display: flex; align-items: center; gap: 8px;"><svg width="16" height="16" viewBox="0 0 64 64" fill="none" aria-hidden="true" ><path d="M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z" fill="var(--brand)" stroke="var(--brand)" stroke-width="3" stroke-linejoin="round"></path><path d="M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z" fill="var(--chrome-fg)" stroke="var(--chrome-fg)" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"></path></svg><span style="font-family: var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; font-size: 12px; font-weight: 600; color: var(--chrome-muted);">PUCRS × Mérida 2026</span></span></footer>
+</div>
+</x-dc>
+</body>
+</html>

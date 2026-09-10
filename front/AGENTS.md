@@ -25,6 +25,13 @@ TanStack Router (file-based) + TanStack Query · i18next · zod ^3.
   is added to ALL of `src/i18n/{pt,es,en}.json` — the catalog parity test
   fails the suite otherwise.
 - Every interactive or asserted element gets a `data-testid`.
+- No test reaches the real network: the guard in `src/test/network-guard-jsdom.ts`
+  fails any test that lets a `fetch` through. A test that mounts a route either
+  mocks **both** `@/lib/api` and `@/lib/sse-client` (the SSE reader fetches
+  outside the RPC client, so the api mock never covers it), or mounts a minimal
+  route tree of its own instead of `routeTree.gen` — see
+  `src/components/header.test.tsx`. Need a controlled `fetch`? Use
+  `vi.stubGlobal('fetch', …)`; there is no allowlist.
 - Review evidence: Playwright specs in `e2e/`, screenshots committed to
   `e2e/evidence/<issue>/` (see `.claude/skills/reviewing-tasks`).
 - Telemetry lives ONLY in `<VercelAnalytics />` (`src/components/analytics.tsx`),

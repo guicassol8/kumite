@@ -120,6 +120,25 @@ describe('root session bootstrap', () => {
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(router.state.location.pathname).toBe('/')
   })
+
+  // #168 asked whether this effect needs a guard against steering a router
+  // that is already unmounted — the thing that turns a stray 401 into a ghost
+  // navigation. It does not, and this pins why: the effect's body is
+  // `return subscribe(...)`, so the subscription IS the cleanup. React drops
+  // the listener on unmount and a later expiry reaches nobody, which is why
+  // no defensive check was added to production code. Delete that `return` and
+  // this test goes red.
+  it('stops listening once unmounted: an expiry after teardown steers nothing', async () => {
+    setSession(fakeUser, 'tok-1')
+    const router = renderApp()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+
+    cleanup()
+    clearSession('expired')
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(router.state.location.pathname).toBe('/')
+  })
 })
 
 // The footer is the only contact channel during the event, so it must survive

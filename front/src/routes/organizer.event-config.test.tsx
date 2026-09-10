@@ -29,6 +29,7 @@ const mockedCodePatch = vi.mocked(api.organizer['event-codes'][':university'].$p
 const organizerUser: SessionUser = {
   id: 'u1',
   email: 'org@edu.pucrs.br',
+  name: 'Org',
   role: 'organizer',
   university: 'pucrs',
   active: true,

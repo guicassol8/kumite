@@ -27,6 +27,12 @@ export const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
 export const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
 export const hasOrganizerCredentials = Boolean(ORGANIZER_EMAIL && ORGANIZER_PASSWORD)
 
+// Since #122 the header renders `name ?? email`, so what these specs assert
+// there is the name. ORGANIZER_NAME mirrors the constant db:seed writes
+// (back/src/db/seed.ts) — the seeded organizer has no env var for it.
+export const ORGANIZER_NAME = 'Organização kumite'
+export const E2E_PARTICIPANT_NAME = 'E2E Participante'
+
 export type AuthHeader = Record<string, string>
 
 /**

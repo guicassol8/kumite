@@ -20,7 +20,7 @@
 # 0a. Sign up + log in a PUCRS participant.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "event-codes-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Elena Codigos", "email": "event-codes-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -92,7 +92,7 @@ jsonpath "$.active" == false
 
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "event-codes-e2e-blocked@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Bruno Bloqueado", "email": "event-codes-e2e-blocked@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 400
 [Asserts]
 jsonpath "$.error" == "invalid_event_code"

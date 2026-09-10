@@ -13,10 +13,11 @@
 # 1. Valid code + matching domain -> participant created, no passwordHash leaked.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "signup-e2e@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Ada Lovelace", "email": "signup-e2e@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 [Asserts]
 jsonpath "$.email" == "signup-e2e@edu.pucrs.br"
+jsonpath "$.name" == "Ada Lovelace"
 jsonpath "$.role" == "participant"
 jsonpath "$.university" == "pucrs"
 jsonpath "$.passwordHash" not exists
@@ -24,7 +25,7 @@ jsonpath "$.passwordHash" not exists
 # 2. Unknown code -> rejected without revealing which codes are valid.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "someone@edu.pucrs.br", "password": "supersecret", "code": "DOES-NOT-EXIST" }
+{ "name": "Alan Turing", "email": "someone@edu.pucrs.br", "password": "supersecret", "code": "DOES-NOT-EXIST" }
 HTTP 400
 [Asserts]
 jsonpath "$.error" == "invalid_event_code"
@@ -32,7 +33,7 @@ jsonpath "$.error" == "invalid_event_code"
 # 3. Domain outside PUCRS2026's allowed suffixes.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "someone@merida.edu.mx", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Alan Turing", "email": "someone@merida.edu.mx", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 400
 [Asserts]
 jsonpath "$.error" == "invalid_email_domain"
@@ -40,7 +41,7 @@ jsonpath "$.error" == "invalid_email_domain"
 # 4. Same email as step 1, different case -> generic rejection, no confirmation.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "Signup-E2E@Edu.Pucrs.br", "password": "anotherpass", "code": "PUCRS2026" }
+{ "name": "Ada Lovelace", "email": "Signup-E2E@Edu.Pucrs.br", "password": "anotherpass", "code": "PUCRS2026" }
 HTTP 400
 [Asserts]
 jsonpath "$.error" == "signup_failed"
@@ -48,7 +49,24 @@ jsonpath "$.error" == "signup_failed"
 # 5. Password under 8 chars -> kata's automatic validation envelope.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "shortpass@edu.pucrs.br", "password": "short1", "code": "PUCRS2026" }
+{ "name": "Curto Demais", "email": "shortpass@edu.pucrs.br", "password": "short1", "code": "PUCRS2026" }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+
+# 5b. No name at all -> same validation envelope (#122). Lettered so the
+# steps other blocks refer to by number keep their numbers.
+POST {{host}}/auth/signup
+Content-Type: application/json
+{ "email": "noname@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+
+# 5c. A name of a single character is rejected the same way.
+POST {{host}}/auth/signup
+Content-Type: application/json
+{ "name": "A", "email": "shortname@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 422
 [Asserts]
 jsonpath "$.error" == "validation_failed"

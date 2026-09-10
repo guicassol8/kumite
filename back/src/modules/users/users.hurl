@@ -14,7 +14,7 @@
 # 0. Sign up and log in to get a real token.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "me-e2e@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Marie Curie", "email": "me-e2e@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -53,7 +53,7 @@ jsonpath "$.error" == "unauthorized"
 # 4. Sign up the target participant and log in the seeded organizer.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "users-e2e-target@edu.pucrs.br", "password": "originalpass", "code": "PUCRS2026" }
+{ "name": "Grace Hopper", "email": "users-e2e-target@edu.pucrs.br", "password": "originalpass", "code": "PUCRS2026" }
 HTTP 201
 [Captures]
 target_id: jsonpath "$.id"
@@ -96,9 +96,35 @@ Authorization: Bearer {{organizer_token}}
 HTTP 200
 [Asserts]
 jsonpath "$.items[0].email" == "users-e2e-target@edu.pucrs.br"
+jsonpath "$.items[0].name" == "Grace Hopper"
 jsonpath "$.items[0].role" == "participant"
 jsonpath "$.items[0].active" == true
 jsonpath "$.total" == 1
+
+# 5b. Search by name fragment (#122). "hopper" appears nowhere in this
+# account's email, so only the name side of the OR can produce this hit.
+GET {{host}}/organizer/users?q=hopper
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.items[0].email" == "users-e2e-target@edu.pucrs.br"
+jsonpath "$.items[0].name" == "Grace Hopper"
+jsonpath "$.total" == 1
+
+# 5c. Case-insensitive on the name side too, and still AND-ed with the other
+# filters: the same fragment plus a university this participant is not in
+# returns nothing.
+GET {{host}}/organizer/users?q=HOPPER
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.total" == 1
+
+GET {{host}}/organizer/users?q=hopper&university=merida
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.total" == 0
 
 # 6. Filter by role/university -> the target (a participant in pucrs) is
 # absent from an organizer-only or merida-only filter.
@@ -235,7 +261,7 @@ jsonpath "$.issues.query" exists
 # checks above and must keep its password.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "users-e2e-reset@edu.pucrs.br", "password": "originalpass", "code": "PUCRS2026" }
+{ "name": "Katherine Johnson", "email": "users-e2e-reset@edu.pucrs.br", "password": "originalpass", "code": "PUCRS2026" }
 HTTP 201
 [Captures]
 reset_target_id: jsonpath "$.id"

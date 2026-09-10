@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { E2E_PARTICIPANT_NAME, ORGANIZER_NAME } from './support/rounds'
 
 // Visual walkthrough for #33. Prereqs (like auth.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
@@ -32,7 +33,7 @@ async function apiSignupAndLogin(email: string, code: string): Promise<string> {
   await fetch(`${BACK_URL}/auth/signup`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: PASSWORD, code }),
+    body: JSON.stringify({ name: 'E2E Participante', email, password: PASSWORD, code }),
   })
   const res = await fetch(`${BACK_URL}/auth/login`, {
     method: 'POST',
@@ -71,20 +72,26 @@ async function apiMaxTeamSize(token: string): Promise<number> {
 
 async function signupThroughUi(page: Page, email: string, code: string): Promise<void> {
   await page.goto('/signup')
+  await page.getByTestId('signup-name-input').fill('E2E Participante')
   await page.getByTestId('signup-email-input').fill(email)
   await page.getByTestId('signup-password-input').fill(PASSWORD)
   await page.getByTestId('signup-confirm-password-input').fill(PASSWORD)
   await page.getByTestId('signup-code-input').fill(code)
   await page.getByTestId('signup-submit-button').click()
-  await expect(page.getByTestId('header-user-email')).toHaveText(email)
+  await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
 }
 
-async function loginThroughUi(page: Page, email: string, password: string): Promise<void> {
+async function loginThroughUi(
+  page: Page,
+  email: string,
+  password: string,
+  expectedName: string,
+): Promise<void> {
   await page.goto('/login')
   await page.getByTestId('login-email-input').fill(email)
   await page.getByTestId('login-password-input').fill(password)
   await page.getByTestId('login-submit-button').click()
-  await expect(page.getByTestId('header-user-email')).toHaveText(email)
+  await expect(page.getByTestId('header-user-email')).toHaveText(expectedName)
 }
 
 test('walks a participant through creating, filling, and leaving a team', async ({ page }) => {
@@ -160,7 +167,7 @@ test('walks a participant through creating, filling, and leaving a team', async 
 
   // 06 — back as the owner, leaving asks for confirmation first.
   await page.getByTestId('header-logout-button').click()
-  await loginThroughUi(page, emails.owner, PASSWORD)
+  await loginThroughUi(page, emails.owner, PASSWORD, E2E_PARTICIPANT_NAME)
   await page.getByTestId('header-teams-link').click()
   await expect(page.getByTestId('my-team-leave')).toBeEnabled()
   await page.getByTestId('my-team-leave').click()
@@ -210,7 +217,7 @@ test.describe('organizer', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   test('sees the listing without any team action', async ({ page }) => {
-    await loginThroughUi(page, ORGANIZER_EMAIL, ORGANIZER_PASSWORD)
+    await loginThroughUi(page, ORGANIZER_EMAIL, ORGANIZER_PASSWORD, ORGANIZER_NAME)
     await page.getByTestId('header-teams-link').click()
 
     // 08 — read-only: the table is there, Criar time and Entrar are not.

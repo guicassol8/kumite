@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { E2E_PARTICIPANT_NAME, ORGANIZER_NAME } from './support/rounds'
 
 // Visual walkthrough for #94: an id typed (or pasted) into the URL that isn't
 // a uuid now stops at the API's input validation as a 422 instead of blowing
@@ -23,12 +24,13 @@ test.describe('malformed id in the URL (#94)', () => {
 
   async function signupThroughUi(page: Page, email: string) {
     await page.goto('/signup')
+    await page.getByTestId('signup-name-input').fill('E2E Participante')
     await page.getByTestId('signup-email-input').fill(email)
     await page.getByTestId('signup-password-input').fill(PASSWORD)
     await page.getByTestId('signup-confirm-password-input').fill(PASSWORD)
     await page.getByTestId('signup-code-input').fill('PUCRS2026')
     await page.getByTestId('signup-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(email)
+    await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
   }
 
   async function loginAsOrganizer(page: Page) {
@@ -36,7 +38,7 @@ test.describe('malformed id in the URL (#94)', () => {
     await page.getByTestId('login-email-input').fill(ORGANIZER_EMAIL)
     await page.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
     await page.getByTestId('login-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
+    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
   }
 
   test('the four id-in-the-URL screens answer not-found instead of erroring', async ({ page }) => {

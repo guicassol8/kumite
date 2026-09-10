@@ -6,6 +6,7 @@ import {
   createRound,
   expect,
   ORGANIZER_EMAIL,
+  ORGANIZER_NAME,
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
@@ -31,7 +32,7 @@ test.describe('organizer overview', () => {
     await page.getByTestId('login-email-input').fill(ORGANIZER_EMAIL)
     await page.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
     await page.getByTestId('login-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
+    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
   }
 
   // The overview's first criterion is about real numbers, so the walkthrough
@@ -41,7 +42,12 @@ test.describe('organizer overview', () => {
     await fetch(`${BACK_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password: PARTICIPANT_PASSWORD, code }),
+      body: JSON.stringify({
+        name: 'E2E Participante',
+        email,
+        password: PARTICIPANT_PASSWORD,
+        code,
+      }),
     })
     const res = await fetch(`${BACK_URL}/auth/login`, {
       method: 'POST',

@@ -1,6 +1,13 @@
 import { z } from 'zod'
 
 export const SignupBodySchema = z.object({
+  // Required here and nowhere else (#122): the column is nullable so accounts
+  // that predate it keep working, so this schema is what makes the name
+  // mandatory for everyone signing up from now on. No charset rule — accents,
+  // spaces and compound names are ordinary. `.trim()` runs before the length
+  // checks, so "  A  " is a 1-character name, and what reaches the db is the
+  // trimmed value.
+  name: z.string().trim().min(2).max(80),
   email: z.string().email(),
   password: z.string().min(8),
   code: z.string().min(1),

@@ -4,6 +4,7 @@ import {
   BACK_URL,
   closeRound,
   createRound,
+  E2E_PARTICIPANT_NAME,
   expect,
   ORGANIZER_EMAIL,
   ORGANIZER_PASSWORD,
@@ -60,12 +61,13 @@ test.describe('round screen (#39)', () => {
 
   async function signupThroughUi(page: Page, email: string): Promise<void> {
     await page.goto('/signup')
+    await page.getByTestId('signup-name-input').fill('E2E Participante')
     await page.getByTestId('signup-email-input').fill(email)
     await page.getByTestId('signup-password-input').fill(PASSWORD)
     await page.getByTestId('signup-confirm-password-input').fill(PASSWORD)
     await page.getByTestId('signup-code-input').fill('PUCRS2026')
     await page.getByTestId('signup-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(email)
+    await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
   }
 
   test('shows the problems table live, then flips to the closed read-only state without a stale notice on reload', async ({

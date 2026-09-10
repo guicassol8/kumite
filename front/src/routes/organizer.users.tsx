@@ -217,6 +217,7 @@ function OrganizerUsersScreen() {
           <Table data-testid="organizer-users-table">
             <TableHeader>
               <TableRow>
+                <TableHead>{t('organizer.users.columns.name')}</TableHead>
                 <TableHead>{t('organizer.users.columns.email')}</TableHead>
                 <TableHead>{t('organizer.users.columns.university')}</TableHead>
                 <TableHead>{t('organizer.users.columns.role')}</TableHead>
@@ -232,6 +233,9 @@ function OrganizerUsersScreen() {
                   data-testid={`organizer-users-row-${item.id}`}
                   className={item.active ? undefined : 'text-muted-foreground'}
                 >
+                  {/* Accounts predating #122 have no name — an em dash, not a
+                      blank cell, so the column still reads as filled in. */}
+                  <TableCell>{item.name ?? t('organizer.users.noName')}</TableCell>
                   <TableCell>{item.email}</TableCell>
                   <TableCell>
                     <UniversityBadge university={item.university} />

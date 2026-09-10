@@ -26,7 +26,7 @@
 # 0a. Sign up + log in the team creator (PUCRS).
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "teams-e2e-creator@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Ada Lovelace", "email": "teams-e2e-creator@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -39,7 +39,7 @@ creator_token: jsonpath "$.token"
 # 0b. Sign up + log in a second PUCRS user (never gets a team of their own).
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "teams-e2e-rival@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Alan Turing", "email": "teams-e2e-rival@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -52,7 +52,7 @@ rival_token: jsonpath "$.token"
 # 0c. Sign up + log in a Mérida user (proves the cross-university join).
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "teams-e2e-cross@merida.edu.mx", "password": "supersecret", "code": "MERIDA2026" }
+{ "name": "Sofia Ruiz", "email": "teams-e2e-cross@merida.edu.mx", "password": "supersecret", "code": "MERIDA2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -65,7 +65,7 @@ cross_token: jsonpath "$.token"
 # 0d. Sign up + log in a fourth user, only used for the team_full attempt.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "teams-e2e-fourth@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Barbara Liskov", "email": "teams-e2e-fourth@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -138,15 +138,17 @@ jsonpath "$.teams[?(@.id=='{{team_id}}')].slotsAvailable" == 2
 jsonpath "$.teams[?(@.id=='{{team_id}}')].frozen" == false
 jsonpath "$.teams[?(@.id=='{{team_id}}')].joinBlockedReason" == "already_in_team"
 jsonpath "$.teams[?(@.id=='{{team_id}}')].members[0].email" == "teams-e2e-creator@edu.pucrs.br"
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[0].name" == "Ada Lovelace"
 
 # 4b. Same list, as an outsider -> no team of their own, the roster stays
-#     anonymous (no emails) and the team is joinable.
+#     anonymous (no emails, no names) and the team is joinable.
 GET {{host}}/teams
 Authorization: Bearer {{rival_token}}
 HTTP 200
 [Asserts]
 jsonpath "$.myTeamId" == null
 jsonpath "$.teams[?(@.id=='{{team_id}}')].members[0].email" == null
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[0].name" == null
 jsonpath "$.teams[?(@.id=='{{team_id}}')].joinBlockedReason" == null
 
 # 5. Cross-university join with mixing unlocked -> 200.
@@ -248,7 +250,7 @@ team2_id: jsonpath "$.id"
 # 17. A 5th user, kept teamless on purpose — the member_not_found fixture.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "teams-e2e-fifth@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Edsger Dijkstra", "email": "teams-e2e-fifth@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login
@@ -447,7 +449,7 @@ HTTP 200
 [Captures]
 rival_id: jsonpath "$.id"
 
-# 44. List, as the organizer -> every member's userId/email/university/role
+# 44. List, as the organizer -> every member's userId/email/name/university/role
 #     is visible (no anonymization), team_id is 3/3 (frozen false), team2_id
 #     is a listed empty team, and the removed team3_id is gone.
 GET {{host}}/organizer/teams
@@ -458,9 +460,11 @@ jsonpath "$.maxTeamSize" == 3
 jsonpath "$.teams[?(@.id=='{{team_id}}')].frozen" == false
 jsonpath "$.teams[?(@.id=='{{team_id}}')].slotsAvailable" == 0
 jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{cross_id}}')].email" == "teams-e2e-cross@merida.edu.mx"
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{cross_id}}')].name" == "Sofia Ruiz"
 jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{cross_id}}')].university" == "merida"
 jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{cross_id}}')].role" == "participant"
 jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{rival_id}}')].email" == "teams-e2e-rival@edu.pucrs.br"
+jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{rival_id}}')].name" == "Alan Turing"
 jsonpath "$.teams[?(@.id=='{{team_id}}')].members[?(@.userId=='{{fourth_id}}')].email" == "teams-e2e-fourth@edu.pucrs.br"
 jsonpath "$.teams[?(@.id=='{{team2_id}}')].members" count == 0
 jsonpath "$.teams[?(@.id=='{{team3_id}}')]" not exists

@@ -131,6 +131,7 @@ function TeamCard({
         <Table data-testid={`team-moderation-members-${team.id}`}>
           <TableHeader>
             <TableRow>
+              <TableHead>{t('organizer.teamModeration.columns.name')}</TableHead>
               <TableHead>{t('organizer.teamModeration.columns.email')}</TableHead>
               <TableHead>{t('organizer.teamModeration.columns.university')}</TableHead>
               <TableHead>{t('organizer.teamModeration.columns.role')}</TableHead>
@@ -143,6 +144,7 @@ function TeamCard({
                 key={member.userId}
                 data-testid={`team-moderation-member-row-${member.userId}`}
               >
+                <TableCell>{member.name ?? t('organizer.teamModeration.noName')}</TableCell>
                 <TableCell>{member.email}</TableCell>
                 <TableCell>
                   <UniversityBadge university={member.university} />

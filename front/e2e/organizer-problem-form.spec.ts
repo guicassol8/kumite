@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { ORGANIZER_NAME } from './support/rounds'
 
 // Visual walkthrough for #13. Prereqs (like organizer-problems.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
@@ -30,7 +31,7 @@ test.describe('organizer problem form', () => {
     await page.getByTestId('login-email-input').fill(ORGANIZER_EMAIL)
     await page.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
     await page.getByTestId('login-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
+    await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
   }
 
   test('creates, validates, saves and publishes a problem end to end', async ({ page }) => {

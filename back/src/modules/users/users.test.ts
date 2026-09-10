@@ -22,10 +22,15 @@ const db = createDb()
 
 const baseUser: NewUser = {
   email: 'ada@example.com',
+  name: 'Ada Lovelace',
   passwordHash: 'hash',
   role: 'participant',
   university: 'pucrs',
 }
+
+// An account created before the #122 migration: the column is nullable, so
+// every read path has to survive it.
+const legacyUser: NewUser = { ...baseUser, email: 'legacy@example.com', name: null }
 
 beforeEach(async () => {
   await db.execute(
@@ -139,11 +144,63 @@ describe('users.service findUserById', () => {
 describe('users.service listUsers', () => {
   it('finds a user by an email fragment, case-insensitively', async () => {
     await createUser(db, baseUser)
-    await createUser(db, { ...baseUser, email: 'grace@example.com' })
+    // A name of its own, or 'ADA' would match this row through the name side
+    // too and the case would stop being about email search.
+    await createUser(db, { ...baseUser, email: 'grace@example.com', name: 'Grace Hopper' })
 
     const result = await listUsers(db, { q: 'ADA', limit: 20, offset: 0 })
     expect(result.items.map((u) => u.email)).toEqual(['ada@example.com'])
     expect(result.total).toBe(1)
+  })
+
+  it('finds a user by a name fragment, case-insensitively (#122)', async () => {
+    await createUser(db, baseUser)
+    await createUser(db, { ...baseUser, email: 'grace@example.com', name: 'Grace Hopper' })
+
+    const result = await listUsers(db, { q: 'LOVELACE', limit: 20, offset: 0 })
+    expect(result.items.map((u) => u.email)).toEqual(['ada@example.com'])
+    expect(result.total).toBe(1)
+    expect(result.items[0]?.name).toBe('Ada Lovelace')
+  })
+
+  it('matches a fragment of either side, name or email', async () => {
+    await createUser(db, { ...baseUser, email: 'zzz@example.com', name: 'Grace Hopper' })
+    await createUser(db, { ...baseUser, email: 'grace@example.com', name: 'Ada Lovelace' })
+
+    // 'grace' is one row's name and the other row's email — both come back.
+    const result = await listUsers(db, { q: 'grace', limit: 20, offset: 0 })
+    expect(result.items.map((u) => u.email).sort()).toEqual([
+      'grace@example.com',
+      'zzz@example.com',
+    ])
+    expect(result.total).toBe(2)
+  })
+
+  it('does not break on a user whose name is null, and never matches it by name', async () => {
+    await createUser(db, legacyUser)
+    await createUser(db, baseUser)
+
+    const byName = await listUsers(db, { q: 'lovelace', limit: 20, offset: 0 })
+    expect(byName.items.map((u) => u.email)).toEqual(['ada@example.com'])
+
+    const byEmail = await listUsers(db, { q: 'legacy', limit: 20, offset: 0 })
+    expect(byEmail.items.map((u) => u.email)).toEqual(['legacy@example.com'])
+    expect(byEmail.items[0]?.name).toBeNull()
+  })
+
+  // The name/email match is one OR'd group: it must not loosen the AND that
+  // joins it to the other filters.
+  it('keeps q AND role/university, not OR', async () => {
+    await createUser(db, baseUser)
+    await createUser(db, { ...baseUser, email: 'org@example.com', role: 'organizer' })
+
+    const result = await listUsers(db, { q: 'lovelace', role: 'organizer', limit: 20, offset: 0 })
+    expect(result.items.map((u) => u.email)).toEqual(['org@example.com'])
+    expect(result.total).toBe(1)
+
+    const none = await listUsers(db, { q: 'lovelace', university: 'merida', limit: 20, offset: 0 })
+    expect(none.items).toEqual([])
+    expect(none.total).toBe(0)
   })
 
   it('filters by role and university', async () => {

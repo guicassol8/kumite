@@ -44,6 +44,10 @@ export const usersTable = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     email: text('email').notNull(),
+    // Nullable on purpose (#122): accounts created before the column existed
+    // have no name and must keep logging in. New signups can't skip it — the
+    // requirement lives in SignupBodySchema, not in the database.
+    name: text('name'),
     passwordHash: text('password_hash').notNull(),
     role: roleEnum('role').notNull(),
     university: universityEnum('university').notNull(),

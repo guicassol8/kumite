@@ -28,6 +28,7 @@ export const Route = createFileRoute('/signup')({
 })
 
 type SignupFormValues = {
+  name: string
   email: string
   password: string
   confirmPassword: string
@@ -40,6 +41,13 @@ function useSignupSchema() {
     () =>
       z
         .object({
+          // Mirrors SignupBodySchema on the back: trim first, so a name made
+          // of spaces neither clears the minimum nor reaches the API.
+          name: z
+            .string()
+            .trim()
+            .min(2, t('auth.signup.errors.nameTooShort'))
+            .max(80, t('auth.signup.errors.nameTooLong')),
           email: z.string().email(t('auth.signup.errors.emailInvalid')),
           password: z.string().min(8, t('auth.signup.errors.passwordTooShort')),
           confirmPassword: z.string(),
@@ -53,8 +61,8 @@ function useSignupSchema() {
   )
 }
 
-function isKnownField(path: string): path is 'email' | 'password' | 'code' {
-  return path === 'email' || path === 'password' || path === 'code'
+function isKnownField(path: string): path is 'name' | 'email' | 'password' | 'code' {
+  return path === 'name' || path === 'email' || path === 'password' || path === 'code'
 }
 
 function SignupScreen() {
@@ -64,12 +72,17 @@ function SignupScreen() {
   const schema = useSignupSchema()
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: '', password: '', confirmPassword: '', code: '' },
+    defaultValues: { name: '', email: '', password: '', confirmPassword: '', code: '' },
   })
 
   async function onSubmit(values: SignupFormValues) {
     const signupRes = await api.auth.signup.$post({
-      json: { email: values.email, password: values.password, code: values.code },
+      json: {
+        name: values.name,
+        email: values.email,
+        password: values.password,
+        code: values.code,
+      },
     })
 
     if (signupRes.status === 201) {
@@ -139,6 +152,19 @@ function SignupScreen() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('auth.signup.nameLabel')}</FormLabel>
+                    <FormControl>
+                      <Input data-testid="signup-name-input" {...field} />
+                    </FormControl>
+                    <FormMessage data-testid="signup-name-error" />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="email"

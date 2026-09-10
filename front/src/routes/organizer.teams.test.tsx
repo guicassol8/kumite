@@ -35,6 +35,7 @@ const mockedMemberMove = vi.mocked(api.organizer.teams.members[':userId'].move.$
 const organizerUser: SessionUser = {
   id: 'org-1',
   email: 'org@edu.pucrs.br',
+  name: 'Org',
   role: 'organizer',
   university: 'pucrs',
   active: true,
@@ -58,8 +59,20 @@ function organizerTeamsList(overrides: Record<string, unknown> = {}) {
         frozen: false,
         slotsAvailable: 1,
         members: [
-          { userId: 'u1', email: 'creator@edu.pucrs.br', university: 'pucrs', role: 'participant' },
-          { userId: 'u2', email: 'cross@merida.edu.mx', university: 'merida', role: 'participant' },
+          {
+            userId: 'u1',
+            email: 'creator@edu.pucrs.br',
+            name: 'Ada Lovelace',
+            university: 'pucrs',
+            role: 'participant',
+          },
+          {
+            userId: 'u2',
+            email: 'cross@merida.edu.mx',
+            name: null,
+            university: 'merida',
+            role: 'participant',
+          },
         ],
       },
       {
@@ -68,7 +81,13 @@ function organizerTeamsList(overrides: Record<string, unknown> = {}) {
         frozen: true,
         slotsAvailable: 0,
         members: [
-          { userId: 'u3', email: 'a@edu.pucrs.br', university: 'pucrs', role: 'participant' },
+          {
+            userId: 'u3',
+            email: 'a@edu.pucrs.br',
+            name: 'Alan Turing',
+            university: 'pucrs',
+            role: 'participant',
+          },
         ],
       },
     ],
@@ -139,6 +158,18 @@ describe('OrganizerTeamsScreen', () => {
     expect(screen.getByTestId('team-moderation-card-team-2')).toBeDefined()
     expect(screen.getByTestId('team-moderation-frozen-team-2')).toBeDefined()
     expect(screen.getByTestId('team-moderation-remove-team-action-team-2')).toBeDefined()
+  })
+
+  it('shows the member name, and a dash for an account that has none (#122)', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+    const named = screen.getByTestId('team-moderation-member-row-u1')
+    expect(named.querySelectorAll('td')[0]?.textContent).toBe('Ada Lovelace')
+    const legacy = screen.getByTestId('team-moderation-member-row-u2')
+    expect(legacy.querySelectorAll('td')[0]?.textContent).toBe('—')
+    expect(legacy.textContent).toContain('cross@merida.edu.mx')
   })
 
   it('renames a team inline and invalidates the listing', async () => {

@@ -17,6 +17,7 @@ import { clearSession, getState, type SessionUser, setSession } from '@/lib/sess
 const fakeUser: SessionUser = {
   id: 'u1',
   email: 'ada@edu.pucrs.br',
+  name: 'Ada Lovelace',
   role: 'participant',
   university: 'pucrs',
   active: true,
@@ -65,12 +66,27 @@ function renderHeader(initialEntry = '/login') {
   return router
 }
 
+// This file renders whole routes (the home screen fires several authenticated
+// queries) and is the only one that does not stub `@/lib/api`, so without this
+// the real `fetch` runs: a 401 on a request carrying our Authorization header
+// makes authFetch call clearSession('expired'), and __root bounces the router
+// to /login. Landing before or after an assertion was pure timing, which is
+// why "stays on the home page" passed in a full run and failed on its own.
+// Discovered from #122.
 beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async () =>
+        new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }),
+    ),
+  )
   clearSession('manual')
 })
 
 afterEach(async () => {
   cleanup()
+  vi.unstubAllGlobals()
   clearSession('manual')
   // i18n is a module singleton: a test that switches language would otherwise
   // leak English/Spanish into every PT assertion that follows.
@@ -87,14 +103,24 @@ describe('Header', () => {
     expect(screen.queryByTestId('header-logout-button')).toBeNull()
   })
 
-  it('shows the user email and a logout button when authenticated', async () => {
+  it('shows the user name and a logout button when authenticated', async () => {
     setSession(fakeUser, 'tok-1')
     renderHeader()
 
     await waitFor(() => expect(screen.getByTestId('header-user-email')).toBeDefined())
-    expect(screen.getByTestId('header-user-email').textContent).toBe('ada@edu.pucrs.br')
+    expect(screen.getByTestId('header-user-email').textContent).toBe('Ada Lovelace')
     expect(screen.queryByTestId('header-login-link')).toBeNull()
     expect(screen.queryByTestId('header-signup-link')).toBeNull()
+  })
+
+  // An account created before the #122 migration has no name — the same slot
+  // falls back to the email rather than rendering nothing.
+  it('falls back to the email for a user with no name', async () => {
+    setSession({ ...fakeUser, name: null }, 'tok-1')
+    renderHeader()
+
+    await waitFor(() => expect(screen.getByTestId('header-user-email')).toBeDefined())
+    expect(screen.getByTestId('header-user-email').textContent).toBe('ada@edu.pucrs.br')
   })
 
   it('does not show the organizer link for a participant', async () => {

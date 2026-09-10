@@ -14,6 +14,7 @@ import { useLeaderboardStream } from './use-leaderboard-stream'
 const fakeUser: SessionUser = {
   id: 'u1',
   email: 'ada@edu.pucrs.br',
+  name: 'Ada',
   role: 'participant',
   university: 'pucrs',
   active: true,

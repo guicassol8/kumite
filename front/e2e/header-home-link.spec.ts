@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { E2E_PARTICIPANT_NAME, ORGANIZER_NAME } from './support/rounds'
 
 // The wordmark is the only way back to the home page from a deep route (#154).
 // The component test already pins the markup and the label; what it cannot see
@@ -13,12 +14,13 @@ const stamp = Date.now()
 
 async function signUpParticipant(page: Page, email: string) {
   await page.goto('/signup')
+  await page.getByTestId('signup-name-input').fill('E2E Participante')
   await page.getByTestId('signup-email-input').fill(email)
   await page.getByTestId('signup-password-input').fill(PASSWORD)
   await page.getByTestId('signup-confirm-password-input').fill(PASSWORD)
   await page.getByTestId('signup-code-input').fill('PUCRS2026')
   await page.getByTestId('signup-submit-button').click()
-  await expect(page.getByTestId('header-user-email')).toHaveText(email)
+  await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
 }
 
 async function loginAsOrganizer(page: Page) {
@@ -26,7 +28,7 @@ async function loginAsOrganizer(page: Page) {
   await page.getByTestId('login-email-input').fill(ORGANIZER_EMAIL)
   await page.getByTestId('login-password-input').fill(ORGANIZER_PASSWORD)
   await page.getByTestId('login-submit-button').click()
-  await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_EMAIL)
+  await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
 }
 
 test.describe('header home link', () => {

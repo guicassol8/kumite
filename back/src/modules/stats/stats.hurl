@@ -14,7 +14,7 @@
 # 0a. Sign up + log in a participant.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "stats-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Sara Estatistica", "email": "stats-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP *
 
 POST {{host}}/auth/login

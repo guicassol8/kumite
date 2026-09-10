@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { ORGANIZER_NAME } from './support/rounds'
 
 // Visual walkthrough for #53. Prereqs (like organizer-team-moderation.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
@@ -33,7 +34,7 @@ async function apiSignupAndLogin(email: string, code: string): Promise<string> {
   await fetch(`${BACK_URL}/auth/signup`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: PASSWORD, code }),
+    body: JSON.stringify({ name: 'E2E Participante', email, password: PASSWORD, code }),
   })
   return apiLogin(email, PASSWORD)
 }
@@ -49,7 +50,7 @@ async function loginThroughUi(page: Page, email: string, password: string): Prom
   await page.getByTestId('login-email-input').fill(email)
   await page.getByTestId('login-password-input').fill(password)
   await page.getByTestId('login-submit-button').click()
-  await expect(page.getByTestId('header-user-email')).toHaveText(email)
+  await expect(page.getByTestId('header-user-email')).toHaveText(ORGANIZER_NAME)
 }
 
 test.describe('organizer user administration', () => {

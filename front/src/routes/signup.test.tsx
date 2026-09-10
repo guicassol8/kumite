@@ -30,6 +30,7 @@ function jsonResponse(status: number, body: unknown): any {
 const fakeUser = {
   id: 'u1',
   email: 'ada@edu.pucrs.br',
+  name: 'Ada Lovelace',
   role: 'participant',
   university: 'pucrs',
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -58,6 +59,9 @@ afterEach(() => {
 })
 
 async function fillForm() {
+  fireEvent.change(screen.getByTestId('signup-name-input'), {
+    target: { value: 'Ada Lovelace' },
+  })
   fireEvent.change(screen.getByTestId('signup-email-input'), {
     target: { value: 'ada@edu.pucrs.br' },
   })
@@ -103,6 +107,9 @@ describe('SignupScreen', () => {
   it('blocks submit client-side on a password/confirm mismatch, without calling the API', async () => {
     renderSignup()
     await waitFor(() => screen.getByTestId('signup-email-input'))
+    fireEvent.change(screen.getByTestId('signup-name-input'), {
+      target: { value: 'Ada Lovelace' },
+    })
     fireEvent.change(screen.getByTestId('signup-email-input'), {
       target: { value: 'ada@edu.pucrs.br' },
     })
@@ -117,6 +124,37 @@ describe('SignupScreen', () => {
     fireEvent.click(screen.getByTestId('signup-submit-button'))
 
     await waitFor(() => expect(mockedSignup).not.toHaveBeenCalled())
+  })
+
+  // Acceptance: a signup with no name is refused — client-side here, so the
+  // request never leaves the browser.
+  it('blocks submit with an empty name and shows the inline error (#122)', async () => {
+    renderSignup()
+    await waitFor(() => screen.getByTestId('signup-email-input'))
+    await fillForm()
+    fireEvent.change(screen.getByTestId('signup-name-input'), { target: { value: '  ' } })
+
+    fireEvent.click(screen.getByTestId('signup-submit-button'))
+
+    const error = await screen.findByTestId('signup-name-error')
+    expect(error.textContent).toContain('nome')
+    await waitFor(() => expect(mockedSignup).not.toHaveBeenCalled())
+  })
+
+  it('sends the name in the signup payload (#122)', async () => {
+    mockedSignup.mockResolvedValue(jsonResponse(201, fakeUser))
+    mockedLogin.mockResolvedValue(jsonResponse(200, { token: 'tok-1' }))
+    mockedMe.mockResolvedValue(jsonResponse(200, fakeUser))
+    renderSignup()
+    await waitFor(() => screen.getByTestId('signup-email-input'))
+    await fillForm()
+
+    fireEvent.click(screen.getByTestId('signup-submit-button'))
+
+    await waitFor(() => expect(mockedSignup).toHaveBeenCalled())
+    expect(mockedSignup.mock.calls[0]?.[0]).toMatchObject({
+      json: { name: 'Ada Lovelace', email: 'ada@edu.pucrs.br', code: 'PUCRS2026' },
+    })
   })
 
   it('auto-logs in and stores the session on a successful signup', async () => {

@@ -18,7 +18,7 @@
 # 0. Sign up + log in a participant, only used for the 401/403 checks.
 POST {{host}}/auth/signup
 Content-Type: application/json
-{ "email": "rounds-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
+{ "name": "Renata Rodada", "email": "rounds-e2e-participant@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
 HTTP 201
 
 POST {{host}}/auth/login

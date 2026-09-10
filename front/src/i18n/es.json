@@ -339,11 +339,13 @@
         "organizer": "Organizador"
       },
       "columns": {
+        "name": "Nombre",
         "email": "Email",
         "university": "Universidad",
         "role": "Rol",
         "actions": "Acciones"
       },
+      "noName": "—",
       "rename": {
         "editAction": "Renombrar",
         "save": "Guardar",
@@ -396,8 +398,8 @@
       },
       "empty": "Ningún usuario encontrado con estos filtros.",
       "search": {
-        "label": "Buscar por correo",
-        "placeholder": "parte del correo"
+        "label": "Buscar por nombre o correo",
+        "placeholder": "parte del nombre o del correo"
       },
       "filters": {
         "all": "Todos",
@@ -410,6 +412,7 @@
         "organizer": "Organizador"
       },
       "columns": {
+        "name": "Nombre",
         "email": "Correo electrónico",
         "university": "Universidad",
         "role": "Rol",
@@ -418,6 +421,7 @@
         "actions": "Acciones"
       },
       "noTeam": "—",
+      "noName": "—",
       "status": {
         "active": "Activo",
         "inactive": "Desactivado"
@@ -580,12 +584,15 @@
     },
     "signup": {
       "title": "Registro",
+      "nameLabel": "Nombre",
       "emailLabel": "Correo electrónico",
       "passwordLabel": "Contraseña",
       "confirmPasswordLabel": "Confirmar contraseña",
       "codeLabel": "Código del evento",
       "submitButton": "Registrarse",
       "errors": {
+        "nameTooShort": "Ingresa tu nombre (al menos 2 caracteres)",
+        "nameTooLong": "El nombre puede tener como máximo 80 caracteres",
         "emailInvalid": "Ingresa un correo electrónico válido",
         "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
         "passwordMismatch": "Las contraseñas no coinciden",

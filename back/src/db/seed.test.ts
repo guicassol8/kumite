@@ -42,6 +42,9 @@ describe('seed', () => {
     expect(users).toHaveLength(1)
     expect(users[0]?.email).toBe(ORGANIZER_EMAIL)
     expect(users[0]?.role).toBe('organizer')
+    // The seeded organizer is not a legacy account: it gets a name like any
+    // other user, without a new env var to supply it (#122).
+    expect(users[0]?.name).toBe('Organização kumite')
 
     const eventCodes = await db.select().from(eventCodesTable)
     const pucrs = eventCodes.find((row) => row.code === 'PUCRS2026')

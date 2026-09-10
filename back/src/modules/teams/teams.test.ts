@@ -29,12 +29,14 @@ import {
 const db = createDb()
 
 let userSeq = 0
-async function insertUser(university: University = 'pucrs') {
+// `name: null` reproduces an account created before the #122 migration.
+async function insertUser(university: University = 'pucrs', name?: string | null) {
   userSeq += 1
   const [user] = await db
     .insert(usersTable)
     .values({
       email: `user-${userSeq}@example.com`,
+      name: name === undefined ? `User ${userSeq}` : name,
       passwordHash: 'hash',
       role: 'participant',
       university,
@@ -604,8 +606,8 @@ describe('listTeams', () => {
           id: created.team.id,
           name: 'Team A',
           members: expect.arrayContaining([
-            { university: 'pucrs', email: creator.email },
-            { university: 'merida', email: joiner.email },
+            { university: 'pucrs', email: creator.email, name: creator.name },
+            { university: 'merida', email: joiner.email, name: joiner.name },
           ]),
           slotsAvailable: 1,
           frozen: false,
@@ -639,8 +641,40 @@ describe('listTeams', () => {
 
     const myTeam = result.teams.find((team) => team.id === mine.team.id)
     const otherTeam = result.teams.find((team) => team.id === theirs.team.id)
-    expect(myTeam?.members).toEqual([{ university: 'pucrs', email: viewer.email }])
-    expect(otherTeam?.members).toEqual([{ university: 'pucrs', email: null }])
+    expect(myTeam?.members).toEqual([
+      { university: 'pucrs', email: viewer.email, name: viewer.name },
+    ])
+    expect(otherTeam?.members).toEqual([{ university: 'pucrs', email: null, name: null }])
+  })
+
+  // The assertion that protects anonymity: a name is identity, so it has to
+  // be gated exactly like the email, not leaked because it is "just a label".
+  it('hides a member name from every team but the viewer own (#122)', async () => {
+    const viewer = await insertUser('pucrs')
+    const stranger = await insertUser('pucrs')
+    const mine = await createTeam(db, viewer.id, 'Mine')
+    const theirs = await createTeam(db, stranger.id, 'Theirs')
+    if (!mine.ok || !theirs.ok) throw new Error('expected success')
+
+    const result = await listTeams(db, viewer.id)
+
+    const otherTeam = result.teams.find((team) => team.id === theirs.team.id)
+    expect(stranger.name).not.toBeNull()
+    expect(otherTeam?.members).toEqual([{ university: 'pucrs', email: null, name: null }])
+  })
+
+  it('returns a null name for a own-team member that predates the column', async () => {
+    const viewer = await insertUser('pucrs')
+    const legacy = await insertUser('pucrs', null)
+    const mine = await createTeam(db, viewer.id, 'Mine')
+    if (!mine.ok) throw new Error('expected success')
+    await joinTeam(db, legacy.id, mine.team.id)
+
+    const result = await listTeams(db, viewer.id)
+
+    expect(result.teams[0]?.members).toEqual(
+      expect.arrayContaining([{ university: 'pucrs', email: legacy.email, name: null }]),
+    )
   })
 
   it('reports myTeamId as null and no email at all for a viewer with no team', async () => {
@@ -652,7 +686,7 @@ describe('listTeams', () => {
     const result = await listTeams(db, viewer.id)
 
     expect(result.myTeamId).toBeNull()
-    expect(result.teams[0]?.members).toEqual([{ university: 'pucrs', email: null }])
+    expect(result.teams[0]?.members).toEqual([{ university: 'pucrs', email: null, name: null }])
   })
 
   it('marks a team that has already submitted as frozen', async () => {
@@ -752,12 +786,42 @@ describe('listOrganizerTeams', () => {
           frozen: false,
           slotsAvailable: 1,
           members: expect.arrayContaining([
-            { userId: creator.id, email: creator.email, university: 'pucrs', role: 'participant' },
-            { userId: joiner.id, email: joiner.email, university: 'merida', role: 'participant' },
+            {
+              userId: creator.id,
+              email: creator.email,
+              name: creator.name,
+              university: 'pucrs',
+              role: 'participant',
+            },
+            {
+              userId: joiner.id,
+              email: joiner.email,
+              name: joiner.name,
+              university: 'merida',
+              role: 'participant',
+            },
           ]),
         },
       ],
     })
+  })
+
+  it('carries a null name for a member that predates the column (#122)', async () => {
+    const legacy = await insertUser('pucrs', null)
+    const created = await createTeam(db, legacy.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await listOrganizerTeams(db)
+
+    expect(result.teams[0]?.members).toEqual([
+      {
+        userId: legacy.id,
+        email: legacy.email,
+        name: null,
+        university: 'pucrs',
+        role: 'participant',
+      },
+    ])
   })
 
   it('still lists a team with zero members with an empty members array', async () => {

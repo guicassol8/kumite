@@ -46,8 +46,11 @@ export function Header() {
             >
               {t('header.changePassword')}
             </Link>
+            {/* Testid kept as-is (#122): it is the identity slot, and renaming
+                it would churn every spec for no gain. Accounts that predate
+                the name column fall back to the email. */}
             <span data-testid="header-user-email" className="text-muted-foreground text-sm">
-              {user.email}
+              {user.name ?? user.email}
             </span>
             <Button
               type="button"

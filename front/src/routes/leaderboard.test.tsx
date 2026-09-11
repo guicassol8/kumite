@@ -22,10 +22,13 @@ vi.mock('@/lib/api', () => ({
 
 import '@/i18n'
 
+import { OFFLINE_AFTER_MS } from '@/hooks/use-leaderboard-stream'
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import type { EventRanking, RoundRanking, SseEvent } from '@/lib/sse-schema'
 import { routeTree } from '@/routeTree.gen'
+
+import { POLL_WHILE_OFFLINE_MS } from './leaderboard'
 
 const mockedTeams = vi.mocked(api.teams.$get)
 const mockedRounds = vi.mocked(api.rounds.$get)
@@ -437,6 +440,173 @@ describe('LeaderboardScreen — no active round', () => {
   })
 })
 
+describe('LeaderboardScreen — SSE never connects (REST fallback)', () => {
+  // The reported bug (#180): `isLoading` included `stream.event === null`,
+  // which is exactly the condition that enables the REST fallback — so the
+  // fallback fetched the data and the screen never left the loading state.
+  it('renders the ranking from the REST fallback when the stream delivers nothing', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+
+    // No emit(): the stream stays silent for the whole test, as it does when
+    // /sse is blocked by a proxy or the venue's network.
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-loading')).toBeNull())
+    expect(mockedEventRanking).toHaveBeenCalled()
+
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('Time 1')
+  })
+
+  // Same root cause: the error branch was `!isLoading && isError`, so it was
+  // unreachable for as long as isLoading was stuck true.
+  it('reaches the error state with a working retry when every REST call fails too', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(500, {}))
+    mockedRounds.mockResolvedValue(jsonResponse(500, {}))
+    mockedRoundRanking.mockResolvedValue(jsonResponse(500, {}))
+    mockedEventRanking.mockResolvedValue(jsonResponse(500, {}))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-error')).toBeDefined())
+    expect(screen.queryByTestId('leaderboard-loading')).toBeNull()
+
+    const retry = screen.getByTestId('leaderboard-error-retry')
+    mockedEventRanking.mockClear()
+    fireEvent.click(retry)
+    await waitFor(() => expect(mockedEventRanking).toHaveBeenCalled())
+  })
+
+  // Data first: a partial failure must never hide a ranking that did load.
+  it('keeps showing the ranking when only the rounds list fails', async () => {
+    mockedRounds.mockResolvedValue(jsonResponse(500, {}))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-loading')).toBeNull())
+    expect(screen.queryByTestId('leaderboard-error')).toBeNull()
+
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+  })
+})
+
+const openRoundSummary = {
+  id: 'r1',
+  name: 'Rodada 1',
+  status: 'open',
+  durationMinutes: 30,
+  openedAt: '2026-09-05T12:00:00.000Z',
+  closesAt: '2026-09-05T13:00:00.000Z',
+  closedAt: null,
+  createdAt: '2026-09-05T11:00:00.000Z',
+  updatedAt: '2026-09-05T12:00:00.000Z',
+  problemCount: 1,
+}
+
+describe('LeaderboardScreen — active round without the stream', () => {
+  // `hasActiveRound` derived from `stream.activeRoundId` alone: with the
+  // stream dead, an open round was invisible and the "Rodada" tab showed the
+  // last *closed* round instead — the wrong round on the venue's big screen.
+  it('derives the open round from GET /rounds when the stream never connects', async () => {
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        openRoundSummary,
+        {
+          id: 'r0',
+          name: 'Rodada 0',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: '2026-09-05T10:00:00.000Z',
+          closesAt: null,
+          closedAt: '2026-09-05T10:30:00.000Z',
+          createdAt: '2026-09-05T09:00:00.000Z',
+          updatedAt: '2026-09-05T10:30:00.000Z',
+          problemCount: 1,
+        },
+      ]),
+    )
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    await waitFor(() => expect(mockedRoundRanking).toHaveBeenCalledWith({ param: { id: 'r1' } }))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+
+    expect(screen.queryByTestId('leaderboard-last-closed-label')).toBeNull()
+    expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('Time 1')
+  })
+
+  // Precedence: while the stream is live the SSE payload wins; once it is
+  // down, the REST poll is the fresher source and replaces the frozen
+  // snapshot instead of being shadowed by it.
+  it('lets a fresher REST result replace the frozen SSE snapshot once the stream is down', async () => {
+    mockedRoundRanking.mockResolvedValue(
+      jsonResponse(200, {
+        ...roundRanking,
+        teams: [
+          {
+            ...roundRanking.teams[0],
+            totalScore: 250,
+            problems: [{ problemId: 'p1', score: 250, attempts: 1 }],
+          },
+          roundRanking.teams[1],
+        ],
+      }),
+    )
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+
+    // The snapshot the stream managed to deliver before dying (100 points).
+    // `emitStatus('open')` is never called, so the stream counts as down.
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('250'),
+    )
+  })
+})
+
+describe('LeaderboardScreen — REST poll while the stream is down', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('re-fetches the event ranking every POLL_WHILE_OFFLINE_MS', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(mockedEventRanking).toHaveBeenCalled())
+    mockedEventRanking.mockClear()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_WHILE_OFFLINE_MS)
+    })
+
+    await waitFor(() => expect(mockedEventRanking).toHaveBeenCalled())
+  })
+
+  it('does not poll while the stream is live', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emitStatus('open')
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-tabs')).toBeDefined())
+    mockedEventRanking.mockClear()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_WHILE_OFFLINE_MS * 3)
+    })
+
+    expect(mockedEventRanking).not.toHaveBeenCalled()
+  })
+})
+
 describe('LeaderboardScreen — connection banner', () => {
   it('shows a banner while connecting/reconnecting and hides it once open', async () => {
     renderLeaderboard()
@@ -453,6 +623,76 @@ describe('LeaderboardScreen — connection banner', () => {
 
     emitStatus('reconnecting')
     await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+  })
+})
+
+describe('LeaderboardScreen — offline signalling', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('switches the banner to the offline copy and raises the "not live" badge', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+    expect(screen.queryByTestId('leaderboard-not-live-badge')).toBeNull()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(OFFLINE_AFTER_MS)
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-not-live-badge')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-connection-banner').textContent).toContain(
+      'Sem conexão ao vivo',
+    )
+
+    emitStatus('open')
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-not-live-badge')).toBeNull())
+    expect(screen.queryByTestId('leaderboard-connection-banner')).toBeNull()
+  })
+})
+
+describe('LeaderboardScreen — the stream drops after connecting', () => {
+  // Acceptance #5: losing a stream that had already delivered a ranking must
+  // never send the venue's big screen back to the loading state.
+  it('keeps the last ranking on screen instead of falling back to loading', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emitStatus('open')
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+
+    emitStatus('reconnecting')
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-table')).toBeDefined()
+    expect(screen.queryByTestId('leaderboard-loading')).toBeNull()
+    expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('Time 1')
+  })
+})
+
+describe('LeaderboardScreen — retry', () => {
+  it('forces a stream reconnect on top of refetching every REST query', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(500, {}))
+    mockedRounds.mockResolvedValue(jsonResponse(500, {}))
+    mockedRoundRanking.mockResolvedValue(jsonResponse(500, {}))
+    mockedEventRanking.mockResolvedValue(jsonResponse(500, {}))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-error')).toBeDefined())
+    expect(connectEventStream).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByTestId('leaderboard-error-retry'))
+
+    await waitFor(() => expect(connectEventStream).toHaveBeenCalledTimes(2))
   })
 })
 
@@ -566,6 +806,16 @@ describe('LeaderboardScreen — presentation mode', () => {
 
   it('shows the round countdown once presentation mode is toggled on', async () => {
     await renderWithActiveRound()
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    expect(screen.getByTestId('round-countdown')).toBeDefined()
+  })
+
+  it('shows the round countdown from the REST open round when the stream never connects', async () => {
+    mockedRounds.mockResolvedValue(jsonResponse(200, [openRoundSummary]))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
 
     fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
 

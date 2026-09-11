@@ -722,6 +722,7 @@
       "event": "Geral"
     },
     "lastClosedRoundLabel": "{{name}} — última rodada encerrada",
+    "notLiveBadge": "não ao vivo",
     "columns": {
       "rank": "#",
       "team": "Time",
@@ -730,7 +731,8 @@
     },
     "connection": {
       "connecting": "Conectando ao placar ao vivo...",
-      "reconnecting": "Conexão perdida — reconectando..."
+      "reconnecting": "Conexão perdida — reconectando...",
+      "offline": "Sem conexão ao vivo — mostrando o último placar carregado. Reconectando..."
     },
     "loading": "Carregando placar...",
     "error": {

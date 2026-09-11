@@ -9,7 +9,7 @@ vi.mock('@/lib/sse-client', () => ({
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import type { EventRanking, RoundRanking, SseEvent } from '@/lib/sse-schema'
 
-import { useLeaderboardStream } from './use-leaderboard-stream'
+import { OFFLINE_AFTER_MS, useLeaderboardStream } from './use-leaderboard-stream'
 
 const fakeUser: SessionUser = {
   id: 'u1',
@@ -285,5 +285,113 @@ describe('useLeaderboardStream', () => {
       closesAt: new Date('2026-09-05T15:00:00.000Z'),
     })
     expect(result.current.closesAt).toEqual(new Date('2026-09-05T15:00:00.000Z'))
+  })
+})
+
+describe('useLeaderboardStream — offline detection', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('flags the stream as offline after OFFLINE_AFTER_MS without an open connection', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    expect(result.current.isLive).toBe(false)
+    expect(result.current.isOffline).toBe(false)
+
+    act(() => vi.advanceTimersByTime(OFFLINE_AFTER_MS - 1))
+    expect(result.current.isOffline).toBe(false)
+
+    act(() => vi.advanceTimersByTime(1))
+    expect(result.current.isOffline).toBe(true)
+  })
+
+  // The sse-client publishes a fresh 'reconnecting' on every retry (every
+  // SSE_RETRY_DELAY_MS). If the timer were keyed on `connectionStatus`
+  // instead of on `isLive`, each retry would rearm the timeout and a stream
+  // that never comes back would never be reported as offline.
+  it('still goes offline while the client keeps re-announcing "reconnecting"', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    for (let elapsed = 0; elapsed < OFFLINE_AFTER_MS; elapsed += 2000) {
+      emitStatus('reconnecting')
+      act(() => vi.advanceTimersByTime(2000))
+    }
+
+    expect(result.current.isOffline).toBe(true)
+  })
+
+  it('does not flag a blip that reconnects before the threshold', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    emitStatus('open')
+    emitStatus('reconnecting')
+    act(() => vi.advanceTimersByTime(OFFLINE_AFTER_MS - 1000))
+    emitStatus('open')
+    act(() => vi.advanceTimersByTime(OFFLINE_AFTER_MS))
+
+    expect(result.current.isLive).toBe(true)
+    expect(result.current.isOffline).toBe(false)
+  })
+
+  it('clears the offline flag once the connection opens again', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    act(() => vi.advanceTimersByTime(OFFLINE_AFTER_MS))
+    expect(result.current.isOffline).toBe(true)
+
+    emitStatus('open')
+    expect(result.current.isOffline).toBe(false)
+    expect(result.current.isLive).toBe(true)
+  })
+})
+
+describe('useLeaderboardStream — reconnect()', () => {
+  it('drops the current connection and opens a new one', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+    expect(connectEventStream).toHaveBeenCalledTimes(1)
+
+    act(() => result.current.reconnect())
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(connectEventStream).toHaveBeenCalledTimes(2)
+  })
+
+  // Acceptance #5: a manual retry must never blank out the board that is
+  // already on screen — only a logout resets the state.
+  it('keeps the last ranking while reconnecting', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useLeaderboardStream())
+
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    act(() => result.current.reconnect())
+
+    expect(result.current.round).toEqual(roundRanking)
+    expect(result.current.event).toEqual(eventRanking)
+  })
+
+  it('keeps a stable identity across renders', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result, rerender } = renderHook(() => useLeaderboardStream())
+
+    const first = result.current.reconnect
+    rerender()
+
+    expect(result.current.reconnect).toBe(first)
   })
 })

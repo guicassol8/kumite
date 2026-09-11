@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
@@ -18,8 +18,12 @@ vi.mock('@/lib/sse-client', () => ({
 
 import '@/i18n'
 
+import { ROOT_BLOCK_TYPE, type WorkspaceState } from '@kumite/blocks'
+import * as Blockly from 'blockly'
+import i18n from '@/i18n'
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
+import { loadWorkspaceState, saveWorkspaceState } from '@/lib/workspace-storage'
 import { routeTree } from '@/routeTree.gen'
 
 const mockedGet = vi.mocked(api.problems[':id'].$get)
@@ -61,6 +65,38 @@ function participantProblem(overrides: Record<string, unknown> = {}) {
   }
 }
 
+// A saved workspace holding the undeletable root plus one identifiable block,
+// which is what the assertions below count. They never read a block's *label*:
+// the labels on this same locale path have bugs of their own (#183, #202) and
+// this file must not go red over them.
+function savedWorkspace(blockId: string): WorkspaceState {
+  return {
+    blocks: {
+      languageVersion: 0,
+      blocks: [
+        { type: ROOT_BLOCK_TYPE, id: 'kumiteSolveRoot', x: 40, y: 40 },
+        { type: 'math_number', id: blockId, x: 20, y: 20, fields: { NUM: 42 } },
+      ],
+    },
+  }
+}
+
+// `WorkspaceState` types its payload loosely, so the block ids this file
+// asserts on need a shape of their own.
+type SerializedBlock = { id?: string }
+
+function blockIdsOf(state: WorkspaceState | undefined): string[] {
+  const serialized = state as { blocks?: { blocks?: SerializedBlock[] } } | undefined
+  return (serialized?.blocks?.blocks ?? []).map((block) => block.id ?? '')
+}
+
+/** The blocks actually on the canvas right now, read from Blockly itself. */
+function liveBlockIds(): string[] {
+  const workspace = Blockly.getMainWorkspace()
+  if (!workspace) throw new Error('the workspace was not injected')
+  return blockIdsOf(Blockly.serialization.workspaces.save(workspace))
+}
+
 function renderProblem(
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
 ) {
@@ -82,9 +118,14 @@ beforeEach(() => {
   setSession(fakeUser, 'tok-1')
 })
 
-afterEach(() => {
+afterEach(async () => {
   cleanup()
   clearSession('manual')
+  localStorage.clear()
+  // i18n is a singleton: a test that switches the language here would
+  // otherwise poison every other file in the run (same reason as
+  // language-selector.test.tsx and use-blockly-locale.test.tsx).
+  await i18n.changeLanguage('pt')
 })
 
 describe('ProblemScreen', () => {
@@ -351,5 +392,110 @@ describe('ProblemScreen', () => {
       band.compareDocumentPosition(screen.getByTestId('problem-actions-bar')) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
+  })
+
+  // #178: the editor subtree used to be torn down whenever the problem query
+  // left `success` — a language switch (new query key → `isPending`) or a
+  // failed refetch (SSE invalidates this query on every event). The remounted
+  // editor came back with the state read at page load, and the next auto-save
+  // wrote that over the good copy.
+  describe('the editor across a language switch and a refetch (#178, #39)', () => {
+    it('does not unmount the editor when the language changes', async () => {
+      mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+
+      renderProblem()
+      const editor = await screen.findByTestId('blockly-workspace')
+
+      fireEvent.click(screen.getByTestId('language-option-es'))
+
+      await waitFor(() => {
+        expect(mockedGet).toHaveBeenCalledWith(expect.objectContaining({ query: { locale: 'es' } }))
+      })
+      // The very same DOM node: a remount would hand back a new one.
+      expect(screen.getByTestId('blockly-workspace')).toBe(editor)
+    })
+
+    it('keeps the blocks on the canvas across a language switch', async () => {
+      saveWorkspaceState('p1', savedWorkspace('blocoDoAluno'))
+      mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+
+      renderProblem()
+      await screen.findByTestId('blockly-workspace')
+      expect(liveBlockIds()).toEqual(expect.arrayContaining(['blocoDoAluno']))
+
+      fireEvent.click(screen.getByTestId('language-option-es'))
+
+      await waitFor(() => {
+        expect(mockedGet).toHaveBeenCalledWith(expect.objectContaining({ query: { locale: 'es' } }))
+      })
+      expect(liveBlockIds()).toHaveLength(2)
+      expect(liveBlockIds()).toEqual(expect.arrayContaining(['blocoDoAluno']))
+    })
+
+    it('does not let the auto-save after a language switch overwrite the good copy', async () => {
+      saveWorkspaceState('p1', savedWorkspace('blocoDoAluno'))
+      mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+
+      renderProblem()
+      await screen.findByTestId('blockly-workspace')
+
+      fireEvent.click(screen.getByTestId('language-option-es'))
+      await waitFor(() => {
+        expect(mockedGet).toHaveBeenCalledWith(expect.objectContaining({ query: { locale: 'es' } }))
+      })
+
+      // Whatever the switch queues up, what lands in storage still holds the
+      // participant's block.
+      await waitFor(() => {
+        expect(loadWorkspaceState('p1')?.blocks?.blocks).toHaveLength(2)
+      })
+      expect(blockIdsOf(loadWorkspaceState('p1'))).toEqual(expect.arrayContaining(['blocoDoAluno']))
+    })
+
+    it('remounts the editor with the other problem workspace when navigating p1 → p2 (#39)', async () => {
+      saveWorkspaceState('p1', savedWorkspace('blocoDeA'))
+      saveWorkspaceState('p2', savedWorkspace('blocoDeB'))
+      mockedGet.mockImplementation(async (args: { param: { id: string } }) =>
+        jsonResponse(
+          200,
+          participantProblem({ id: args.param.id, title: `Problema ${args.param.id}` }),
+        ),
+      )
+
+      const { router } = renderProblem()
+      await screen.findByTestId('blockly-workspace')
+      expect(liveBlockIds()).toEqual(expect.arrayContaining(['blocoDeA']))
+
+      await act(async () => {
+        await router.navigate({ to: '/problem/$id', params: { id: 'p2' } })
+      })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('problem-statement-panel').textContent).toContain('Problema p2')
+      })
+      await waitFor(() => {
+        expect(liveBlockIds()).toEqual(expect.arrayContaining(['blocoDeB']))
+      })
+      expect(liveBlockIds()).not.toEqual(expect.arrayContaining(['blocoDeA']))
+    })
+
+    it('keeps the editor on screen when a refetch fails and the data is still there', async () => {
+      mockedGet
+        .mockResolvedValueOnce(jsonResponse(200, participantProblem()))
+        .mockResolvedValue(jsonResponse(500, { error: 'internal', message: 'boom' }))
+
+      const { queryClient } = renderProblem()
+      const editor = await screen.findByTestId('blockly-workspace')
+
+      await act(async () => {
+        await queryClient.refetchQueries({ queryKey: ['problem', 'p1'] })
+      })
+
+      // The refetch really ran and really failed — without this the rest of
+      // the test would pass on a query that never left `success`.
+      expect(mockedGet).toHaveBeenCalledTimes(2)
+      expect(screen.queryByTestId('problem-load-error')).toBeNull()
+      expect(screen.getByTestId('blockly-workspace')).toBe(editor)
+    })
   })
 })

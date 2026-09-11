@@ -67,6 +67,14 @@ function ProblemScreen() {
   const problem = useQuery({
     queryKey: [...problemQueryKey(id), locale],
     queryFn: () => fetchProblem(id, locale),
+    // Switching the language is a new query key, which without this drops the
+    // screen into `isPending` and tears the editor subtree down mid-solution
+    // (#178). Holding the previous locale's data keeps the statement on screen
+    // (translated a moment later) and the editor mounted — but only while it
+    // is the *same* problem: navigating p1 → p2 must never show p1's
+    // statement next to p2's workspace.
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[1] === id ? previous : undefined,
   })
 
   const examples = problem.data?.examples ?? []
@@ -125,7 +133,13 @@ function ProblemScreen() {
     }
   }
 
-  if (problem.isError) {
+  const data = problem.data
+
+  // Only a failure with nothing to show takes the screen: an SSE-triggered
+  // refetch that fails (`useEventStream` invalidates this query on every
+  // event) must not throw away a workspace the participant is in the middle
+  // of (#178).
+  if (problem.isError && !data) {
     return (
       <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">
         {problem.error instanceof ProblemNotFoundError ? (
@@ -152,7 +166,10 @@ function ProblemScreen() {
     )
   }
 
-  if (problem.isPending) {
+  // `!data` rather than `isPending`: with the error branch above only firing
+  // on an empty screen, this is what still narrows `data` to a loaded problem
+  // for the whole body below.
+  if (!data) {
     return (
       <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">
         <p data-testid="problem-loading">{t('problem.loading')}</p>
@@ -160,7 +177,6 @@ function ProblemScreen() {
     )
   }
 
-  const data = problem.data
   const isClosed = data.roundStatus === 'closed'
   // Drives both the results band and how much room the statement gives up
   // for it on the stacked (mobile) layout.
@@ -275,6 +291,11 @@ function ProblemScreen() {
           )}
         >
           <BlocklyWorkspace
+            // The editor's identity is the problem (same reason as
+            // organizer.problems.$id.edit.tsx and organizer.rounds.$id.edit.tsx):
+            // going from /problem/A to /problem/B has to rebuild it around B's
+            // workspace instead of keeping A's blocks on the canvas (#39).
+            key={id}
             ref={workspaceRef}
             toolbox={toolbox}
             options={workspaceOptions}

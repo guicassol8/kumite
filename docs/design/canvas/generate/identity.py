@@ -92,7 +92,9 @@ def components_board():
             return f'<div style="display: flex; flex-direction: column; gap: 10px;"><span class="eyebrow">{label}</span><div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">{inner}</div></div>'
         btns = (f'<span class="btn btn-primary">Criar time</span><span class="btn btn-brand">{icon("send", 16)}Submeter</span><span class="btn btn-outline">{icon("play", 16)}Executar</span>'
                 f'<span class="btn btn-ghost">Cancelar</span><span class="btn btn-destructive">Sair do time</span><span class="btn btn-sm btn-outline">Entrar</span>')
-        inputs = (f'<div class="input" style="width: 180px; color: var(--muted);">E-mail</div><div class="input" style="width: 180px; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft);">foco</div>'
+        # foco = borda de 1 px em ring + halo de 3 px em ring/50 (identity.md § 5)
+        focus_ring = 'border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);'
+        inputs = (f'<div class="input" style="width: 180px; color: var(--muted);">E-mail</div><div class="input" style="width: 180px; {focus_ring}">foco</div>'
                   f'<div style="display: flex; flex-direction: column; gap: 4px;"><div class="input" style="width: 180px; border-color: var(--destructive);">erro</div><span class="small" style="color: var(--destructive);">Informe o nome do time</span></div>')
         badges = ('<span class="badge badge-success">Fácil</span><span class="badge" style="color: var(--warning-text); border-color: var(--warning);">Médio</span><span class="badge" style="color: var(--destructive); border-color: var(--destructive);">Difícil</span>'
                   '<span class="badge badge-solid">Publicado</span><span class="badge badge-muted">Rascunho</span><span class="badge badge-muted" style="text-decoration: line-through;">Arquivado</span>'

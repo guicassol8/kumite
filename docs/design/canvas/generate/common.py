@@ -6,20 +6,22 @@ FONTS = ("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600
 
 # Variante A "Hinomaru" — vermilion + tinta + papel quente (recomendada)
 LIGHT = dict(
-    background="#FCFAF7", background2="#F2F0EC", card="#FFFFFF",
+    background="#FCFAF7", background2="#F2F0EC", card="#FFFFFF", surface="#F2F0EC",
     foreground="#1C1716", foreground2="#2A2523", muted="#69615D", border="#E1DDDA",
     primary="#1C1716", primary_fg="#FCFAF7",
-    brand="#DD2824", brand_text="#DD2824", brand_hover="#CE2320", brand_soft="#FBE5E1", brand_fg="#FFFFFF",
+    brand="#DD2824", brand_text="#DD2824", brand_on_chrome="#F45246", brand_hover="#CE2320",
+    brand_soft="#FBE5E1", brand_fg="#FFFFFF", ring="#DD2824",
     destructive="#C1133A", destructive_soft="#FBE7EC", success="#008433", success_soft="#E3F5EA",
     warning="#ECAA0B", warning_text="#A06700", warning_soft="#FBF1D6",
     chrome="#1C1716", chrome_fg="#F3F1EF", chrome_muted="#9D9792", chrome_border="#312D2C",
 )
 DARK = dict(
-    background="#120F0D", background2="#1B1716", card="#1B1716",
+    background="#120F0D", background2="#1B1716", card="#1B1716", surface="#282322",
     foreground="#F3F1EF", foreground2="#E6E2DE", muted="#9D9792", border="#312D2C",
     primary="#F3F1EF", primary_fg="#1C1716",
-    brand="#DD2824", brand_text="#F45246", brand_hover="#CE2320", brand_soft="#3A1A18", brand_fg="#FFFFFF",
-    destructive="#E8496A", destructive_soft="#3A1520", success="#3DBA6A", success_soft="#12301C",
+    brand="#DD2824", brand_text="#F45246", brand_on_chrome="#F45246", brand_hover="#CE2320",
+    brand_soft="#3A1A18", brand_fg="#FFFFFF", ring="#DD2824",
+    destructive="#EF5C7B", destructive_soft="#3A1520", success="#3DBA6A", success_soft="#12301C",
     warning="#F5C044", warning_text="#F5C044", warning_soft="#3A2E10",
     chrome="#0E0C0B", chrome_fg="#F3F1EF", chrome_muted="#9D9792", chrome_border="#312D2C",
 )

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./api', () => ({
   api: { me: { $get: vi.fn() } },
@@ -115,4 +115,173 @@ describe('session store', () => {
       expect(localStorage.getItem('kumite-token')).toBeNull()
     },
   )
+})
+
+// #179: a `GET /me` that rejects (network blip, back restarting) used to be
+// cached as a rejected promise — `status` stayed `'loading'` forever and every
+// later `ensureHydrated()` re-threw the same error, so F5 was the only way
+// out. Fake timers keep the 0/500/1500ms backoff from costing 2s per test.
+describe('hydration with a failing /me (#179)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // The retries live behind `setTimeout`, so the promise only settles after
+  // the fake clock is drained — awaiting it first would deadlock the test.
+  async function settle<T>(promise: Promise<T>): Promise<T> {
+    await vi.runAllTimersAsync()
+    return promise
+  }
+
+  it('resolves instead of rejecting when the request fails', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    const session = await loadSession()
+
+    await expect(settle(session.ensureHydrated())).resolves.toBeUndefined()
+  })
+
+  it('leaves the loading state once the retries are exhausted', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    const session = await loadSession()
+
+    await settle(session.ensureHydrated())
+
+    expect(session.getState().status).not.toBe('loading')
+  })
+
+  it('does not cache the failure: the next ensureHydrated tries /me again', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    const session = await loadSession()
+
+    await settle(session.ensureHydrated())
+    const afterFirst = mockedGetMe.mock.calls.length
+
+    await settle(session.ensureHydrated())
+
+    expect(mockedGetMe.mock.calls.length).toBeGreaterThan(afterFirst)
+  })
+
+  it('lands in error with the token intact, so a retry still has one to send', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    const session = await loadSession()
+
+    await settle(session.ensureHydrated())
+
+    expect(session.getState()).toMatchObject({ status: 'error', user: null, token: 'tok-1' })
+    expect(localStorage.getItem('kumite-token')).toBe('tok-1')
+  })
+
+  it('retries three times before giving up', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    const session = await loadSession()
+
+    await settle(session.ensureHydrated())
+
+    expect(mockedGetMe).toHaveBeenCalledTimes(3)
+  })
+
+  it('recovers on a later attempt without the caller noticing', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValue(meResponse(200, fakeUser))
+    const session = await loadSession()
+
+    await settle(session.ensureHydrated())
+
+    expect(session.getState()).toMatchObject({ status: 'authenticated', user: fakeUser })
+  })
+
+  // A proxy that accepts the connection and never answers is the same stuck
+  // screen as a refused one, so every attempt carries its own 8s abort signal.
+  // The mock only rejects when that signal fires, which is also what pins the
+  // signal to actually reach the request.
+  it('aborts an attempt that never answers and still reaches error', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockImplementation(
+      // biome-ignore lint/suspicious/noExplicitAny: the hc client's own options type
+      (_args?: any, options?: any) =>
+        new Promise((_resolve, reject) => {
+          const signal: AbortSignal | undefined = options?.init?.signal
+          signal?.addEventListener('abort', () => reject(new Error('AbortError')))
+        }),
+    )
+    const session = await loadSession()
+
+    await settle(session.ensureHydrated())
+
+    expect(session.getState().status).toBe('error')
+    expect(localStorage.getItem('kumite-token')).toBe('tok-1')
+  })
+
+  // A 503 from a back that is restarting is not a logout. Before #179 the
+  // `else` branch wiped the token on *any* non-200, so a 30s deploy signed
+  // the whole auditorium out for real.
+  it('keeps the token through a 503 instead of treating it as a logout', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockResolvedValue(meResponse(503, { error: 'unavailable' }))
+    const session = await loadSession()
+
+    await settle(session.ensureHydrated())
+
+    expect(session.getState()).toMatchObject({ status: 'error', token: 'tok-1' })
+    expect(localStorage.getItem('kumite-token')).toBe('tok-1')
+  })
+
+  it('treats a 401 as an expired session, not a retryable failure', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockResolvedValue(meResponse(401, { error: 'unauthorized' }))
+    const session = await loadSession()
+
+    await settle(session.ensureHydrated())
+
+    expect(session.getState()).toMatchObject({ status: 'anonymous', reason: 'expired' })
+    expect(localStorage.getItem('kumite-token')).toBeNull()
+    expect(mockedGetMe).toHaveBeenCalledTimes(1)
+  })
+
+  // The root keys the retry card off 'error'. If a retry dropped the status to
+  // 'loading' the card would unmount, the route underneath would flash for the
+  // two seconds of the cycle, and the button's "Tentando…" would go with it.
+  it('stays in error for the whole retry instead of flickering through loading', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    const session = await loadSession()
+    await settle(session.ensureHydrated())
+
+    const seen: string[] = []
+    const unsubscribe = session.subscribe(() => seen.push(session.getState().status))
+    await settle(session.retryHydration())
+    unsubscribe()
+
+    expect(seen).not.toContain('loading')
+    expect(session.getState().status).toBe('error')
+  })
+
+  it('retryHydration runs a fresh cycle and authenticates, with no reload', async () => {
+    localStorage.setItem('kumite-token', 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    const session = await loadSession()
+    await settle(session.ensureHydrated())
+    expect(session.getState().status).toBe('error')
+
+    mockedGetMe.mockReset()
+    mockedGetMe.mockResolvedValue(meResponse(200, fakeUser))
+    await settle(session.retryHydration())
+
+    expect(session.getState()).toMatchObject({
+      status: 'authenticated',
+      user: fakeUser,
+      token: 'tok-1',
+    })
+  })
 })

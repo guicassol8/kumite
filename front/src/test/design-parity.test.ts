@@ -21,6 +21,15 @@ const REPO_ROOT = path.resolve(import.meta.dirname, '../../..')
 const TOKENS_CSS = path.join(REPO_ROOT, 'docs/design/tokens/tokens.css')
 const INDEX_CSS = path.join(REPO_ROOT, 'front/src/index.css')
 
+// Same story for the icons: Vite only serves what sits in `front/public/`,
+// so the two files are copies of `docs/design/logo/`. Byte for byte, because
+// a re-export of the logo that never reached `public/` is a stale favicon
+// nobody notices until the tab is wrong in front of an auditorium.
+const COPIED_ICONS = [
+  ['docs/design/logo/favicon.svg', 'front/public/favicon.svg'],
+  ['docs/design/logo/png/apple-touch-icon-180.png', 'front/public/apple-touch-icon.png'],
+] as const
+
 /** Blockly's palette (#218) is consumed by `@kumite/blocks`, not by the theme. */
 const isBlockToken = (name: string) => name.startsWith('--block-')
 
@@ -68,6 +77,17 @@ describe('the identity tokens copied into front/src/index.css', () => {
       })
 
       expect(drifted).toEqual([])
+    })
+  }
+})
+
+describe('the icons copied into front/public', () => {
+  for (const [source, copy] of COPIED_ICONS) {
+    it(`keeps ${copy} byte for byte equal to ${source}`, () => {
+      const original = readFileSync(path.join(REPO_ROOT, source))
+      const served = readFileSync(path.join(REPO_ROOT, copy))
+
+      expect(served.equals(original)).toBe(true)
     })
   }
 })

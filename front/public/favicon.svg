@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <style>.r{fill:#1C1716;stroke:#1C1716} @media (prefers-color-scheme: dark){.r{fill:#F3F1EF;stroke:#F3F1EF}}</style>
+  <path d="M6.5 18 L11.5 18 L13.5 12 L19.5 12 L21.5 18 L26.5 18 L26.5 50 L21.5 50 L19.5 44 L13.5 44 L11.5 50 L6.5 50 Z" fill="#DD2824" stroke="#DD2824" stroke-width="3" stroke-linejoin="round"/>
+  <path class="r" d="M6.5 18 L11.5 18 L13.5 12 L19.5 12 L21.5 18 L26.5 18 L26.5 50 L21.5 50 L19.5 44 L13.5 44 L11.5 50 L6.5 50 Z" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"/>
+</svg>

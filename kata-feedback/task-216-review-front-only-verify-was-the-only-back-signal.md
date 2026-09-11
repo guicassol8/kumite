@@ -46,12 +46,11 @@ nem por engano — o overhead de tê-lo conectado foi zero.
 
 ## Observação de ambiente (não é kata)
 
-Registrada aqui só porque atrapalhou a verificação e pode se repetir: `docker
-compose up -d` na worktree de review falhou com `all predefined address pools
-have been fully subnetted` — 9 projetos compose de worktrees paralelas
-esgotaram o pool de sub-redes do Docker. `docker network prune` é ação sobre
-recurso compartilhado (outras sessões podem ter redes vivas), então o contorno
-foi subir um Postgres avulso com `docker run --network bridge -p 5463:5432`,
-que não cria rede nova. Vale como nota para quem for escrever a limpeza de
-worktrees: remover a worktree sem `docker compose down -v` deixa a rede órfã
-consumindo o pool.
+`docker compose up -d` na worktree de review falhou com `all predefined address
+pools have been fully subnetted` — o mesmo esgotamento de pool que
+`task-228-review-docs-only-kata-out-of-frame-docker-network-pool-exhausted.md`
+já descreve em detalhe; não repito aqui. Registro só a **segunda ocorrência**,
+para dizer que não foi episódio isolado, e o contorno que usei: `docker run
+--network bridge -p 5463:5432 postgres:17-alpine`, que sobe um Postgres avulso
+sem criar rede nova — útil quando `docker network prune` não está disponível
+por ser ação sobre recurso compartilhado.

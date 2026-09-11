@@ -26,7 +26,12 @@ import {
 
 export { BACK_URL, hasOrganizerCredentials, ORGANIZER_EMAIL, ORGANIZER_PASSWORD } from './rounds'
 
-const PASSWORD = 'supersecret'
+/**
+ * Password every participant this fixture creates is signed up with.
+ * Exported so a spec that has to log a second account in through the real
+ * login form (#175) does not have to duplicate the literal.
+ */
+export const PARTICIPANT_PASSWORD = 'supersecret'
 const TOKEN_KEY = 'kumite-token'
 
 /**
@@ -41,6 +46,18 @@ export const EDITOR_FIXTURE_TIMEOUT_MS = 60_000
 export type EditorFixture = {
   problemId: string
   participantToken: string
+  /**
+   * The address behind `participantToken`. A spec that logs this same account
+   * back in through the UI needs it, and re-deriving it from the label would
+   * miss the `Date.now()` the signup actually used.
+   */
+  participantEmail: string
+}
+
+export type SeededParticipant = {
+  email: string
+  password: string
+  token: string
 }
 
 /**
@@ -108,25 +125,49 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
   await openRoundWithRetry(auth, roundId)
   await closeRound(auth, roundId)
 
-  const participantEmail = `${slug}-e2e-${Date.now()}@edu.pucrs.br`
+  const { email: participantEmail, token: participantToken } = await seedParticipant(label)
+
+  return { problemId, participantToken, participantEmail }
+}
+
+/**
+ * Signs a brand-new participant up and logs them in, returning the credentials
+ * plus a token. `seedEditorFixture` uses it for the account it hands back, and
+ * a spec that needs a *second* account in the same fixture (the next user on
+ * the same browser, #175) calls it directly.
+ *
+ * The address carries `Date.now()` and a random suffix: two calls in the same
+ * millisecond would otherwise collide on the unique email, and the second
+ * signup would quietly answer with the first account.
+ */
+export async function seedParticipant(label: string): Promise<SeededParticipant> {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  const email = `${slug}-e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@edu.pucrs.br`
+
   await fetch(`${BACK_URL}/auth/signup`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       name: 'E2E Participante',
-      email: participantEmail,
-      password: PASSWORD,
+      email,
+      password: PARTICIPANT_PASSWORD,
       code: 'PUCRS2026',
     }),
   })
-  const participantLogin = await fetch(`${BACK_URL}/auth/login`, {
+  const login = await fetch(`${BACK_URL}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: participantEmail, password: PASSWORD }),
+    body: JSON.stringify({ email, password: PARTICIPANT_PASSWORD }),
   })
-  const { token: participantToken } = (await participantLogin.json()) as { token: string }
+  const { token } = (await login.json()) as { token?: string }
+  if (!token) {
+    throw new Error(`could not log the seeded participant in (HTTP ${login.status})`)
+  }
 
-  return { problemId, participantToken }
+  return { email, password: PARTICIPANT_PASSWORD, token }
 }
 
 /** Signs the page in via the stored token instead of walking the login UI. */

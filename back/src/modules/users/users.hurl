@@ -1,4 +1,7 @@
-# API E2E for GET /me and the organizer user-management routes (#52).
+# API E2E for GET /me and the organizer user-management routes (#52), plus one
+# call to POST /auth/complete-password-reset (step 23b, #177) — the failure
+# path, where the two reset flows cross. That route's own file is
+# password-reset.hurl.
 # Prereqs, in order:
 #   docker compose up -d
 #   pnpm db:migrate
@@ -383,6 +386,30 @@ Authorization: Bearer {{reset_token}}
 HTTP 200
 [Asserts]
 jsonpath "$.mustChangePassword" == true
+
+# 23b. (#177) A *failed* OTP reset must move nothing: the flag stays up and the
+# account stays boxed in. The happy path of #177 cannot be driven from here —
+# the plaintext OTP only ever exists inside the notification
+# (notifications.service.ts), no route hands it back — so it is covered by
+# password-reset.test.ts instead.
+POST {{host}}/auth/complete-password-reset
+Content-Type: application/json
+{ "email": "users-e2e-reset@edu.pucrs.br", "otp": "000000", "newPassword": "somenewpassword" }
+HTTP 400
+[Asserts]
+jsonpath "$.error" == "invalid_otp"
+
+GET {{host}}/me
+Authorization: Bearer {{reset_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.mustChangePassword" == true
+
+GET {{host}}/teams
+Authorization: Bearer {{reset_token}}
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "password_change_required"
 
 # 24. A wrong current password does not lift the block.
 POST {{host}}/auth/change-password

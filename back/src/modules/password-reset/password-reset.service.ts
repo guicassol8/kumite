@@ -249,10 +249,17 @@ export async function completePasswordReset(
     return { ok: false, error: 'invalid_otp' }
   }
 
+  // `mustChangePassword` falls here too (#177). Redeeming the OTP proves
+  // possession of the address and the user has just chosen the password
+  // themselves — the same standard `changePassword` clears the flag on. Leaving
+  // it set traps anyone who reaches this route after an organizer reset: they
+  // would land on /change-password and be asked for the "current" password
+  // they picked seconds ago. The delete below drops the code in the same
+  // breath, so it cannot be redeemed again over the password just chosen.
   const passwordHash = await argon2.hash(input.newPassword)
   await db
     .update(usersTable)
-    .set({ passwordHash, updatedAt: new Date() })
+    .set({ passwordHash, mustChangePassword: false, updatedAt: new Date() })
     .where(eq(usersTable.id, user.id))
   await db.delete(passwordResetOtpsTable).where(eq(passwordResetOtpsTable.userId, user.id))
 

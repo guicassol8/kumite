@@ -3,9 +3,27 @@
 from check_tokens import contrast
 from mark import mark_svg
 
-FONTS = ("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800"
-         "&family=Barlow:wght@400;500;600&family=Inter:wght@400;500;600"
-         "&family=JetBrains+Mono:wght@400;500&display=swap")
+# As fontes são servidas de generate/fonts/, por caminho relativo ao artboard —
+# nunca de fonts.googleapis.com. Antes da #227 era um <link> para o Google, e
+# offline os 14 PNGs de ../screens/ saíam em Arial Narrow sem erro nenhum. A
+# proveniência de cada arquivo está em generate/fonts/README.md.
+# font-display: block para o shot.mjs nunca fotografar o fallback.
+def _face(family, file, weight, style="normal"):
+    return (f"@font-face{{font-family:'{family}';font-style:{style};font-weight:{weight};"
+            f"font-display:block;src:url('generate/fonts/{file}') format('woff2');}}")
+
+FONT_FACES = "".join([
+    _face("Barlow Condensed", "BarlowCondensed-Medium.woff2", 500),
+    _face("Barlow Condensed", "BarlowCondensed-SemiBold.woff2", 600),
+    _face("Barlow Condensed", "BarlowCondensed-Bold.woff2", 700),
+    _face("Barlow Condensed", "BarlowCondensed-ExtraBold.woff2", 800),
+    _face("Barlow", "Barlow-Regular.woff2", 400),
+    _face("Barlow", "Barlow-Medium.woff2", 500),
+    _face("Barlow", "Barlow-SemiBold.woff2", 600),
+    # Variáveis: um arquivo cobre a faixa inteira de peso.
+    _face("JetBrains Mono", "JetBrainsMono-Variable.woff2", "100 800"),
+    _face("Inter", "Inter-Variable.woff2", "100 900"),
+])
 
 # Variante A "Hinomaru" — vermilion + tinta + papel quente (recomendada)
 LIGHT = dict(
@@ -223,7 +241,7 @@ def page(title, body, dark=False, extra_css="", width=None, script=None):
 <x-dc>
 <helmet>
   <title>{title}</title>
-  <link rel="stylesheet" href="{FONTS}">
+  <style>{FONT_FACES}</style>
   <style>{CSS}{extra_css}</style>
 </helmet>
 <div class="screen {cls}" style="{w}">

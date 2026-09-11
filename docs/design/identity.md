@@ -21,16 +21,38 @@ literal (punho, faixa, kimono, lutador), mascote ou cartoon, neon/glow gamer.
 
 **"Dois blocos em guarda."** Duas silhuetas de bloco idênticas — aba em cima,
 encaixe embaixo, como um bloco do editor — giradas 180° uma em relação à
-outra, frente a frente, separadas por um vão de 4/64. Elas encaixariam; não
+outra, frente a frente, separadas por um vão de 8/64. Elas encaixariam; não
 encaixam. É o instante antes do primeiro movimento. Duas universidades, uma
 disputa.
 
 - O bloco **vermelho é sempre o da esquerda**; o da direita toma a cor do texto
   do fundo (tinta no claro, papel no escuro).
-- Construção em grade 64×64, cantos de raio 3 (via stroke-linejoin round), sem
-  contorno, sem sombra, sem gradiente. Nunca girar, espelhar, separar as cores
-  ou colocar sobre foto sem uma placa de cor sólida atrás.
-- Tamanhos mínimos: 16 px (favicon), 24 px no header, 32 px em avatar.
+- Construção em grade 64×64: borda externa do bloco em **6,5**, borda interna
+  em **26,5**, cantos de raio 3 via `stroke-linejoin: round` com
+  `stroke-width: 3`. Sem contorno, sem sombra, sem gradiente. Nunca girar,
+  espelhar, separar as cores ou colocar sobre foto sem uma placa de cor sólida
+  atrás.
+- **O stroke faz parte da conta do vão.** `stroke-width: 3` infla o path em 1,5
+  unidade para cada lado: os blocos vão de 5,0 a 28,0 e o vão renderizado é
+  64 − 2×28 = **8 unidades**. Mexer nas bordas ou na largura do stroke sem
+  refazer essa conta é como a v1 acabou com vão de 4/64 na spec e 1/64 na tela
+  (#227). A geometria mora em `canvas/generate/mark.py`, num lugar só, e
+  `canvas/generate/check_mark.py` mede o resultado nos PNGs.
+- Tamanhos mínimos: 16 px (favicon), 24 px no header, 32 px em avatar. O vão
+  sobrevive a todos eles — medido nos PNGs exportados, não no SVG:
+
+  | Tamanho | Vão renderizado |
+  |---|---|
+  | 16 px (favicon) | 2 px |
+  | 24 px (header) | 2 px |
+  | 32 px (avatar) | 4 px |
+  | 64 px | 8 px |
+
+  É por isso que **não existe uma variante de vão exagerado só para 16/32 px**,
+  como se faz com ícone de app: a avaliação foi feita e a geometria única dá
+  conta. A silhueta continua ocupando 41 das 64 unidades na vertical, então em
+  16 px ela entrega uma mancha de ≈ 16 × 10 px — estreita, mas com os dois
+  blocos separados, que é o que o conceito exige.
 - Wordmark: **kumite**, sempre minúsculo, Barlow Condensed 600, tracking −1%,
   contornado em `logo/kumite-wordmark.svg` (não depende da fonte instalada).
 - Lockups: horizontal (símbolo 64 de altura · vão 20 · wordmark em **corpo**
@@ -39,9 +61,16 @@ disputa.
 - Largura mínima do lockup horizontal: **96 px**. O header é a única exceção,
   e é documentada: ali o símbolo vai em 24 px, o que dá um lockup de ≈ 80 px,
   aceitável porque o contexto já nomeia o produto.
-- O símbolo em `logo/` é o vetor canônico. Os prompts em `logo-prompts.md`
-  servem para explorar alternativas; um resultado melhor substitui o SVG
-  mantendo a `viewBox 0 0 64 64`.
+- O símbolo em `logo/` é o vetor canônico — é a marca, não um rascunho à espera
+  da geração de imagem. Os prompts em `logo-prompts.md` servem para explorar
+  alternativas; trocar o símbolo por um deles é **v2 da identidade**, não um
+  ajuste, e segue o checklist de substituição que está lá.
+- **Exceção à regra do vermelho à esquerda:** no `kumite-app-icon.svg` o
+  vermelho é a **placa**, e os dois blocos são papel (esquerda) e tinta
+  (direita). É a única inversão permitida, porque ali o vermelho já é a
+  superfície da marca e repetir o bloco vermelho sobre ele o apagaria. Vale só
+  para o ícone de app e o `apple-touch-icon`; em qualquer outro suporte a
+  Regra 1 de `logo/README.md` continua valendo sem exceção.
 
 ## 3. Paleta — vermelho faixa + carvão (variante A · Hinomaru)
 

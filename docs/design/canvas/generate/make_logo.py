@@ -5,17 +5,13 @@ from fontTools.pens.boundsPen import BoundsPen
 from fontTools.pens.transformPen import TransformPen
 import os
 
+from mark import MARK_PATH, STROKE_WIDTH, mark_paths
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.normpath(os.path.join(HERE, "..", "..", "logo"))  # docs/design/logo
 os.makedirs(OUT, exist_ok=True)
 RED, INK, PAPER, DARKBG, LIGHTBG = "#DD2824", "#1C1716", "#F3F1EF", "#120F0D", "#FCFAF7"
-MARK_PATH = "M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z"
-
-def mark_paths(left, right, dx=0, dy=0, scale=1.0):
-    t = f'translate({dx} {dy}) scale({scale})' if (dx or dy or scale != 1) else ''
-    g_open = f'<g transform="{t}">' if t else '<g>'
-    return (f'{g_open}<path d="{MARK_PATH}" fill="{left}" stroke="{left}" stroke-width="3" stroke-linejoin="round"/>'
-            f'<path d="{MARK_PATH}" fill="{right}" stroke="{right}" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"/></g>')
+# O path e o par de blocos vêm de mark.py, o único lugar onde a geometria existe.
 
 def svg(w, h, body, bg=None, title="kumite"):
     rect = f'<rect width="{w}" height="{h}" fill="{bg}"/>' if bg else ''
@@ -71,8 +67,8 @@ open(f"{OUT}/kumite-app-icon.svg", "w").write(svg(512, 512,
 open(f"{OUT}/favicon.svg", "w").write(
     f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">\n'
     f'  <style>.r{{fill:{INK};stroke:{INK}}} @media (prefers-color-scheme: dark){{.r{{fill:{PAPER};stroke:{PAPER}}}}}</style>\n'
-    f'  <path d="{MARK_PATH}" fill="{RED}" stroke="{RED}" stroke-width="3" stroke-linejoin="round"/>\n'
-    f'  <path class="r" d="{MARK_PATH}" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"/>\n</svg>\n')
+    f'  <path d="{MARK_PATH}" fill="{RED}" stroke="{RED}" stroke-width="{STROKE_WIDTH}" stroke-linejoin="round"/>\n'
+    f'  <path class="r" d="{MARK_PATH}" stroke-width="{STROKE_WIDTH}" stroke-linejoin="round" transform="rotate(180 32 32)"/>\n</svg>\n')
 
 # ---- lockups: mark 64 + gap 20 + wordmark at 55px, vertically centered on the mark ----
 FS = 55

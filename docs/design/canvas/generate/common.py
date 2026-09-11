@@ -1,6 +1,7 @@
 # Shared tokens, CSS, icons and component helpers for the kumite identity canvas.
 
 from check_tokens import contrast
+from mark import mark_svg
 
 FONTS = ("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800"
          "&family=Barlow:wght@400;500;600&family=Inter:wght@400;500;600"
@@ -120,15 +121,10 @@ a { color: inherit; text-decoration: none; } a:hover { color: var(--brand-text);
 """ % (vars_block(LIGHT), vars_block(DARK))
 
 # ---------- SVG symbol: "dois blocos em guarda" ----------
+# A geometria mora em mark.py e em nenhum outro lugar — ver a #227.
 def mark(size=32, left=None, right=None, extra=""):
-    """Two mirrored block silhouettes (tab + notch) facing each other across a 4-unit gap."""
-    left = left or "var(--brand)"
-    right = right or "var(--foreground)"
-    p = "M8 18 L13 18 L15 12 L23 12 L25 18 L30 18 L30 50 L25 50 L23 44 L15 44 L13 50 L8 50 Z"
-    return (f'<svg width="{size}" height="{size}" viewBox="0 0 64 64" fill="none" aria-hidden="true" {extra}>'
-            f'<path d="{p}" fill="{left}" stroke="{left}" stroke-width="3" stroke-linejoin="round"></path>'
-            f'<path d="{p}" fill="{right}" stroke="{right}" stroke-width="3" stroke-linejoin="round" transform="rotate(180 32 32)"></path>'
-            f'</svg>')
+    """Two mirrored block silhouettes (tab + notch) facing each other across an 8-unit gap."""
+    return mark_svg(size, left, right, extra)
 
 def wordmark(size=24, color="var(--chrome-fg)"):
     return (f'<span style="font-family: var(--font-display); font-weight: 600; font-size: {size}px; '

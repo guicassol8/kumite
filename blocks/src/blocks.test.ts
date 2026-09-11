@@ -134,6 +134,22 @@ describe('defineKumiteBlocks', () => {
     expect(reserved).toContain(SOLUTION_PARAM_NAME)
   })
 
+  it('registers the reserved names once, however often it is called', () => {
+    // `addReservedWords` is `RESERVED_WORDS_ += words + ','` — it appends
+    // unconditionally. `defineKumiteBlocks` runs on every `generateSolution`
+    // call, so without a guard the list grows by two entries per codegen for
+    // the life of the process, and `init()` re-splits it every time.
+    defineKumiteBlocks()
+    defineKumiteBlocks('en')
+    defineKumiteBlocks('es')
+
+    const reserved = (
+      javascriptGenerator as unknown as { RESERVED_WORDS_: string }
+    ).RESERVED_WORDS_.split(',')
+    expect(reserved.filter((word) => word === SOLUTION_FUNCTION_NAME)).toHaveLength(1)
+    expect(reserved.filter((word) => word === SOLUTION_PARAM_NAME)).toHaveLength(1)
+  })
+
   it('re-registers with another locale without throwing (#57 relabels at runtime)', () => {
     defineKumiteBlocks('pt')
 

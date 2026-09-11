@@ -90,11 +90,15 @@ async function addRoundProblem(roundId: string, problemId: string, position = 0)
 
 let attemptCounter = 0
 
-async function submit(teamId: string, problemId: string, createdAt?: Date) {
+// roundId is the round the submission was stamped with at accept time (#176).
+// These stats still count `inRound` by time window, which is why the fixtures
+// below can stamp a round and still place a row outside its window.
+async function submit(teamId: string, problemId: string, roundId: string, createdAt?: Date) {
   const user = await insertUser()
   attemptCounter += 1
   await db.insert(submissionsTable).values({
     problemId,
+    roundId,
     teamId,
     userId: user.id,
     workspace: {},
@@ -206,7 +210,11 @@ describe('getEventStats submissions and rounds', () => {
   it('reports no round and a null inRound when the event has no round yet', async () => {
     const team = await insertTeam('Time A')
     const problem = await insertProblem()
-    await submit(team.id, problem.id)
+    // A draft round: submissions.round_id is NOT NULL (#176), and a draft is
+    // neither active nor last-closed, so the event still has no round to report.
+    const draft = await insertRound('Rascunho')
+    await addRoundProblem(draft.id, problem.id)
+    await submit(team.id, problem.id, draft.id)
 
     const stats = await getEventStats(db)
 
@@ -227,9 +235,9 @@ describe('getEventStats submissions and rounds', () => {
     })
     await addRoundProblem(round.id, problem.id)
 
-    await submit(team.id, problem.id, new Date(openedAt.getTime() - 60_000))
-    await submit(team.id, problem.id, new Date(openedAt.getTime() + 60_000))
-    await submit(team.id, problem.id, new Date(openedAt.getTime() + 120_000))
+    await submit(team.id, problem.id, round.id, new Date(openedAt.getTime() - 60_000))
+    await submit(team.id, problem.id, round.id, new Date(openedAt.getTime() + 60_000))
+    await submit(team.id, problem.id, round.id, new Date(openedAt.getTime() + 120_000))
 
     const stats = await getEventStats(db)
 
@@ -257,9 +265,9 @@ describe('getEventStats submissions and rounds', () => {
     await addRoundProblem(older.id, problem.id)
     await addRoundProblem(newest.id, problem.id)
 
-    await submit(team.id, problem.id, new Date(Date.now() - 170 * 60_000))
-    await submit(team.id, problem.id, new Date(Date.now() - 110 * 60_000))
-    await submit(team.id, problem.id, new Date(Date.now() - 100 * 60_000))
+    await submit(team.id, problem.id, older.id, new Date(Date.now() - 170 * 60_000))
+    await submit(team.id, problem.id, newest.id, new Date(Date.now() - 110 * 60_000))
+    await submit(team.id, problem.id, newest.id, new Date(Date.now() - 100 * 60_000))
 
     const stats = await getEventStats(db)
 

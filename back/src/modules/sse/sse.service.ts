@@ -1,6 +1,13 @@
+import { JUDGE_TIMEOUT_MS } from '../../config'
 import type { Db } from '../../db/client'
 import { getEventRanking, getRoundRanking } from '../ranking/ranking.service'
-import { findOpenRound, reapExpiredRound } from '../rounds/rounds.service'
+import {
+  clearPendingRoundClosure,
+  findOpenRound,
+  pendingRoundClosures,
+  reapExpiredRound,
+} from '../rounds/rounds.service'
+import { hasJudgingInFlight } from '../submissions/submissions.service'
 
 import type { RankingUpdatedEvent, SseEvent, StateSyncEvent } from './sse.schema'
 
@@ -57,15 +64,46 @@ export function publishRoundClosed(bus: SseBus, round: { id: string }) {
   bus.publish({ type: 'round.closed', serverTime: new Date(), roundId: round.id })
 }
 
+// How long a closed round's announcement waits for judging to drain (#176).
+// A submission accepted at the buzzer is still in the sandbox when the round
+// ends, and the front fetches a closed round's ranking exactly once, on this
+// event — announcing before the row lands shows a leaderboard missing it.
+//
+// The ceiling exists so a stuck worker cannot hold the event forever: a whole
+// judging run is several cases at JUDGE_TIMEOUT_MS each plus sandbox startup,
+// so the per-case timeout alone is not enough and the slack covers the rest.
+// Past it the event goes out regardless — a late leaderboard is worse than a
+// slightly incomplete one.
+export const ROUND_CLOSE_ANNOUNCE_MAX_WAIT_MS = JUDGE_TIMEOUT_MS + 10_000
+
+/**
+ * Publishes `round.closed` for every round closed but not yet announced,
+ * holding back only those still judging and still inside the ceiling.
+ *
+ * Called both by the expiry tick and, right after an organizer's manual
+ * close, by the route — so a close with nothing in flight is still announced
+ * synchronously rather than waiting for the next tick.
+ */
+export function announceClosedRounds(bus: SseBus, now = Date.now()): void {
+  for (const { roundId, closedAt } of pendingRoundClosures()) {
+    const waitedMs = now - closedAt.getTime()
+    if (hasJudgingInFlight(roundId) && waitedMs < ROUND_CLOSE_ANNOUNCE_MAX_WAIT_MS) continue
+
+    clearPendingRoundClosure(roundId)
+    publishRoundClosed(bus, { id: roundId })
+  }
+}
+
 // A background tick must not crash the process: a DB error is caught and
 // logged, never thrown. The heartbeat always fires — success or failure —
 // since it's also what tells connected clients the stream is still alive.
 export async function runExpiryTick(db: Db, bus: SseBus): Promise<void> {
   try {
-    const closed = await reapExpiredRound(db)
-    for (const round of closed) {
-      publishRoundClosed(bus, round)
-    }
+    // The return value is deliberately ignored: a read path may have reaped
+    // the round before this tick ran, so what to announce comes from the
+    // pending set, never from the rows this particular call happened to close.
+    await reapExpiredRound(db)
+    announceClosedRounds(bus)
   } catch (error) {
     console.error('sse expiry tick failed', error)
   }

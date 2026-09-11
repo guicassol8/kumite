@@ -239,3 +239,77 @@ HTTP 422
 [Asserts]
 jsonpath "$.error" == "validation_failed"
 jsonpath "$.issues.params" exists
+
+# --- #176: a problem reused across rounds ---
+#
+# Each round counts only the submissions stamped with its own id, and the
+# problem page agrees with the round the participant has just played. Team C
+# is the one submitting here: it scored zero in the round above, so a leak in
+# either direction shows up immediately. (The judge-outlives-the-round race
+# itself is not expressible in hurl — it is covered in submissions.test.ts.)
+
+# 10. Reuse the draft round from step 1c: same problem, second round.
+POST {{host}}/organizer/rounds/{{draft_round_id}}/open
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "open"
+
+# 11. Team C returns the literal 7: one of the two hidden cases -> 50/100.
+POST {{host}}/submissions
+Authorization: Bearer {{token_c}}
+Content-Type: application/json
+{
+  "problemId": "{{problem_id}}",
+  "roundId": "{{draft_round_id}}",
+  "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "math_number", "id": "sete", "fields": { "NUM": 7 } } } } }] } }
+}
+HTTP 201
+[Asserts]
+jsonpath "$.score" == 50
+
+POST {{host}}/organizer/rounds/{{draft_round_id}}/close
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "closed"
+
+# 12. The second round sees only its own submission: C scored, A and B did not.
+GET {{host}}/rounds/{{draft_round_id}}/ranking
+Authorization: Bearer {{token_c}}
+HTTP 200
+[Asserts]
+jsonpath "$.teams" count == 3
+jsonpath "$.teams[0].teamName" == "Ranking E2E Time C"
+jsonpath "$.teams[0].totalScore" == 50
+jsonpath "$.teams[0].rank" == 1
+jsonpath "$.teams[?(@.teamName=='Ranking E2E Time A')].totalScore" == 0
+jsonpath "$.teams[?(@.teamName=='Ranking E2E Time B')].totalScore" == 0
+
+# 13. And the first round is untouched by that submission.
+GET {{host}}/rounds/{{round_id}}/ranking
+Authorization: Bearer {{token_a}}
+HTTP 200
+[Asserts]
+jsonpath "$.teams[0].teamName" == "Ranking E2E Time A"
+jsonpath "$.teams[0].totalScore" == 100
+jsonpath "$.teams[?(@.teamName=='Ranking E2E Time C')].totalScore" == 0
+
+# 14. AC3: the problem page shows the score of the round just played (the most
+#     recently opened one containing the problem) — the same 50 the round
+#     ranking above reports for Team C, not a best mixed across both rounds.
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{token_c}}
+HTTP 200
+[Asserts]
+jsonpath "$.roundStatus" == "closed"
+jsonpath "$.bestSubmission.score" == 50
+
+# 15. Same page for Team A, whose 100 belongs to the *first* round: scoped to
+#     the most recent round, it has nothing there.
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{token_a}}
+HTTP 200
+[Asserts]
+jsonpath "$.roundStatus" == "closed"
+jsonpath "$.bestSubmission" == null

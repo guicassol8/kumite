@@ -25,6 +25,31 @@ type RoundProblemRow = typeof roundProblemsTable.$inferSelect
 
 export type ReapedRound = { id: string; closesAt: Date | null }
 
+// --- Closed rounds still waiting to be announced (#176) ---
+//
+// reapExpiredRound is called from ~11 read paths but only the SSE tick
+// publishes round.closed. Whichever read reaped the round first used to win
+// the race and the tick, finding no freshly-closed row, announced nothing —
+// the event was simply lost. Every close now lands here instead, and the
+// announcer drains it, so the closure survives no matter which path noticed
+// it. Process-local, same reasoning as the submission throttle.
+const pendingClosures = new Map<string, Date>()
+
+export type PendingClosure = { roundId: string; closedAt: Date }
+
+export function pendingRoundClosures(): PendingClosure[] {
+  return [...pendingClosures].map(([roundId, closedAt]) => ({ roundId, closedAt }))
+}
+
+export function clearPendingRoundClosure(roundId: string): void {
+  pendingClosures.delete(roundId)
+}
+
+/** Test seam: forgets every unannounced closure. Never used in production. */
+export function resetPendingRoundClosures(): void {
+  pendingClosures.clear()
+}
+
 // Lazy expiry: a round past its own closesAt is closed here, on the read
 // path, so nothing depends on a scheduler ever running. closedAt is set to
 // the round's own closesAt (deterministic "closed exactly on schedule"), not
@@ -32,11 +57,15 @@ export type ReapedRound = { id: string; closesAt: Date | null }
 // closed (empty when nothing was expired) so callers — the SSE tick — know
 // what to announce without a second query.
 export async function reapExpiredRound(db: Db): Promise<ReapedRound[]> {
-  return db
+  const closed = await db
     .update(roundsTable)
     .set({ status: 'closed', closedAt: roundsTable.closesAt, updatedAt: new Date() })
     .where(and(eq(roundsTable.status, 'open'), lte(roundsTable.closesAt, new Date())))
     .returning({ id: roundsTable.id, closesAt: roundsTable.closesAt })
+
+  const now = new Date()
+  for (const round of closed) pendingClosures.set(round.id, now)
+  return closed
 }
 
 function toDetail(round: RoundRow, problems: RoundProblemRow[]): RoundDetail {
@@ -302,12 +331,18 @@ export async function extendRound(db: Db, id: string, minutes: number): Promise<
 
 export type ProblemRoundAccess =
   | { status: 'open'; roundId: string }
-  | { status: 'closed' }
+  | { status: 'closed'; roundId: string }
   | { status: 'none' }
 
 // A problem never in a round, or only in a draft one, is 'none' — the same
 // "never announces itself" rule the participant read already applies to a
 // draft problem. Open beats closed when a problem sits in both.
+//
+// 'closed' carries a roundId too (#176): a reused problem sits in several
+// closed rounds, and the score the problem page shows has to be the score of
+// one specific round — the most recently opened one, the round the
+// participant has just played. Without it the page reduced over every round
+// at once and disagreed with each round's own leaderboard.
 export async function getProblemRoundAccess(
   db: Db,
   problemId: string,
@@ -315,14 +350,18 @@ export async function getProblemRoundAccess(
   await reapExpiredRound(db)
 
   const rows = await db
-    .select({ roundId: roundsTable.id, status: roundsTable.status })
+    .select({ roundId: roundsTable.id, status: roundsTable.status, openedAt: roundsTable.openedAt })
     .from(roundProblemsTable)
     .innerJoin(roundsTable, eq(roundProblemsTable.roundId, roundsTable.id))
     .where(and(eq(roundProblemsTable.problemId, problemId), ne(roundsTable.status, 'draft')))
 
   const open = rows.find((row) => row.status === 'open')
   if (open) return { status: 'open', roundId: open.roundId }
-  if (rows.length > 0) return { status: 'closed' }
+
+  const mostRecent = rows
+    .slice()
+    .sort((a, b) => (b.openedAt?.getTime() ?? 0) - (a.openedAt?.getTime() ?? 0))[0]
+  if (mostRecent) return { status: 'closed', roundId: mostRecent.roundId }
   return { status: 'none' }
 }
 
@@ -367,6 +406,9 @@ export async function closeRound(db: Db, id: string): Promise<CloseRoundResult> 
     .update(roundsTable)
     .set({ status: 'closed', closedAt: new Date(), updatedAt: new Date() })
     .where(eq(roundsTable.id, id))
+  // Announced by the same drain as an expired round (#176): an organizer
+  // closing early races judging exactly like the clock does.
+  pendingClosures.set(id, new Date())
 
   const detail = await getRound(db, id)
   if (!detail) throw new Error('expected round to still exist right after close')
@@ -394,6 +436,7 @@ async function getBestScoresForTeam(
   db: Db,
   teamId: string,
   problemIds: string[],
+  roundId: string,
 ): Promise<Map<string, number>> {
   if (problemIds.length === 0) return new Map()
 
@@ -401,7 +444,11 @@ async function getBestScoresForTeam(
     .select({ problemId: submissionsTable.problemId, score: submissionsTable.score })
     .from(submissionsTable)
     .where(
-      and(eq(submissionsTable.teamId, teamId), inArray(submissionsTable.problemId, problemIds)),
+      and(
+        eq(submissionsTable.teamId, teamId),
+        eq(submissionsTable.roundId, roundId),
+        inArray(submissionsTable.problemId, problemIds),
+      ),
     )
     .orderBy(desc(submissionsTable.score), asc(submissionsTable.createdAt))
 
@@ -460,7 +507,7 @@ export async function getParticipantRound(
           const teamId = await findTeamIdForParticipant(db, userId)
           return teamId === null
             ? new Map<string, number>()
-            : getBestScoresForTeam(db, teamId, problemIds)
+            : getBestScoresForTeam(db, teamId, problemIds, round.id)
         })()
       : new Map<string, number>()
 

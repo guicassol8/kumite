@@ -10,7 +10,8 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
-import { closeRound, createRound, openRound } from '../rounds/rounds.service'
+import { closeRound, createRound, getProblemRoundAccess, openRound } from '../rounds/rounds.service'
+import { getBestSubmission } from '../submissions/submissions.service'
 
 import {
   getEventRanking,
@@ -231,15 +232,20 @@ async function insertUser() {
   return user
 }
 
+// roundId is explicit, not derived from the clock (#176): the round a
+// submission belongs to is stamped on the row, so a fixture has to say which
+// round it is submitting into.
 async function submit(
+  roundId: string,
   teamId: string,
   problemId: string,
   score: number,
-  options: { createdAt?: Date; attemptNumber?: number } = {},
+  options: { attemptNumber?: number } = {},
 ) {
   const user = await insertUser()
   await db.insert(submissionsTable).values({
     problemId,
+    roundId,
     teamId,
     userId: user.id,
     workspace: {},
@@ -247,7 +253,6 @@ async function submit(
     caseResults: [],
     score,
     attemptNumber: options.attemptNumber ?? 1,
-    ...(options.createdAt ? { createdAt: options.createdAt } : {}),
   })
 }
 
@@ -282,8 +287,8 @@ describe('getRoundRanking', () => {
     const opened = await openRound(db, created.round.id)
     if (!opened.ok) throw new Error('expected open to succeed')
 
-    await submit(teamA.id, problem.id, 100)
-    await submit(teamB.id, problem.id, 50)
+    await submit(opened.round.id, teamA.id, problem.id, 100)
+    await submit(opened.round.id, teamB.id, problem.id, 50)
 
     const ranking = await getRoundRanking(db, opened.round.id)
 
@@ -298,7 +303,7 @@ describe('getRoundRanking', () => {
     ])
   })
 
-  it('only counts submissions made inside this round’s own time window, even for a reused problem', async () => {
+  it('counts each submission in the round it was stamped with, even for a reused problem', async () => {
     const problem = await insertProblem()
     const team = await insertTeam('Time A')
 
@@ -310,7 +315,7 @@ describe('getRoundRanking', () => {
     if (!firstRound.ok) throw new Error('expected create to succeed')
     const openedFirst = await openRound(db, firstRound.round.id)
     if (!openedFirst.ok) throw new Error('expected open to succeed')
-    await submit(team.id, problem.id, 100)
+    await submit(openedFirst.round.id, team.id, problem.id, 100)
     const closedFirst = await closeRound(db, firstRound.round.id)
     if (!closedFirst.ok) throw new Error('expected close to succeed')
 
@@ -324,15 +329,62 @@ describe('getRoundRanking', () => {
     if (!openedSecond.ok) throw new Error('expected open to succeed')
     // Same team + problem as the first round's submission above: the unique
     // index is on (team, problem, attempt), so this is attempt 2 overall —
-    // exactly the point being proven, that it still lands in the second
-    // round's own window rather than the first's.
-    await submit(team.id, problem.id, 40, { attemptNumber: 2 })
+    // exactly the point being proven, that each round counts only the
+    // submissions stamped with its own id.
+    await submit(openedSecond.round.id, team.id, problem.id, 40, { attemptNumber: 2 })
 
     const firstRanking = await getRoundRanking(db, firstRound.round.id)
     const secondRanking = await getRoundRanking(db, secondRound.round.id)
 
     expect(firstRanking?.teams[0]).toMatchObject({ totalScore: 100 })
     expect(secondRanking?.teams[0]).toMatchObject({ totalScore: 40 })
+  })
+
+  // #176 AC3: the problem page and the round's leaderboard have to show the
+  // same number. They used to diverge on a reused problem — the page reduced
+  // over every round at once, the leaderboard over one round.
+  it('agrees with the problem page on the score of a reused problem', async () => {
+    const problem = await insertProblem()
+    const team = await insertTeam('Time A')
+
+    const firstRound = await createRound(db, {
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!firstRound.ok) throw new Error('expected create to succeed')
+    const openedFirst = await openRound(db, firstRound.round.id)
+    if (!openedFirst.ok) throw new Error('expected open to succeed')
+    await submit(openedFirst.round.id, team.id, problem.id, 100)
+    const closedFirst = await closeRound(db, firstRound.round.id)
+    if (!closedFirst.ok) throw new Error('expected close to succeed')
+
+    const secondRound = await createRound(db, {
+      name: 'Rodada 2',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!secondRound.ok) throw new Error('expected create to succeed')
+    const openedSecond = await openRound(db, secondRound.round.id)
+    if (!openedSecond.ok) throw new Error('expected open to succeed')
+    await submit(openedSecond.round.id, team.id, problem.id, 40, { attemptNumber: 2 })
+    const closedSecond = await closeRound(db, secondRound.round.id)
+    if (!closedSecond.ok) throw new Error('expected close to succeed')
+
+    // The page reads the round the participant has just played (the most
+    // recently opened one containing the problem).
+    const access = await getProblemRoundAccess(db, problem.id)
+    if (access.status !== 'closed') throw new Error('expected closed round access')
+    expect(access.roundId).toBe(secondRound.round.id)
+
+    const pageScore = await getBestSubmission(db, team.id, problem.id, access.roundId)
+    const secondRanking = await getRoundRanking(db, secondRound.round.id)
+
+    // 40, the second round's score — not 100, the best across both rounds.
+    expect(pageScore?.score).toBe(40)
+    expect(secondRanking?.teams[0]?.problems).toEqual([
+      { problemId: problem.id, score: 40, attempts: 1 },
+    ])
   })
 
   // Part of #50: a team removed by the organizer keeps its submissions for
@@ -350,8 +402,8 @@ describe('getRoundRanking', () => {
     const opened = await openRound(db, created.round.id)
     if (!opened.ok) throw new Error('expected open to succeed')
 
-    await submit(activeTeam.id, problem.id, 100)
-    await submit(removedTeam.id, problem.id, 90)
+    await submit(opened.round.id, activeTeam.id, problem.id, 100)
+    await submit(opened.round.id, removedTeam.id, problem.id, 90)
     await db
       .update(teamsTable)
       .set({ removedAt: new Date() })
@@ -383,8 +435,8 @@ describe('getEventRanking', () => {
     if (!firstRound.ok) throw new Error('expected create to succeed')
     const openedFirst = await openRound(db, firstRound.round.id)
     if (!openedFirst.ok) throw new Error('expected open to succeed')
-    await submit(teamA.id, problemA.id, 100)
-    await submit(teamB.id, problemA.id, 20)
+    await submit(openedFirst.round.id, teamA.id, problemA.id, 100)
+    await submit(openedFirst.round.id, teamB.id, problemA.id, 20)
     const closedFirst = await closeRound(db, firstRound.round.id)
     if (!closedFirst.ok) throw new Error('expected close to succeed')
 
@@ -396,8 +448,8 @@ describe('getEventRanking', () => {
     if (!secondRound.ok) throw new Error('expected create to succeed')
     const openedSecond = await openRound(db, secondRound.round.id)
     if (!openedSecond.ok) throw new Error('expected open to succeed')
-    await submit(teamA.id, problemB.id, 30)
-    await submit(teamB.id, problemB.id, 90)
+    await submit(openedSecond.round.id, teamA.id, problemB.id, 30)
+    await submit(openedSecond.round.id, teamB.id, problemB.id, 90)
     // secondRound stays open — the event ranking must include the active round too.
 
     const ranking = await getEventRanking(db)

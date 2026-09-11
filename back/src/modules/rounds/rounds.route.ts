@@ -2,7 +2,7 @@ import { ErrorBodySchema } from '@katajs-framework/core'
 
 import { defineRoute } from '../../context'
 import { requireOrganizer, requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
-import { publishRoundClosed, publishRoundExtended, publishRoundOpened } from '../sse/sse.service'
+import { announceClosedRounds, publishRoundExtended, publishRoundOpened } from '../sse/sse.service'
 
 import {
   CreateRoundBodySchema,
@@ -190,7 +190,10 @@ export const closeRoundRoute = defineRoute({
   handler: async (c) => {
     const result = await closeRound(c.get('db'), c.input.params.id)
     if (result.ok) {
-      publishRoundClosed(c.get('sseBus'), { id: result.round.id })
+      // Drains rather than publishing directly (#176): with nothing in flight
+      // this still announces synchronously, and when a submission accepted at
+      // the buzzer is mid-judging it waits for the tick that follows the drain.
+      announceClosedRounds(c.get('sseBus'))
       return c.json(result.round, 200)
     }
 

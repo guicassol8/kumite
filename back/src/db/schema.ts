@@ -245,6 +245,14 @@ export const submissionsTable = pgTable(
       // restrict: a problem with submission history can't be deleted — the
       // scores would lose their meaning (same rule as round_problems).
       .references(() => problemsTable.id, { onDelete: 'restrict' }),
+    // The round this submission was accepted into, stamped at INSERT from the
+    // roundId the accept gate (isProblemInOpenRound) has just validated (#176).
+    // Before this column the round was *derived* from createdAt falling inside
+    // [openedAt, closedAt] (#37), which dropped every submission whose judging
+    // outlived the round it was accepted in.
+    roundId: uuid('round_id')
+      .notNull()
+      .references(() => roundsTable.id, { onDelete: 'restrict' }),
     // userId is an audit field ("who on the team submitted"); teamId is the
     // identity that scoring and the leaderboard group by. Both mandatory:
     // every submission belongs to an authenticated participant with a team.
@@ -277,5 +285,8 @@ export const submissionsTable = pgTable(
       desc(table.score),
       asc(table.createdAt),
     ),
+    // Serves the round-scoped reads (#176): the ranking's per-round fetch and
+    // the per-round best-score lookups behind the problem page.
+    index('submissions_round_problem_team_idx').on(table.roundId, table.problemId, table.teamId),
   ],
 )

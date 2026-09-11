@@ -19,6 +19,7 @@ export const SubmissionCaseResultSchema = z.object({
 export const SubmissionSchema = z.object({
   id: z.string(),
   problemId: z.string(),
+  roundId: z.string(),
   userId: z.string(),
   teamId: z.string(),
   workspace: JsonValueSchema,

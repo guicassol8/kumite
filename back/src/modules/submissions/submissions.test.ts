@@ -21,6 +21,7 @@ import {
 import type { JudgeCaseResult } from '../judge/judge.schema'
 import { WorkspaceSchema } from '../judge/judge.schema'
 import type { TestCase } from '../problems/problems.schema'
+import { getEventRanking, getRoundRanking } from '../ranking/ranking.service'
 import { closeRound, createRound, openRound } from '../rounds/rounds.service'
 import { runRankingTick } from '../sse/sse.service'
 
@@ -29,6 +30,7 @@ import {
   acquireSubmissionSlot,
   findTeamIdForUser,
   getBestSubmission,
+  hasJudgingInFlight,
   releaseSubmissionSlot,
   resetSubmissionThrottle,
   type SubmitOutcome,
@@ -38,11 +40,32 @@ import {
   toResponseCases,
 } from './submissions.service'
 
+// #176: the judge is the window during which the round can close underneath a
+// submission that was already accepted. Wrapping the real runJudge (rather
+// than replacing it) keeps every other test on the real sandbox; only a test
+// that installs `onJudged` sees anything different, and what it installs runs
+// *after* the sandbox and *before* the INSERT — the exact race, with no sleep
+// and no clock control.
+const judgeRace = vi.hoisted(() => ({ onJudged: null as null | (() => Promise<void>) }))
+
+vi.mock('../judge/judge.service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../judge/judge.service')>()
+  return {
+    ...actual,
+    runJudge: async (...args: Parameters<typeof actual.runJudge>) => {
+      const results = await actual.runJudge(...args)
+      if (judgeRace.onJudged) await judgeRace.onJudged()
+      return results
+    },
+  }
+})
+
 // Runs against the real dockerized Postgres (docker compose up -d) — the
 // #35 migrations must already be applied.
 const db = createDb()
 
 beforeEach(async () => {
+  judgeRace.onJudged = null
   await db.execute(
     sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemTranslationsTable}, ${problemsTable}, ${teamMembersTable}, ${teamsTable}, ${usersTable} restart identity cascade`,
   )
@@ -52,13 +75,31 @@ afterAll(async () => {
   await db.$client.end()
 })
 
+// Every submission carries the round it was accepted into (#176), so even a
+// fixture that only cares about the row itself needs one. Closed, not open:
+// some tests below call this twice and rounds_single_open_idx allows a single
+// open round.
 async function insertProblem() {
   const [problem] = await db
     .insert(problemsTable)
     .values({ difficulty: 'easy', status: 'published' })
     .returning()
   if (!problem) throw new Error('expected a problem fixture')
-  return problem
+  const [round] = await db
+    .insert(roundsTable)
+    .values({
+      name: 'Rodada fixture',
+      durationMinutes: 30,
+      status: 'closed',
+      openedAt: new Date('2026-08-31T10:00:00.000Z'),
+      closedAt: new Date('2026-08-31T14:00:00.000Z'),
+    })
+    .returning()
+  if (!round) throw new Error('expected a round fixture')
+  await db
+    .insert(roundProblemsTable)
+    .values({ roundId: round.id, problemId: problem.id, position: 0 })
+  return { ...problem, roundId: round.id }
 }
 
 async function insertTeam(name = 'Time A') {
@@ -114,6 +155,7 @@ describe('submissions table', () => {
       .insert(submissionsTable)
       .values({
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: user.id,
         teamId: team.id,
         workspace: { blocks: { languageVersion: 0, blocks: [] } },
@@ -131,6 +173,7 @@ describe('submissions table', () => {
 
     expect(submission).toMatchObject({
       problemId: problem.id,
+      roundId: problem.roundId,
       userId: user.id,
       teamId: team.id,
       workspace: { blocks: { languageVersion: 0, blocks: [] } },
@@ -152,6 +195,7 @@ describe('submissions table', () => {
     const { user, team } = await insertTeamMember()
     await db.insert(submissionsTable).values({
       problemId: problem.id,
+      roundId: problem.roundId,
       userId: user.id,
       teamId: team.id,
       workspace: {},
@@ -164,6 +208,7 @@ describe('submissions table', () => {
     await expect(
       db.insert(submissionsTable).values({
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: user.id,
         teamId: team.id,
         workspace: {},
@@ -180,6 +225,7 @@ describe('submissions table', () => {
     const { user, team } = await insertTeamMember()
     await db.insert(submissionsTable).values({
       problemId: problem.id,
+      roundId: problem.roundId,
       userId: user.id,
       teamId: team.id,
       workspace: {},
@@ -197,6 +243,7 @@ describe('submissions table', () => {
     const { user, team } = await insertTeamMember()
     await db.insert(submissionsTable).values({
       problemId: problem.id,
+      roundId: problem.roundId,
       userId: user.id,
       teamId: team.id,
       workspace: {},
@@ -214,6 +261,7 @@ describe('submissions table', () => {
     const { user, team } = await insertTeamMember()
     await db.insert(submissionsTable).values({
       problemId: problem.id,
+      roundId: problem.roundId,
       userId: user.id,
       teamId: team.id,
       workspace: {},
@@ -232,7 +280,7 @@ describe('getBestSubmission', () => {
     const problem = await insertProblem()
     const team = await insertTeam()
 
-    expect(await getBestSubmission(db, team.id, problem.id)).toBeNull()
+    expect(await getBestSubmission(db, team.id, problem.id, problem.roundId)).toBeNull()
   })
 
   it('returns the highest score, when it was reached and the attempt count', async () => {
@@ -242,6 +290,7 @@ describe('getBestSubmission', () => {
     await db.insert(submissionsTable).values([
       {
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: user.id,
         teamId: team.id,
         workspace: {},
@@ -253,6 +302,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: user.id,
         teamId: team.id,
         workspace: {},
@@ -264,6 +314,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: user.id,
         teamId: team.id,
         workspace: {},
@@ -275,7 +326,7 @@ describe('getBestSubmission', () => {
       },
     ])
 
-    expect(await getBestSubmission(db, team.id, problem.id)).toEqual({
+    expect(await getBestSubmission(db, team.id, problem.id, problem.roundId)).toEqual({
       score: 80,
       achievedAt: best,
       attempts: 3,
@@ -289,6 +340,7 @@ describe('getBestSubmission', () => {
     await db.insert(submissionsTable).values([
       {
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: user.id,
         teamId: team.id,
         workspace: {},
@@ -300,6 +352,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: user.id,
         teamId: team.id,
         workspace: {},
@@ -311,7 +364,7 @@ describe('getBestSubmission', () => {
       },
     ])
 
-    expect(await getBestSubmission(db, team.id, problem.id)).toEqual({
+    expect(await getBestSubmission(db, team.id, problem.id, problem.roundId)).toEqual({
       score: 80,
       achievedAt: earliest,
       attempts: 2,
@@ -330,6 +383,7 @@ describe('getBestSubmission', () => {
     await db.insert(submissionsTable).values([
       {
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: user.id,
         teamId: team.id,
         workspace: {},
@@ -341,6 +395,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: otherUser.id,
         teamId: otherTeam.id,
         workspace: {},
@@ -351,6 +406,7 @@ describe('getBestSubmission', () => {
       },
       {
         problemId: otherProblem.id,
+        roundId: otherProblem.roundId,
         userId: user.id,
         teamId: team.id,
         workspace: {},
@@ -361,7 +417,7 @@ describe('getBestSubmission', () => {
       },
     ])
 
-    expect(await getBestSubmission(db, team.id, problem.id)).toEqual({
+    expect(await getBestSubmission(db, team.id, problem.id, problem.roundId)).toEqual({
       score: 40,
       achievedAt: own,
       attempts: 1,
@@ -593,6 +649,7 @@ describe('submitSolution', () => {
       const [row] = await db.select().from(submissionsTable)
       expect(row).toMatchObject({
         problemId: problem.id,
+        roundId: problem.roundId,
         userId: user.id,
         teamId: team.id,
         score: 100,
@@ -966,5 +1023,123 @@ describe('findTeamIdForUser', () => {
     const user = await insertUser('sozinho@edu.pucrs.br')
 
     expect(await findTeamIdForUser(db, user.id)).toBeNull()
+  })
+})
+
+// --- #176: the round closes while the judge is still running ---
+//
+// The accept gate (isProblemInOpenRound) runs before the judge, the INSERT
+// runs after it. A submission accepted one second before closesAt therefore
+// lands with a createdAt outside the round's window whenever judging outlives
+// the round — which is precisely the closing seconds, when most people submit.
+describe('submitSolution when the round closes mid-judging', () => {
+  beforeEach(() => {
+    resetSubmissionThrottle()
+  })
+
+  it(
+    'counts the score in both rankings, matching the problem page',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+
+      // Closes the round between the sandbox verdict and the INSERT: the
+      // submission was accepted while open, the row is written after.
+      judgeRace.onJudged = async () => {
+        const closed = await closeRound(db, problem.roundId)
+        if (!closed.ok) throw new Error('expected the mid-judging close to succeed')
+      }
+
+      const result = expectSubmitted(
+        await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        ),
+      )
+      expect(result.score).toBe(100)
+
+      // The problem page has always counted it...
+      expect(await getBestSubmission(db, team.id, problem.id, problem.roundId)).toMatchObject({
+        score: 100,
+      })
+
+      // ...so both leaderboards must agree.
+      const roundRanking = await getRoundRanking(db, problem.roundId)
+      expect(roundRanking?.teams[0]).toMatchObject({ teamId: team.id, totalScore: 100 })
+
+      const eventRanking = await getEventRanking(db)
+      expect(eventRanking.teams[0]).toMatchObject({ teamId: team.id, totalScore: 100 })
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  // The counter behind the round.closed hold (#176 AC4): the SSE announcement
+  // waits on it, so a leak would hold a round's closure until the ceiling.
+  it(
+    'reports judging in flight for the round while the submission is being judged',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+
+      expect(hasJudgingInFlight(problem.roundId)).toBe(false)
+
+      let seenMidJudging: boolean | null = null
+      judgeRace.onJudged = async () => {
+        seenMidJudging = hasJudgingInFlight(problem.roundId)
+      }
+
+      await submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+      )
+
+      expect(seenMidJudging).toBe(true)
+      expect(hasJudgingInFlight(problem.roundId)).toBe(false)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'releases the round even when the judge throws',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+
+      judgeRace.onJudged = async () => {
+        throw new Error('judge exploded')
+      }
+
+      await expect(
+        submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        ),
+      ).rejects.toThrow('judge exploded')
+
+      // A stuck counter would hold that round's closure for the whole ceiling.
+      expect(hasJudgingInFlight(problem.roundId)).toBe(false)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it('never claims a round when the submission is refused before the accept gate', async () => {
+    const { user, team } = await insertTeamMember()
+    const roundId = '00000000-0000-0000-0000-000000000000'
+
+    const outcome = await submitSolution(
+      db,
+      { userId: user.id, teamId: team.id },
+      {
+        problemId: '00000000-0000-0000-0000-000000000000',
+        roundId,
+        workspace: solutionWorkspace,
+      },
+    )
+
+    expect(outcome).toEqual({ ok: false, error: 'problem_not_found' })
+    expect(hasJudgingInFlight(roundId)).toBe(false)
   })
 })

@@ -5,6 +5,8 @@ import { createDb } from '../../db/client'
 import {
   eventConfigTable,
   problemsTable,
+  roundProblemsTable,
+  roundsTable,
   submissionsTable,
   teamMembersTable,
   teamsTable,
@@ -48,7 +50,7 @@ async function insertUser(university: University = 'pucrs', name?: string | null
 
 beforeEach(async () => {
   await db.execute(
-    sql`truncate table ${submissionsTable}, ${problemsTable}, ${teamMembersTable}, ${teamsTable}, ${eventConfigTable}, ${usersTable} restart identity cascade`,
+    sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemsTable}, ${teamMembersTable}, ${teamsTable}, ${eventConfigTable}, ${usersTable} restart identity cascade`,
   )
 })
 
@@ -58,10 +60,30 @@ async function insertSubmission(teamId: string, userId: string) {
     .values({ difficulty: 'easy', status: 'published' })
     .returning()
   if (!problem) throw new Error('expected a problem fixture')
+  // Every submission belongs to a round (#176), so the fixture needs one even
+  // though nothing here reads it. Closed, not open: this helper is called more
+  // than once per test and rounds_single_open_idx allows a single open round.
+  const [round] = await db
+    .insert(roundsTable)
+    .values({
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      status: 'closed',
+      openedAt: new Date(),
+      closedAt: new Date(),
+    })
+    .returning()
+  if (!round) throw new Error('expected a round fixture')
+  await db.insert(roundProblemsTable).values({
+    roundId: round.id,
+    problemId: problem.id,
+    position: 0,
+  })
   const [submission] = await db
     .insert(submissionsTable)
     .values({
       problemId: problem.id,
+      roundId: round.id,
       teamId,
       userId,
       workspace: {},

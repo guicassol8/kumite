@@ -10,7 +10,12 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary text-primary-foreground shadow-xs hover:bg-primary/90',
-        destructive: 'bg-destructive text-white shadow-xs hover:bg-destructive/90',
+        // "Erro e contorno" (docs/design/identity.md § 3, Regra 1): crimson
+        // desenha a borda e o texto, nunca a superficie. Um bloco vermelho
+        // cheio se le como a acao principal da tela, o oposto do que uma
+        // acao destrutiva deve parecer ao lado de Submeter.
+        destructive:
+          'border border-destructive bg-transparent text-destructive shadow-xs hover:bg-destructive/10',
         outline: 'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground',
         secondary: 'bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80',
         ghost: 'hover:bg-accent hover:text-accent-foreground',

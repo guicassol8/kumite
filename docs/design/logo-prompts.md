@@ -83,7 +83,7 @@ sports tournament poster, huge bold condensed grotesque typography reading "KUMI
    assim que a v1 saiu com 4/64 no papel e 1/64 na tela (#227).
 
 5. **Não substitua `logo/kumite-mark.svg` — ele é gerado.** Trocar aquele
-   arquivo à mão não propaga para os outros 15 SVGs, os 36 PNGs nem os 14
+   arquivo à mão não propaga para os outros 14 SVGs, os 36 PNGs nem os 14
    artboards, e o primeiro `make_logo.py` desfaz a substituição. O fluxo que de
    fato propaga, a partir da raiz do repositório:
 
@@ -92,7 +92,7 @@ sports tournament poster, huge bold condensed grotesque typography reading "KUMI
    #    docs/design/canvas/generate/mark.py
    #    Ajuste OUTER_EDGE/INNER_EDGE na mesma edição, para as constantes
    #    derivadas (INK_*, GAP_UNITS) continuarem dizendo a verdade.
-   .venv/bin/python docs/design/canvas/generate/make_logo.py   # 16 SVGs
+   .venv/bin/python docs/design/canvas/generate/make_logo.py   # 15 SVGs
    sh docs/design/logo/export.sh                               # 36 PNGs + check_mark.py
    .venv/bin/python docs/design/canvas/generate/build.py       # 14 artboards
    node docs/design/canvas/generate/shot.mjs                   # 14 telas

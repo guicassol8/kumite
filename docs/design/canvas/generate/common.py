@@ -22,7 +22,6 @@ FONT_FACES = "".join([
     _face("Barlow", "Barlow-SemiBold.woff2", 600),
     # Variáveis: um arquivo cobre a faixa inteira de peso.
     _face("JetBrains Mono", "JetBrainsMono-Variable.woff2", "100 800"),
-    _face("Inter", "Inter-Variable.woff2", "100 900"),
 ])
 
 # Variante A "Hinomaru" — vermilion + tinta + papel quente (recomendada)
@@ -69,7 +68,7 @@ CSS = """
 :root {
 %s
   --font-display: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
-  --font-body: 'Barlow', 'Inter', system-ui, sans-serif;
+  --font-body: 'Barlow', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --radius: 6px;
 }

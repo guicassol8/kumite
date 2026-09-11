@@ -20,7 +20,6 @@ const REQUIRED_FONTS = [
   ['Barlow Condensed', '600 16px "Barlow Condensed"'],
   ['Barlow', '400 16px "Barlow"'],
   ['JetBrains Mono', '400 16px "JetBrains Mono"'],
-  ['Inter', '400 16px "Inter"'],
 ];
 
 // Antes da #227 aqui havia um waitForTimeout(1500) e as fontes vinham de

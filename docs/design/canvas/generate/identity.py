@@ -64,27 +64,20 @@ def palette_board():
 
 # ---------- Tipografia ----------
 def type_board():
-    props = '{"bodyFont":{"editor":"enum","default":"Barlow","options":["Barlow","Inter"],"section":"Tipografia"}}'
-    logic = """class Component extends DCLogic {
-  renderVals() {
-    const f = this.props.bodyFont ?? 'Barlow';
-    return { bodyFont: f === 'Inter' ? "'Inter', system-ui, sans-serif" : "'Barlow', 'Inter', system-ui, sans-serif", bodyName: f };
-  }
-}"""
     def row(label, sample, meta):
         return (f'<div style="display: grid; grid-template-columns: 180px minmax(0, 1fr) 220px; gap: 24px; align-items: baseline; padding: 16px 0; border-top: 1px solid var(--border);"><span class="eyebrow">{label}</span><div style="min-width: 0;">{sample}</div><span class="muted" style="font-size: 12px; line-height: 1.4;">{meta}</span></div>')
-    body = (f'<div class="board">{title_row("Identidade kumite · 03", "Tipografia", "Barlow Condensed nos títulos, placar, timer e wordmark (energia de pôster); a Barlow regular no corpo — mesma família, mesmo ritmo, sem cara de Inter. Alterne o corpo para Inter no controle acima do artboard e compare; JetBrains Mono só em JSON e casos de teste.")}'
+    body = (f'<div class="board">{title_row("Identidade kumite · 03", "Tipografia", "Barlow Condensed nos títulos, placar, timer e wordmark (energia de pôster); a Barlow regular no corpo — mesma família, mesmo ritmo. Decisão fechada em 2026-09-10 (CHANGELOG v1.0); JetBrains Mono só em JSON e casos de teste.")}'
             '<div style="display: flex; flex-direction: column;">'
             + row("Display · telão", '<span class="display" style="font-weight: 800; font-size: 84px; line-height: 0.9; text-transform: uppercase; letter-spacing: 0.01em;">Placar <span style="color: var(--brand-text);">41:07</span></span>', "Barlow Condensed 800 · 84/76 · caixa-alta · tabular-nums no número")
             + row("H1 · título de página", '<span class="h1">Área do organizador</span>', "Barlow Condensed 700 · 36/36 · caixa-alta · tracking +1%")
             + row("H2 · card, problema", '<span class="h2">Soma dos Pares</span>', "Barlow Condensed 600 · 24/26 · caixa normal")
             + row("Eyebrow · rótulo", '<span class="eyebrow">Casos de exemplo</span>', "Barlow Condensed 600 · 13 · caixa-alta · tracking +12% · cinza")
-            + row("Corpo", '<p style="margin: 0; font-size: 15px; line-height: 1.5; max-width: 560px; font-family: {{bodyFont}};">Receba uma lista de números inteiros e devolva a soma dos que são pares. Se não houver nenhum par, devolva 0. Cada time pode submeter quantas vezes quiser; vale a melhor pontuação.</p>', "Barlow ou Inter (alterne acima) · 400 · 15/22 · formulários e enunciados · 14 em tabelas")
-            + row("UI · botões e rótulos", '<div style="display: flex; gap: 10px; align-items: center; font-family: {{bodyFont}};"><span class="btn btn-primary" style="font-family: inherit;">Criar time</span><span class="btn btn-outline" style="font-family: inherit;">Executar</span><span class="label" style="font-family: inherit;">Código do evento</span></div>', "Corpo 500 · 14 · botões 36px (44px em telas de toque)")
+            + row("Corpo", '<p style="margin: 0; font-size: 15px; line-height: 1.5; max-width: 560px;">Receba uma lista de números inteiros e devolva a soma dos que são pares. Se não houver nenhum par, devolva 0. Cada time pode submeter quantas vezes quiser; vale a melhor pontuação.</p>', "Barlow 400 · 15/22 · formulários e enunciados · 14 em tabelas")
+            + row("UI · botões e rótulos", '<div style="display: flex; gap: 10px; align-items: center;"><span class="btn btn-primary" style="font-family: inherit;">Criar time</span><span class="btn btn-outline" style="font-family: inherit;">Executar</span><span class="label" style="font-family: inherit;">Código do evento</span></div>', "Corpo 500 · 14 · botões 36px (44px em telas de toque)")
             + row("Números · placar", '<div style="display: flex; gap: 24px; align-items: baseline;"><span class="num" style="font-weight: 700; font-size: 44px; line-height: 1;">350</span><span class="num" style="font-weight: 600; font-size: 24px; color: var(--brand-text);">41:07</span><span class="num" style="font-weight: 600; font-size: 20px; color: var(--muted);">3/4</span></div>', "Barlow Condensed 600–700 · sempre font-variant-numeric: tabular-nums")
             + row("Mono · casos de teste", '<span class="mono">{ "entrada": [1, 2, 3, 4], "esperado": 6 }</span>', "JetBrains Mono 400 · 13/20")
             + '</div></div>')
-    return page("Tipografia", body, extra_css=BOARD, script=(props, logic))
+    return page("Tipografia", body, extra_css=BOARD)
 
 # ---------- Componentes ----------
 def components_board():

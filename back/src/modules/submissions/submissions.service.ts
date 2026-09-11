@@ -102,6 +102,32 @@ export function releaseSubmissionSlot(
 export function resetSubmissionThrottle(): void {
   inFlightIdentities.clear()
   cooldownUntil.clear()
+  judgingByRound.clear()
+}
+
+// --- Judging in flight, per round (#176) ---
+//
+// Process-local, same reasoning as the throttle above. The round's closure
+// must not be announced while a submission accepted inside it is still being
+// judged: the front fetches a closed round's ranking exactly once, on that
+// event, so announcing early shows a leaderboard missing the very submissions
+// that came in at the buzzer.
+const judgingByRound = new Map<string, number>()
+
+function enterJudging(roundId: string): void {
+  judgingByRound.set(roundId, (judgingByRound.get(roundId) ?? 0) + 1)
+}
+
+function leaveJudging(roundId: string): void {
+  const current = judgingByRound.get(roundId)
+  if (current === undefined) return
+  if (current <= 1) judgingByRound.delete(roundId)
+  else judgingByRound.set(roundId, current - 1)
+}
+
+/** Whether any submission accepted into this round is still being judged. */
+export function hasJudgingInFlight(roundId: string): boolean {
+  return (judgingByRound.get(roundId) ?? 0) > 0
 }
 
 // --- Scoring and case mapping (#21) ---
@@ -232,6 +258,9 @@ export async function submitSolution(
   if (denial) return { ok: false, error: 'throttled', ...denial }
 
   let ranTheJudge = false
+  // Set only once the accept gate below has passed, so the `finally` releases
+  // exactly what it claimed (#176).
+  let judgingRoundId: string | null = null
   try {
     // Straight at the table, not problems.service.getProblem: the translation
     // join is irrelevant here and `status = 'published'` is part of the rule —
@@ -247,6 +276,11 @@ export async function submitSolution(
     if (!(await isProblemInOpenRound(db, body.roundId, problem.id))) {
       return { ok: false, error: 'no_active_round' }
     }
+
+    // Accepted: from here to the INSERT, this round has judging in flight and
+    // must not have its closure announced (#176).
+    judgingRoundId = body.roundId
+    enterJudging(judgingRoundId)
 
     const generated = generateJudgeSource(body.workspace, body.locale ?? DEFAULT_LOCALE)
     if (!generated.ok) {
@@ -312,6 +346,7 @@ export async function submitSolution(
       },
     }
   } finally {
+    if (judgingRoundId !== null) leaveJudging(judgingRoundId)
     releaseSubmissionSlot(identityKey, ranTheJudge)
   }
 }

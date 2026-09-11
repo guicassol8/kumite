@@ -7,6 +7,18 @@ import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
 import { k } from '../../context'
 import { createDb } from '../../db/client'
 import { roundsTable, teamsTable, usersTable } from '../../db/schema'
+import { listRounds, resetPendingRoundClosures } from '../rounds/rounds.service'
+
+// #176: the hold on round.closed keys off judging still in flight. The real
+// counter is driven by submitSolution (covered in submissions.test.ts); here
+// it is steered directly so the announcement rule can be tested on its own.
+const judging = vi.hoisted(() => ({ rounds: new Set<string>() }))
+
+vi.mock('../submissions/submissions.service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../submissions/submissions.service')>()
+  return { ...actual, hasJudgingInFlight: (roundId: string) => judging.rounds.has(roundId) }
+})
+
 import type { SseEvent } from './sse.schema'
 import {
   HeartbeatEventSchema,
@@ -18,6 +30,7 @@ import {
   StateSyncEventSchema,
 } from './sse.schema'
 import {
+  announceClosedRounds,
   buildRankingUpdatedEvent,
   buildStateSyncEvent,
   createSseBus,
@@ -25,6 +38,7 @@ import {
   publishRoundClosed,
   publishRoundExtended,
   publishRoundOpened,
+  ROUND_CLOSE_ANNOUNCE_MAX_WAIT_MS,
   runExpiryTick,
   runRankingTick,
 } from './sse.service'
@@ -200,6 +214,8 @@ describe('sse.service', () => {
     const db = createDb()
 
     beforeEach(async () => {
+      judging.rounds.clear()
+      resetPendingRoundClosures()
       await db.execute(sql`truncate table ${roundsTable}, ${teamsTable} restart identity cascade`)
     })
 
@@ -271,6 +287,101 @@ describe('sse.service', () => {
 
         expect(fn).toHaveBeenCalledTimes(1)
         expect(fn).toHaveBeenCalledWith(expect.objectContaining({ type: 'heartbeat' }))
+      })
+
+      // #176 part 1: reapExpiredRound runs on ~11 read paths. Whichever runs
+      // first closes the round, and the tick then found no freshly-closed row
+      // — the event was lost. The announcement now comes from the pending set.
+      it('still announces a round another read path already reaped', async () => {
+        const [round] = await db
+          .insert(roundsTable)
+          .values({
+            name: 'Round 1',
+            durationMinutes: 30,
+            status: 'open',
+            openedAt: new Date(Date.now() - 120_000),
+            closesAt: new Date(Date.now() - 60_000),
+          })
+          .returning()
+        if (!round) throw new Error('expected fixture')
+        // A plain read beats the tick to it and closes the round itself.
+        await listRounds(db)
+
+        const bus = createSseBus()
+        const fn = vi.fn()
+        bus.subscribe(fn)
+
+        await runExpiryTick(db, bus)
+
+        expect(fn).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'round.closed', roundId: round.id }),
+        )
+      })
+
+      // #176 part 2 (AC4): a submission accepted at the buzzer is still being
+      // judged when the round ends. Announcing now would show a leaderboard
+      // missing it — the front fetches a closed round's ranking exactly once.
+      it('holds round.closed while the round still has judging in flight', async () => {
+        const [round] = await db
+          .insert(roundsTable)
+          .values({
+            name: 'Round 1',
+            durationMinutes: 30,
+            status: 'open',
+            openedAt: new Date(Date.now() - 120_000),
+            closesAt: new Date(Date.now() - 60_000),
+          })
+          .returning()
+        if (!round) throw new Error('expected fixture')
+        judging.rounds.add(round.id)
+
+        const bus = createSseBus()
+        const fn = vi.fn()
+        bus.subscribe(fn)
+
+        await runExpiryTick(db, bus)
+
+        expect(fn).toHaveBeenCalledTimes(1)
+        expect(fn).toHaveBeenCalledWith(expect.objectContaining({ type: 'heartbeat' }))
+
+        // Judging drains; the next tick announces it.
+        judging.rounds.delete(round.id)
+        await runExpiryTick(db, bus)
+
+        expect(fn).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'round.closed', roundId: round.id }),
+        )
+      })
+
+      it('announces anyway once the wait ceiling passes, even with judging stuck', async () => {
+        const [round] = await db
+          .insert(roundsTable)
+          .values({
+            name: 'Round 1',
+            durationMinutes: 30,
+            status: 'open',
+            openedAt: new Date(Date.now() - 120_000),
+            closesAt: new Date(Date.now() - 60_000),
+          })
+          .returning()
+        if (!round) throw new Error('expected fixture')
+        judging.rounds.add(round.id)
+
+        const bus = createSseBus()
+        const fn = vi.fn()
+        bus.subscribe(fn)
+
+        await runExpiryTick(db, bus)
+        expect(fn).not.toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'round.closed', roundId: round.id }),
+        )
+
+        // A worker that never returns must not hold the event forever.
+        announceClosedRounds(bus, Date.now() + ROUND_CLOSE_ANNOUNCE_MAX_WAIT_MS + 1)
+
+        expect(fn).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'round.closed', roundId: round.id }),
+        )
       })
 
       it('does not throw when the db rejects', async () => {

@@ -30,6 +30,7 @@ import {
   acquireSubmissionSlot,
   findTeamIdForUser,
   getBestSubmission,
+  hasJudgingInFlight,
   releaseSubmissionSlot,
   resetSubmissionThrottle,
   type SubmitOutcome,
@@ -1072,4 +1073,73 @@ describe('submitSolution when the round closes mid-judging', () => {
     },
     JUDGED_TEST_TIMEOUT_MS,
   )
+
+  // The counter behind the round.closed hold (#176 AC4): the SSE announcement
+  // waits on it, so a leak would hold a round's closure until the ceiling.
+  it(
+    'reports judging in flight for the round while the submission is being judged',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+
+      expect(hasJudgingInFlight(problem.roundId)).toBe(false)
+
+      let seenMidJudging: boolean | null = null
+      judgeRace.onJudged = async () => {
+        seenMidJudging = hasJudgingInFlight(problem.roundId)
+      }
+
+      await submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+      )
+
+      expect(seenMidJudging).toBe(true)
+      expect(hasJudgingInFlight(problem.roundId)).toBe(false)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'releases the round even when the judge throws',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+
+      judgeRace.onJudged = async () => {
+        throw new Error('judge exploded')
+      }
+
+      await expect(
+        submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        ),
+      ).rejects.toThrow('judge exploded')
+
+      // A stuck counter would hold that round's closure for the whole ceiling.
+      expect(hasJudgingInFlight(problem.roundId)).toBe(false)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it('never claims a round when the submission is refused before the accept gate', async () => {
+    const { user, team } = await insertTeamMember()
+    const roundId = '00000000-0000-0000-0000-000000000000'
+
+    const outcome = await submitSolution(
+      db,
+      { userId: user.id, teamId: team.id },
+      {
+        problemId: '00000000-0000-0000-0000-000000000000',
+        roundId,
+        workspace: solutionWorkspace,
+      },
+    )
+
+    expect(outcome).toEqual({ ok: false, error: 'problem_not_found' })
+    expect(hasJudgingInFlight(roundId)).toBe(false)
+  })
 })

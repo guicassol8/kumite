@@ -25,6 +25,31 @@ type RoundProblemRow = typeof roundProblemsTable.$inferSelect
 
 export type ReapedRound = { id: string; closesAt: Date | null }
 
+// --- Closed rounds still waiting to be announced (#176) ---
+//
+// reapExpiredRound is called from ~11 read paths but only the SSE tick
+// publishes round.closed. Whichever read reaped the round first used to win
+// the race and the tick, finding no freshly-closed row, announced nothing —
+// the event was simply lost. Every close now lands here instead, and the
+// announcer drains it, so the closure survives no matter which path noticed
+// it. Process-local, same reasoning as the submission throttle.
+const pendingClosures = new Map<string, Date>()
+
+export type PendingClosure = { roundId: string; closedAt: Date }
+
+export function pendingRoundClosures(): PendingClosure[] {
+  return [...pendingClosures].map(([roundId, closedAt]) => ({ roundId, closedAt }))
+}
+
+export function clearPendingRoundClosure(roundId: string): void {
+  pendingClosures.delete(roundId)
+}
+
+/** Test seam: forgets every unannounced closure. Never used in production. */
+export function resetPendingRoundClosures(): void {
+  pendingClosures.clear()
+}
+
 // Lazy expiry: a round past its own closesAt is closed here, on the read
 // path, so nothing depends on a scheduler ever running. closedAt is set to
 // the round's own closesAt (deterministic "closed exactly on schedule"), not
@@ -32,11 +57,15 @@ export type ReapedRound = { id: string; closesAt: Date | null }
 // closed (empty when nothing was expired) so callers — the SSE tick — know
 // what to announce without a second query.
 export async function reapExpiredRound(db: Db): Promise<ReapedRound[]> {
-  return db
+  const closed = await db
     .update(roundsTable)
     .set({ status: 'closed', closedAt: roundsTable.closesAt, updatedAt: new Date() })
     .where(and(eq(roundsTable.status, 'open'), lte(roundsTable.closesAt, new Date())))
     .returning({ id: roundsTable.id, closesAt: roundsTable.closesAt })
+
+  const now = new Date()
+  for (const round of closed) pendingClosures.set(round.id, now)
+  return closed
 }
 
 function toDetail(round: RoundRow, problems: RoundProblemRow[]): RoundDetail {
@@ -377,6 +406,9 @@ export async function closeRound(db: Db, id: string): Promise<CloseRoundResult> 
     .update(roundsTable)
     .set({ status: 'closed', closedAt: new Date(), updatedAt: new Date() })
     .where(eq(roundsTable.id, id))
+  // Announced by the same drain as an expired round (#176): an organizer
+  // closing early races judging exactly like the clock does.
+  pendingClosures.set(id, new Date())
 
   const detail = await getRound(db, id)
   if (!detail) throw new Error('expected round to still exist right after close')

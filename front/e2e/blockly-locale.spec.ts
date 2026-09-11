@@ -1,5 +1,6 @@
-import { expect, type Page, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
+import { dragBlockFromFlyout } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -13,23 +14,6 @@ import {
 // seeded problem carries an `es` translation, so the screen is Spanish end to
 // end for this describe's `es-MX` browser.
 const evidence = (name: string) => `e2e/evidence/57/${name}.png`
-
-async function dragBlockFromFlyout(page: Page, category: string) {
-  const host = page.getByTestId('blockly-workspace')
-  const toolbox = page.locator('.blocklyToolbox')
-  await toolbox.getByRole('treeitem', { name: category }).click()
-  const flyoutBlock = page.locator('.blocklyFlyout g.blocklyDraggable').first()
-  await expect(flyoutBlock).toBeVisible()
-  const source = await flyoutBlock.boundingBox()
-  const canvas = await host.boundingBox()
-  if (!source || !canvas) throw new Error('the flyout block or the canvas has no box')
-  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2)
-  await page.mouse.down()
-  await page.mouse.move(canvas.x + canvas.width * 0.6, canvas.y + canvas.height * 0.6, {
-    steps: 12,
-  })
-  await page.mouse.up()
-}
 
 test.describe('browser detected as Spanish (es-MX)', () => {
   test.use({ locale: 'es-MX' })

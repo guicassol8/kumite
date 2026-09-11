@@ -1,5 +1,7 @@
 import type { WorkspaceState } from '@/components/blockly/blockly-workspace'
 
+const KEY_PREFIX = 'kumite:workspace:'
+
 // The key carries the user id (#175): keyed by problem alone, one account's
 // canvas opened on the next account's screen — same browser, different person.
 // The scope is what fixes it, not a wipe on logout: the owner has to find the
@@ -7,7 +9,7 @@ import type { WorkspaceState } from '@/components/blockly/blockly-workspace'
 // logout button at all — an expired token, a closed tab, a crash — leak just
 // the same.
 function storageKey(userId: string, problemId: string): string {
-  return `kumite:workspace:${userId}:${problemId}`
+  return `${KEY_PREFIX}${userId}:${problemId}`
 }
 
 export function loadWorkspaceState(
@@ -38,6 +40,32 @@ export function saveWorkspaceState(
     localStorage.setItem(storageKey(userId, problemId), JSON.stringify(state))
   } catch {
     // localStorage may be unavailable (private mode, quota, disabled) — auto-save is best-effort.
+  }
+}
+
+/**
+ * Drops the workspaces saved before the key had an owner — the leaked data of
+ * achado #2, which is already sitting in the browser of anyone who ran the old
+ * build and stays readable by whoever signs in next. Scoping new keys does not
+ * reach it; this sweep does, once, at bootstrap.
+ *
+ * Old keys have three `:`-separated segments and new ones four. Problem and
+ * user ids are uuids, which contain no `:`, so counting segments tells the two
+ * formats apart with nothing to guess at.
+ */
+export function purgeLegacyWorkspaceState(): void {
+  try {
+    const legacy: string[] = []
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (key?.startsWith(KEY_PREFIX) && key.split(':').length === 3) legacy.push(key)
+    }
+    // Collected first, removed after: removing while walking by index shifts
+    // the entries left and skips every other match.
+    for (const key of legacy) localStorage.removeItem(key)
+  } catch {
+    // see saveWorkspaceState — and this one runs before anything is on
+    // screen, so a throw here would be a blank page over a best-effort sweep.
   }
 }
 

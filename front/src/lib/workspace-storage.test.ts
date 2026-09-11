@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { clearWorkspaceState, loadWorkspaceState, saveWorkspaceState } from './workspace-storage'
+import {
+  clearWorkspaceState,
+  loadWorkspaceState,
+  purgeLegacyWorkspaceState,
+  saveWorkspaceState,
+} from './workspace-storage'
 
 const fixture = {
   blocks: {
@@ -105,5 +110,52 @@ describe('workspace-storage', () => {
     })
 
     expect(() => clearWorkspaceState(ALUNO_1, 'soma-dos-pares')).not.toThrow()
+  })
+
+  // The leaked data of achado #2 is still sitting in every browser that ran
+  // the old build: keys with no owner, readable by whoever logs in next. The
+  // new scope alone does not remove them, so the bootstrap sweeps them once.
+  describe('purgeLegacyWorkspaceState', () => {
+    const legacyKey = 'kumite:workspace:soma-dos-pares'
+
+    it('removes the keys saved before the workspace had an owner', () => {
+      localStorage.setItem(legacyKey, JSON.stringify(fixture))
+
+      purgeLegacyWorkspaceState()
+
+      expect(localStorage.getItem(legacyKey)).toBeNull()
+    })
+
+    it('keeps the user-scoped keys, so nobody loses a solution to the sweep', () => {
+      localStorage.setItem(legacyKey, JSON.stringify(fixture))
+      saveWorkspaceState(ALUNO_1, 'soma-dos-pares', fixture)
+      saveWorkspaceState(ALUNO_2, 'outro-problema', fixture)
+
+      purgeLegacyWorkspaceState()
+
+      expect(loadWorkspaceState(ALUNO_1, 'soma-dos-pares')).toEqual(fixture)
+      expect(loadWorkspaceState(ALUNO_2, 'outro-problema')).toEqual(fixture)
+    })
+
+    it('leaves keys that are not this module alone', () => {
+      localStorage.setItem('kumite-token', 'tok')
+      localStorage.setItem('kumite-lang', 'pt')
+
+      purgeLegacyWorkspaceState()
+
+      expect(localStorage.getItem('kumite-token')).toBe('tok')
+      expect(localStorage.getItem('kumite-lang')).toBe('pt')
+    })
+
+    // It runs at bootstrap, before anything is on screen: throwing here would
+    // take the whole app down over a best-effort cleanup.
+    it('does not throw when localStorage is unavailable', () => {
+      vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+        throw new Error('unavailable')
+      })
+      localStorage.setItem(legacyKey, JSON.stringify(fixture))
+
+      expect(() => purgeLegacyWorkspaceState()).not.toThrow()
+    })
   })
 })

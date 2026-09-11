@@ -48,6 +48,28 @@ function neutralizeCommentTerminators(blocks: Blockly.Block[]): void {
 }
 
 /**
+ * Proves the emitted source is a *callable* `solve`, not just text that reads
+ * like one. The signature check above matches characters; this one asks the
+ * engine, which is the only thing that settles it.
+ *
+ * `new Function` compiles the body and stops there — nothing the participant
+ * wrote executes here, on the judge's process or in the editor. It is the
+ * cheap way to hold the line without an AST parser or a new dependency.
+ *
+ * The vector that made this necessary: Blockly's `quote_` escapes `\`, `\n`
+ * and `'`, but not U+000D, which JS honours as a line terminator. A text field
+ * carrying one emits `return 'a<CR>b';` — signature intact, `SyntaxError` on
+ * instantiation, every case back as a runtime error with no cause named.
+ */
+function assertParses(source: string, message: string): void {
+  try {
+    new Function(source)
+  } catch (cause) {
+    throw new BlocksError('invalid-generated-code', message, { cause })
+  }
+}
+
+/**
  * Turns a serialized workspace into the JS source of `solve(input)`.
  *
  * Runs headless, so it is the same call on the editor and on the judge. The
@@ -122,6 +144,7 @@ export function generateSolution(
     if (!SOLVE_SIGNATURE.test(source)) {
       throw new BlocksError('invalid-generated-code', messages.errorInvalidGeneratedCode)
     }
+    assertParses(source, messages.errorInvalidGeneratedCode)
     return source
   } finally {
     workspace.dispose()

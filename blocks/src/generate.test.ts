@@ -241,6 +241,38 @@ describe('generateSolution', () => {
     }
   })
 
+  it('refuses a source that carries the solve signature but does not parse', () => {
+    // The signature check proves the *text* is there, not that the source is
+    // callable. Blockly's `quote_` escapes `\\`, `\n` and `'` — not U+000D, a
+    // line terminator JS honours — so a text field carrying one emits
+    // `return 'a<CR>b';`: signature intact, `SyntaxError` on instantiation.
+    // Reachable through a forged workspace, which is the trust boundary here.
+    const error = expectBlocksError(() =>
+      generateSolution({
+        blocks: {
+          languageVersion: 0,
+          blocks: [
+            {
+              type: ROOT_BLOCK_TYPE,
+              id: 'raiz',
+              inputs: {
+                RETURN: {
+                  block: {
+                    type: 'text',
+                    id: 'texto',
+                    fields: { TEXT: `a${LINE_TERMINATORS[0]}b` },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      }),
+    )
+
+    expect(error.code).toBe('invalid-generated-code')
+  })
+
   it('accepts the real source it produces', () => {
     // The other half of the guard: it must not reject what the generator
     // legitimately emits, comment lines and variable declarations included.

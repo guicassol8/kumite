@@ -16,6 +16,28 @@ const CRASH_WORKER_URL = new URL('../../judge-test-worker.mjs', import.meta.url)
 // route (#21) performs on the incoming body, never a cast.
 const somaDosParesWorkspace = WorkspaceSchema.parse(somaDosPares)
 const raizDesabilitadaWorkspace = WorkspaceSchema.parse(raizDesabilitada)
+// U+000D built from its code point: it is invisible in an editor and some
+// tools normalize it away on save, and its presence is the whole point.
+const textoQueNaoParseia = WorkspaceSchema.parse({
+  blocks: {
+    languageVersion: 0,
+    blocks: [
+      {
+        type: 'kumite_solve',
+        id: 'raiz',
+        inputs: {
+          RETURN: {
+            block: {
+              type: 'text',
+              id: 'texto',
+              fields: { TEXT: `a${String.fromCharCode(0x0d)}b` },
+            },
+          },
+        },
+      },
+    ],
+  },
+})
 
 /** Every test that needs runnable source goes through the judge's own codegen
  * — one path, so the suite can never prove a source shape the judge does not
@@ -230,10 +252,24 @@ describe('generateJudgeSource', () => {
     })
   })
 
+  it('refuses a workspace whose source carries the signature but does not parse', () => {
+    // A text field carrying U+000D: Blockly's `quote_` does not escape it, so
+    // the source keeps the `solve` signature and still throws `SyntaxError` on
+    // instantiation. Reached with a real workspace, no seam — this is what the
+    // judge would otherwise have run, reporting every case as a runtime error.
+    const result = generateJudgeSource(textoQueNaoParseia)
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'invalid_generated_code',
+      message: expect.any(String),
+    })
+  })
+
   it('maps the structural guard to its own client code', () => {
-    // Same seam as the blocks package's own test: nothing the judge can be
-    // handed reaches this path any more, and that is the point — the mapping
-    // has to exist before the path does.
+    // Same seam as the blocks package's own test, for the empty-success shape
+    // specifically: no workspace produces `"\n\n\n"` any more, and that is the
+    // point — the mapping has to outlive the path that first needed it.
     const finish = vi.spyOn(javascriptGenerator, 'finish').mockReturnValue('\n\n\n')
     try {
       const result = generateJudgeSource(somaDosParesWorkspace)

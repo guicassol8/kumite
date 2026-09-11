@@ -200,3 +200,33 @@ describe('forced password change guard', () => {
     expect(res.status).toBe(200)
   })
 })
+
+// --- Deactivated account (#174) ---
+
+// Deactivating a user is the only moderation lever during the event, and until
+// #174 it did nothing to sessions already issued: the JWT stayed good for its
+// whole ~24h TTL, so a banned participant kept browsing, submitting and
+// scoring. Only a *new* login was refused. These tests are that bug, frozen.
+describe('deactivated account guard', () => {
+  const deactivatedRoutes: Call[] = [
+    { method: 'GET', path: '/me' },
+    { method: 'GET', path: '/teams' },
+    { method: 'POST', path: '/submissions', body: {} },
+  ]
+
+  it.each(deactivatedRoutes)(
+    '$method $path with a token issued before the ban -> 401 unauthorized',
+    async (call) => {
+      const participant = await insertUser('participant')
+      // Issued while the account was still active — the tab the participant
+      // left open before the organizer hit Deactivate.
+      const token = await tokenFor(participant)
+      await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, participant.id))
+
+      const res = await request(call, token)
+
+      expect(res.status).toBe(401)
+      expect(await res.json()).toMatchObject({ error: 'unauthorized' })
+    },
+  )
+})

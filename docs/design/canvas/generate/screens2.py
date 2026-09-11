@@ -1,17 +1,52 @@
 from common import *
 
+# 21 times — o mesmo número que o board do organizador afirma. Os seis
+# primeiros são os de sempre, na mesma ordem, para o enquadramento do Placar
+# não mudar à toa; os 15 seguintes existem para o telão ter transbordo de
+# verdade (identity.md § 5, "Telão · transbordo").
 RANKS = [("Los Recursivos", "merida", 100, 100, 150, 350, False), ("Byte Fighters", "pucrs", 100, 100, 100, 300, True),
          ("Kernel Panic", "pucrs", 100, 60, 100, 260, False), ("Pila de Ideas", "merida", 100, 100, None, 200, False),
-         ("Tupi Code", "pucrs", 80, None, 0, 80, False), ("Mérida Devs", "merida", 40, None, None, 40, False)]
+         ("Tupi Code", "pucrs", 80, None, 0, 80, False), ("Mérida Devs", "merida", 40, None, None, 40, False),
+         ("Punhos de Código", "pucrs", 40, None, None, 40, False), ("Algoritmo Andino", "merida", 20, 20, None, 40, False),
+         ("Sem Ponto e Vírgula", "pucrs", None, 30, None, 30, False), ("Los Compiladores", "merida", 30, None, None, 30, False),
+         ("Dojo Digital", "pucrs", 20, None, None, 20, False), ("Bits del Sur", "merida", None, 20, None, 20, False),
+         ("Pilha Cheia", "pucrs", 10, 10, None, 20, False), ("Nodo Mérida", "merida", 10, None, None, 10, False),
+         ("Faixa Preta", "pucrs", None, 10, None, 10, False), ("Bucle Infinito", "merida", 0, 10, None, 10, False),
+         ("Guarda Alta", "pucrs", 0, None, None, 0, False), ("Los Punteros", "merida", 0, 0, None, 0, False),
+         ("Tatame Byte", "pucrs", None, 0, None, 0, False), ("Cero Absoluto", "merida", 0, None, 0, 0, False),
+         ("Últimos Recursos", "merida", None, None, 0, 0, False)]
+
+# Geral acumulado: a soma das três rodadas do evento. É outra classificação —
+# quem lidera a rodada em curso não lidera o evento —, e é o que o telão mostra
+# enquanto não há rodada aberta.
+GERAL = [("Byte Fighters", "pucrs", 100, 300, 300, 700, True), ("Los Recursivos", "merida", 60, 250, 350, 660, False),
+         ("Kernel Panic", "pucrs", 100, 200, 260, 560, False), ("Pila de Ideas", "merida", 100, 180, 200, 480, False),
+         ("Algoritmo Andino", "merida", 100, 160, 40, 300, False), ("Tupi Code", "pucrs", 60, 140, 80, 280, False),
+         ("Los Compiladores", "merida", 100, 120, 30, 250, False), ("Punhos de Código", "pucrs", 60, 100, 40, 200, False),
+         ("Mérida Devs", "merida", 40, 100, 40, 180, False), ("Dojo Digital", "pucrs", 40, 100, 20, 160, False),
+         ("Sem Ponto e Vírgula", "pucrs", 20, 100, 30, 150, False), ("Bits del Sur", "merida", 40, 80, 20, 140, False),
+         ("Pilha Cheia", "pucrs", 20, 80, 20, 120, False), ("Nodo Mérida", "merida", 40, 60, 10, 110, False),
+         ("Faixa Preta", "pucrs", 20, 60, 10, 90, False), ("Bucle Infinito", "merida", 20, 40, 10, 70, False),
+         ("Guarda Alta", "pucrs", 20, 40, 0, 60, False), ("Los Punteros", "merida", 0, 40, 0, 40, False),
+         ("Tatame Byte", "pucrs", 20, 20, 0, 40, False), ("Cero Absoluto", "merida", 0, 20, 0, 20, False),
+         ("Últimos Recursos", "merida", 0, 0, 0, 0, False)]
+
+# Quantas linhas INTEIRAS cabem na altura do telão no enquadramento destas
+# pranchas (1440x810), medido: linha de 83 px, rodapé fechando em 788 px. Na
+# implementação N é calculado da altura real da tela — num projetor 1080p cabem
+# mais. A densidade é constante: identity.md § 5 proíbe encolher a tipografia
+# para caber mais um time, então o que sobra vai para as páginas seguintes.
+TELAO_ROWS = 6
+TELAO_SECONDS = 15
 
 def score(v, big=False):
     fs = "28px" if big else "16px"
     if v is None: return f'<span class="muted" style="font-size: {fs};">—</span>'
     return f'<span class="num" style="font-weight: 600; font-size: {fs};">{v}</span>'
 
-def rank_rows(big=False):
+def rank_rows(data, big=False, start=1):
     rows = ""
-    for i, (name, u, a, b, c, tot, mine) in enumerate(RANKS, 1):
+    for i, (name, u, a, b, c, tot, mine) in enumerate(data, start):
         rc = "var(--brand)" if i == 1 else ("var(--foreground)" if i <= 3 else "var(--muted)")
         fs = "36px" if big else "20px"
         nm = "26px" if big else "15px"
@@ -31,22 +66,53 @@ def leaderboard():
             f'<div style="display: flex; align-items: center; gap: 12px;"><span class="live"><span class="dot"></span>Ao vivo · Rodada 2</span><span class="num" style="font-weight: 600; font-size: 24px; letter-spacing: 0.02em;">41:07</span><span class="btn btn-outline">{icon("expand", 16)}Modo telão</span></div></div>'
             '<div class="card" style="overflow: hidden;"><table class="table" style="table-layout: fixed;"><colgroup><col style="width: 64px;"><col><col style="width: 90px;"><col style="width: 90px;"><col style="width: 90px;"><col style="width: 110px;"></colgroup>'
             '<thead><tr><th>#</th><th>Time</th><th>A</th><th>B</th><th>C</th><th>Total</th></tr></thead>'
-            f'<tbody>{rank_rows()}</tbody></table></div>'
+            f'<tbody>{rank_rows(RANKS[:6])}</tbody></table></div>'
             '<div style="display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 13px;" class="muted"><span><b style="color: var(--foreground); font-family: var(--font-display); font-size: 14px;">A</b> Soma dos Pares</span><span><b style="color: var(--foreground); font-family: var(--font-display); font-size: 14px;">B</b> Maior Valor da Lista</span><span><b style="color: var(--foreground); font-family: var(--font-display); font-size: 14px;">C</b> Contar Números Negativos</span><span style="margin-left: auto;">— sem submissão · 0 zerou</span></div>'
             '</div></main>' + footer())
     return page("Placar", body)
 
-def telao():
-    body = ('<div style="flex: 1; display: flex; flex-direction: column; padding: 40px 64px 32px; gap: 28px;">'
+def _telao(title_eyebrow, corner, data, headers, legend, page_title):
+    """Telão em qualquer um dos seus estados. O layout é o mesmo — o que muda é
+    o canto direito (contagem ao vivo, selo Geral, horário de encerramento) e a
+    origem do ranking. A densidade nunca muda: quem não cabe vai para a página
+    seguinte."""
+    pages = -(-len(data) // TELAO_ROWS)
+    pager = ""
+    if pages > 1:
+        pager = (f'<span style="display: inline-flex; align-items: center; gap: 10px; font-size: 16px;">'
+                 f'<span class="num" style="font-weight: 600; color: var(--foreground);">1 / {pages}</span>'
+                 f'· troca a cada {TELAO_SECONDS} s</span>')
+    ths = "".join(f'<th style="font-size: 18px;">{h}</th>' for h in ("#", "Time", *headers, "Total"))
+    body = ('<div style="flex: 1; display: flex; flex-direction: column; padding: 32px 64px 24px; gap: 28px;">'
             '<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;">'
-            f'<div style="display: flex; align-items: center; gap: 24px;">{mark(64, right="var(--foreground)")}<div style="display: flex; flex-direction: column;"><span class="display" style="font-weight: 800; font-size: 84px; line-height: 0.9; letter-spacing: 0.01em; text-transform: uppercase;">Placar</span><span class="eyebrow" style="font-size: 18px; margin-top: 8px;">PUCRS × Mérida · programação em blocos</span></div></div>'
-            '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;"><span class="live" style="font-size: 20px;"><span class="dot" style="width: 12px; height: 12px;"></span>Rodada 2 · ao vivo</span><span class="num" style="font-weight: 700; font-size: 96px; line-height: 0.9; letter-spacing: 0.02em; color: var(--brand-text);">41:07</span></div></div>'
+            f'<div style="display: flex; align-items: center; gap: 24px;">{mark(64, right="var(--foreground)")}<div style="display: flex; flex-direction: column;"><span class="display" style="font-weight: 800; font-size: 84px; line-height: 0.9; letter-spacing: 0.01em; text-transform: uppercase;">Placar</span><span class="eyebrow" style="font-size: 18px; margin-top: 8px;">{title_eyebrow}</span></div></div>'
+            f'{corner}</div>'
             '<table class="table" style="table-layout: fixed;"><colgroup><col style="width: 90px;"><col><col style="width: 140px;"><col style="width: 140px;"><col style="width: 140px;"><col style="width: 180px;"></colgroup>'
-            '<thead><tr><th style="font-size: 18px;">#</th><th style="font-size: 18px;">Time</th><th style="font-size: 18px;">A</th><th style="font-size: 18px;">B</th><th style="font-size: 18px;">C</th><th style="font-size: 18px;">Total</th></tr></thead>'
-            f'<tbody>{rank_rows(big=True)}</tbody></table>'
-            f'<div style="margin-top: auto; display: flex; justify-content: space-between; align-items: center;" class="muted"><span style="font-size: 18px;"><b style="color: var(--foreground); font-family: var(--font-display);">A</b> Soma dos Pares &nbsp;&nbsp; <b style="color: var(--foreground); font-family: var(--font-display);">B</b> Maior Valor da Lista &nbsp;&nbsp; <b style="color: var(--foreground); font-family: var(--font-display);">C</b> Contar Números Negativos</span><span style="display: inline-flex; align-items: center; gap: 10px; font-size: 16px;">{icon("collapse", 18)}<span class="kbd">Esc</span> sair do modo telão</span></div>'
+            f'<thead><tr>{ths}</tr></thead>'
+            f'<tbody>{rank_rows(data[:TELAO_ROWS], big=True)}</tbody></table>'
+            f'<div style="margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 24px;" class="muted"><span style="font-size: 18px;">{legend}</span>{pager}<span style="display: inline-flex; align-items: center; gap: 10px; font-size: 16px;">{icon("collapse", 18)}<span class="kbd">Esc</span> sair do modo telão</span></div>'
             '</div>')
-    return page("Placar — modo telão", body, dark=True, extra_css=".table td { padding: 14px 12px; border-bottom-color: var(--border); } .badge-uni { font-size: 14px; height: 26px; padding: 0 8px; }")
+    return page(page_title, body, dark=True, extra_css=".table td { padding: 14px 12px; border-bottom-color: var(--border); } .badge-uni { font-size: 14px; height: 26px; padding: 0 8px; }")
+
+def _abc(*labels):
+    return " &nbsp;&nbsp; ".join(f'<b style="color: var(--foreground); font-family: var(--font-display);">{k}</b> {v}' for k, v in labels)
+
+def telao():
+    """(a) Rodada ao vivo — identity.md § 5."""
+    corner = ('<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">'
+              '<span class="live" style="font-size: 20px;"><span class="dot" style="width: 12px; height: 12px;"></span>Rodada 2 · ao vivo</span>'
+              '<span class="num" style="font-weight: 700; font-size: 96px; line-height: 0.9; letter-spacing: 0.02em; color: var(--brand-text);">41:07</span></div>')
+    legend = _abc(("A", "Soma dos Pares"), ("B", "Maior Valor da Lista"), ("C", "Contar Números Negativos"))
+    return _telao("PUCRS × Mérida · programação em blocos", corner, RANKS, ("A", "B", "C"), legend, "Placar — modo telão")
+
+def telao_geral():
+    """(b) Sem rodada aberta — onde o projetor passa a maior parte do tempo de
+    sala. O canto da contagem vira selo + eyebrow: nunca fica vazio."""
+    corner = ('<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">'
+              '<span class="badge" style="height: 44px; padding: 0 20px; border-radius: 8px; font-family: var(--font-display); font-weight: 700; font-size: 28px; letter-spacing: 0.12em; text-transform: uppercase; border-color: var(--border);">Geral</span>'
+              '<span class="eyebrow" style="font-size: 18px;">Aguardando a próxima rodada</span></div>')
+    legend = _abc(("1", "Aquecimento"), ("2", "Rodada 1"), ("3", "Rodada 2"))
+    return _telao("PUCRS × Mérida · classificação acumulada", corner, GERAL, ("1", "2", "3"), legend, "Placar — modo telão · sem rodada aberta")
 
 def organizer():
     def stat(title, num, lines, action=""):

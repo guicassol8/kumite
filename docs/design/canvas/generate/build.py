@@ -3,7 +3,7 @@ import json, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 CANVAS = os.path.normpath(os.path.join(HERE, ".."))  # docs/design/canvas
 from screens import editor, login, signup_mobile, teams
-from screens2 import leaderboard, telao, organizer, home
+from screens2 import leaderboard, telao, telao_geral, organizer, home
 from identity import logo_board, palette_board, type_board, components_board, blockly_board
 
 OUT = CANVAS
@@ -16,6 +16,7 @@ files = {
     "Times.dc.html": teams(),
     "Placar.dc.html": leaderboard(),
     "Telao.dc.html": telao(),
+    "TelaoGeral.dc.html": telao_geral(),
     "Organizador.dc.html": organizer(),
     "Inicio.dc.html": home(),
     "Simbolo.dc.html": logo_board(),
@@ -52,6 +53,7 @@ canvas = {
     {"file": "Placar.dc.html", "title": "Placar", "x": 0, "y": 1884, "w": 1280, "h": 800, "page": "telas"},
     {"file": "Organizador.dc.html", "title": "Painel do organizador", "x": 1360, "y": 1884, "w": 1280, "h": 800, "page": "telas"},
     {"file": "Telao.dc.html", "title": "Placar · modo telão", "x": 2720, "y": 1884, "w": 1440, "h": 810, "page": "telas"},
+    {"file": "TelaoGeral.dc.html", "title": "Telão · sem rodada aberta", "x": 0, "y": 2774, "w": 1440, "h": 810, "page": "telas"},
   ],
   "annotations": [
     {"id": "nota-paleta", "x": 1280, "y": -150, "w": 420, "page": "identidade", "text": "Recomendação: variante A (Hinomaru). Todas as telas da página Telas estão nela. Se preferir B ou C, eu re-tokenizo tudo."},

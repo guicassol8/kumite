@@ -364,6 +364,12 @@ def check_parity(css_blocks, groups, radius):
 
 HEX_ANYWHERE = re.compile(r"#[0-9A-Fa-f]{6}\b")
 
+# Quanto um oklch pode passar do cubo sRGB, em linear, antes de contar como
+# fora do gamut. Os oklch tirados por inversão de um hex passam no máximo
+# 0,0007 (arredondamento da grafia curta); os que de fato estavam fora
+# passavam de 0,0067 a 0,028 — uma ordem de grandeza de folga dos dois lados.
+GAMUT_TOLERANCE = 0.002
+
 
 def declared_pairs(css_blocks, comments):
     """Cada declaração como (camada, prop, oklch, hex) — o oklch e o hex podem
@@ -400,15 +406,34 @@ def check_oklch(css_blocks, comments):
 
 
 def check_gamut(css_blocks, comments):
+    """O oklch anotado tem de descrever a MESMA cor do hex sem depender de
+    clipagem. Um oklch fora do gamut só vira aquele hex porque o navegador
+    clipa em sRGB — em tela P3 ele não clipa, e aí a cor diverge do hex gêmeo
+    usado nos --block-* e nos SVGs do logo. A conversão inversa de um hex de
+    borda (canal em 0 ou 255) cai microscopicamente fora ao ser arredondada
+    para a grafia curta; é isso que a tolerância cobre."""
     errors = []
-    for layer, prop, triple, _ in declared_pairs(css_blocks, comments):
-        if not oklch_in_gamut(*triple):
+    for layer, prop, triple, hx in declared_pairs(css_blocks, comments):
+        raw = oklch_to_linear(*triple)
+        overshoot = max(max(-c, c - 1, 0.0) for c in raw)
+        if overshoot > GAMUT_TOLERANCE:
             errors.append(
                 f"--{prop} ({layer}): oklch({' '.join('%g' % x for x in triple)}) "
-                f"cai fora do gamut sRGB — em tela P3 o navegador não clipa e a "
-                f"cor diverge do hex gêmeo usado nos --block-* e nos SVGs do logo"
+                f"cai {overshoot:.4f} fora do gamut sRGB em linear — só vira "
+                f"{hx} porque o navegador clipa; puxe o croma para dentro"
             )
     return errors
+
+
+def gamut_edge_tokens(css_blocks, comments):
+    """Tokens cujo hex encosta na superfície do gamut sRGB (algum canal em 00
+    ou FF): não sobra croma nenhum: qualquer aumento sai do gamut. Não é erro
+    — identity.md os anota."""
+    edge = []
+    for layer, prop, _, hx in declared_pairs(css_blocks, comments):
+        if hx and any(hx[i:i + 2].upper() in ("00", "FF") for i in (1, 3, 5)):
+            edge.append(f"--{prop} ({layer}) = {hx}")
+    return edge
 
 
 def check_contrast(groups):
@@ -440,7 +465,8 @@ def main():
     checks = [
         ("1. paridade tokens.css ↔ kumite.tokens.json", check_parity(css_blocks, groups, radius)),
         ("2. o oklch do comentário rende o hex declarado", check_oklch(css_blocks, comments)),
-        ("3. todo oklch citado está dentro do gamut sRGB", check_gamut(css_blocks, comments)),
+        ("3. o oklch descreve o hex sem depender de clipagem em sRGB",
+         check_gamut(css_blocks, comments)),
         ("4. tabela de contraste de identity.md § 3", check_contrast(groups)),
     ]
 

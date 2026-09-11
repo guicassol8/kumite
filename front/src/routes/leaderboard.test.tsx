@@ -27,6 +27,8 @@ import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import type { EventRanking, RoundRanking, SseEvent } from '@/lib/sse-schema'
 import { routeTree } from '@/routeTree.gen'
 
+import { POLL_WHILE_OFFLINE_MS } from './leaderboard'
+
 const mockedTeams = vi.mocked(api.teams.$get)
 const mockedRounds = vi.mocked(api.rounds.$get)
 const mockedRoundRanking = vi.mocked(api.rounds[':id'].ranking.$get)
@@ -484,6 +486,123 @@ describe('LeaderboardScreen — SSE never connects (REST fallback)', () => {
 
     fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
     await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+  })
+})
+
+const openRoundSummary = {
+  id: 'r1',
+  name: 'Rodada 1',
+  status: 'open',
+  durationMinutes: 30,
+  openedAt: '2026-09-05T12:00:00.000Z',
+  closesAt: '2026-09-05T13:00:00.000Z',
+  closedAt: null,
+  createdAt: '2026-09-05T11:00:00.000Z',
+  updatedAt: '2026-09-05T12:00:00.000Z',
+  problemCount: 1,
+}
+
+describe('LeaderboardScreen — active round without the stream', () => {
+  // `hasActiveRound` derived from `stream.activeRoundId` alone: with the
+  // stream dead, an open round was invisible and the "Rodada" tab showed the
+  // last *closed* round instead — the wrong round on the venue's big screen.
+  it('derives the open round from GET /rounds when the stream never connects', async () => {
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        openRoundSummary,
+        {
+          id: 'r0',
+          name: 'Rodada 0',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: '2026-09-05T10:00:00.000Z',
+          closesAt: null,
+          closedAt: '2026-09-05T10:30:00.000Z',
+          createdAt: '2026-09-05T09:00:00.000Z',
+          updatedAt: '2026-09-05T10:30:00.000Z',
+          problemCount: 1,
+        },
+      ]),
+    )
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    await waitFor(() => expect(mockedRoundRanking).toHaveBeenCalledWith({ param: { id: 'r1' } }))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+
+    expect(screen.queryByTestId('leaderboard-last-closed-label')).toBeNull()
+    expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('Time 1')
+  })
+
+  // Precedence: while the stream is live the SSE payload wins; once it is
+  // down, the REST poll is the fresher source and replaces the frozen
+  // snapshot instead of being shadowed by it.
+  it('lets a fresher REST result replace the frozen SSE snapshot once the stream is down', async () => {
+    mockedRoundRanking.mockResolvedValue(
+      jsonResponse(200, {
+        ...roundRanking,
+        teams: [
+          {
+            ...roundRanking.teams[0],
+            totalScore: 250,
+            problems: [{ problemId: 'p1', score: 250, attempts: 1 }],
+          },
+          roundRanking.teams[1],
+        ],
+      }),
+    )
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+
+    // The snapshot the stream managed to deliver before dying (100 points).
+    // `emitStatus('open')` is never called, so the stream counts as down.
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('250'),
+    )
+  })
+})
+
+describe('LeaderboardScreen — REST poll while the stream is down', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('re-fetches the event ranking every POLL_WHILE_OFFLINE_MS', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(mockedEventRanking).toHaveBeenCalled())
+    mockedEventRanking.mockClear()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_WHILE_OFFLINE_MS)
+    })
+
+    await waitFor(() => expect(mockedEventRanking).toHaveBeenCalled())
+  })
+
+  it('does not poll while the stream is live', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emitStatus('open')
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-tabs')).toBeDefined())
+    mockedEventRanking.mockClear()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(POLL_WHILE_OFFLINE_MS * 3)
+    })
+
+    expect(mockedEventRanking).not.toHaveBeenCalled()
   })
 })
 

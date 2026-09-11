@@ -39,6 +39,12 @@ function toApiLocale(language: string): 'pt' | 'es' | 'en' {
 
 const ROW_TRANSITION = { layout: { duration: 0.4, ease: 'easeInOut' } } as const
 
+// With the stream down the REST queries below become the only source of
+// fresh data, so they poll on this interval until it comes back. Polling
+// `rounds` is what makes a round opening or closing show up at all without
+// SSE — every other fallback hangs off which round is active.
+export const POLL_WHILE_OFFLINE_MS = 15_000
+
 // Table row classes mirror ui/table.tsx's TableRow — needed here because the
 // position-change animation (#45 plan) requires `motion.tr`, not the plain
 // `<tr>` that component renders.
@@ -92,10 +98,19 @@ function LeaderboardScreen() {
   }, [queryClient])
   const stream = useLeaderboardStream(invalidateRounds)
 
-  const teams = useQuery({ queryKey: TEAMS_QUERY_KEY, queryFn: fetchTeams })
-  const rounds = useQuery({ queryKey: ROUNDS_QUERY_KEY, queryFn: fetchRounds })
+  const refetchInterval = stream.isLive ? false : POLL_WHILE_OFFLINE_MS
 
-  const hasActiveRound = stream.activeRoundId !== null
+  const teams = useQuery({ queryKey: TEAMS_QUERY_KEY, queryFn: fetchTeams })
+  const rounds = useQuery({ queryKey: ROUNDS_QUERY_KEY, queryFn: fetchRounds, refetchInterval })
+
+  // `stream.activeRoundId` used to be the only source of "a round is open",
+  // so a dead stream made an open round invisible and the "Rodada" tab fell
+  // back to the last *closed* round — the wrong round on the venue's screen
+  // (#180). GET /rounds already reports the open one (and reaps expired
+  // rounds on the way), so it covers the gap with no backend change.
+  const restOpenRound = (rounds.data ?? []).find((round) => round.status === 'open') ?? null
+  const activeRoundId = stream.activeRoundId ?? restOpenRound?.id ?? null
+  const hasActiveRound = activeRoundId !== null
   const serverTimeOffsetMs = stream.serverTime ? stream.serverTime.getTime() - Date.now() : 0
   const closedRounds = (rounds.data ?? [])
     .filter((round) => round.status === 'closed' && round.closedAt)
@@ -106,29 +121,44 @@ function LeaderboardScreen() {
     queryKey: ['ranking', 'round', lastClosedRound?.id],
     queryFn: () => fetchRoundRanking(lastClosedRound!.id),
     enabled: !hasActiveRound && lastClosedRound !== null,
+    refetchInterval,
   })
 
   // `ranking.updated` only re-publishes on a submission-driven dirty tick
   // (#44) — a round that opens with zero submissions never arrives via SSE
   // on its own, so fetch it once over REST as soon as `activeRoundId` shows
   // up. A later `ranking.updated` for this round overrides it (see below).
+  // Same query key as the SSE path uses, so the two share one cache entry
+  // instead of duplicating the round's ranking.
   const activeRoundRanking = useQuery({
-    queryKey: ['ranking', 'round', stream.activeRoundId],
-    queryFn: () => fetchRoundRanking(stream.activeRoundId!),
-    enabled: hasActiveRound && stream.round === null,
+    queryKey: ['ranking', 'round', activeRoundId],
+    queryFn: () => fetchRoundRanking(activeRoundId!),
+    enabled: hasActiveRound && (stream.round === null || !stream.isLive),
+    refetchInterval,
   })
 
   const eventRankingRest = useQuery({
     queryKey: ['ranking', 'event'],
     queryFn: fetchEventRanking,
-    enabled: stream.event === null,
+    enabled: stream.event === null || !stream.isLive,
+    refetchInterval,
   })
 
+  // Precedence flips with the connection: while the stream is live its
+  // payload is the freshest thing there is, and REST only fills the gaps;
+  // once it is down the poll is the newer source and the frozen SSE snapshot
+  // becomes the fallback. The trailing `??` is what satisfies acceptance #5 —
+  // a stream that dies before the first REST answer keeps its last ranking on
+  // screen instead of dropping back to loading.
   const displayedRound: RoundRanking | null = hasActiveRound
-    ? (stream.round ?? activeRoundRanking.data ?? null)
+    ? stream.isLive
+      ? (stream.round ?? activeRoundRanking.data ?? null)
+      : (activeRoundRanking.data ?? stream.round ?? null)
     : (lastClosedRanking.data ?? null)
   const isLastClosedRound = !hasActiveRound && displayedRound !== null
-  const eventRanking = stream.event ?? eventRankingRest.data ?? null
+  const eventRanking = stream.isLive
+    ? (stream.event ?? eventRankingRest.data ?? null)
+    : (eventRankingRest.data ?? stream.event ?? null)
 
   const problemIds = displayedRound?.problemIds ?? []
   const problemQueries = useQueries({

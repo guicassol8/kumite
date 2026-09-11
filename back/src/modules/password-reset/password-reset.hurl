@@ -19,8 +19,11 @@
 # that same 204 too, and that the current password keeps working until the
 # code is actually completed.
 #
-# This file spends 5 of the per-IP request budget and ~5 of the complete one,
-# and it is the only .hurl touching these two routes.
+# This file spends 5 of the per-IP request budget and ~5 of the complete one.
+# It is not quite alone on these routes: users.hurl calls
+# /auth/complete-password-reset once (one more off the complete budget), on the
+# failure path only, to prove that a failed OTP reset leaves `mustChangePassword`
+# standing after an organizer reset (#177).
 #
 # Creates a unique user (`password-reset-e2e@...`) — rerunning this file
 # locally without resetting the db fails the first signup on the second run.

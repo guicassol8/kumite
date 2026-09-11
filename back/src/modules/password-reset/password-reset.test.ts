@@ -860,3 +860,95 @@ describe('resetPasswordByOrganizer', () => {
     })
   })
 })
+
+// --- The two reset flows crossing: OTP after an organizer reset (#177) ---
+
+describe('completePasswordReset after an organizer reset (#177)', () => {
+  const ip = '203.0.113.9'
+
+  // The exact chain from the bug report: the organizer resets the account
+  // (which flags it), and the participant ignores the temporary password and
+  // goes through "forgot my password" instead.
+  async function flaggedUserWithPendingOtp() {
+    const organizer = await createOrganizer()
+    const target = await createTestUser()
+
+    const reset = await resetPasswordByOrganizer(db, {
+      organizerId: organizer.id,
+      targetId: target.id,
+      adminPassword: ADMIN_PASSWORD,
+      ip,
+    })
+    if (!reset.ok) throw new Error('expected the organizer reset to succeed')
+
+    await issuePasswordResetOtp(db, target.id)
+    return { target, temporaryPassword: reset.temporaryPassword, otp: lastOtp() }
+  }
+
+  it('clears mustChangePassword when the user resets by OTP', async () => {
+    const { target, otp } = await flaggedUserWithPendingOtp()
+    expect((await findUserById(db, target.id))?.mustChangePassword).toBe(true)
+
+    const result = await completePasswordReset(
+      db,
+      { email: target.email, otp, newPassword: 'brand-new-password' },
+      ip,
+    )
+
+    expect(result).toEqual({ ok: true })
+    expect((await findUserById(db, target.id))?.mustChangePassword).toBe(false)
+  })
+
+  it('lets that user log in with the new password, with no forced change left', async () => {
+    const { target, temporaryPassword, otp } = await flaggedUserWithPendingOtp()
+
+    await completePasswordReset(
+      db,
+      { email: target.email, otp, newPassword: 'brand-new-password' },
+      ip,
+    )
+
+    expect(await login(db, { email: target.email, password: 'brand-new-password' })).toMatchObject({
+      ok: true,
+    })
+    expect(await login(db, { email: target.email, password: temporaryPassword })).toEqual({
+      ok: false,
+      error: 'invalid_credentials',
+    })
+    expect((await findUserById(db, target.id))?.mustChangePassword).toBe(false)
+  })
+
+  it('leaves the flag and the password untouched on a wrong OTP', async () => {
+    const { target, temporaryPassword } = await flaggedUserWithPendingOtp()
+
+    const result = await completePasswordReset(
+      db,
+      { email: target.email, otp: '000000', newPassword: 'brand-new-password' },
+      ip,
+    )
+
+    expect(result).toEqual({ ok: false, error: 'invalid_otp' })
+    const unchanged = await findUserById(db, target.id)
+    expect(unchanged?.mustChangePassword).toBe(true)
+    expect(await argon2.verify(unchanged?.passwordHash ?? '', temporaryPassword)).toBe(true)
+  })
+
+  it('leaves the flag and the password untouched on an expired OTP', async () => {
+    const { target, temporaryPassword, otp } = await flaggedUserWithPendingOtp()
+
+    await db.execute(
+      sql`update password_reset_otps set expires_at = now() - interval '1 minute' where user_id = ${target.id}`,
+    )
+
+    const result = await completePasswordReset(
+      db,
+      { email: target.email, otp, newPassword: 'brand-new-password' },
+      ip,
+    )
+
+    expect(result).toEqual({ ok: false, error: 'invalid_otp' })
+    const unchanged = await findUserById(db, target.id)
+    expect(unchanged?.mustChangePassword).toBe(true)
+    expect(await argon2.verify(unchanged?.passwordHash ?? '', temporaryPassword)).toBe(true)
+  })
+})

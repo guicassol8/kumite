@@ -2,6 +2,7 @@ import * as Blockly from 'blockly'
 import { javascriptGenerator } from 'blockly/javascript'
 
 import { defineKumiteBlocks, ROOT_BLOCK_TYPE } from './blocks'
+import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
 import { BlocksError } from './errors'
 import { type BlockLocale, DEFAULT_LOCALE, messagesFor } from './messages'
 import { allowedBlockTypes, type WorkspaceState } from './toolbox'
@@ -17,6 +18,17 @@ import { allowedBlockTypes, type WorkspaceState } from './toolbox'
  * comment.
  */
 const COMMENT_LINE_TERMINATORS = new RegExp(`[${String.fromCharCode(0x0d, 0x2028, 0x2029)}]`, 'g')
+
+/**
+ * The exact line the root block's generator emits. Anchored to the start of a
+ * line, which is what makes the check worth anything: every comment is a
+ * `// ...` line by the time this runs, so no text a participant typed can
+ * satisfy it.
+ */
+const SOLVE_SIGNATURE = new RegExp(
+  `^function ${SOLUTION_FUNCTION_NAME}\\(${SOLUTION_PARAM_NAME}\\) \\{$`,
+  'm',
+)
 
 /**
  * Rewrites every block comment so it cannot break out of its `// ` prefix.
@@ -100,7 +112,17 @@ export function generateSolution(
     // never leaks code into the solution.
     const generated = javascriptGenerator.blockToCode(root, true)
     const code = typeof generated === 'string' ? generated : generated[0]
-    return javascriptGenerator.finish(code)
+    const source = javascriptGenerator.finish(code)
+
+    // Last line of defence: a "successful" generation must actually define the
+    // function the contract promises. With the guard above in place this is
+    // unreachable through any known path — it exists for the next empty-success
+    // path nobody saw coming, so that it surfaces as a refusal instead of as
+    // `solve is not defined` on every case.
+    if (!SOLVE_SIGNATURE.test(source)) {
+      throw new BlocksError('invalid-generated-code', messages.errorInvalidGeneratedCode)
+    }
+    return source
   } finally {
     workspace.dispose()
   }

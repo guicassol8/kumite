@@ -1,5 +1,6 @@
 import { raizDesabilitada, somaDosPares } from '@kumite/blocks'
-import { describe, expect, it } from 'vitest'
+import { javascriptGenerator } from 'blockly/javascript'
+import { describe, expect, it, vi } from 'vitest'
 
 import type { JudgeCase, JudgeConfig, Workspace } from './judge.schema'
 import { WorkspaceSchema } from './judge.schema'
@@ -227,6 +228,24 @@ describe('generateJudgeSource', () => {
     expect(generateJudgeSource(raizDesabilitadaWorkspace, 'en')).toMatchObject({
       message: 'There is a disabled block in your solution. Re-enable it to continue.',
     })
+  })
+
+  it('maps the structural guard to its own client code', () => {
+    // Same seam as the blocks package's own test: nothing the judge can be
+    // handed reaches this path any more, and that is the point — the mapping
+    // has to exist before the path does.
+    const finish = vi.spyOn(javascriptGenerator, 'finish').mockReturnValue('\n\n\n')
+    try {
+      const result = generateJudgeSource(somaDosParesWorkspace)
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'invalid_generated_code',
+        message: expect.any(String),
+      })
+    } finally {
+      finish.mockRestore()
+    }
   })
 
   it('localizes the refusal message', () => {

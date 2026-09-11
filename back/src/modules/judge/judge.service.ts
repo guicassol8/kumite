@@ -25,6 +25,7 @@ const CODEGEN_ERROR_CODES: Record<BlocksErrorCode, CodegenErrorCode> = {
   'duplicate-root': 'duplicate_root',
   'block-not-allowed': 'block_not_allowed',
   'disabled-block': 'disabled_block',
+  'invalid-generated-code': 'invalid_generated_code',
 }
 
 /**

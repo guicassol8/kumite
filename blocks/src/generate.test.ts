@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { javascriptGenerator } from 'blockly/javascript'
+import { describe, expect, it, vi } from 'vitest'
 
 import { ROOT_BLOCK_TYPE } from './blocks'
 import { BlocksError } from './errors'
@@ -223,6 +224,28 @@ describe('generateSolution', () => {
     )
 
     expect(error.code).toBe('disabled-block')
+  })
+
+  it('refuses a "successful" generation that defines no solve function', () => {
+    // The seam has to be `finish`: `generateSolution` calls `defineKumiteBlocks`
+    // first, which overwrites `forBlock`, so patching the root generator would
+    // be undone before it ran. This stands in for the next empty-success path
+    // nobody has found yet — the one the guard exists for.
+    const finish = vi.spyOn(javascriptGenerator, 'finish').mockReturnValue('\n\n\n')
+    try {
+      const error = expectBlocksError(() => generateSolution(somaDosPares))
+
+      expect(error.code).toBe('invalid-generated-code')
+    } finally {
+      finish.mockRestore()
+    }
+  })
+
+  it('accepts the real source it produces', () => {
+    // The other half of the guard: it must not reject what the generator
+    // legitimately emits, comment lines and variable declarations included.
+    expect(() => generateSolution(somaDosPares)).not.toThrow()
+    expect(() => generateSolution(comentarioComQuebra)).not.toThrow()
   })
 })
 

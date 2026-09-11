@@ -42,6 +42,7 @@ export const CodegenErrorCodeSchema = z.enum([
   'duplicate_root',
   'block_not_allowed',
   'disabled_block',
+  'invalid_generated_code',
 ])
 
 export const JudgeConfigSchema = z.object({

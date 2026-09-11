@@ -4,6 +4,7 @@ export type BlocksErrorCode =
   | 'duplicate-root'
   | 'block-not-allowed'
   | 'disabled-block'
+  | 'invalid-generated-code'
 
 /**
  * Thrown by `generateSolution`. Callers branch on `code`, never on the message

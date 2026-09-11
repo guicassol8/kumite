@@ -228,10 +228,31 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
 
 ## 5. Interface
 
-- **Chrome carvão nos dois modos**: header (56 px) e rodapé em `chrome`,
-  lockup à esquerda, navegação, chip da rodada ao vivo (nome + timer),
-  usuário, Sair em contorno claro, idioma como controle segmentado, botão de
-  tema. No celular: lockup + idioma + menu.
+- **Chrome carvão nos dois modos**: header (56 px) e rodapé em `chrome`. O
+  inventário abaixo é a **lista fechada** do que o chrome tem — quem implementa
+  (#217) constrói estes elementos e nenhum outro.
+
+  **Header, desktop (≥ 768 px)**, da esquerda para a direita: lockup (símbolo
+  24 px + wordmark); navegação (Times, Placar e, para o organizador,
+  Organizador); chip da rodada ao vivo (ponto + nome da rodada + timer) em
+  `brand-on-chrome`; **ícone de reportar bug** — traço de 2 px em grade 24, sem
+  rótulo, com nome acessível ("Reportar um problema"), abrindo o formulário de
+  bug; **gatilho do menu do usuário** — nome truncado (com reticências) mais um
+  chevron, que abre um dropdown com nome e e-mail no topo e **"Trocar senha"**
+  como único item de ação; controle segmentado de idioma (PT · ES · EN); botão
+  de tema. **Idioma, tema e Sair continuam visíveis na barra** no desktop — não
+  migram para dentro do menu do usuário, que existe para o que não cabe nela.
+
+  **Header, celular (< 768 px)**: lockup + controle de idioma + botão de menu.
+  O botão abre um **painel de menu** com navegação, bloco do usuário (nome e
+  e-mail), chip da rodada, tema, idioma, reportar bug e Sair. É esse painel que
+  fecha o #186; o FAB de reportar bug não existe em largura nenhuma.
+
+  **Rodapé**: contato da organização; **indicador de status da API** — ponto de
+  8 px (`success` conectado · `destructive` sem conexão · `chrome-muted`
+  conectando) **mais rótulo curto** ("Conectado", "Sem conexão", "Conectando"),
+  porque a §3 proíbe cor como única pista; e símbolo de 16 px +
+  "PUCRS × Mérida 2026". No celular o rodapé empilha.
 - **Modo de cor**: claro por padrão; escuro completo (`.dark`) por **escolha
   do usuário**, persistida em `localStorage`. Seguir `prefers-color-scheme`
   quando o usuário ainda não escolheu é trabalho da #234 — até lá, o padrão é
@@ -256,19 +277,83 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   caixa-alta — sem emoji de bandeira, que renderiza diferente por sistema).
 - **Alertas**: cartão com borda na cor semântica + ícone + texto; erro em
   crimson, sucesso em verde, informação neutra. Nunca placa preenchida.
-- **Tabelas**: cabeçalho em eyebrow, hairlines, numerais em display tabular;
-  sem scroll horizontal em nenhuma largura (colunas comprimem; abaixo do
-  breakpoint estreito, cards).
+- **Tabelas**: cabeçalho em eyebrow, hairlines, numerais em display tabular.
+  **O breakpoint estreito é 768 px** — valor único, em
+  `tokens/kumite.tokens.json` como `size.breakpoint-cards`. De **768 px para
+  cima**: tabela, com as colunas comprimindo e **sem scroll horizontal na
+  página**. **Abaixo de 768 px**: um card por linha. `position: sticky` na
+  coluna do time é reforço de leitura dentro da tabela larga, **nunca** a
+  resposta ao transbordo — uma coluna fixa só produz efeito num container que
+  rola horizontalmente, que é exatamente o que esta regra proíbe.
+- **Abas** (painel do organizador): abaixo de 768 px as abas **quebram em duas
+  linhas**, todas visíveis, sem scroll lateral e sem trocar de componente; o
+  sublinhado vermelho continua marcando a aba ativa.
+- **Expansão de texto**: navegação, abas e rótulos são dimensionados pela
+  **string mais longa dos três catálogos** (pt/es/en), nunca pela portuguesa —
+  "Rodadas" / "Rondas" / "Rounds" não medem o mesmo, e é a maior que decide se
+  a barra cabe.
 - **Ao vivo**: ponto vermelho + texto em eyebrow vermelho; timer em Barlow
   Condensed 600. No header, que é carvão nos dois modos, o chip e a contagem
   usam `brand-on-chrome`; sobre papel ou cartão, `brand-text`. Nos últimos
   5 min o timer só muda de peso, não de token.
 - **Ícones**: traço de 2 px em grade 24 (estilo Lucide, já usado pelo shadcn).
   Sem emoji.
-- **Telão** (placar): tela cheia, tema escuro forçado, sem header/rodapé,
-  **título do telão** 84 px e **contagem do telão** 96 px em `brand-text`
-  (os dois papéis da tabela de tipografia, pelos mesmos nomes), linhas
-  ≥ 28 px, legenda A/B/C no rodapé, `Esc` sai.
+- **Telão** (placar projetado): tela cheia, tema escuro forçado, sem
+  header/rodapé, **título do telão** 84 px e **contagem do telão** 96 px em
+  `brand-text` (os dois papéis da tabela de tipografia, pelos mesmos nomes),
+  linhas ≥ 28 px, legenda A/B/C no rodapé, `Esc` sai. A densidade é
+  **constante**: nenhum estado encolhe a tipografia para caber mais um time.
+  São **três estados** e uma regra de movimento — o telão fica no ar o evento
+  inteiro, não só durante uma rodada.
+
+  **(a) Rodada ao vivo.** Chip "Rodada N · ao vivo" e a contagem de 96 px no
+  canto direito. **Transbordo**: `N` é o número de linhas **inteiras** que cabem
+  na altura da tela nessa densidade — nenhuma linha pode ficar cortada na borda
+  inferior, e uma tela projetada não rola. Quando há mais times do que `N`, o
+  telão **pagina o ranking inteiro a cada 15 s** (Top N, depois os seguintes, e
+  volta ao começo), com um indicador discreto de página no rodapé, ao lado da
+  legenda A/B/C — "1 / 2 · troca a cada 15 s". Não há pódio congelado: a
+  paginação percorre a tabela toda, inclusive o topo. Com `N` times ou menos não
+  há paginação nem indicador.
+
+  **(b) Sem rodada aberta.** É onde o projetor passa a maior parte do tempo de
+  sala. O telão mostra o **placar Geral acumulado**; o chip "ao vivo" e a
+  contagem de 96 px dão lugar, **no mesmo canto** do layout `space-between`, a
+  um selo `Geral` mais a eyebrow "Aguardando a próxima rodada" — o canto nunca
+  fica vazio. Transbordo e paginação valem igual.
+
+  **(c) Rodada recém-encerrada.** O momento da revelação: ranking final da
+  rodada que acabou, chip "Rodada N · encerrada" em `muted` no lugar do "ao
+  vivo", e o horário de encerramento no lugar da contagem. Mantém-se até a
+  próxima rodada abrir ou até o organizador sair do telão.
+
+  **(d) Mudança de posição por SSE.** É a razão de existir de um placar
+  projetado: quando uma submissão muda a classificação, a linha **desliza** para
+  a posição nova em ~400 ms e fica **realçada em `brand-soft`** por ~3 s,
+  esvaindo — nunca um redraw silencioso. Vale nos três estados e respeita
+  `prefers-reduced-motion` (abaixo).
+
+### Acessibilidade e movimento
+
+- **Sair do telão tem dois caminhos, os dois obrigatórios.** Com
+  `requestFullscreen`, o `Esc` é consumido pelo navegador e o `keydown` **não
+  chega à página**: um listener de tecla sozinho deixa o usuário fora do
+  fullscreen mas ainda no tema forçado e sem chrome. Então a saída escuta
+  **`fullscreenchange`** — que cobre o `Esc`, o F11 e qualquer saída disparada
+  pelo navegador — **e** o `keydown` de `Esc`, que cobre o fallback sem a
+  Fullscreen API. Qualquer um dos dois restaura header, rodapé e o tema que o
+  usuário tinha escolhido; sair pelo botão passa pelo mesmo caminho.
+- **Foco**: ao entrar no telão o foco vai para o botão "Sair do telão"; ao sair,
+  volta para o gatilho que o abriu. O botão tem nome acessível mesmo quando é
+  só ícone.
+- **Contagem regressiva**: o timer que muda de segundo em segundo é
+  `aria-live="off"`. Um timer em `aria-live` interrompe o leitor de tela **a
+  cada segundo** — e o chip da rodada está em **toda** tela autenticada, não só
+  no telão. A informação chega por um **resumo textual não-live** ("Rodada 2
+  termina em 41 minutos"), atualizado no máximo uma vez por minuto.
+- **`prefers-reduced-motion`**: desliga as transições, a pulsação do ponto "ao
+  vivo" e a reordenação animada das linhas. O estado final é idêntico — a linha
+  aparece já na posição nova, e o realce entra e sai sem interpolação.
 
 ## 6. Editor Blockly (`@kumite/blocks`)
 
@@ -283,7 +368,7 @@ continuar aprendível) mas sem brigar entre si nem com o vermelho:
 | Texto | `#008282` | |
 | Listas | `#8E57A5` | |
 | Variáveis | `#A76700` | sai do rosa 330°, vizinho do vermelho |
-| resolver (raiz) | `#2A2523` | texto `#F3F1EF`; é o tatame — não arrastável nem apagável |
+| resolver (raiz) | `#2A2523` | texto `#F3F1EF`; é o tatame — **não apagável nem duplicável, mas arrastável** (contrato travado em `front/src/components/blockly/editor-contract.test.tsx`) |
 | entrada | `#DD2824` | o único bloco vermelho do canvas |
 
 Chrome do editor nos tokens da UI: toolbox em cartão com barra de categoria de

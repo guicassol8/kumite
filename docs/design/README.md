@@ -37,7 +37,13 @@ por isso os **arquivos-fonte do canvas** estão em `canvas/`:
 Para regerar o artifact em qualquer conta: abra uma sessão do Claude Code neste
 repo, rode `/design` e peça para **re-semear o canvas a partir de
 `docs/design/canvas/`** (os artboards e o `canvas.json` já estão no formato que
-a skill consome). Para mudar uma tela de forma consistente, edite o gerador
+a skill consome). **Leve `canvas/generate/fonts/` junto**: os artboards trazem
+as fontes por `@font-face` com caminho relativo (`generate/fonts/*.woff2`), e um
+artboard publicado sem essa pasta ao lado cai no fallback do sistema **sem erro
+nenhum** — a mesma degradação silenciosa que a #227 tirou do `shot.mjs`, que só
+guarda o caminho local. Confira a tipografia do artifact contra
+`screens/Tipografia.png` depois de re-semear. Para mudar uma tela de forma
+consistente, edite o gerador
 (`generate/*.py`), rode `build.py` → `shot.mjs` → `build.py` (o segundo é
 preciso porque o `shot.mjs` grava `heights.json`, que realimenta o
 dimensionamento dos frames fluidos):

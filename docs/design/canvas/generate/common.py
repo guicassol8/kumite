@@ -1,5 +1,7 @@
 # Shared tokens, CSS, icons and component helpers for the kumite identity canvas.
 
+from check_tokens import contrast
+
 FONTS = ("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800"
          "&family=Barlow:wght@400;500;600&family=Inter:wght@400;500;600"
          "&family=JetBrains+Mono:wght@400;500&display=swap")
@@ -28,6 +30,18 @@ DARK = dict(
 
 BLOCKS = dict(logic="#2A75BA", loops="#298646", math="#6B64BA", text="#008282",
               lists="#8E57A5", variables="#A76700", root="#2A2523", input="#DD2824")
+
+def readable_on(bg):
+    """Tinta ou papel sobre bg, o que contrastar mais. Substitui a lista de hex
+    escritos à mão, que não sabia de um token novo (o degrau #282322 do escuro)."""
+    return "#FFFFFF" if contrast("#FFFFFF", bg) >= contrast("#1C1716", bg) else "#1C1716"
+
+
+# Anel de foco — uma definição só, a mesma de identity.md § 5 e de tokens.css:
+# borda de 1 px em ring + halo de 3 px em ring/50. brand-soft é fundo de linha
+# e halo, nunca o indicador de foco.
+FOCUS_RING = ("border-color: var(--ring); "
+              "box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);")
 
 def vars_block(t):
     return "\n".join(f"  --{k.replace('_','-')}: {v};" for k, v in t.items())

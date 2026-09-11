@@ -34,16 +34,18 @@ def logo_board():
 # ---------- Paleta ----------
 def palette_board():
     def sw(hex_, name, role, fg=None, h=88):
-        fg = fg or ("#FFFFFF" if hex_ in ("#1C1716", "#2A2523", "#DD2824", "#CE2320", "#C1133A", "#008433", "#A06700", "#69615D", "#120F0D", "#1B1716", "#312D2C") else "#1C1716")
+        fg = fg or readable_on(hex_)
         return (f'<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;"><div class="swatch" style="height: {h}px; background: {hex_}; color: {fg}; display: flex; align-items: flex-end; padding: 8px 10px;"><span class="mono" style="font-size: 12px;">{hex_}</span></div>'
                 f'<span style="font-size: 13px; font-weight: 500; line-height: 1.2;">{name}</span><span class="muted" style="font-size: 12px; line-height: 1.3;">{role}</span></div>')
-    light = [("#FCFAF7", "Papel", "fundo das telas"), ("#F2F0EC", "Papel 2", "superfícies mudas, grid do editor"), ("#FFFFFF", "Cartão", "cards, inputs, tabelas"),
-             ("#E1DDDA", "Borda", "hairlines 1px"), ("#69615D", "Cinza texto", "texto secundário"), ("#1C1716", "Tinta", "texto, botão primário, chrome"),
-             ("#DD2824", "Vermelho faixa", "marca · Submeter · ao vivo · #1"), ("#CE2320", "Vermelho hover", "hover/pressed da marca"),
-             ("#C1133A", "Crimson", "erro e destrutivo — só contorno e texto"), ("#008433", "Verde", "caso passou · publicado"), ("#ECAA0B", "Âmbar", "só ícone e borda"), ("#A06700", "Âmbar-texto", "Médio · aviso em texto")]
-    dark = [("#120F0D", "Fundo escuro", "background"), ("#1B1716", "Cartão escuro", "cards e inputs"), ("#312D2C", "Borda escura", "hairlines"),
-            ("#9D9792", "Cinza escuro", "texto secundário"), ("#F3F1EF", "Papel-texto", "texto, botão primário"), ("#F45246", "Vermelho-texto (escuro)", "texto, timer, ao vivo; botões seguem #DD2824"),
-            ("#E8496A", "Crimson (escuro)", "erro"), ("#3DBA6A", "Verde (escuro)", "ok"), ("#F5C044", "Âmbar (escuro)", "aviso")]
+    # Os hex saem de LIGHT/DARK, que tokens.css confere: repetir o valor aqui foi
+    # o que deixou o crimson do escuro parado no #E8496A depois da #225.
+    light = [(LIGHT["background"], "Papel", "fundo das telas"), (LIGHT["background2"], "Papel 2", "superfícies mudas, grid do editor"), (LIGHT["card"], "Cartão", "cards, inputs, tabelas"),
+             (LIGHT["border"], "Borda", "hairlines 1px"), (LIGHT["muted"], "Cinza texto", "texto secundário"), (LIGHT["foreground"], "Tinta", "texto, botão primário, chrome"),
+             (LIGHT["brand"], "Vermelho faixa", "marca · Submeter · ao vivo · #1"), (LIGHT["brand_hover"], "Vermelho hover", "hover/pressed da marca"),
+             (LIGHT["destructive"], "Crimson", "erro e destrutivo — só contorno e texto"), (LIGHT["success"], "Verde", "caso passou · publicado"), (LIGHT["warning"], "Âmbar", "só preenchimento e borda"), (LIGHT["warning_text"], "Âmbar-texto", "Médio · aviso em texto")]
+    dark = [(DARK["background"], "Fundo escuro", "background"), (DARK["card"], "Cartão escuro", "cards e inputs"), (DARK["surface"], "Superfície de estado", "hover de linha, linha selecionada, botão fantasma"), (DARK["border"], "Borda escura", "hairlines"),
+            (DARK["muted"], "Cinza escuro", "texto secundário"), (DARK["foreground"], "Papel-texto", "texto, botão primário"), (DARK["brand_text"], "Vermelho-texto (escuro)", "texto, timer, ao vivo; botões seguem " + DARK["brand"]),
+            (DARK["destructive"], "Crimson (escuro)", "erro"), (DARK["success"], "Verde (escuro)", "ok"), (DARK["warning"], "Âmbar (escuro)", "aviso")]
     def mini(bg, chrome, brand, fg, name, note, border, tag="alternativa"):
         return (f'<div class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;"><div style="display: flex; justify-content: space-between; align-items: baseline;"><span class="h3">{name}</span><span class="muted small">{tag}</span></div>'
                 f'<div style="border-radius: 8px; overflow: hidden; border: 1px solid {border};"><div style="background: {chrome}; height: 34px; display: flex; align-items: center; padding: 0 12px; gap: 8px;">{mark(18, left=brand, right="#F3F1EF")}<span style="font-family: var(--font-display); font-weight: 600; font-size: 16px; color: #F3F1EF;">kumite</span></div>'
@@ -92,9 +94,7 @@ def components_board():
             return f'<div style="display: flex; flex-direction: column; gap: 10px;"><span class="eyebrow">{label}</span><div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">{inner}</div></div>'
         btns = (f'<span class="btn btn-primary">Criar time</span><span class="btn btn-brand">{icon("send", 16)}Submeter</span><span class="btn btn-outline">{icon("play", 16)}Executar</span>'
                 f'<span class="btn btn-ghost">Cancelar</span><span class="btn btn-destructive">Sair do time</span><span class="btn btn-sm btn-outline">Entrar</span>')
-        # foco = borda de 1 px em ring + halo de 3 px em ring/50 (identity.md § 5)
-        focus_ring = 'border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);'
-        inputs = (f'<div class="input" style="width: 180px; color: var(--muted);">E-mail</div><div class="input" style="width: 180px; {focus_ring}">foco</div>'
+        inputs = (f'<div class="input" style="width: 180px; color: var(--muted);">E-mail</div><div class="input" style="width: 180px; {FOCUS_RING}">foco</div>'
                   f'<div style="display: flex; flex-direction: column; gap: 4px;"><div class="input" style="width: 180px; border-color: var(--destructive);">erro</div><span class="small" style="color: var(--destructive);">Informe o nome do time</span></div>')
         badges = ('<span class="badge badge-success">Fácil</span><span class="badge" style="color: var(--warning-text); border-color: var(--warning);">Médio</span><span class="badge" style="color: var(--destructive); border-color: var(--destructive);">Difícil</span>'
                   '<span class="badge badge-solid">Publicado</span><span class="badge badge-muted">Rascunho</span><span class="badge badge-muted" style="text-decoration: line-through;">Arquivado</span>'

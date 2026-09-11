@@ -31,8 +31,12 @@ disputa.
 - Tamanhos mínimos: 16 px (favicon), 24 px no header, 32 px em avatar.
 - Wordmark: **kumite**, sempre minúsculo, Barlow Condensed 600, tracking −1%,
   contornado em `logo/kumite-wordmark.svg` (não depende da fonte instalada).
-- Lockups: horizontal (símbolo 64 · vão 20 · wordmark 55 px) e empilhado.
-  Arquivos e regras de uso em `logo/README.md`.
+- Lockups: horizontal (símbolo 64 de altura · vão 20 · wordmark em **corpo**
+  55 px — é o `font-size`, não a largura; o lockup inteiro sai em 212,09 × 64)
+  e empilhado. Arquivos e regras de uso em `logo/README.md`.
+- Largura mínima do lockup horizontal: **96 px**. O header é a única exceção,
+  e é documentada: ali o símbolo vai em 24 px, o que dá um lockup de ≈ 80 px,
+  aceitável porque o contexto já nomeia o produto.
 - O símbolo em `logo/` é o vetor canônico. Os prompts em `logo-prompts.md`
   servem para explorar alternativas; um resultado melhor substitui o SVG
   mantendo a `viewBox 0 0 64 64`.
@@ -175,7 +179,8 @@ no front devem ser servidas do bundle (`@fontsource/*`), nunca por
 
 | Papel | Fonte | Peso | Tamanho / entrelinha | Uso |
 |---|---|---|---|---|
-| Display · telão | Barlow Condensed | 800 | 84 / 76, caixa-alta, tracking +1% | título do telão, contagem regressiva |
+| Título do telão | Barlow Condensed | 800 | 84 / 76, caixa-alta, tracking +1% | título do telão |
+| Contagem do telão | Barlow Condensed | 800 | 96 / 88, tabular | contagem regressiva do telão |
 | H1 · página | Barlow Condensed | 700 | 36 / 36, caixa-alta, tracking +1% | "PLACAR", "TIMES", "ÁREA DO ORGANIZADOR" |
 | Stat | Barlow Condensed | 700 | 44 / 44, tabular | números da visão geral, timer |
 | H2 · card, problema | Barlow Condensed | 600 | 24 / 26 | título de card, nome do problema |
@@ -196,11 +201,20 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   lockup à esquerda, navegação, chip da rodada ao vivo (nome + timer),
   usuário, Sair em contorno claro, idioma como controle segmentado, botão de
   tema. No celular: lockup + idioma + menu.
-- **Modo de cor**: claro por padrão; escuro completo (`.dark`), escolhido pelo
-  usuário ou pelo sistema (`prefers-color-scheme`), persistido em
-  `localStorage`. O telão força escuro.
-- **Raio 6 px** em controles, 8 px em cards, pílula em badges. Hairlines de
-  1 px, sem sombra além do anel de foco (`brand-soft`, 3 px).
+- **Modo de cor**: claro por padrão; escuro completo (`.dark`) por **escolha
+  do usuário**, persistida em `localStorage`. Seguir `prefers-color-scheme`
+  quando o usuário ainda não escolheu é trabalho da #234 — até lá, o padrão é
+  claro para todo mundo. O telão força escuro.
+- **Foco**: borda de 1 px em `ring` mais um halo de 3 px em `ring/50` — é o
+  que os primitivos do shadcn já fazem
+  (`focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50`).
+  `ring` é o único token do indicador de foco; `brand-soft` é fundo de linha e
+  halo, **nunca** o indicador (daria 1,2:1 sobre o cartão).
+- **Raio 6 px** em controles, 8 px em cards, pílula em badges. `tokens.css`
+  declara a escala inteira (`--radius-sm/md/lg/xl`) em valores absolutos em
+  vez de derivá-la de `--radius`: o `calc()` do shadcn entregaria 4 px em
+  controle e 10 px em card, o oposto disto. Hairlines de 1 px, sem sombra
+  além do anel de foco.
 - **Controles**: 36 px de altura; 44 px em telas de toque e formulários de
   autenticação. Botões: primário (tinta), marca (vermelho, um por tela),
   contorno, fantasma, destrutivo (contorno crimson).
@@ -215,12 +229,15 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   sem scroll horizontal em nenhuma largura (colunas comprimem; abaixo do
   breakpoint estreito, cards).
 - **Ao vivo**: ponto vermelho + texto em eyebrow vermelho; timer em Barlow
-  Condensed 600; nos últimos 5 min o timer fica em `brand-text`.
+  Condensed 600. No header, que é carvão nos dois modos, o chip e a contagem
+  usam `brand-on-chrome`; sobre papel ou cartão, `brand-text`. Nos últimos
+  5 min o timer só muda de peso, não de token.
 - **Ícones**: traço de 2 px em grade 24 (estilo Lucide, já usado pelo shadcn).
   Sem emoji.
 - **Telão** (placar): tela cheia, tema escuro forçado, sem header/rodapé,
-  título 84 px, contagem 96 px em `brand-text`, linhas ≥ 28 px, legenda A/B/C
-  no rodapé, `Esc` sai.
+  **título do telão** 84 px e **contagem do telão** 96 px em `brand-text`
+  (os dois papéis da tabela de tipografia, pelos mesmos nomes), linhas
+  ≥ 28 px, legenda A/B/C no rodapé, `Esc` sai.
 
 ## 6. Editor Blockly (`@kumite/blocks`)
 

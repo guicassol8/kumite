@@ -24,7 +24,10 @@ SVG? Rode `sh docs/design/logo/export.sh` e commite os dois.
 1. Vermelho é sempre o bloco da **esquerda**. O da direita usa a cor do texto
    do fundo (tinta no claro, papel no escuro). Nunca inverta.
 2. Área de respiro: metade da altura do símbolo em volta de todo o lockup.
-3. Tamanhos mínimos: símbolo 16 px; lockup horizontal 96 px de largura.
+3. Tamanhos mínimos: símbolo 16 px; lockup horizontal 96 px de largura. O
+   header é a única exceção, e é documentada: ali o símbolo vai em 24 px, o
+   que dá um lockup de ≈ 80 px, aceitável porque o contexto já nomeia o
+   produto.
 4. Nunca girar, espelhar, esticar, contornar, aplicar gradiente, sombra ou
    glow, nem colocar sobre foto sem placa sólida.
 5. Sobre outras cores que não papel/tinta/carvão, use a versão monocromática.

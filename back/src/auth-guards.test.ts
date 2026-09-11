@@ -229,4 +229,67 @@ describe('deactivated account guard', () => {
       expect(await res.json()).toMatchObject({ error: 'unauthorized' })
     },
   )
+
+  it('accepts the very same token again once the organizer reactivates', async () => {
+    const participant = await insertUser('participant')
+    const token = await tokenFor(participant)
+    await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, participant.id))
+
+    const banned = await request({ method: 'GET', path: '/teams' }, token)
+    expect(banned.status).toBe(401)
+
+    await db.update(usersTable).set({ active: true }).where(eq(usersTable.id, participant.id))
+
+    // The same token, never reissued: the ban refuses a session while the
+    // column says so, it does not revoke the credential. Reactivating has to
+    // put the participant straight back in without a new login.
+    const reinstated = await request({ method: 'GET', path: '/teams' }, token)
+    expect(reinstated.status).toBe(200)
+  })
+
+  // The three routes above are the ones the issue reproduced by hand. This is
+  // the one that keeps the P0 shut: it sweeps *every* registered route wired
+  // to `requireUser` and names the ones that answered anything but 401. If
+  // someone later "optimizes" the `resolve` — drops the `active` read to save
+  // a column, folds the check into a per-route guard, adds an authenticated
+  // route through some other path — this fails with the route list, instead
+  // of the ban silently going back to doing nothing.
+  it('refuses a deactivated token on every authenticated route, without an allowlist', async () => {
+    const participant = await insertUser('participant')
+    const token = await tokenFor(participant)
+    await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, participant.id))
+
+    const authenticated = registeredRoutes().filter((route) => route.use?.includes(requireUser))
+    expect(authenticated.length).toBeGreaterThan(0)
+
+    const offenders: string[] = []
+    for (const route of authenticated) {
+      // No body on purpose: the 401 of `requireUser` short-circuits before
+      // input validation runs (kata ADR-0011), so a bare request is enough
+      // and we do not have to hand-write a valid payload per route. `GET /sse`
+      // is swept like the rest — the guard refuses it before `streamSSE` is
+      // ever reached, so nothing opens a stream here.
+      const res = await request(
+        { method: route.method, path: route.path.replace(/:[^/]+/g, NIL_ID) },
+        token,
+      )
+      if (res.status !== 401) offenders.push(`${route.method} ${route.path} -> ${res.status}`)
+    }
+
+    // Not `toHaveLength(0)`: the failure has to name the route that let a
+    // banned account through, same reason as the guardrail above.
+    expect(offenders).toEqual([])
+  })
+
+  it('leaves an active account untouched', async () => {
+    const participant = await insertUser('participant')
+    const token = await tokenFor(participant)
+
+    const teams = await request({ method: 'GET', path: '/teams' }, token)
+    expect(teams.status).toBe(200)
+
+    const me = await request({ method: 'GET', path: '/me' }, token)
+    expect(me.status).toBe(200)
+    expect(await me.json()).toMatchObject({ active: true })
+  })
 })

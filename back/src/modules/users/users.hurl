@@ -168,7 +168,10 @@ HTTP 403
 [Asserts]
 jsonpath "$.error" == "cannot_demote_self"
 
-# 10. Deactivate the target -> their login now fails.
+# 10. Deactivate the target -> their login now fails *and their existing
+# token stops working*. `target_token` was captured back in step 4b, before
+# the deactivation: it is the tab the participant left open before the ban,
+# which is exactly the scenario of #174.
 POST {{host}}/organizer/users/{{target_id}}/deactivate
 Authorization: Bearer {{organizer_token}}
 HTTP 200
@@ -181,6 +184,14 @@ Content-Type: application/json
 HTTP 401
 [Asserts]
 jsonpath "$.error" == "invalid_credentials"
+
+# 10b. The pre-ban token dies too (#174). Before the fix this answered 200
+# with `"active": false` in the body, and the banned account kept submitting.
+GET {{host}}/me
+Authorization: Bearer {{target_token}}
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
 
 # 11. Deactivate self -> 403, self-guard.
 POST {{host}}/organizer/users/{{organizer_id}}/deactivate
@@ -200,6 +211,15 @@ POST {{host}}/auth/login
 Content-Type: application/json
 { "email": "users-e2e-target@edu.pucrs.br", "password": "originalpass" }
 HTTP 200
+
+# 12b. And the *same* pre-ban token works again, without a new login: the
+# ban refuses a session while the column says so, it never revoked the
+# credential (#174).
+GET {{host}}/me
+Authorization: Bearer {{target_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.active" == true
 
 # 13. Every organizer action 404s on an unknown id.
 GET {{host}}/organizer/users/00000000-0000-0000-0000-000000000000

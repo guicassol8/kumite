@@ -8,12 +8,13 @@
 <x-dc>
 <helmet>
   <title>Tipografia</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+  <style>@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:500;font-display:block;src:url('generate/fonts/BarlowCondensed-Medium.woff2') format('woff2');}@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:600;font-display:block;src:url('generate/fonts/BarlowCondensed-SemiBold.woff2') format('woff2');}@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:700;font-display:block;src:url('generate/fonts/BarlowCondensed-Bold.woff2') format('woff2');}@font-face{font-family:'Barlow Condensed';font-style:normal;font-weight:800;font-display:block;src:url('generate/fonts/BarlowCondensed-ExtraBold.woff2') format('woff2');}@font-face{font-family:'Barlow';font-style:normal;font-weight:400;font-display:block;src:url('generate/fonts/Barlow-Regular.woff2') format('woff2');}@font-face{font-family:'Barlow';font-style:normal;font-weight:500;font-display:block;src:url('generate/fonts/Barlow-Medium.woff2') format('woff2');}@font-face{font-family:'Barlow';font-style:normal;font-weight:600;font-display:block;src:url('generate/fonts/Barlow-SemiBold.woff2') format('woff2');}@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:100 800;font-display:block;src:url('generate/fonts/JetBrainsMono-Variable.woff2') format('woff2');}@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:block;src:url('generate/fonts/Inter-Variable.woff2') format('woff2');}</style>
   <style>
 :root {
   --background: #FCFAF7;
   --background2: #F2F0EC;
   --card: #FFFFFF;
+  --surface: #F2F0EC;
   --foreground: #1C1716;
   --foreground2: #2A2523;
   --muted: #69615D;
@@ -22,9 +23,11 @@
   --primary-fg: #FCFAF7;
   --brand: #DD2824;
   --brand-text: #DD2824;
+  --brand-on-chrome: #F45246;
   --brand-hover: #CE2320;
   --brand-soft: #FBE5E1;
   --brand-fg: #FFFFFF;
+  --ring: #DD2824;
   --destructive: #C1133A;
   --destructive-soft: #FBE7EC;
   --success: #008433;
@@ -45,6 +48,7 @@
   --background: #120F0D;
   --background2: #1B1716;
   --card: #1B1716;
+  --surface: #282322;
   --foreground: #F3F1EF;
   --foreground2: #E6E2DE;
   --muted: #9D9792;
@@ -53,10 +57,12 @@
   --primary-fg: #1C1716;
   --brand: #DD2824;
   --brand-text: #F45246;
+  --brand-on-chrome: #F45246;
   --brand-hover: #CE2320;
   --brand-soft: #3A1A18;
   --brand-fg: #FFFFFF;
-  --destructive: #E8496A;
+  --ring: #DD2824;
+  --destructive: #EF5C7B;
   --destructive-soft: #3A1520;
   --success: #3DBA6A;
   --success-soft: #12301C;

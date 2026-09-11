@@ -1,0 +1,7 @@
+# Dependências do gerador da identidade (docs/design/canvas/generate/).
+# Uso, a partir da raiz do repo:
+#   python3 -m venv .venv
+#   .venv/bin/pip install -r docs/design/canvas/generate/requirements.txt
+fonttools==4.65.0
+brotli==1.2.0      # fontTools lê/escreve WOFF2 através dele
+pillow==12.3.0     # check_mark.py lê os PNGs exportados

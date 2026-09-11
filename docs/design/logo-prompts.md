@@ -12,7 +12,10 @@ Antes de gerar, duas verdades sobre modelos de imagem:
   texto. Por isso o símbolo canônico já existe como vetor em `logo/` — use os
   prompts para achar uma versão melhor da forma, não para reproduzir o SVG.
 - O resultado bom vira vetor de novo (Illustrator › Image Trace, Vectorizer.ai,
-  Inkscape › Trace Bitmap) e entra em `logo/` substituindo o SVG provisório.
+  Inkscape › Trace Bitmap) e entra pelo `MARK_PATH` de
+  `canvas/generate/mark.py` — **não** substituindo o SVG à mão, que é gerado
+  (ver o item 5 do checklist). Trocar o símbolo é v2 da identidade: o que está
+  em `logo/` hoje é canônico, não um rascunho.
   O wordmark **não** sai do gerador: é Barlow Condensed 600 tipografado, já
   contornado em `logo/kumite-wordmark.svg`.
 
@@ -74,5 +77,33 @@ sports tournament poster, huge bold condensed grotesque typography reading "KUMI
    precisa sobreviver sem o vermelho.
 3. O bloco vermelho é sempre o da **esquerda**; o da direita toma a cor do
    texto do fundo (tinta no claro, papel no escuro).
-4. Vetorize e substitua `logo/kumite-mark.svg` mantendo a viewBox 0 0 64 64,
-   para que o componente `Mark` do front continue funcionando sem mudanças.
+4. Vetorize mantendo a `viewBox 0 0 64 64` e **confira o vão renderizado**, não
+   o vão do desenho: se o path usa `stroke-width` para arredondar cantos, o
+   stroke infla a silhueta metade da largura para cada lado e come o vão. Foi
+   assim que a v1 saiu com 4/64 no papel e 1/64 na tela (#227).
+
+5. **Não substitua `logo/kumite-mark.svg` — ele é gerado.** Trocar aquele
+   arquivo à mão não propaga para os outros 14 SVGs, os 36 PNGs nem os 14
+   artboards, e o primeiro `make_logo.py` desfaz a substituição. O fluxo que de
+   fato propaga, a partir da raiz do repositório:
+
+   ```sh
+   # 1. Extraia o `d` do path vetorizado e cole em MARK_PATH — um lugar só:
+   #    docs/design/canvas/generate/mark.py
+   #    Ajuste OUTER_EDGE/INNER_EDGE na mesma edição, para as constantes
+   #    derivadas (INK_*, GAP_UNITS) continuarem dizendo a verdade.
+   .venv/bin/python docs/design/canvas/generate/make_logo.py   # 15 SVGs
+   sh docs/design/logo/export.sh                               # 36 PNGs + check_mark.py
+   .venv/bin/python docs/design/canvas/generate/build.py       # 14 artboards
+   node docs/design/canvas/generate/shot.mjs                   # 14 telas
+   .venv/bin/python docs/design/canvas/generate/build.py       # heights.json realimenta
+   ```
+
+   `check_mark.py` falha se os dois blocos se tocarem em 16, 24, 32 ou 64 px —
+   é o item 1 deste checklist, automatizado. Commite SVGs, PNGs, artboards e
+   telas **juntos**.
+
+6. Trocar o símbolo é **v2 da identidade**, não um ajuste de v1.x: o símbolo
+   atual é canônico (ver `identity.md` § 2 e o `CHANGELOG.md`), não um
+   provisório à espera destes prompts. Abra a entrada de v2 no changelog junto
+   com a troca.

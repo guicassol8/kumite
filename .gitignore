@@ -14,3 +14,6 @@ front/blob-report/
 
 # Python bytecode from docs/design/canvas/generate
 __pycache__/
+
+# venv do gerador da identidade (docs/design/canvas/generate/requirements.txt)
+.venv/

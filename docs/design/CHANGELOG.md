@@ -3,6 +3,54 @@
 Registro datado das decisões de design. Uma entrada por mudança de direção,
 paleta, tipografia ou logo; ajustes de implementação ficam nos PRs.
 
+## v1.2 — 2026-09-11 — o vão do símbolo e um gerador que roda (#227)
+
+O símbolo é o ativo mais reproduzido da identidade, e o vão entre os dois
+blocos **é** o conceito ("elas encaixariam; não encaixam"). Nos tamanhos em que
+a marca é de fato usada, ele não existia: 0 px de fundo em 16, 32 e 64 px. Os
+dois blocos se tocavam e a marca lia como uma peça sólida bicolor — o oposto do
+que a v1 descreve. Conceito e paleta não mudam de direção aqui.
+
+- **Vão: 4/64 → 8/64.** A causa não era o path, era o `stroke-width: 3` que
+  arredonda os cantos: ele infla o desenho 1,5 unidade por lado e comia 3 das 4
+  unidades do vão, deixando 1/64 na tela. Consertar só o número da spec não
+  bastava — vão de 4/64 ainda mede alfa 144/255 nas colunas centrais em 16 px,
+  ou seja, cinza, não fundo. Com 8/64 o vão renderizado é 2 px em 16 e 24 px,
+  4 px em 32 e 8 px em 64. As bordas do bloco passam a 6,5 (externa) e 26,5
+  (interna), a aba/encaixe encolhe de 8 para 6 unidades e a marca fica com
+  54/64 de pegada.
+- **Sem variante de vão exagerado para 16/32 px.** Foi avaliada, como se faz
+  com ícone de app, e dispensada: a geometria única já entrega vão visível em
+  todos os tamanhos. A tabela por tamanho está em `identity.md` § 2.
+- **O símbolo deixa de ser "provisório" e passa a canônico.** `identity.py`
+  dizia uma coisa e `identity.md` outra. Trocar o símbolo pelos prompts de
+  `logo-prompts.md` passa a ser **v2 da identidade**, não um ajuste.
+- **Exceção do ícone de app, escrita.** No `kumite-app-icon.svg` o vermelho é a
+  placa e os blocos são papel + tinta — uma inversão da Regra 1 que os arquivos
+  já entregavam e nenhum documento registrava. Agora está em `identity.md` § 2
+  e na Regra 1 de `logo/README.md`.
+
+**Infraestrutura** (o que tornava tudo acima impossível de corrigir):
+
+- **O gerador não rodava.** `make_logo.py` importava `fontTools` no topo, sem
+  `requirements.txt` em lugar nenhum, e abria um TTF que não era versionado e
+  não tinha origem documentada. Agora há `requirements.txt` pinado, os imports
+  de fonte estão dentro de `build_wordmark()` (símbolo e favicon saem sem fonte
+  alguma) e a falta de qualquer coisa dá erro explícito.
+- **Fontes versionadas.** Barlow Condensed 500/600/700/800, Barlow 400/500/600,
+  JetBrains Mono e Inter, em WOFF2, com o OFL de cada família e a proveniência
+  (commit de origem + SHA-256 de cada TTF) em `canvas/generate/fonts/README.md`.
+- **Fim da degradação silenciosa nas telas.** Os artboards pediam a fonte a
+  `fonts.googleapis.com` e o `shot.mjs` fotografava depois de um
+  `waitForTimeout(1500)`: offline, os 14 PNGs de `screens/` — a referência
+  visual citada por nome em sete issues — eram commitados em Arial Narrow, sem
+  erro. Agora é `@font-face` local e o `shot.mjs` aborta antes de escrever
+  qualquer PNG se alguma face não carregar.
+- **Uma geometria só.** O path vivia duplicado em `make_logo.py` e `common.py`,
+  sem que um importasse o outro. Agora mora em `canvas/generate/mark.py`, e
+  `canvas/generate/check_mark.py` — chamado pelo `export.sh` — mede o vão nos
+  PNGs e falha se os blocos se tocarem, para a regressão não voltar calada.
+
 ## v1.1 — 2026-09-11 — saneamento da camada de tokens (#225)
 
 Auditoria da camada entregue pela v1: os valores não sobreviviam à

@@ -28,15 +28,31 @@ por isso os **arquivos-fonte do canvas** estão em `canvas/`:
   navegador como página normal (é HTML com estilos inline).
 - `canvas/canvas.json` — posições, páginas ("Identidade" e "Telas") e notas.
 - `canvas/generate/` — o gerador que escreve esses artboards (`build.py` e
-  módulos), o script de screenshots (`shot.mjs`, usa o Playwright do `front/`)
-  e `make_logo.py` (SVGs do logo).
+  módulos), o script de screenshots (`shot.mjs`, usa o Playwright do `front/`),
+  `make_logo.py` (SVGs do logo), `mark.py` (a geometria do símbolo, num lugar
+  só), `check_mark.py` (mede o vão nos PNGs) e `fonts/` (as fontes versionadas
+  em WOFF2 — nada vem de `fonts.googleapis.com`). Os scripts Python precisam do
+  venv de `canvas/generate/requirements.txt`.
 
 Para regerar o artifact em qualquer conta: abra uma sessão do Claude Code neste
 repo, rode `/design` e peça para **re-semear o canvas a partir de
 `docs/design/canvas/`** (os artboards e o `canvas.json` já estão no formato que
-a skill consome). Para mudar uma tela de forma consistente, edite o gerador
-(`generate/*.py`), rode `python3 build.py`, depois `node shot.mjs` para
-atualizar `screens/`.
+a skill consome). **Leve `canvas/generate/fonts/` junto**: os artboards trazem
+as fontes por `@font-face` com caminho relativo (`generate/fonts/*.woff2`), e um
+artboard publicado sem essa pasta ao lado cai no fallback do sistema **sem erro
+nenhum** — a mesma degradação silenciosa que a #227 tirou do `shot.mjs`, que só
+guarda o caminho local. Confira a tipografia do artifact contra
+`screens/Tipografia.png` depois de re-semear. Para mudar uma tela de forma
+consistente, edite o gerador
+(`generate/*.py`), rode `build.py` → `shot.mjs` → `build.py` (o segundo é
+preciso porque o `shot.mjs` grava `heights.json`, que realimenta o
+dimensionamento dos frames fluidos):
+
+```sh
+.venv/bin/python docs/design/canvas/generate/build.py
+node docs/design/canvas/generate/shot.mjs
+.venv/bin/python docs/design/canvas/generate/build.py
+```
 
 Exportar PNG/PDF: no artifact, pelo botão Export da barra; fora dele,
 `screens/` já tem cada prancha em PNG e `logo/export.sh` regenera os PNGs do

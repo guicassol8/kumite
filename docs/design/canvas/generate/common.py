@@ -206,7 +206,7 @@ def user_menu_panel(name, email):
             f'<span style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; font-size: 14px; font-weight: 500; color: var(--foreground); background: var(--background2);">{icon("key", 16, "var(--muted)")}Trocar senha</span>'
             '</div></div>')
 
-def header(mode="participant", round_chip=True, email=USER_NAME, theme="light", compact=False, menu_open=False):
+def header(mode="participant", round_chip=True, name=USER_NAME, theme="light", compact=False, menu_open=False):
     """Charcoal header shared by every screen. mode: anon | participant | organizer."""
     links = ""
     if mode == "organizer":
@@ -234,9 +234,9 @@ def header(mode="participant", round_chip=True, email=USER_NAME, theme="light", 
         trigger = ('<span style="position: relative; display: inline-flex;">'
                    '<span style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 6px; '
                    f'border: 1px solid {"var(--chrome-border)" if menu_open else "transparent"}; background: {"rgba(255,255,255,.06)" if menu_open else "transparent"};">'
-                   f'<span style="font-size: 13px; font-weight: 500; color: var(--chrome-fg); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{email}</span>'
+                   f'<span style="font-size: 13px; font-weight: 500; color: var(--chrome-fg); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{name}</span>'
                    f'{icon("chevd", 14, "var(--chrome-muted)")}</span>'
-                   f'{user_menu_panel(email, USER_EMAIL) if menu_open else ""}</span>')
+                   f'{user_menu_panel(name, USER_EMAIL) if menu_open else ""}</span>')
         right = (bug + trigger +
                  f'<a href="#" class="btn btn-sm btn-chrome">{icon("logout", 14)}Sair</a>')
     theme_icon = icon("moon" if theme == "light" else "sun", 16)

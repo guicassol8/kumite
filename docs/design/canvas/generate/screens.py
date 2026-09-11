@@ -176,10 +176,11 @@ def mobile_menu():
            f'<div style="display: flex; align-items: center; gap: 10px;"><div class="seg chrome"><span class="on">PT</span><span>ES</span><span>EN</span></div>'
            f'<span style="display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; border: 1px solid var(--chrome-fg); border-radius: 6px; background: rgba(255,255,255,.08);">{icon("x", 18, "var(--chrome-fg)")}</span></div></header>')
     def nav(label, on=False):
-        col = "var(--chrome-fg)" if on else "var(--chrome-fg)"
+        # A aba ativa se distingue pelo filete vermelho à esquerda, não pela cor
+        # do texto: os itens de navegação do painel têm todos o mesmo peso.
         bar = "2px solid var(--brand-on-chrome)" if on else "2px solid transparent"
         return (f'<span style="display: flex; align-items: center; justify-content: space-between; padding: 13px 20px; border-left: {bar}; '
-                f'font-size: 17px; font-weight: 500; color: {col};">{label}{icon("chevr", 18, "var(--chrome-muted)")}</span>')
+                f'font-size: 17px; font-weight: 500; color: var(--chrome-fg);">{label}{icon("chevr", 18, "var(--chrome-muted)")}</span>')
     def row(ic, label, trailing=""):
         return (f'<span style="display: flex; align-items: center; gap: 12px; padding: 13px 20px; font-size: 15px; font-weight: 500; color: var(--chrome-fg);">'
                 f'{icon(ic, 18, "var(--chrome-muted)")}<span style="flex: 1;">{label}</span>{trailing}</span>')

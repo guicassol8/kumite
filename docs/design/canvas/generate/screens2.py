@@ -127,7 +127,7 @@ def organizer():
                      for i, (n, u, s) in enumerate([("Los Recursivos", "merida", 350), ("Byte Fighters", "pucrs", 300), ("Kernel Panic", "pucrs", 260)], 1))
     shortcuts = "".join(f'<a href="#" style="display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-top: 1px solid var(--border); font-weight: 500;">{n}{icon("arrow", 16, "var(--muted)")}</a>'
                         for n in ["Problemas", "Rodadas", "Usuários", "Configuração do evento"])
-    body = (header("organizer", email="Organização") +
+    body = (header("organizer", name="Organização") +
             '<main style="flex: 1; padding: 24px 24px; display: flex; justify-content: center;"><div style="width: 100%; max-width: 1120px; display: flex; flex-direction: column; gap: 16px;">'
             '<h1 class="h1">Área do organizador</h1>'
             '<div class="tabs"><span class="on">Visão geral</span><span>Problemas</span><span>Rodadas</span><span>Configuração do evento</span><span>Times</span><span>Usuários</span></div>'

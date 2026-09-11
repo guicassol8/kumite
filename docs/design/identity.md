@@ -241,9 +241,10 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   rótulo, com nome acessível ("Reportar um problema"), abrindo o formulário de
   bug; **gatilho do menu do usuário** — nome truncado (com reticências) mais um
   chevron, que abre um dropdown com nome e e-mail no topo e **"Trocar senha"**
-  como único item de ação; controle segmentado de idioma (PT · ES · EN); botão
-  de tema. **Idioma, tema e Sair continuam visíveis na barra** no desktop — não
-  migram para dentro do menu do usuário, que existe para o que não cabe nela.
+  como único item de ação; botão **Sair** em contorno claro; controle segmentado
+  de idioma (PT · ES · EN); botão de tema. **Idioma, tema e Sair continuam
+  visíveis na barra** no desktop — não migram para dentro do menu do usuário,
+  que existe para o que não cabe nela.
 
   **Header, celular (< 768 px)**: lockup + controle de idioma + botão de menu.
   O botão abre um **painel de menu** com navegação, bloco do usuário (nome e

@@ -44,10 +44,10 @@ em `tokens.css` e em `kumite.tokens.json` é outra coisa: é fallback da pilha d
 
 ## Por que não subsetadas
 
-Subsetar para latin + latin-ext cortaria o JetBrains Mono de 72 para 46 KB. Não foi feito **de propósito**: um glifo fora
-do subset não dá erro, renderiza tofu — exatamente a classe de degradação
-silenciosa que a #227 existe para eliminar. 26 KB num diretório de docs não
-pagam esse risco.
+Subsetar para latin + latin-ext cortaria o JetBrains Mono de 72 para 46 KB.
+Não foi feito **de propósito**: um glifo fora do subset não dá erro, renderiza
+tofu — exatamente a classe de degradação silenciosa que a #227 existe para
+eliminar. 26 KB num diretório de docs não pagam esse risco.
 
 ## Como reproduzir
 

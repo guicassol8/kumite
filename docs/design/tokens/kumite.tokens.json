@@ -253,6 +253,10 @@
     "lockup-min-width": {
       "$value": { "value": 96, "unit": "px" },
       "$description": "largura mínima do lockup horizontal; o header é a exceção documentada (símbolo 24 px ≈ 80 px de lockup)"
+    },
+    "breakpoint-cards": {
+      "$value": { "value": 768, "unit": "px" },
+      "$description": "o breakpoint estreito, valor único: abaixo dele o placar e as tabelas viram cards e as abas quebram em duas linhas; dele para cima, tabela com as colunas comprimindo e sem scroll horizontal"
     }
   }
 }

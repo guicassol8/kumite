@@ -73,9 +73,10 @@ logo.
 - **Os tokens são conferidos por script**, não no olho:
   `python3 canvas/generate/check_tokens.py` falha se `tokens.css` e
   `kumite.tokens.json` divergirem, se o `oklch` anotado não render o hex ao
-  lado, se algum `oklch` só chegar naquela cor por clipagem de gamut, ou se
+  lado, se algum `oklch` só chegar naquela cor por clipagem de gamut, se
   a tabela de contraste de `identity.md` não bater com o que os valores
-  rendem.
+  rendem, ou se `canvas/generate/common.py` — que repete os mesmos hex para
+  desenhar as pranchas, e é a quarta cópia deles — sair de sincronia.
 - **Camadas de token**: primitivos (`color.primitive.red-600`) → semânticos
   por modo (`color.light.brand`, `color.dark.brand`) → uso em componentes via
   as variáveis CSS do shadcn. Só os semânticos aparecem no código.

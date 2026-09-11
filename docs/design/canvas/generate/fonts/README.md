@@ -18,7 +18,7 @@ Todos os arquivos vêm do repositório **`google/fonts`**, no commit fixo
 8e44913e4ff26fc997e6856c1ec40ff4791c98c5
 ```
 
-Licença **SIL Open Font License 1.1** nas quatro famílias, que permite
+Licença **SIL Open Font License 1.1** nas três famílias, que permite
 redistribuir — o OFL de cada uma vai junto (`OFL-*.txt`), como a licença exige.
 
 | Arquivo | Uso | Origem (`ofl/…` no commit acima) | SHA-256 do TTF de origem |
@@ -31,18 +31,23 @@ redistribuir — o OFL de cada uma vai junto (`OFL-*.txt`), como a licença exig
 | `Barlow-Medium.woff2` | `--font-body` 500 | `barlow/Barlow-Medium.ttf` | `f8906f762cb73dca441da034bc363b2d8e2e68bc10d5c05e58717646c20cc4b4` |
 | `Barlow-SemiBold.woff2` | `--font-body` 600 | `barlow/Barlow-SemiBold.ttf` | `86577cb32f8abe3673db53ca0f4221e6856751a4f6730c867e00f720f8bb1fc5` |
 | `JetBrainsMono-Variable.woff2` | `--font-mono` 400 e 500 | `jetbrainsmono/JetBrainsMono[wght].ttf` | `48715a42ec242c21e9f02692891e147d022299a52e48d5e413e1a942193ffeda` |
-| `Inter-Variable.woff2` | comparação de corpo no artboard Tipografia (400/500/600) | `inter/Inter[opsz,wght].ttf` | `29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031` |
 
-Total: **679 KB**. As duas variáveis foram renomeadas (`[wght]` → `-Variable`)
-só para tirar colchete e vírgula de dentro de um `url()` de CSS.
+Total: **337 KB**. A variável do JetBrains Mono foi renomeada (`[wght]` →
+`-Variable`) só para tirar o colchete de dentro de um `url()` de CSS.
+
+A Inter esteve aqui (350 KB, metade da pasta) enquanto o corpo do texto era uma
+decisão em aberto: o artboard de tipografia trazia um controle para alternar
+Barlow ↔ Inter e comparar. A decisão fechou em Barlow em 2026-09-10 (CHANGELOG
+v1.0), e o arquivo saiu na #228 junto com o controle. O `'Inter'` que continua
+em `tokens.css` e em `kumite.tokens.json` é outra coisa: é fallback da pilha de
+`--font-sans`, não resíduo dessa escolha.
 
 ## Por que não subsetadas
 
-Subsetar para latin + latin-ext cortaria o Inter de 350 para 135 KB e o
-JetBrains Mono de 72 para 46 KB. Não foi feito **de propósito**: um glifo fora
-do subset não dá erro, renderiza tofu — exatamente a classe de degradação
-silenciosa que a #227 existe para eliminar. 240 KB num diretório de docs não
-paga esse risco.
+Subsetar para latin + latin-ext cortaria o JetBrains Mono de 72 para 46 KB.
+Não foi feito **de propósito**: um glifo fora do subset não dá erro, renderiza
+tofu — exatamente a classe de degradação silenciosa que a #227 existe para
+eliminar. 26 KB num diretório de docs não pagam esse risco.
 
 ## Como reproduzir
 
@@ -59,11 +64,9 @@ for f in Regular Medium SemiBold; do
   curl -sSLO "$BASE/barlow/Barlow-$f.ttf"
 done
 curl -sSL -o 'JetBrainsMono[wght].ttf' "$BASE/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf"
-curl -sSL -o 'Inter[opsz,wght].ttf'    "$BASE/inter/Inter%5Bopsz,wght%5D.ttf"
 curl -sSL -o OFL-BarlowCondensed.txt   "$BASE/barlowcondensed/OFL.txt"
 curl -sSL -o OFL-Barlow.txt            "$BASE/barlow/OFL.txt"
 curl -sSL -o OFL-JetBrainsMono.txt     "$BASE/jetbrainsmono/OFL.txt"
-curl -sSL -o OFL-Inter.txt             "$BASE/inter/OFL.txt"
 ```
 
 Conferir os SHA-256 contra a tabela acima (`sha256sum *.ttf`), converter para
@@ -76,7 +79,6 @@ from fontTools.ttLib import TTFont
 for n in [f for f in os.listdir('.') if f.endswith('.ttf')]:
     f = TTFont(n); f.flavor = 'woff2'; f.save(n[:-4] + '.woff2')
 PY
-mv 'Inter[opsz,wght].woff2' Inter-Variable.woff2
 mv 'JetBrainsMono[wght].woff2' JetBrainsMono-Variable.woff2
 rm -f ./*.ttf
 ```

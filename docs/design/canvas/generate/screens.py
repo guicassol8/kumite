@@ -118,7 +118,7 @@ def login():
 def signup_mobile():
     hdr = (f'<header class="chrome-bar" style="display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 16px; flex: none;">{lockup(24)}'
            f'<div style="display: flex; align-items: center; gap: 10px;"><div class="seg chrome"><span class="on">PT</span><span>ES</span><span>EN</span></div>'
-           f'<span style="display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; border: 1px solid var(--chrome-border); border-radius: 6px;">{icon("grip", 18, "var(--chrome-fg)")}</span></div></header>')
+           f'<span style="display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; border: 1px solid var(--chrome-border); border-radius: 6px;">{icon("menu", 18, "var(--chrome-fg)")}</span></div></header>')
     def field(label, value, extra="", muted=False):
         col = "var(--muted)" if muted else "var(--foreground)"
         return (f'<div style="display: flex; flex-direction: column; gap: 6px;"><span class="label">{label}</span>'
@@ -166,3 +166,41 @@ def teams():
             f'<div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;"><div style="display: flex; flex-direction: column; gap: 4px;"><h1 class="h1">Times</h1><span class="muted">Times de até 4 pessoas. Mistura entre universidades liberada.</span></div><span class="btn btn-primary">{icon("plus", 16)}Criar time</span></div>'
             f'{my}{table}</div></main>' + footer())
     return page("Times", body)
+
+# ---------- Painel de menu do celular (< 768 px) ----------
+# O componente mais complexo da #217 e o que fecha o #186: abaixo do
+# breakpoint a navegação, o usuário, tema, idioma, reportar bug e Sair moram
+# todos aqui. Inventário em identity.md § 5.
+def mobile_menu():
+    hdr = (f'<header class="chrome-bar" style="display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 16px; flex: none;">{lockup(24)}'
+           f'<div style="display: flex; align-items: center; gap: 10px;"><div class="seg chrome"><span class="on">PT</span><span>ES</span><span>EN</span></div>'
+           f'<span style="display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; border: 1px solid var(--chrome-fg); border-radius: 6px; background: rgba(255,255,255,.08);">{icon("x", 18, "var(--chrome-fg)")}</span></div></header>')
+    def nav(label, on=False):
+        # A aba ativa se distingue pelo filete vermelho à esquerda, não pela cor
+        # do texto: os itens de navegação do painel têm todos o mesmo peso.
+        bar = "2px solid var(--brand-on-chrome)" if on else "2px solid transparent"
+        return (f'<span style="display: flex; align-items: center; justify-content: space-between; padding: 13px 20px; border-left: {bar}; '
+                f'font-size: 17px; font-weight: 500; color: var(--chrome-fg);">{label}{icon("chevr", 18, "var(--chrome-muted)")}</span>')
+    def row(ic, label, trailing=""):
+        return (f'<span style="display: flex; align-items: center; gap: 12px; padding: 13px 20px; font-size: 15px; font-weight: 500; color: var(--chrome-fg);">'
+                f'{icon(ic, 18, "var(--chrome-muted)")}<span style="flex: 1;">{label}</span>{trailing}</span>')
+    rule = '<div style="height: 1px; background: var(--chrome-border); margin: 8px 0;"></div>'
+    panel = ('<div style="flex: 1; background: var(--chrome); color: var(--chrome-fg); display: flex; flex-direction: column; padding: 8px 0 20px;">'
+             # Bloco do usuário
+             '<div style="display: flex; align-items: center; gap: 12px; padding: 12px 20px 16px;">'
+             '<span style="width: 40px; height: 40px; border-radius: 999px; background: var(--chrome-border); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--chrome-fg);">A</span>'
+             '<span style="display: flex; flex-direction: column; line-height: 1.3;"><span style="font-size: 16px; font-weight: 600;">Ana Souza</span>'
+             '<span style="font-size: 13px; color: var(--chrome-muted);">ana.souza@edu.pucrs.br</span></span></div>'
+             # Chip da rodada
+             '<div style="padding: 0 20px 12px;"><div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 14px; height: 44px; border: 1px solid var(--chrome-border); border-radius: 8px;">'
+             '<span class="live"><span class="dot"></span>Rodada 2</span>'
+             '<span class="num" style="font-weight: 600; font-size: 22px; color: var(--chrome-fg); letter-spacing: 0.02em;">41:07</span></div></div>'
+             + rule
+             + nav("Início", on=True) + nav("Times") + nav("Placar")
+             + rule
+             + row("moon", "Tema escuro", '<span style="display: inline-flex; width: 40px; height: 24px; border-radius: 999px; background: var(--chrome-border); align-items: center; padding: 0 3px;"><span style="width: 18px; height: 18px; border-radius: 999px; background: var(--chrome-fg);"></span></span>')
+             + row("bug", "Reportar um problema")
+             + rule
+             + row("logout", "Sair")
+             + '</div>')
+    return page("Menu do celular", hdr + panel, extra_css=".screen { background: var(--chrome); }")

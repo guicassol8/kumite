@@ -2,8 +2,8 @@ import json, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CANVAS = os.path.normpath(os.path.join(HERE, ".."))  # docs/design/canvas
-from screens import editor, login, signup_mobile, teams
-from screens2 import leaderboard, telao, organizer, home
+from screens import editor, login, signup_mobile, teams, mobile_menu
+from screens2 import leaderboard, telao, telao_geral, organizer, home
 from identity import logo_board, palette_board, type_board, components_board, blockly_board
 
 OUT = CANVAS
@@ -16,8 +16,11 @@ files = {
     "Times.dc.html": teams(),
     "Placar.dc.html": leaderboard(),
     "Telao.dc.html": telao(),
+    "TelaoGeral.dc.html": telao_geral(),
     "Organizador.dc.html": organizer(),
     "Inicio.dc.html": home(),
+    "MenuUsuario.dc.html": home(menu_open=True),
+    "MenuCelular.dc.html": mobile_menu(),
     "Simbolo.dc.html": logo_board(),
     "Paleta.dc.html": palette_board(),
     "Tipografia.dc.html": type_board(),
@@ -52,13 +55,15 @@ canvas = {
     {"file": "Placar.dc.html", "title": "Placar", "x": 0, "y": 1884, "w": 1280, "h": 800, "page": "telas"},
     {"file": "Organizador.dc.html", "title": "Painel do organizador", "x": 1360, "y": 1884, "w": 1280, "h": 800, "page": "telas"},
     {"file": "Telao.dc.html", "title": "Placar · modo telão", "x": 2720, "y": 1884, "w": 1440, "h": 810, "page": "telas"},
+    {"file": "TelaoGeral.dc.html", "title": "Telão · sem rodada aberta", "x": 0, "y": 2774, "w": 1440, "h": 810, "page": "telas"},
+    {"file": "MenuUsuario.dc.html", "title": "Menu do usuário · desktop", "x": 1520, "y": 2774, "w": 1280, "h": 800, "page": "telas"},
+    {"file": "MenuCelular.dc.html", "title": "Menu · celular", "x": 2880, "y": 2774, "w": 390, "h": 844, "page": "telas"},
   ],
   "annotations": [
-    {"id": "nota-paleta", "x": 1280, "y": -150, "w": 420, "page": "identidade", "text": "Recomendação: variante A (Hinomaru). Todas as telas da página Telas estão nela. Se preferir B ou C, eu re-tokenizo tudo."},
-    {"id": "nota-tipo", "x": 0, "y": ROW2 - 130, "w": 380, "page": "identidade", "text": "Corpo: Barlow (recomendado) ou Inter — alterne no controle acima do artboard de tipografia e compare."},
+    {"id": "nota-paleta", "x": 1280, "y": -150, "w": 420, "page": "identidade", "text": "Variante A (Hinomaru): decisão fechada em 2026-09-10. B e C ficam no artboard só como registro das alternativas descartadas — ver identity.md § 3 e o CHANGELOG."},
     {"id": "nota-editor", "x": 0, "y": 830, "w": 460, "page": "telas", "text": "Editor: enunciado e resultados colapsáveis (#203), barra de ações ancorada (#160), recentrar junto ao zoom (#205), blocos harmonizados (@kumite/blocks)."},
     {"id": "nota-placar", "x": 0, "y": 1784, "w": 460, "page": "telas", "text": "Placar: colunas A/B/C com legenda (#207), coluna do time fixa, linha do seu time em vermelho-suave. Modo telão = restyle do modo apresentação que já existe."},
-    {"id": "nota-mobile", "x": 2720, "y": -150, "w": 390, "page": "telas", "text": "Header mobile: lockup + idioma + menu (#186). Rodapé empilhado. O FAB de reportar bug sai do canto e vira item do menu (#198)."},
+    {"id": "nota-mobile", "x": 2720, "y": -150, "w": 390, "page": "telas", "text": "Header mobile: lockup + idioma + menu (#186). Rodapé empilhado. Reportar bug: ícone no header no desktop, item do painel no celular — o FAB do canto não existe em largura nenhuma (#198, #217)."},
   ],
   "launch": {"view": "canvas", "page": "identidade"}
 }

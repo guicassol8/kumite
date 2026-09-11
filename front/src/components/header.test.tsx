@@ -233,7 +233,9 @@ describe('Header home link', () => {
     expect(link.tagName).toBe('A')
     expect(link.getAttribute('href')).toBe('/')
     expect(link.getAttribute('aria-label')).toBe('kumite — página inicial')
-    expect(link.textContent).toBe('kumite')
+    // The wordmark is the outlined SVG, which is aria-hidden: the accessible
+    // name is bought entirely by the label above, in every language.
+    expect(link.querySelector('[data-testid="brand-lockup"]')).not.toBeNull()
   })
 
   it('navigates to the home page through the router when clicked', async () => {
@@ -315,7 +317,9 @@ describe('Header home link', () => {
       ),
     )
 
-    expect(screen.getByTestId('header-home-link').textContent).toBe('kumite')
+    expect(
+      screen.getByTestId('header-home-link').querySelector('[data-testid="brand-lockup"]'),
+    ).not.toBeNull()
   })
 
   it('navigates without asking for confirmation', async () => {

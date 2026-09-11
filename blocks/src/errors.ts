@@ -3,6 +3,7 @@ export type BlocksErrorCode =
   | 'missing-root'
   | 'duplicate-root'
   | 'block-not-allowed'
+  | 'disabled-block'
 
 /**
  * Thrown by `generateSolution`. Callers branch on `code`, never on the message

@@ -7,6 +7,35 @@ import { type BlockLocale, DEFAULT_LOCALE, messagesFor } from './messages'
 import { allowedBlockTypes, type WorkspaceState } from './toolbox'
 
 /**
+ * The line terminators JS honours that are *not* `\n`. Blockly copies comment
+ * text verbatim into `// ...` lines, so any of these ends the comment and
+ * promotes the rest of the text to real code — the allowlist never sees it,
+ * because it only inspects `block.type` (#181, finding #14).
+ *
+ * `\n` is deliberately absent: Blockly's own `prefixLines` already splits on it
+ * and prefixes every resulting line with `// `, so a multi-line comment stays a
+ * comment.
+ */
+const COMMENT_LINE_TERMINATORS = new RegExp(`[${String.fromCharCode(0x0d, 0x2028, 0x2029)}]`, 'g')
+
+/**
+ * Rewrites every block comment so it cannot break out of its `// ` prefix.
+ * Neutralizing, not stripping: the participant keeps their comment, it just
+ * becomes one line.
+ *
+ * Mutates blocks of the throwaway workspace `generateSolution` builds and
+ * disposes, so nothing here reaches the participant's saved state.
+ */
+function neutralizeCommentTerminators(blocks: Blockly.Block[]): void {
+  for (const block of blocks) {
+    const text = block.getCommentText()
+    if (text === null) continue
+    const safe = text.replace(COMMENT_LINE_TERMINATORS, ' ')
+    if (safe !== text) block.setCommentText(safe)
+  }
+}
+
+/**
  * Turns a serialized workspace into the JS source of `solve(input)`.
  *
  * Runs headless, so it is the same call on the editor and on the judge. The
@@ -51,7 +80,21 @@ export function generateSolution(
       }
     }
 
+    neutralizeCommentTerminators(blocks)
+
     const root = roots[0] as Blockly.Block
+
+    // A disabled block generates nothing at all, so the root being off used to
+    // come back as a successful `"\n\n\n"` — no `solve`, every case failing
+    // with `solve is not defined` and no hint why (#181, finding #15).
+    // `getDescendants` includes the root itself, so one call covers the root
+    // and everything hanging off it. Blocks loose on the canvas stay out of
+    // scope: Blockly disables some of them on its own, and `thisOnly` below
+    // already keeps them out of the generated source.
+    if (root.getDescendants(false).some((block) => !block.isEnabled())) {
+      throw new BlocksError('disabled-block', messages.errorDisabledBlock)
+    }
+
     javascriptGenerator.init(workspace)
     // `thisOnly` keeps generation anchored on the root: a stray top-level block
     // never leaks code into the solution.

@@ -29,18 +29,19 @@ export const JudgeCaseResultSchema = z.discriminatedUnion('outcome', [
  * Deliberately permissive: it only proves "this is a JSON object". The real
  * shape is Blockly's serialization format, owned by the deserializer inside
  * `generateSolution` — a second definition in zod would drift away from it,
- * and every rejection this schema would add is already one of the four
- * codegen refusals below.
+ * and every rejection this schema would add is already one of the codegen
+ * refusals below.
  */
 export const WorkspaceSchema = z.record(z.string(), JsonValueSchema)
 
-/** The four ways codegen can refuse a workspace. Snake_case: it is also the
+/** The ways codegen can refuse a workspace. Snake_case: it is also the
  * `c.error` code the route (#21) hands to the client. */
 export const CodegenErrorCodeSchema = z.enum([
   'malformed_workspace',
   'missing_root',
   'duplicate_root',
   'block_not_allowed',
+  'disabled_block',
 ])
 
 export const JudgeConfigSchema = z.object({

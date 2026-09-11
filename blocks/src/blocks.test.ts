@@ -3,6 +3,7 @@ import { javascriptGenerator } from 'blockly/javascript'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { defineKumiteBlocks, INPUT_BLOCK_TYPE, ROOT_BLOCK_TYPE } from './blocks'
+import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
 import { messagesFor } from './messages'
 
 function labelsOf(block: Blockly.Block): string[] {
@@ -116,6 +117,21 @@ describe('defineKumiteBlocks', () => {
         expect(precondition(item, block), `${id} on a curated block`).toBe('enabled')
       })
     }
+  })
+
+  it('reserves the two names the solution contract owns', () => {
+    defineKumiteBlocks()
+
+    // Blockly keeps the list as a comma-separated string of every reserved
+    // word; a participant variable matching one gets renamed at `init()`.
+    // `RESERVED_WORDS_` is `protected` in the .d.ts with no public reader, and
+    // asserting on it here is the point: it pins the registration to
+    // `defineKumiteBlocks`, where generate.test.ts can only observe the effect.
+    const reserved = (
+      javascriptGenerator as unknown as { RESERVED_WORDS_: string }
+    ).RESERVED_WORDS_.split(',')
+    expect(reserved).toContain(SOLUTION_FUNCTION_NAME)
+    expect(reserved).toContain(SOLUTION_PARAM_NAME)
   })
 
   it('re-registers with another locale without throwing (#57 relabels at runtime)', () => {

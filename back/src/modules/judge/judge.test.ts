@@ -1,4 +1,4 @@
-import { somaDosPares } from '@kumite/blocks'
+import { raizDesabilitada, somaDosPares } from '@kumite/blocks'
 import { describe, expect, it } from 'vitest'
 
 import type { JudgeCase, JudgeConfig, Workspace } from './judge.schema'
@@ -14,6 +14,7 @@ const CRASH_WORKER_URL = new URL('../../judge-test-worker.mjs', import.meta.url)
 // package; parsing it is how it becomes a Workspace here — the same step the
 // route (#21) performs on the incoming body, never a cast.
 const somaDosParesWorkspace = WorkspaceSchema.parse(somaDosPares)
+const raizDesabilitadaWorkspace = WorkspaceSchema.parse(raizDesabilitada)
 
 /** Every test that needs runnable source goes through the judge's own codegen
  * — one path, so the suite can never prove a source shape the judge does not
@@ -214,6 +215,18 @@ describe('generateJudgeSource', () => {
       blocks: { languageVersion: 0, blocks: [{ semTipo: true }] },
     })
     expect(result).toEqual({ ok: false, error: 'malformed_workspace', message: expect.any(String) })
+  })
+
+  it('refuses a workspace whose root block is disabled', () => {
+    const result = generateJudgeSource(raizDesabilitadaWorkspace)
+
+    expect(result).toEqual({ ok: false, error: 'disabled_block', message: expect.any(String) })
+    expect(result.ok === false && result.message).toBe(
+      'Há um bloco desabilitado na sua solução. Reative-o para continuar.',
+    )
+    expect(generateJudgeSource(raizDesabilitadaWorkspace, 'en')).toMatchObject({
+      message: 'There is a disabled block in your solution. Re-enable it to continue.',
+    })
   })
 
   it('localizes the refusal message', () => {

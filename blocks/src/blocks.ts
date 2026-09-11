@@ -18,6 +18,14 @@ export const INPUT_BLOCK_TYPE = 'kumite_input'
 export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
   const messages = messagesFor(locale)
 
+  // The generator already reserves every ECMAScript keyword and every name on
+  // `globalThis`, but not the two the solution contract owns. Without this, a
+  // participant variable named `input` *is* the `solve` parameter — same
+  // binding, no error, wrong answer (#181, finding #8). Derived from
+  // `contract.ts` so the day the contract changes this follows it, and safe to
+  // repeat: `addReservedWords` appends, and only `init()` reads the list.
+  javascriptGenerator.addReservedWords(`${SOLUTION_FUNCTION_NAME},${SOLUTION_PARAM_NAME}`)
+
   Blockly.Blocks[ROOT_BLOCK_TYPE] = {
     init(this: Blockly.Block) {
       this.appendDummyInput().appendField(messages.solveTitle)

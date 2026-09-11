@@ -1,6 +1,7 @@
 import {
   emptyWorkspaceState,
   ROOT_BLOCK_TYPE,
+  raizDesabilitada,
   somaDosPares,
   type WorkspaceState,
 } from '@kumite/blocks'
@@ -89,6 +90,23 @@ describe('useExampleRun', () => {
     expect(result.current.state).toEqual({
       status: 'invalid',
       message: 'O bloco "text_print" não é permitido nesta solução.',
+    })
+    expect(workers.spawned).toHaveLength(0)
+  })
+
+  it('surfaces the disabled-block refusal without spawning a worker', async () => {
+    const workers = deferredWorkers()
+    const { result } = renderHook(() => useExampleRun(examples, workers))
+
+    await act(async () => {
+      await result.current.run(raizDesabilitada)
+    })
+
+    // #181, finding #15: this used to "run" a source with no solve at all and
+    // report every example as a runtime error, with no hint about the cause.
+    expect(result.current.state).toEqual({
+      status: 'invalid',
+      message: 'Há um bloco desabilitado na sua solução. Reative-o para continuar.',
     })
     expect(workers.spawned).toHaveLength(0)
   })

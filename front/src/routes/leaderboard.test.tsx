@@ -437,6 +437,56 @@ describe('LeaderboardScreen — no active round', () => {
   })
 })
 
+describe('LeaderboardScreen — SSE never connects (REST fallback)', () => {
+  // The reported bug (#180): `isLoading` included `stream.event === null`,
+  // which is exactly the condition that enables the REST fallback — so the
+  // fallback fetched the data and the screen never left the loading state.
+  it('renders the ranking from the REST fallback when the stream delivers nothing', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+
+    // No emit(): the stream stays silent for the whole test, as it does when
+    // /sse is blocked by a proxy or the venue's network.
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-loading')).toBeNull())
+    expect(mockedEventRanking).toHaveBeenCalled()
+
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('Time 1')
+  })
+
+  // Same root cause: the error branch was `!isLoading && isError`, so it was
+  // unreachable for as long as isLoading was stuck true.
+  it('reaches the error state with a working retry when every REST call fails too', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(500, {}))
+    mockedRounds.mockResolvedValue(jsonResponse(500, {}))
+    mockedRoundRanking.mockResolvedValue(jsonResponse(500, {}))
+    mockedEventRanking.mockResolvedValue(jsonResponse(500, {}))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-error')).toBeDefined())
+    expect(screen.queryByTestId('leaderboard-loading')).toBeNull()
+
+    const retry = screen.getByTestId('leaderboard-error-retry')
+    mockedEventRanking.mockClear()
+    fireEvent.click(retry)
+    await waitFor(() => expect(mockedEventRanking).toHaveBeenCalled())
+  })
+
+  // Data first: a partial failure must never hide a ranking that did load.
+  it('keeps showing the ranking when only the rounds list fails', async () => {
+    mockedRounds.mockResolvedValue(jsonResponse(500, {}))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-loading')).toBeNull())
+    expect(screen.queryByTestId('leaderboard-error')).toBeNull()
+
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+  })
+})
+
 describe('LeaderboardScreen — connection banner', () => {
   it('shows a banner while connecting/reconnecting and hides it once open', async () => {
     renderLeaderboard()

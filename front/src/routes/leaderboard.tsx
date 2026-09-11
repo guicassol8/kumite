@@ -152,18 +152,32 @@ function LeaderboardScreen() {
   const teamsById = new Map((teams.data?.teams ?? []).map((team) => [team.id, team]))
   const myTeamId = teams.data?.myTeamId ?? null
 
+  // `stream.event === null` used to sit in this list, which is exactly the
+  // condition that enables the REST fallback below — so the fallback fetched
+  // the ranking and the screen stayed in loading forever whenever /sse never
+  // connected (#180). The rule now is "nothing to show yet, and something is
+  // still on its way". Every clause stays paired with its own `enabled`
+  // guard: a *disabled* query reports `isPending: true` in TanStack Query
+  // (status 'pending', fetchStatus 'idle'), so an unguarded `isPending` would
+  // recreate the same deadlock from the other side.
   const isLoading =
-    stream.event === null ||
+    (eventRanking === null && eventRankingRest.isPending) ||
     teams.isPending ||
     rounds.isPending ||
     (!hasActiveRound && lastClosedRound !== null && lastClosedRanking.isPending) ||
-    (hasActiveRound && stream.round === null && activeRoundRanking.isPending)
+    (hasActiveRound && displayedRound === null && activeRoundRanking.isPending)
+  // Data first: a failure only takes over the screen when there is no ranking
+  // at all to render. Tradeoff: an isolated `rounds.isError` with a working
+  // event ranking no longer shows the error state, and the "Rodada" tab falls
+  // through to its empty state — accepted so a valid board is never hidden.
+  const hasAnyRanking = displayedRound !== null || eventRanking !== null
   const isError =
-    teams.isError ||
-    rounds.isError ||
-    lastClosedRanking.isError ||
-    activeRoundRanking.isError ||
-    eventRankingRest.isError
+    !hasAnyRanking &&
+    (teams.isError ||
+      rounds.isError ||
+      lastClosedRanking.isError ||
+      activeRoundRanking.isError ||
+      eventRankingRest.isError)
   const hasNeverHadARound = !hasActiveRound && lastClosedRound === null
   const defaultTab = hasActiveRound || hasNeverHadARound ? 'round' : 'event'
   const [manualTab, setManualTab] = useState<'round' | 'event' | null>(null)

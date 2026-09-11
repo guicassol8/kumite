@@ -3,8 +3,10 @@ import type { Page } from '@playwright/test'
 
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
+  participantIdOf,
   seedEditorFixture,
   seedParticipantToken,
+  workspaceStorageKey,
 } from './support/editor-fixture'
 import {
   BACK_URL,
@@ -48,12 +50,17 @@ async function expectFooterBelowMain(page: Page): Promise<void> {
 }
 
 /** Seeds the saved workspace, which is what the screen restores on mount. */
-async function seedWorkspace(page: Page, problemId: string, state: unknown): Promise<void> {
+async function seedWorkspace(
+  page: Page,
+  userId: string,
+  problemId: string,
+  state: unknown,
+): Promise<void> {
   await page.addInitScript(
     ([key, saved]) => {
       window.localStorage.setItem(key as string, saved as string)
     },
-    [`kumite:workspace:${problemId}`, JSON.stringify(state)],
+    [workspaceStorageKey(userId, problemId), JSON.stringify(state)],
   )
 }
 
@@ -82,17 +89,18 @@ test.describe('/problem/$id — barra ancorada, rodada encerrada (#155)', () => 
 
   let problemId: string
   let participantToken: string
+  let participantId: string
 
   test.beforeAll(async () => {
     test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
     // A closed round: this describe never submits, so it must not hold the
     // single-open-round slot against the rest of the suite.
-    ;({ problemId, participantToken } = await seedEditorFixture('Problem Layout'))
+    ;({ problemId, participantToken, participantId } = await seedEditorFixture('Problem Layout'))
   })
 
   test.beforeEach(async ({ page }) => {
     await seedParticipantToken(page, participantToken)
-    await seedWorkspace(page, problemId, somaDosPares)
+    await seedWorkspace(page, participantId, problemId, somaDosPares)
   })
 
   for (const { label, size, closed, results, yieldsStatement } of VIEWPORTS) {
@@ -245,6 +253,7 @@ test.describe('/problem/$id — barra ancorada, rodada aberta (#155)', () => {
   let problemId: string
   let roundId: string
   let participantToken: string
+  let participantId: string
 
   test.beforeAll(async () => {
     test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
@@ -300,6 +309,7 @@ test.describe('/problem/$id — barra ancorada, rodada aberta (#155)', () => {
       body: JSON.stringify({ email, password: PASSWORD }),
     })
     ;({ token: participantToken } = (await login.json()) as { token: string })
+    participantId = await participantIdOf(participantToken)
     // Submitting is a team act: without one the route answers 404 not_in_team.
     await api('/teams', {
       method: 'POST',
@@ -318,7 +328,7 @@ test.describe('/problem/$id — barra ancorada, rodada aberta (#155)', () => {
     await roundSlot.open(auth, roundId)
 
     await seedParticipantToken(page, participantToken)
-    await seedWorkspace(page, problemId, somaDosPares)
+    await seedWorkspace(page, participantId, problemId, somaDosPares)
     await page.setViewportSize({ width: 1280, height: 720 })
     await page.goto(`/problem/${problemId}`)
     await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()

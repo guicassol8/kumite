@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Confere a camada de tokens de docs/design. stdlib puro, sem dependências.
 
-Quatro checagens, nesta ordem:
+Cinco checagens, nesta ordem:
 
   1. paridade   — tokens.css e kumite.tokens.json declaram o mesmo conjunto de
                   tokens semânticos com os mesmos valores;
@@ -9,7 +9,9 @@ Quatro checagens, nesta ordem:
                   para aquele hex exato;
   3. gamut      — todo oklch citado cai dentro do gamut sRGB;
   4. contraste  — a tabela de contraste de identity.md §3 bate, par a par, com
-                  o que os tokens rendem, no valor e no nível.
+                  o que os tokens rendem, no valor e no nível;
+  5. gerador    — common.LIGHT/DARK/BLOCKS, a quarta cópia dos mesmos hex,
+                  bate com tokens.css.
 
 Uso: python3 docs/design/canvas/generate/check_tokens.py
 Sai com 0 se tudo passa, 1 na primeira checagem que falha.
@@ -458,6 +460,85 @@ def check_contrast(groups):
     return errors
 
 
+# --------------------------------------------------------------------------
+# 5. o gerador do canvas é uma QUARTA cópia dos mesmos hex
+# --------------------------------------------------------------------------
+
+# common.py repete à mão os valores de tokens.css, e as quatro checagens acima
+# não alcançam essa cópia. Foi por aí que um valor sobreviveu: depois de
+# --destructive do escuro virar #EF5C7B, o board da paleta continuava mostrando
+# #E8496A. Corrigido na #225; esta checagem fecha a classe.
+
+# (1) Mapa de nomes — o gerador usa vocabulário próprio, e a correspondência
+# precisa ser explícita, não por convenção: o `muted` dele é o
+# `muted-foreground` do tokens.css, e o `surface` dele é o `muted`.
+GENERATOR_NAMES = {
+    "background2": "background-2",
+    "muted": "muted-foreground",
+    "surface": "muted",
+    "primary_fg": "primary-foreground",
+    "brand_fg": "brand-foreground",
+    "chrome_fg": "chrome-foreground",
+}
+
+# (2) Allowlist — chaves que só existem no gerador, sem token correspondente:
+# fundos de badge dos artboards e o degrau `foreground2`. Acrescentar um nome
+# aqui é decisão consciente (o valor deixa de ser conferido), e tirar um token
+# desta lista sem tirá-lo do gerador também é erro: uma allowlist obsoleta
+# volta a esconder divergência.
+GENERATOR_ONLY = {"foreground2", "destructive_soft", "success_soft", "warning_soft"}
+
+
+def _css_name(key):
+    return GENERATOR_NAMES.get(key, key.replace("_", "-"))
+
+
+def check_generator(css_blocks):
+    # common.py faz `from check_tokens import contrast`, então o import mora
+    # aqui dentro — no topo do módulo seria circular.
+    import common
+
+    errors = []
+    layers = ((":root", "claro", common.LIGHT), (".dark", "escuro", common.DARK))
+    for layer, label, table in layers:
+        css = resolve_css(css_blocks, layer)
+        for key in sorted(table):
+            if key in GENERATOR_ONLY:
+                continue
+            name = _css_name(key)
+            if name not in css:
+                errors.append(
+                    f"{label}: common.py tem '{key}' e tokens.css não tem --{name} — "
+                    f"mapeie o nome em GENERATOR_NAMES ou declare-o em GENERATOR_ONLY"
+                )
+                continue
+            got, want = table[key].upper(), css[name].upper()
+            if got != want:
+                errors.append(
+                    f"{label}: common.py tem {key} = {got}, tokens.css tem --{name} = {want}"
+                )
+    for key in sorted(GENERATOR_ONLY):
+        name = _css_name(key)
+        if name in resolve_css(css_blocks, ":root"):
+            errors.append(
+                f"allowlist obsoleta: '{key}' virou o token --{name} em tokens.css — "
+                f"tire-o de GENERATOR_ONLY para que o valor volte a ser conferido"
+            )
+    blocks_css = {k[6:]: v for k, v in css_blocks.get("block", {}).items()}
+    for key in sorted(common.BLOCKS):
+        if key not in blocks_css:
+            errors.append(f"blocos: common.BLOCKS tem '{key}' e tokens.css não tem --block-{key}")
+            continue
+        got, want = common.BLOCKS[key].upper(), blocks_css[key].upper()
+        if got != want:
+            errors.append(
+                f"blocos: common.BLOCKS[{key!r}] = {got}, tokens.css tem --block-{key} = {want}"
+            )
+    for key in sorted(set(blocks_css) - set(common.BLOCKS)):
+        errors.append(f"blocos: tokens.css tem --block-{key} e common.BLOCKS não")
+    return errors
+
+
 def main():
     css_blocks, comments = parse_css()
     groups, radius = parse_json_tokens()
@@ -468,6 +549,7 @@ def main():
         ("3. o oklch descreve o hex sem depender de clipagem em sRGB",
          check_gamut(css_blocks, comments)),
         ("4. tabela de contraste de identity.md § 3", check_contrast(groups)),
+        ("5. common.py (gerador do canvas) ↔ tokens.css", check_generator(css_blocks)),
     ]
 
     failed = False

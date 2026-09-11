@@ -5,6 +5,7 @@ import {
   hasOrganizerCredentials,
   seedEditorFixture,
   seedParticipantToken,
+  workspaceStorageKey,
 } from './support/editor-fixture'
 
 // Visual walkthrough for #4: the protected root block, the pt-br locale of the
@@ -47,10 +48,11 @@ test.describe('the root block and native blocks (#4)', () => {
 
   let problemId: string
   let participantToken: string
+  let participantId: string
 
   test.beforeAll(async () => {
     test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
-    ;({ problemId, participantToken } = await seedEditorFixture('Root Block'))
+    ;({ problemId, participantToken, participantId } = await seedEditorFixture('Root Block'))
   })
 
   test.beforeEach(async ({ page }) => {
@@ -151,7 +153,7 @@ test.describe('the root block and native blocks (#4)', () => {
         window.localStorage.setItem(key as string, state as string)
       },
       [
-        `kumite:workspace:${problemId}`,
+        workspaceStorageKey(participantId, problemId),
         JSON.stringify({
           blocks: {
             languageVersion: 0,

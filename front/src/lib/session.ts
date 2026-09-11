@@ -1,6 +1,7 @@
 import type { InferResponseType } from 'hono'
 
 import { api } from './api'
+import { queryClient } from './query-client'
 
 export type SessionUser = InferResponseType<typeof api.me.$get, 200>
 
@@ -67,6 +68,17 @@ export function setSession(user: SessionUser, token: string): void {
 
 export function clearSession(reason: 'manual' | 'expired'): void {
   removeStoredToken()
+  // The cache outlives the token otherwise, and the next account on this
+  // browser renders the previous one's teams, rounds and rankings until a
+  // background refetch replaces them (#175). Doing it here covers every way a
+  // session ends at once: the Sair button, a 401 in `authFetch`, a 401 during
+  // hydration, the root's session-error card.
+  //
+  // No recursion to worry about: the refetch this kicks off in observers that
+  // are still mounted goes out *without* an Authorization header (the token is
+  // already gone), and `authFetch` only drops the session on a 401 that
+  // carried one — so that 401 does not come back through here.
+  queryClient.clear()
   setState({ status: 'anonymous', user: null, token: null, reason })
 }
 

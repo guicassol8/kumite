@@ -1,6 +1,8 @@
 import { somaDosPares } from '@kumite/blocks'
 import type { Page } from '@playwright/test'
 
+import { participantIdOf, workspaceStorageKey } from './support/editor-fixture'
+
 import {
   BACK_URL,
   closeRound,
@@ -87,13 +89,22 @@ test.describe('problem screen (#7)', () => {
     })
   }
 
-  /** The workspace the screen restores on mount, keyed by the real problem id. */
-  async function seedWorkspace(page: Page, problemId: string): Promise<void> {
-    await page.addInitScript(
+  /**
+   * The workspace the screen restores on mount, under the key of the account
+   * that owns it — the participant who signed up on this page (#175).
+   *
+   * Written straight into the open page rather than through `addInitScript`:
+   * the owner only exists once the account does, and from there on the test
+   * never loads another document — every step is a client-side navigation, so
+   * an init script would never run again.
+   */
+  async function seedWorkspace(page: Page, problemId: string, token: string): Promise<void> {
+    const userId = await participantIdOf(token)
+    await page.evaluate(
       ([key, state]) => {
         window.localStorage.setItem(key as string, state as string)
       },
-      [`kumite:workspace:${problemId}`, JSON.stringify(somaDosPares)],
+      [workspaceStorageKey(userId, problemId), JSON.stringify(somaDosPares)],
     )
   }
 
@@ -108,12 +119,12 @@ test.describe('problem screen (#7)', () => {
       durationMinutes: 30,
       problemIds: [problemId],
     })
-    await seedWorkspace(page, problemId)
-
     // 01 — sign up, create a team, then open the round live while the home
     // screen is up (same live-round proof as round-screen.spec.ts).
     await signupThroughUi(page, participantEmail)
-    await apiCreateTeam(await participantToken(page))
+    const token = await participantToken(page)
+    await apiCreateTeam(token)
+    await seedWorkspace(page, problemId, token)
     await roundSlot.open(auth, roundId)
     await expect(page.getByTestId('home-round-card')).toContainText(roundName, {
       timeout: 15_000,

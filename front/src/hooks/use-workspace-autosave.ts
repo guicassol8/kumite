@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 import type { WorkspaceState } from '@/components/blockly/blockly-workspace'
+import { useSession } from '@/hooks/use-session'
 import {
   clearWorkspaceState,
   loadWorkspaceState,
@@ -9,8 +10,8 @@ import {
 
 const DEBOUNCE_MS = 500
 
-type Snapshot = { problemId: string; state: WorkspaceState | undefined }
-type Pending = { problemId: string; state: WorkspaceState }
+type Snapshot = { userId: string | undefined; problemId: string; state: WorkspaceState | undefined }
+type Pending = { userId: string | undefined; problemId: string; state: WorkspaceState }
 
 /**
  * Debounced per-problem persistence for the block editor, plus the state a
@@ -25,12 +26,23 @@ type Pending = { problemId: string; state: WorkspaceState }
  * storage.
  */
 export function useWorkspaceAutoSave(problemId: string) {
+  // Everything below is scoped to whoever is signed in (#175) — the snapshot
+  // kept in memory as much as the key in localStorage. Without the user in
+  // `savedRef`'s identity, switching accounts in a tab that never unmounts the
+  // editor would seed the next one's canvas from the previous one's blocks.
+  const { user } = useSession()
+  const userId = user?.id
+
   // Re-read during render rather than in an effect: the remount that consumes
   // `initialState` happens in the very same commit as the id change, so an
   // effect would run too late and seed the new editor with the old problem.
   const savedRef = useRef<Snapshot | null>(null)
-  if (savedRef.current === null || savedRef.current.problemId !== problemId) {
-    savedRef.current = { problemId, state: loadWorkspaceState(problemId) }
+  if (
+    savedRef.current === null ||
+    savedRef.current.problemId !== problemId ||
+    savedRef.current.userId !== userId
+  ) {
+    savedRef.current = { userId, problemId, state: loadWorkspaceState(userId, problemId) }
   }
   const initialState = savedRef.current.state
 
@@ -46,17 +58,17 @@ export function useWorkspaceAutoSave(problemId: string) {
     const pending = pendingRef.current
     if (!pending) return
     pendingRef.current = null
-    saveWorkspaceState(pending.problemId, pending.state)
+    saveWorkspaceState(pending.userId, pending.problemId, pending.state)
   }, [])
 
   const handleChange = useCallback(
     (state: WorkspaceState) => {
-      savedRef.current = { problemId, state }
-      pendingRef.current = { problemId, state }
+      savedRef.current = { userId, problemId, state }
+      pendingRef.current = { userId, problemId, state }
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       timeoutRef.current = setTimeout(flush, DEBOUNCE_MS)
     },
-    [problemId, flush],
+    [userId, problemId, flush],
   )
 
   // Runs on unmount and on every id change: leaving the screen mid-debounce
@@ -69,9 +81,9 @@ export function useWorkspaceAutoSave(problemId: string) {
     pendingRef.current = null
     // Also forgets the live state, or a remount right after "Limpar blocos"
     // would put the cleared blocks straight back on the canvas.
-    savedRef.current = { problemId, state: undefined }
-    clearWorkspaceState(problemId)
-  }, [problemId])
+    savedRef.current = { userId, problemId, state: undefined }
+    clearWorkspaceState(userId, problemId)
+  }, [userId, problemId])
 
   return { initialState, handleChange, clearSaved }
 }

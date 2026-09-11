@@ -139,6 +139,23 @@ In practice the forced-change block already delivers the effect: the old token
 stays valid but every route it can reach answers 403, so the only thing it can
 still do is change the password.
 
+Still true after #174, which fixed the neighbouring case — deactivating an
+account did nothing to sessions already issued. No revocation list was
+invented there either: the `resolve` of `requireUser` already loaded the
+user's row on every request, so it simply stopped accepting one with
+`active: false`, and the 401 lands before any handler.
+
+The two blocks are deliberately asymmetric. `mustChangePassword` answers 403
+and leaves two doors open (`GET /me`, `POST /auth/change-password`) because
+that state must be escapable — the account is legitimate, it just holds a
+password an organizer dictated out loud. `active: false` answers 401 and drops
+the session whole: a banned account gets no escape hatch, which is the point
+of the ban. That also means a deactivated participant who was handed a
+temporary password still cannot use it — the 401 of the `resolve` arrives
+before the 403 of `password_change_required`. Organizer resets targeting a
+deactivated participant remain valid, since the caller authenticating there is
+the organizer, who is active.
+
 ## Consequences
 
 ### Positive

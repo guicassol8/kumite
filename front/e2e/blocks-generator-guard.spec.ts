@@ -6,6 +6,7 @@ import {
   hasOrganizerCredentials,
   seedEditorFixture,
   seedParticipantToken,
+  workspaceStorageKey,
 } from './support/editor-fixture'
 
 // Visual evidence for #181: a workspace the generator now refuses reaches the
@@ -23,10 +24,12 @@ test.describe('generator guards (#181)', () => {
 
   let problemId: string
   let participantToken: string
+  let participantId: string
 
   test.beforeAll(async () => {
     test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
-    ;({ problemId, participantToken } = await seedEditorFixture('Blocks Generator Guard'))
+    ;({ problemId, participantToken, participantId } =
+      await seedEditorFixture('Blocks Generator Guard'))
   })
 
   test.beforeEach(async ({ page }) => {
@@ -38,7 +41,7 @@ test.describe('generator guards (#181)', () => {
       ([key, saved]) => {
         window.localStorage.setItem(key as string, saved as string)
       },
-      [`kumite:workspace:${problemId}`, JSON.stringify(raizDesabilitada)],
+      [workspaceStorageKey(participantId, problemId), JSON.stringify(raizDesabilitada)],
     )
 
     await page.goto(`/problem/${problemId}`)

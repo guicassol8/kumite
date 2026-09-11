@@ -4,6 +4,7 @@ import {
   BACK_URL,
   closeRound,
   createRound,
+  E2E_PARTICIPANT_NAME,
   ORGANIZER_EMAIL,
   ORGANIZER_PASSWORD,
   openRoundWithRetry,
@@ -47,17 +48,17 @@ export type EditorFixture = {
   problemId: string
   participantToken: string
   /**
-   * The address behind `participantToken`. A spec that logs this same account
-   * back in through the UI needs it, and re-deriving it from the label would
-   * miss the `Date.now()` the signup actually used.
+   * The id behind `participantToken`. A spec that seeds a saved workspace by
+   * hand needs it: the storage key carries the owner since #175.
    */
-  participantEmail: string
+  participantId: string
 }
 
 export type SeededParticipant = {
   email: string
   password: string
   token: string
+  id: string
 }
 
 /**
@@ -125,9 +126,9 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
   await openRoundWithRetry(auth, roundId)
   await closeRound(auth, roundId)
 
-  const { email: participantEmail, token: participantToken } = await seedParticipant(label)
+  const { token: participantToken, id: participantId } = await seedParticipant(label)
 
-  return { problemId, participantToken, participantEmail }
+  return { problemId, participantToken, participantId }
 }
 
 /**
@@ -139,8 +140,15 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
  * The address carries `Date.now()` and a random suffix: two calls in the same
  * millisecond would otherwise collide on the unique email, and the second
  * signup would quietly answer with the first account.
+ *
+ * `name` is what the header renders. It defaults to the shared label, and a
+ * spec that puts two accounts on screen passes its own so the screenshots say
+ * which one is looking (#175).
  */
-export async function seedParticipant(label: string): Promise<SeededParticipant> {
+export async function seedParticipant(
+  label: string,
+  name = E2E_PARTICIPANT_NAME,
+): Promise<SeededParticipant> {
   const slug = label
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -151,7 +159,7 @@ export async function seedParticipant(label: string): Promise<SeededParticipant>
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      name: 'E2E Participante',
+      name,
       email,
       password: PARTICIPANT_PASSWORD,
       code: 'PUCRS2026',
@@ -167,7 +175,25 @@ export async function seedParticipant(label: string): Promise<SeededParticipant>
     throw new Error(`could not log the seeded participant in (HTTP ${login.status})`)
   }
 
-  return { email, password: PARTICIPANT_PASSWORD, token }
+  return { email, password: PARTICIPANT_PASSWORD, token, id: await participantIdOf(token) }
+}
+
+/** Who a participant token belongs to, straight from the API. */
+export async function participantIdOf(token: string): Promise<string> {
+  const res = await fetch(`${BACK_URL}/me`, { headers: { Authorization: `Bearer ${token}` } })
+  const { id } = (await res.json()) as { id?: string }
+  if (!id) throw new Error(`could not read the participant id (HTTP ${res.status})`)
+  return id
+}
+
+/**
+ * Where the editor keeps a participant's saved workspace. Mirrors
+ * `src/lib/workspace-storage.ts`: the key carries the owner since #175, and a
+ * spec that seeds one by hand under the old problem-only name would be writing
+ * where nothing reads — the bootstrap sweep deletes those on sight.
+ */
+export function workspaceStorageKey(userId: string, problemId: string): string {
+  return `kumite:workspace:${userId}:${problemId}`
 }
 
 /** Signs the page in via the stored token instead of walking the login UI. */

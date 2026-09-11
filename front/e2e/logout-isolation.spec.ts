@@ -36,22 +36,30 @@ test.describe('what survives a logout in the same browser (#175)', () => {
 
   test.beforeAll(async () => {
     test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
-    ;({ problemId, participantEmail: alunoUmEmail } = await seedEditorFixture('Logout Isolation'))
-    ;({ email: alunoDoisEmail } = await seedParticipant('Logout Isolation Aluno 2'))
+    ;({ problemId } = await seedEditorFixture('Logout Isolation'))
+    // Both accounts are seeded here rather than reusing the fixture's own, so
+    // each carries a display name of its own: the header is what tells a
+    // reviewer which of the two is looking at the screenshot.
+    ;({ email: alunoUmEmail } = await seedParticipant('Logout Isolation Aluno 1', 'Aluno 1'))
+    ;({ email: alunoDoisEmail } = await seedParticipant('Logout Isolation Aluno 2', 'Aluno 2'))
   })
 
-  /** Fills the login form already on screen and waits for the app to come back. */
-  async function submitLogin(page: Page, email: string): Promise<void> {
+  /**
+   * Fills the login form already on screen and waits for the app to come back
+   * with *this* account on the header — which is also what pins the identity
+   * in the evidence screenshots.
+   */
+  async function submitLogin(page: Page, email: string, name: string): Promise<void> {
     await page.getByTestId('login-email-input').fill(email)
     await page.getByTestId('login-password-input').fill(PARTICIPANT_PASSWORD)
     await page.getByTestId('login-submit-button').click()
-    await expect(page.getByTestId('header-user-email')).toBeVisible()
+    await expect(page.getByTestId('header-user-email')).toHaveText(name)
   }
 
   /** Reaches /login with a full document load. */
-  async function loginFromCold(page: Page, email: string): Promise<void> {
+  async function loginFromCold(page: Page, email: string, name: string): Promise<void> {
     await page.goto('/login')
-    await submitLogin(page, email)
+    await submitLogin(page, email, name)
   }
 
   /**
@@ -61,9 +69,9 @@ test.describe('what survives a logout in the same browser (#175)', () => {
    * under test. Reaching the form through the header link keeps the same JS
    * context alive, which is what a real user clicking "Entrar" does too.
    */
-  async function loginWithoutReload(page: Page, email: string): Promise<void> {
+  async function loginWithoutReload(page: Page, email: string, name: string): Promise<void> {
     await page.getByTestId('header-login-link').click()
-    await submitLogin(page, email)
+    await submitLogin(page, email, name)
   }
 
   async function logoutThroughUi(page: Page): Promise<void> {
@@ -78,7 +86,7 @@ test.describe('what survives a logout in the same browser (#175)', () => {
     const host = page.getByTestId('blockly-workspace')
 
     // Aluno 1 builds something and lets the debounced auto-save land.
-    await loginFromCold(page, alunoUmEmail)
+    await loginFromCold(page, alunoUmEmail, 'Aluno 1')
     await page.goto(`/problem/${problemId}`)
     await dragBlockFromFlyout(page, 'Matemática')
     await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(2)
@@ -89,7 +97,7 @@ test.describe('what survives a logout in the same browser (#175)', () => {
 
     // Aluno 2 takes the same browser and opens the same problem. The only
     // block on the canvas must be the root one `withRootBlock` seeds.
-    await loginWithoutReload(page, alunoDoisEmail)
+    await loginWithoutReload(page, alunoDoisEmail, 'Aluno 2')
     await page.goto(`/problem/${problemId}`)
     // Injecting Blockly a second time in the same run can outlast the 30s
     // `expect` default on a cold dev server (its module graph is transformed
@@ -105,7 +113,7 @@ test.describe('what survives a logout in the same browser (#175)', () => {
 
     // Aluno 1 creates a distinctive team, which warms the `['teams']` cache
     // entry with a payload carrying his own `myTeamId`.
-    await loginFromCold(page, alunoUmEmail)
+    await loginFromCold(page, alunoUmEmail, 'Aluno 1')
     await page.getByTestId('header-teams-link').click()
     await createTeamThroughUi(page, teamName)
     await expect(page.getByTestId('my-team-name')).toContainText(teamName)
@@ -126,7 +134,7 @@ test.describe('what survives a logout in the same browser (#175)', () => {
 
     // From here to the assertion there is no document load on purpose — see
     // `loginWithoutReload`.
-    await loginWithoutReload(page, alunoDoisEmail)
+    await loginWithoutReload(page, alunoDoisEmail, 'Aluno 2')
     await page.getByTestId('header-teams-link').click()
 
     await expect(page.getByTestId('teams-loading')).toBeVisible()

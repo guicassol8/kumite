@@ -6,6 +6,7 @@ import {
   hasOrganizerCredentials,
   seedEditorFixture,
   seedParticipantToken,
+  workspaceStorageKey,
 } from './support/editor-fixture'
 
 // Visual walkthrough for #5, one screenshot per acceptance criterion.
@@ -105,10 +106,11 @@ test.describe('running examples locally (#5)', () => {
 
   let problemId: string
   let participantToken: string
+  let participantId: string
 
   test.beforeAll(async () => {
     test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
-    ;({ problemId, participantToken } = await seedEditorFixture('Run Examples'))
+    ;({ problemId, participantToken, participantId } = await seedEditorFixture('Run Examples'))
   })
 
   test.beforeEach(async ({ page }) => {
@@ -121,7 +123,7 @@ test.describe('running examples locally (#5)', () => {
       ([key, saved]) => {
         window.localStorage.setItem(key as string, saved as string)
       },
-      [`kumite:workspace:${problemId}`, JSON.stringify(state)],
+      [workspaceStorageKey(participantId, problemId), JSON.stringify(state)],
     )
   }
 

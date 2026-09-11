@@ -27,6 +27,13 @@ export type BlockMessages = {
   errorDuplicateRoot: string
   /** Carries `{type}`, replaced with the offending block type. */
   errorBlockNotAllowed: string
+  /** No `{type}`: the participant sees the greyed-out block on screen, and
+   * `kumite_solve` is an internal identifier they have never been shown. */
+  errorDisabledBlock: string
+  /** Last-resort refusal: the generator returned something that is not a
+   * solution. Deliberately vague — there is no participant action that maps to
+   * it, and by construction nobody should ever see it. */
+  errorInvalidGeneratedCode: string
 }
 
 export const messages: Record<BlockLocale, BlockMessages> = {
@@ -47,6 +54,9 @@ export const messages: Record<BlockLocale, BlockMessages> = {
     errorMissingRoot: 'A solução precisa do bloco "resolver".',
     errorDuplicateRoot: 'A solução só pode ter um bloco "resolver".',
     errorBlockNotAllowed: 'O bloco "{type}" não é permitido nesta solução.',
+    errorDisabledBlock: 'Há um bloco desabilitado na sua solução. Reative-o para continuar.',
+    errorInvalidGeneratedCode:
+      'A sua solução não pôde ser gerada. Revise os blocos e tente de novo.',
   },
   es: {
     solveTitle: 'resolver',
@@ -66,6 +76,9 @@ export const messages: Record<BlockLocale, BlockMessages> = {
     errorMissingRoot: 'La solución necesita el bloque "resolver".',
     errorDuplicateRoot: 'La solución solo puede tener un bloque "resolver".',
     errorBlockNotAllowed: 'El bloque "{type}" no está permitido en esta solución.',
+    errorDisabledBlock: 'Hay un bloque deshabilitado en tu solución. Reactivalo para continuar.',
+    errorInvalidGeneratedCode:
+      'Tu solución no se pudo generar. Revisá los bloques e intentalo de nuevo.',
   },
   en: {
     solveTitle: 'solve',
@@ -84,6 +97,9 @@ export const messages: Record<BlockLocale, BlockMessages> = {
     errorMissingRoot: 'The solution needs the "solve" block.',
     errorDuplicateRoot: 'The solution can only have one "solve" block.',
     errorBlockNotAllowed: 'The "{type}" block is not allowed in this solution.',
+    errorDisabledBlock: 'There is a disabled block in your solution. Re-enable it to continue.',
+    errorInvalidGeneratedCode:
+      'Your solution could not be generated. Check the blocks and try again.',
   },
 }
 

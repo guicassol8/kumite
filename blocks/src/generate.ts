@@ -2,9 +2,72 @@ import * as Blockly from 'blockly'
 import { javascriptGenerator } from 'blockly/javascript'
 
 import { defineKumiteBlocks, ROOT_BLOCK_TYPE } from './blocks'
+import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
 import { BlocksError } from './errors'
 import { type BlockLocale, DEFAULT_LOCALE, messagesFor } from './messages'
 import { allowedBlockTypes, type WorkspaceState } from './toolbox'
+
+/**
+ * The line terminators JS honours that are *not* `\n`. Blockly copies comment
+ * text verbatim into `// ...` lines, so any of these ends the comment and
+ * promotes the rest of the text to real code — the allowlist never sees it,
+ * because it only inspects `block.type` (#181, finding #14).
+ *
+ * `\n` is deliberately absent: Blockly's own `prefixLines` already splits on it
+ * and prefixes every resulting line with `// `, so a multi-line comment stays a
+ * comment.
+ */
+const COMMENT_LINE_TERMINATORS = new RegExp(`[${String.fromCharCode(0x0d, 0x2028, 0x2029)}]`, 'g')
+
+/**
+ * The exact line the root block's generator emits. Anchored to the start of a
+ * line, which is what makes the check worth anything: every comment is a
+ * `// ...` line by the time this runs, so no text a participant typed can
+ * satisfy it.
+ */
+const SOLVE_SIGNATURE = new RegExp(
+  `^function ${SOLUTION_FUNCTION_NAME}\\(${SOLUTION_PARAM_NAME}\\) \\{$`,
+  'm',
+)
+
+/**
+ * Rewrites every block comment so it cannot break out of its `// ` prefix.
+ * Neutralizing, not stripping: the participant keeps their comment, it just
+ * becomes one line.
+ *
+ * Mutates blocks of the throwaway workspace `generateSolution` builds and
+ * disposes, so nothing here reaches the participant's saved state.
+ */
+function neutralizeCommentTerminators(blocks: Blockly.Block[]): void {
+  for (const block of blocks) {
+    const text = block.getCommentText()
+    if (text === null) continue
+    const safe = text.replace(COMMENT_LINE_TERMINATORS, ' ')
+    if (safe !== text) block.setCommentText(safe)
+  }
+}
+
+/**
+ * Proves the emitted source is a *callable* `solve`, not just text that reads
+ * like one. The signature check above matches characters; this one asks the
+ * engine, which is the only thing that settles it.
+ *
+ * `new Function` compiles the body and stops there — nothing the participant
+ * wrote executes here, on the judge's process or in the editor. It is the
+ * cheap way to hold the line without an AST parser or a new dependency.
+ *
+ * The vector that made this necessary: Blockly's `quote_` escapes `\`, `\n`
+ * and `'`, but not U+000D, which JS honours as a line terminator. A text field
+ * carrying one emits `return 'a<CR>b';` — signature intact, `SyntaxError` on
+ * instantiation, every case back as a runtime error with no cause named.
+ */
+function assertParses(source: string, message: string): void {
+  try {
+    new Function(source)
+  } catch (cause) {
+    throw new BlocksError('invalid-generated-code', message, { cause })
+  }
+}
 
 /**
  * Turns a serialized workspace into the JS source of `solve(input)`.
@@ -51,13 +114,38 @@ export function generateSolution(
       }
     }
 
+    neutralizeCommentTerminators(blocks)
+
     const root = roots[0] as Blockly.Block
+
+    // A disabled block generates nothing at all, so the root being off used to
+    // come back as a successful `"\n\n\n"` — no `solve`, every case failing
+    // with `solve is not defined` and no hint why (#181, finding #15).
+    // `getDescendants` includes the root itself, so one call covers the root
+    // and everything hanging off it. Blocks loose on the canvas stay out of
+    // scope: Blockly disables some of them on its own, and `thisOnly` below
+    // already keeps them out of the generated source.
+    if (root.getDescendants(false).some((block) => !block.isEnabled())) {
+      throw new BlocksError('disabled-block', messages.errorDisabledBlock)
+    }
+
     javascriptGenerator.init(workspace)
     // `thisOnly` keeps generation anchored on the root: a stray top-level block
     // never leaks code into the solution.
     const generated = javascriptGenerator.blockToCode(root, true)
     const code = typeof generated === 'string' ? generated : generated[0]
-    return javascriptGenerator.finish(code)
+    const source = javascriptGenerator.finish(code)
+
+    // Last line of defence: a "successful" generation must actually define the
+    // function the contract promises. With the guard above in place this is
+    // unreachable through any known path — it exists for the next empty-success
+    // path nobody saw coming, so that it surfaces as a refusal instead of as
+    // `solve is not defined` on every case.
+    if (!SOLVE_SIGNATURE.test(source)) {
+      throw new BlocksError('invalid-generated-code', messages.errorInvalidGeneratedCode)
+    }
+    assertParses(source, messages.errorInvalidGeneratedCode)
+    return source
   } finally {
     workspace.dispose()
   }

@@ -11,12 +11,32 @@ export const ROOT_BLOCK_TYPE = 'kumite_solve'
 export const INPUT_BLOCK_TYPE = 'kumite_input'
 
 /**
+ * Guards the one part of `defineKumiteBlocks` that is not idempotent.
+ * `addReservedWords` is `RESERVED_WORDS_ += words + ','`: it appends
+ * unconditionally, and this function runs on every `generateSolution` call, so
+ * without this the list would grow by two entries per codegen for the life of
+ * the process — and `init()` re-splits the whole string every time.
+ */
+let reservedNamesRegistered = false
+
+/**
  * Registers the two kumite blocks and their JS generators. Idempotent by
  * construction — assigning into `Blockly.Blocks` re-registers instead of
  * throwing, so #57 can call it again with another locale to relabel.
  */
 export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
   const messages = messagesFor(locale)
+
+  // The generator already reserves every ECMAScript keyword and every name on
+  // `globalThis`, but not the two the solution contract owns. Without this, a
+  // participant variable named `input` *is* the `solve` parameter — same
+  // binding, no error, wrong answer (#181, finding #8). Derived from
+  // `contract.ts` so the day the contract changes this follows it. Registered
+  // once per process: only `init()` reads the list, and it reads all of it.
+  if (!reservedNamesRegistered) {
+    javascriptGenerator.addReservedWords(`${SOLUTION_FUNCTION_NAME},${SOLUTION_PARAM_NAME}`)
+    reservedNamesRegistered = true
+  }
 
   Blockly.Blocks[ROOT_BLOCK_TYPE] = {
     init(this: Blockly.Block) {

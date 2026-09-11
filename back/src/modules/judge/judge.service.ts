@@ -24,6 +24,8 @@ const CODEGEN_ERROR_CODES: Record<BlocksErrorCode, CodegenErrorCode> = {
   'missing-root': 'missing_root',
   'duplicate-root': 'duplicate_root',
   'block-not-allowed': 'block_not_allowed',
+  'disabled-block': 'disabled_block',
+  'invalid-generated-code': 'invalid_generated_code',
 }
 
 /**
@@ -31,8 +33,8 @@ const CODEGEN_ERROR_CODES: Record<BlocksErrorCode, CodegenErrorCode> = {
  * runs — the same `generateSolution` the editor calls, so editor and judge
  * can never disagree about what a set of blocks means.
  *
- * The four refusals come back as data for the route to map to a 400. Anything
- * else thrown is a genuine bug and propagates, becoming a 500 at kata's edge.
+ * The refusals come back as data for the route to map to a 400. Anything else
+ * thrown is a genuine bug and propagates, becoming a 500 at kata's edge.
  */
 export function generateJudgeSource(
   workspace: Workspace,

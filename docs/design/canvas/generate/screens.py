@@ -106,7 +106,7 @@ def login():
         '<div style="display: flex; flex-direction: column; gap: 6px;"><h1 class="h1" style="font-size: 40px;">Entrar</h1><span class="muted">Use o e-mail cadastrado com o código do evento.</span></div>'
         '<div style="display: flex; flex-direction: column; gap: 14px;">'
         '<div style="display: flex; flex-direction: column; gap: 6px;"><span class="label">E-mail</span><div class="input input-lg" style="color: var(--foreground);">ana.souza@edu.pucrs.br</div></div>'
-        f'<div style="display: flex; flex-direction: column; gap: 6px;"><span class="label">Senha</span><div class="input input-lg" style="justify-content: space-between; box-shadow: 0 0 0 3px var(--brand-soft); border-color: var(--brand);"><span style="letter-spacing: 0.2em;">••••••••••</span>{icon("eye", 16, "var(--muted)")}</div></div>'
+        f'<div style="display: flex; flex-direction: column; gap: 6px;"><span class="label">Senha</span><div class="input input-lg" style="justify-content: space-between; {FOCUS_RING}"><span style="letter-spacing: 0.2em;">••••••••••</span>{icon("eye", 16, "var(--muted)")}</div></div>'
         '</div>'
         '<span class="btn btn-primary btn-lg" style="width: 100%;">Entrar</span>'
         '<div style="display: flex; justify-content: space-between; font-size: 14px;"><a href="#" class="muted" style="text-decoration: underline; text-underline-offset: 3px;">Esqueci minha senha</a><span class="muted">Sem conta? <a href="#" style="color: var(--foreground); font-weight: 500;">Cadastrar</a></span></div>'

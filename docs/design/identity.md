@@ -1,8 +1,10 @@
 # kumite — identidade visual (v1, 2026-09-10)
 
-Fonte da verdade da marca e da interface do kumite (epic de implementação: #214). Decidida com o organizador
-em 2026-09-10 (sessão de design; canvas navegável em `canvas/`, ver
-`README.md`). Mudanças aqui passam por PR e ganham entrada no `CHANGELOG.md`.
+A spec da marca e da interface do kumite (epic de implementação: #214):
+manda no que as telas fazem e cita **tokens**; quem manda nos **valores** é
+`tokens/kumite.tokens.json`. Decidida com o organizador em 2026-09-10
+(sessão de design; canvas navegável em `canvas/`, ver `README.md`). Mudanças
+aqui passam por PR e ganham entrada no `CHANGELOG.md`.
 
 ## 1. Conceito — dojo moderno
 
@@ -31,57 +33,78 @@ disputa.
 - Tamanhos mínimos: 16 px (favicon), 24 px no header, 32 px em avatar.
 - Wordmark: **kumite**, sempre minúsculo, Barlow Condensed 600, tracking −1%,
   contornado em `logo/kumite-wordmark.svg` (não depende da fonte instalada).
-- Lockups: horizontal (símbolo 64 · vão 20 · wordmark 55 px) e empilhado.
-  Arquivos e regras de uso em `logo/README.md`.
+- Lockups: horizontal (símbolo 64 de altura · vão 20 · wordmark em **corpo**
+  55 px — é o `font-size`, não a largura; o lockup inteiro sai em 212,09 × 64)
+  e empilhado. Arquivos e regras de uso em `logo/README.md`.
+- Largura mínima do lockup horizontal: **96 px**. O header é a única exceção,
+  e é documentada: ali o símbolo vai em 24 px, o que dá um lockup de ≈ 80 px,
+  aceitável porque o contexto já nomeia o produto.
 - O símbolo em `logo/` é o vetor canônico. Os prompts em `logo-prompts.md`
   servem para explorar alternativas; um resultado melhor substitui o SVG
   mantendo a `viewBox 0 0 64 64`.
 
 ## 3. Paleta — vermelho faixa + carvão (variante A · Hinomaru)
 
-Vermilion quente, tinta sumi e papel levemente quente. Todos os valores em
-`tokens/kumite.tokens.json` (W3C DTCG) e `tokens/tokens.css` (CSS pronto para
-`front/src/index.css`).
+Vermilion quente, tinta sumi e papel levemente quente. Os valores vigentes
+estão em `tokens/kumite.tokens.json` — a fonte da verdade — e derivados à mão
+em `tokens/tokens.css`; as tabelas abaixo repetem o hex para leitura, e quem
+implementa cita **o token**, nunca o valor. `canvas/generate/check_tokens.py`
+confere os três arquivos.
 
 ### Modo claro
 
 | Token | Hex | oklch | Uso |
 |---|---|---|---|
-| background (papel) | `#FCFAF7` | 0.985 0.004 75 | fundo das telas |
-| background-2 (papel 2) | `#F2F0EC` | 0.955 0.006 75 | superfícies mudas, grade do editor |
-| card | `#FFFFFF` | 1 0 0 | cards, inputs, tabelas |
-| border | `#E1DDDA` | 0.90 0.006 60 | hairlines de 1 px |
-| muted-foreground | `#69615D` | 0.50 0.012 50 | texto secundário |
-| foreground (tinta) | `#1C1716` | 0.21 0.008 40 | texto, botão primário, chrome |
+| background (papel) | `#FCFAF7` | 0.986 0.005 78 | fundo das telas |
+| background-2 (papel 2) | `#F2F0EC` | 0.956 0.006 85 | superfícies mudas, grade do editor |
+| card | `#FFFFFF` | 1 0 90 | cards, inputs, tabelas |
+| muted | `#F2F0EC` | = papel 2 | hover de linha, linha selecionada, botão fantasma e secundário |
+| border / input | `#E1DDDA` | 0.9 0.006 60 | hairlines de 1 px, borda de controle |
+| muted-foreground | `#69615D` | 0.5 0.012 48 | texto secundário |
+| foreground (tinta) | `#1C1716` | 0.21 0.008 31 | texto, botão primário, chrome |
 | brand (vermelho faixa) | `#DD2824` | 0.58 0.215 28 | preenchimento: Submeter, Abrir rodada, badge "Seu time", símbolo |
-| brand-text | `#DD2824` | = brand | texto: ao vivo, timer, #1 |
+| brand-text | `#DD2824` | = brand | texto vermelho sobre papel/cartão: #1, × do pôster |
+| brand-on-chrome | `#F45246` | 0.66 0.2 28 | texto vermelho **sobre o chrome**: ao vivo, contagem regressiva |
+| ring | `#DD2824` | = brand | anel de foco (borda 1 px + halo `ring/50`) |
 | brand-hover | `#CE2320` | 0.55 0.205 28 | hover/pressed |
-| brand-soft | `#FBE5E1` | 0.95 0.025 28 | linha do seu time, anel de foco |
-| destructive (crimson) | `#C1133A` | 0.52 0.200 18 | erro e ação destrutiva — só contorno e texto |
-| success | `#008433` | 0.53 0.160 150 | caso passou, publicado |
-| warning | `#ECAA0B` | 0.78 0.160 80 | só ícone, borda e preenchimento — nunca texto |
-| warning-text | `#A06700` | 0.56 0.130 75 | "Médio", avisos em texto |
+| brand-soft | `#FBE5E1` | 0.94 0.0248 30 | fundo da linha do seu time e halo — nunca o indicador de foco |
+| destructive (crimson) | `#C1133A` | 0.52 0.2 18 | erro e ação destrutiva — só contorno e texto |
+| success | `#008433` | 0.535 0.155 148 | caso passou, publicado |
+| warning | `#ECAA0B` | 0.78 0.16 80 | só preenchimento e borda decorativa — nunca texto nem ícone sozinho |
+| warning-text | `#A06700` | 0.562 0.121 72 | "Médio", avisos em texto, ícone de aviso isolado |
 | chrome | `#1C1716` | = tinta | header e rodapé |
-| chrome-foreground | `#F3F1EF` | 0.96 0.004 75 | texto do chrome |
-| chrome-muted | `#9D9792` | 0.68 0.010 60 | texto secundário do chrome |
-| chrome-border | `#312D2C` | 0.30 0.006 40 | bordas dentro do chrome |
+| chrome-foreground | `#F3F1EF` | 0.96 0.0034 68 | texto do chrome |
+| chrome-muted | `#9D9792` | 0.68 0.01 63 | texto secundário do chrome |
+| chrome-border | `#312D2C` | 0.3 0.006 34 | bordas dentro do chrome |
 
 ### Modo escuro (`.dark`)
 
-| Token | Hex | Uso |
-|---|---|---|
-| background | `#120F0D` | fundo |
-| card / background-2 | `#1B1716` | cards, inputs, grade do editor |
-| border | `#312D2C` | hairlines |
-| muted-foreground | `#9D9792` | texto secundário |
-| foreground | `#F3F1EF` | texto; botão primário vira papel com texto tinta |
-| brand | `#DD2824` | preenchimentos (mesmo do claro) |
-| brand-text | `#F45246` | texto, timer, ao vivo sobre o fundo escuro |
-| brand-soft | `#3A1A18` | linha do seu time |
-| destructive | `#E8496A` | erro |
-| success | `#3DBA6A` | ok |
-| warning / warning-text | `#F5C044` | aviso (no escuro passa como texto) |
-| chrome | `#0E0C0B` | header e rodapé, um passo mais escuro que o fundo |
+| Token | Hex | oklch | Uso |
+|---|---|---|---|
+| background | `#120F0D` | 0.17 0.007 56 | fundo |
+| card / background-2 | `#1B1716` | 0.21 0.007 34 | cards, inputs, grade do editor |
+| muted / secondary / accent | `#282322` | 0.26 0.008 31 | superfície de estado: hover de linha, linha selecionada, botão fantasma e secundário |
+| border / input | `#312D2C` | 0.3 0.006 34 | hairlines, borda de controle |
+| muted-foreground | `#9D9792` | 0.68 0.01 63 | texto secundário |
+| foreground | `#F3F1EF` | 0.96 0.0034 68 | texto; botão primário vira papel com texto tinta |
+| brand | `#DD2824` | 0.58 0.215 28 | preenchimentos (mesmo do claro) |
+| brand-text | `#F45246` | 0.66 0.2 28 | texto vermelho sobre o fundo escuro |
+| brand-on-chrome | `#F45246` | = brand-text | ao vivo e contagem sobre o chrome (mesmo token nos dois modos) |
+| ring | `#DD2824` | = brand | anel de foco |
+| brand-soft | `#3A1A18` | 0.263 0.051 25 | fundo da linha do seu time |
+| destructive | `#EF5C7B` | 0.673 0.182 10.6 | erro — claro o bastante para a variante `/90` do alerta passar AA |
+| success | `#3DBA6A` | 0.7 0.1596 151.57 | ok |
+| warning / warning-text | `#F5C044` | 0.834 0.148 85 | aviso (no escuro passa como texto) |
+| chrome | `#0E0C0B` | 0.156 0.004 48 | header e rodapé, um passo mais escuro que o fundo |
+
+**Hex é o valor; o oklch é anotação.** `tokens.css` declara hex porque um
+`oklch()` fora do gamut sRGB só chega naquela cor por clipagem do navegador —
+em tela P3 ele não clipa, e a cor passa a divergir do hex gêmeo usado nos
+SVGs do logo e nos `--block-*`. Quatro tokens **encostam na superfície do
+gamut** (algum canal em `00`/`FF`, isto é, sem folga de croma nenhuma):
+`success` `#008433`, `warning-text` `#A06700` e os blocos `text` `#008282` e
+`variables` `#A76700`. Aumentar o croma de qualquer um deles sai do gamut;
+mexer neles é mexer no hex, nunca no oklch.
 
 ### Regras do vermelho
 
@@ -92,10 +115,20 @@ Vermilion quente, tinta sumi e papel levemente quente. Todos os valores em
 2. **Um botão vermelho por tela**, o da ação competitiva (Submeter, Abrir
    rodada, Publicar, Ver rodada). O botão primário comum é tinta.
 3. Vermelho como texto só em: chip "ao vivo", contagem regressiva, numeral do
-   #1, o × de "PUCRS × Mérida". No escuro, texto usa `brand-text` (#F45246).
-4. Âmbar nunca é texto no claro (1,95:1). Para texto, `warning-text`.
+   #1, o × de "PUCRS × Mérida". **O fundo decide o token**: sobre papel ou
+   cartão é `brand-text` (no escuro ele já é mais claro); sobre o **chrome**,
+   que é carvão nos dois modos, é `brand-on-chrome` — também nos dois modos.
+   O `brand-text` do claro sobre o chrome dá 3,72:1 e reprova, e é exatamente
+   ali que ficam o chip "ao vivo" e a contagem regressiva do header.
+4. Âmbar vivo nunca é texto (2,0:1 sobre papel) **nem ícone sozinho**: serve
+   de preenchimento e borda. Texto e ícone que carregam a informação sem
+   companhia usam `warning-text`.
 
 ### Contraste (WCAG 2.x, calculado)
+
+Recalculada par a par por `canvas/generate/check_tokens.py` a partir dos
+tokens: a checagem 4 falha se uma linha aqui divergir do que os valores
+rendem. `/90` é a opacidade que o shadcn aplica na descrição do `Alert`.
 
 | Par | Razão | Nível |
 |---|---|---|
@@ -103,18 +136,35 @@ Vermilion quente, tinta sumi e papel levemente quente. Todos os valores em
 | cinza texto sobre papel / cartão | 5,8 / 6,1 | AA |
 | branco sobre vermelho faixa (botão) | 4,8 | AA |
 | vermelho faixa como texto sobre papel | 4,6 | AA |
-| crimson sobre papel | 5,9 | AA |
-| verde sobre papel | 4,6 | AA |
-| âmbar-texto sobre papel | 4,6 | AA (âmbar vivo: 1,95, só ícone) |
-| tinta sobre vermelho-suave | 14,7 | AAA |
-| chrome-muted sobre chrome | 6,2 | AA |
-| escuro: papel-texto sobre fundo | 17,0 | AAA |
-| escuro: brand-text sobre fundo | 5,6 | AA |
-| escuro: crimson / verde / âmbar sobre fundo | 5,1 / 7,7 / 11,4 | AA / AAA / AAA |
-| texto branco sobre cada bloco do editor | 4,6–5,2 | AA |
+| dificuldade no claro: verde / âmbar-texto / crimson sobre cartão | 4,8 / 4,7 / 6,1 | AA |
+| crimson sobre papel — cheio / `/90` | 5,9 / 5,2 | AA |
+| âmbar vivo sobre papel — preenchimento e borda, nunca ícone sozinho | 2,0 | decorativo |
+| tinta sobre vermelho-suave (fundo de linha) | 14,7 | AAA |
+| anel de foco (`ring`) sobre papel / cartão | 4,6 / 4,8 | AA |
+| anel de foco (`ring`) sobre cartão escuro / superfície de estado | 3,7 / 3,3 | AA |
+| `brand-on-chrome` sobre chrome claro / escuro | 5,2 / 5,7 | AA |
+| chrome-muted sobre chrome | 6,1 | AA |
+| escuro: papel-texto sobre fundo / cartão | 16,9 / 15,8 | AAA |
+| escuro: brand-text sobre fundo / cartão | 5,6 / 5,2 | AA |
+| escuro: papel-texto sobre vermelho-suave (fundo de linha) | 13,9 | AAA |
+| escuro: destructive sobre cartão — cheio / `/90` | 5,5 / 4,7 | AA |
+| escuro: dificuldade verde / âmbar / crimson sobre cartão | 7,1 / 10,6 / 5,5 | AA |
+| escuro: texto / texto secundário sobre a superfície de estado | 13,8 / 5,4 | AA |
+| escuro: cartão ↔ superfície de estado (degrau de hover/seleção) | 1,1 | decorativo |
+| hairline sobre papel / cartão / cartão escuro | 1,3 / 1,3 / 1,3 | decorativo |
+| borda de controle de formulário sobre papel / cartão escuro | 1,3 / 1,3 | decorativo |
+| texto branco sobre cada bloco do editor (menor / maior) | 4,6 – 5,2 | AA |
 | texto papel sobre o bloco resolver | 13,4 | AAA |
 
-Bordas e ícones decorativos precisam de 3:1 e passam em todos os pares acima.
+**O que "decorativo" quer dizer aqui.** As hairlines de 1 px e o degrau de
+superfície do escuro ficam perto de 1,3:1 e **não chegam a 3:1** — por isso
+nunca são a única pista de nada. O que o kumite exige em 3:1 é o **indicador
+de foco** e todo **ícone que carrega uma informação sozinho**, e esses dois
+estão na tabela acima (`ring`, `warning-text`). Um campo de formulário é
+identificado pelo rótulo e pelo preenchimento, com a borda como reforço; e no
+escuro **o estado de uma linha se lê pelo degrau `card` → `muted` mais o
+hairline**, nunca só pelo fundo — se um estado precisar existir sem esses
+dois, ele ganha texto, ícone ou marca de seleção.
 
 ### Alternativas descartadas (registro)
 
@@ -131,7 +181,8 @@ no front devem ser servidas do bundle (`@fontsource/*`), nunca por
 
 | Papel | Fonte | Peso | Tamanho / entrelinha | Uso |
 |---|---|---|---|---|
-| Display · telão | Barlow Condensed | 800 | 84 / 76, caixa-alta, tracking +1% | título do telão, contagem regressiva |
+| Título do telão | Barlow Condensed | 800 | 84 / 76, caixa-alta, tracking +1% | título do telão |
+| Contagem do telão | Barlow Condensed | 800 | 96 / 88, tabular | contagem regressiva do telão |
 | H1 · página | Barlow Condensed | 700 | 36 / 36, caixa-alta, tracking +1% | "PLACAR", "TIMES", "ÁREA DO ORGANIZADOR" |
 | Stat | Barlow Condensed | 700 | 44 / 44, tabular | números da visão geral, timer |
 | H2 · card, problema | Barlow Condensed | 600 | 24 / 26 | título de card, nome do problema |
@@ -152,11 +203,20 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   lockup à esquerda, navegação, chip da rodada ao vivo (nome + timer),
   usuário, Sair em contorno claro, idioma como controle segmentado, botão de
   tema. No celular: lockup + idioma + menu.
-- **Modo de cor**: claro por padrão; escuro completo (`.dark`), escolhido pelo
-  usuário ou pelo sistema (`prefers-color-scheme`), persistido em
-  `localStorage`. O telão força escuro.
-- **Raio 6 px** em controles, 8 px em cards, pílula em badges. Hairlines de
-  1 px, sem sombra além do anel de foco (`brand-soft`, 3 px).
+- **Modo de cor**: claro por padrão; escuro completo (`.dark`) por **escolha
+  do usuário**, persistida em `localStorage`. Seguir `prefers-color-scheme`
+  quando o usuário ainda não escolheu é trabalho da #234 — até lá, o padrão é
+  claro para todo mundo. O telão força escuro.
+- **Foco**: borda de 1 px em `ring` mais um halo de 3 px em `ring/50` — é o
+  que os primitivos do shadcn já fazem
+  (`focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50`).
+  `ring` é o único token do indicador de foco; `brand-soft` é fundo de linha e
+  halo, **nunca** o indicador (daria 1,2:1 sobre o cartão).
+- **Raio 6 px** em controles, 8 px em cards, pílula em badges. `tokens.css`
+  declara a escala inteira (`--radius-sm/md/lg/xl`) em valores absolutos em
+  vez de derivá-la de `--radius`: o `calc()` do shadcn entregaria 4 px em
+  controle e 10 px em card, o oposto disto. Hairlines de 1 px, sem sombra
+  além do anel de foco.
 - **Controles**: 36 px de altura; 44 px em telas de toque e formulários de
   autenticação. Botões: primário (tinta), marca (vermelho, um por tela),
   contorno, fantasma, destrutivo (contorno crimson).
@@ -171,12 +231,15 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   sem scroll horizontal em nenhuma largura (colunas comprimem; abaixo do
   breakpoint estreito, cards).
 - **Ao vivo**: ponto vermelho + texto em eyebrow vermelho; timer em Barlow
-  Condensed 600; nos últimos 5 min o timer fica em `brand-text`.
+  Condensed 600. No header, que é carvão nos dois modos, o chip e a contagem
+  usam `brand-on-chrome`; sobre papel ou cartão, `brand-text`. Nos últimos
+  5 min o timer só muda de peso, não de token.
 - **Ícones**: traço de 2 px em grade 24 (estilo Lucide, já usado pelo shadcn).
   Sem emoji.
 - **Telão** (placar): tela cheia, tema escuro forçado, sem header/rodapé,
-  título 84 px, contagem 96 px em `brand-text`, linhas ≥ 28 px, legenda A/B/C
-  no rodapé, `Esc` sai.
+  **título do telão** 84 px e **contagem do telão** 96 px em `brand-text`
+  (os dois papéis da tabela de tipografia, pelos mesmos nomes), linhas
+  ≥ 28 px, legenda A/B/C no rodapé, `Esc` sai.
 
 ## 6. Editor Blockly (`@kumite/blocks`)
 

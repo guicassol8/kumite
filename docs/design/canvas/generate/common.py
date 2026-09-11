@@ -1,31 +1,47 @@
 # Shared tokens, CSS, icons and component helpers for the kumite identity canvas.
 
+from check_tokens import contrast
+
 FONTS = ("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800"
          "&family=Barlow:wght@400;500;600&family=Inter:wght@400;500;600"
          "&family=JetBrains+Mono:wght@400;500&display=swap")
 
 # Variante A "Hinomaru" — vermilion + tinta + papel quente (recomendada)
 LIGHT = dict(
-    background="#FCFAF7", background2="#F2F0EC", card="#FFFFFF",
+    background="#FCFAF7", background2="#F2F0EC", card="#FFFFFF", surface="#F2F0EC",
     foreground="#1C1716", foreground2="#2A2523", muted="#69615D", border="#E1DDDA",
     primary="#1C1716", primary_fg="#FCFAF7",
-    brand="#DD2824", brand_text="#DD2824", brand_hover="#CE2320", brand_soft="#FBE5E1", brand_fg="#FFFFFF",
+    brand="#DD2824", brand_text="#DD2824", brand_on_chrome="#F45246", brand_hover="#CE2320",
+    brand_soft="#FBE5E1", brand_fg="#FFFFFF", ring="#DD2824",
     destructive="#C1133A", destructive_soft="#FBE7EC", success="#008433", success_soft="#E3F5EA",
     warning="#ECAA0B", warning_text="#A06700", warning_soft="#FBF1D6",
     chrome="#1C1716", chrome_fg="#F3F1EF", chrome_muted="#9D9792", chrome_border="#312D2C",
 )
 DARK = dict(
-    background="#120F0D", background2="#1B1716", card="#1B1716",
+    background="#120F0D", background2="#1B1716", card="#1B1716", surface="#282322",
     foreground="#F3F1EF", foreground2="#E6E2DE", muted="#9D9792", border="#312D2C",
     primary="#F3F1EF", primary_fg="#1C1716",
-    brand="#DD2824", brand_text="#F45246", brand_hover="#CE2320", brand_soft="#3A1A18", brand_fg="#FFFFFF",
-    destructive="#E8496A", destructive_soft="#3A1520", success="#3DBA6A", success_soft="#12301C",
+    brand="#DD2824", brand_text="#F45246", brand_on_chrome="#F45246", brand_hover="#CE2320",
+    brand_soft="#3A1A18", brand_fg="#FFFFFF", ring="#DD2824",
+    destructive="#EF5C7B", destructive_soft="#3A1520", success="#3DBA6A", success_soft="#12301C",
     warning="#F5C044", warning_text="#F5C044", warning_soft="#3A2E10",
     chrome="#0E0C0B", chrome_fg="#F3F1EF", chrome_muted="#9D9792", chrome_border="#312D2C",
 )
 
 BLOCKS = dict(logic="#2A75BA", loops="#298646", math="#6B64BA", text="#008282",
               lists="#8E57A5", variables="#A76700", root="#2A2523", input="#DD2824")
+
+def readable_on(bg):
+    """Tinta ou papel sobre bg, o que contrastar mais. Substitui a lista de hex
+    escritos à mão, que não sabia de um token novo (o degrau #282322 do escuro)."""
+    return "#FFFFFF" if contrast("#FFFFFF", bg) >= contrast("#1C1716", bg) else "#1C1716"
+
+
+# Anel de foco — uma definição só, a mesma de identity.md § 5 e de tokens.css:
+# borda de 1 px em ring + halo de 3 px em ring/50. brand-soft é fundo de linha
+# e halo, nunca o indicador de foco.
+FOCUS_RING = ("border-color: var(--ring); "
+              "box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);")
 
 def vars_block(t):
     return "\n".join(f"  --{k.replace('_','-')}: {v};" for k, v in t.items())

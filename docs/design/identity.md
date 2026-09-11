@@ -245,8 +245,11 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
 
   **Header, celular (< 768 px)**: lockup + controle de idioma + botão de menu.
   O botão abre um **painel de menu** com navegação, bloco do usuário (nome e
-  e-mail), chip da rodada, tema, idioma, reportar bug e Sair. É esse painel que
-  fecha o #186; o FAB de reportar bug não existe em largura nenhuma.
+  e-mail), chip da rodada, tema, reportar bug e Sair. É esse painel que fecha o
+  #186; o FAB de reportar bug não existe em largura nenhuma. O **idioma não
+  entra no painel**: fica no header em toda largura, porque é a única
+  preferência que precisa ser alcançável sem abrir menu nenhum — inclusive
+  deslogado, por quem não consegue ler a interface no idioma em que ela abriu.
 
   **Rodapé**: contato da organização; **indicador de status da API** — ponto de
   8 px (`success` conectado · `destructive` sem conexão · `chrome-muted`

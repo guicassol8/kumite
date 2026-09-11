@@ -143,8 +143,8 @@ def organizer():
             '</div></div></main>' + footer())
     return page("Painel do organizador", body)
 
-def home():
-    body = (header("participant") +
+def home(menu_open=False):
+    body = (header("participant", menu_open=menu_open) +
             '<main style="flex: 1; padding: 48px 24px 32px; display: flex; justify-content: center;"><div style="width: 100%; max-width: 880px; display: flex; flex-direction: column; gap: 28px;">'
             f'<div style="display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;">{mark(88, right="var(--foreground)")}<span class="display" style="font-weight: 600; font-size: 72px; line-height: 0.9; letter-spacing: -0.01em;">kumite</span><span class="eyebrow" style="font-size: 15px;">PUCRS × Mérida — programação em blocos</span></div>'
             '<div class="card" style="border-color: var(--brand); padding: 22px 26px; display: flex; align-items: center; justify-content: space-between; gap: 20px;">'
@@ -158,4 +158,4 @@ def home():
             '<a href="#" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-top: 1px solid var(--border);"><span style="font-weight: 500;">Aquecimento</span><span class="muted small">#4 · 100 pts · 01/09/2026</span></a>'
             '</div></div></div>'
             '</div></main>' + footer())
-    return page("Início", body)
+    return page("Menu do usuário" if menu_open else "Início", body)

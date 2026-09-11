@@ -2,7 +2,7 @@ import json, os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CANVAS = os.path.normpath(os.path.join(HERE, ".."))  # docs/design/canvas
-from screens import editor, login, signup_mobile, teams
+from screens import editor, login, signup_mobile, teams, mobile_menu
 from screens2 import leaderboard, telao, telao_geral, organizer, home
 from identity import logo_board, palette_board, type_board, components_board, blockly_board
 
@@ -19,6 +19,8 @@ files = {
     "TelaoGeral.dc.html": telao_geral(),
     "Organizador.dc.html": organizer(),
     "Inicio.dc.html": home(),
+    "MenuUsuario.dc.html": home(menu_open=True),
+    "MenuCelular.dc.html": mobile_menu(),
     "Simbolo.dc.html": logo_board(),
     "Paleta.dc.html": palette_board(),
     "Tipografia.dc.html": type_board(),
@@ -54,6 +56,8 @@ canvas = {
     {"file": "Organizador.dc.html", "title": "Painel do organizador", "x": 1360, "y": 1884, "w": 1280, "h": 800, "page": "telas"},
     {"file": "Telao.dc.html", "title": "Placar · modo telão", "x": 2720, "y": 1884, "w": 1440, "h": 810, "page": "telas"},
     {"file": "TelaoGeral.dc.html", "title": "Telão · sem rodada aberta", "x": 0, "y": 2774, "w": 1440, "h": 810, "page": "telas"},
+    {"file": "MenuUsuario.dc.html", "title": "Menu do usuário · desktop", "x": 1520, "y": 2774, "w": 1280, "h": 800, "page": "telas"},
+    {"file": "MenuCelular.dc.html", "title": "Menu · celular", "x": 2880, "y": 2774, "w": 390, "h": 844, "page": "telas"},
   ],
   "annotations": [
     {"id": "nota-paleta", "x": 1280, "y": -150, "w": 420, "page": "identidade", "text": "Recomendação: variante A (Hinomaru). Todas as telas da página Telas estão nela. Se preferir B ou C, eu re-tokenizo tudo."},

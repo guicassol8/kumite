@@ -10,7 +10,7 @@ const dir = path.resolve(here, '..');                 // docs/design/canvas
 const out = path.resolve(here, '../../screens');     // docs/design/screens
 const heightsFile = path.join(here, 'heights.json');
 fs.mkdirSync(out, { recursive: true });
-const sizes = { 'CadastroCelular': [390, 844], 'Telao': [1440, 810], 'TelaoGeral': [1440, 810] };
+const sizes = { 'CadastroCelular': [390, 844], 'Telao': [1440, 810], 'TelaoGeral': [1440, 810], 'MenuCelular': [390, 844] };
 const flowing = ['Simbolo', 'Paleta', 'Tipografia', 'Componentes', 'Blockly'];
 const only = process.argv.slice(2);
 

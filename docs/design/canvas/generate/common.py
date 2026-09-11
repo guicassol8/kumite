@@ -181,12 +181,33 @@ def icon(name, size=16, color="currentColor", sw=2):
         "wifi": '<path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"></path><circle cx="12" cy="19" r="1"></circle>',
         "globe": '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path>',
         "arrow": '<path d="M5 12h14M13 6l6 6-6 6"></path>',
+        "bug": '<path d="M18 11v3a6 6 0 0 1-12 0v-3a6 6 0 0 1 12 0z"></path><path d="M9 6.2a3 3 0 0 1 6 0M12 20v-9M3 10h3M18 10h3M3.5 5.5 6 7.5M20.5 5.5 18 7.5M3.5 17.5 6 15.5M20.5 17.5 18 15.5"></path>',
+        "key": '<circle cx="7.5" cy="15.5" r="4.5"></circle><path d="M10.7 12.3 21 2M17 6l3 3M14 9l3 3"></path>',
+        "menu": '<path d="M4 7h16M4 12h16M4 17h16"></path>',
     }[name]
     return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" stroke="{color}" '
             f'stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{d}</svg>')
 
 # ---------- App chrome ----------
-def header(mode="participant", round_chip=True, email="Ana Souza", theme="light", compact=False):
+# O inventário do header e do rodapé é lista fechada — identity.md § 5. O que
+# está aqui é o que a #217 constrói, e nada além disso.
+
+USER_NAME, USER_EMAIL = "Ana Souza", "ana.souza@edu.pucrs.br"
+
+def user_menu_panel(name, email):
+    """Dropdown do menu do usuário: nome e e-mail no topo, 'Trocar senha' como
+    único item. Idioma, tema e Sair NÃO entram aqui — continuam na barra."""
+    # Cartão claro sobre a barra carvão: as cores vão explícitas porque
+    # '.chrome-bar .muted' pintaria o e-mail de chrome-muted sobre papel.
+    return ('<div class="card" style="position: absolute; top: 40px; right: 0; width: 264px; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,.28); overflow: hidden;">'
+            '<div style="padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px;">'
+            f'<span style="font-size: 14px; font-weight: 600; color: var(--foreground);">{name}</span>'
+            f'<span style="font-size: 12px; color: var(--muted);">{email}</span></div>'
+            '<div style="padding: 6px;">'
+            f'<span style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; font-size: 14px; font-weight: 500; color: var(--foreground); background: var(--background2);">{icon("key", 16, "var(--muted)")}Trocar senha</span>'
+            '</div></div>')
+
+def header(mode="participant", round_chip=True, email=USER_NAME, theme="light", compact=False, menu_open=False):
     """Charcoal header shared by every screen. mode: anon | participant | organizer."""
     links = ""
     if mode == "organizer":
@@ -205,22 +226,45 @@ def header(mode="participant", round_chip=True, email="Ana Souza", theme="light"
         right = ('<a href="#" style="font-size: 14px; font-weight: 500;">Entrar</a>'
                  '<a href="#" class="btn btn-sm" style="background: var(--chrome-fg); color: var(--chrome);">Cadastrar</a>')
     else:
-        right = (f'<span class="muted" style="font-size: 13px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{email}</span>'
+        # Ícone de reportar bug: só ícone, com nome acessível — o FAB do canto
+        # não existe em largura nenhuma (#198, #217).
+        bug = ('<span title="Reportar um problema" style="display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; '
+               f'border: 1px solid var(--chrome-border); border-radius: 6px; color: var(--chrome-fg);">{icon("bug", 16)}</span>')
+        # Gatilho do menu do usuário: nome truncado + chevron, no lugar do
+        # e-mail solto que ficava aqui antes.
+        trigger = ('<span style="position: relative; display: inline-flex;">'
+                   '<span style="display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 6px; '
+                   f'border: 1px solid {"var(--chrome-border)" if menu_open else "transparent"}; background: {"rgba(255,255,255,.06)" if menu_open else "transparent"};">'
+                   f'<span style="font-size: 13px; font-weight: 500; color: var(--chrome-fg); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{email}</span>'
+                   f'{icon("chevd", 14, "var(--chrome-muted)")}</span>'
+                   f'{user_menu_panel(email, USER_EMAIL) if menu_open else ""}</span>')
+        right = (bug + trigger +
                  f'<a href="#" class="btn btn-sm btn-chrome">{icon("logout", 14)}Sair</a>')
     theme_icon = icon("moon" if theme == "light" else "sun", 16)
     pad = "0 16px" if compact else "0 24px"
     return (f'<header class="chrome-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 56px; padding: {pad}; flex: none;">'
             f'<div style="display: flex; align-items: center; gap: 28px;">{lockup(26)}'
             f'<nav style="display: flex; align-items: center; gap: 20px;">{links}</nav></div>'
-            f'<div style="display: flex; align-items: center; gap: 16px;">{chip}{right}'
+            f'<div style="display: flex; align-items: center; gap: 12px;">{chip}{right}'
             f'<div class="seg chrome"><span class="on">PT</span><span>ES</span><span>EN</span></div>'
             f'<span style="display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; border: 1px solid var(--chrome-border); border-radius: 6px; color: var(--chrome-fg);">{theme_icon}</span>'
             f'</div></header>')
 
-def footer(compact=False):
+def api_status(state="ok"):
+    """Indicador de status da API: ponto MAIS rótulo. A § 3 proíbe cor como
+    única pista, então o rótulo não é decorativo."""
+    color, label = {"ok": ("var(--success)", "Conectado"),
+                    "down": ("var(--destructive)", "Sem conexão"),
+                    "wait": ("var(--chrome-muted)", "Conectando")}[state]
+    return (f'<span style="display: inline-flex; align-items: center; gap: 8px;">'
+            f'<span class="dot" style="background: {color};"></span>'
+            f'<span style="color: var(--chrome-fg);">{label}</span></span>')
+
+def footer(compact=False, status="ok"):
     pad = "12px 16px" if compact else "14px 24px"
     return (f'<footer class="footer" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: {pad}; flex: none; margin-top: auto;">'
             f'<span>Dúvidas? Fale com a organização: <a href="#">ligadealgoritmos@gmail.com</a></span>'
+            f'{api_status(status)}'
             f'<span style="display: flex; align-items: center; gap: 8px;">{mark(16, right="var(--chrome-fg)")}<span style="font-family: var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; font-size: 12px; font-weight: 600; color: var(--chrome-muted);">PUCRS × Mérida 2026</span></span>'
             f'</footer>')
 

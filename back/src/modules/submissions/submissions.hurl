@@ -180,6 +180,25 @@ HTTP 400
 [Asserts]
 jsonpath "$.error" == "missing_root"
 
+# 4b. The root block disabled in the editor -> 400 disabled_block (#181,
+#     finding #15). It used to generate `"\n\n\n"` as a success and fail every
+#     case with `solve is not defined`. `disabledReasons` is what Blockly 13
+#     serializes for "Disable Block"; the TS twin of this workspace is
+#     `raizDesabilitada` in @kumite/blocks (hurl cannot import it).
+#     Deliberately before the happy path: a codegen refusal never reaches the
+#     sandbox and arms no cooldown, so it leaves the accounting below intact.
+POST {{host}}/submissions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+{
+  "problemId": "{{problem_id}}",
+  "roundId": "{{round_id}}",
+  "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "disabledReasons": ["manual"], "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
+}
+HTTP 400
+[Asserts]
+jsonpath "$.error" == "disabled_block"
+
 # 5. The happy path -> 201, full score, and the hidden case comes back as a
 #    bare ✓/✗: no expected, no actual, no ms.
 POST {{host}}/submissions

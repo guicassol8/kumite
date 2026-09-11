@@ -1,10 +1,11 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import './i18n'
 import './index.css'
+import { queryClient } from './lib/query-client'
 import { purgeLegacyWorkspaceState } from './lib/workspace-storage'
 import { routeTree } from './routeTree.gen'
 
@@ -15,8 +16,6 @@ declare module '@tanstack/react-router' {
     router: typeof router
   }
 }
-
-const queryClient = new QueryClient()
 
 // Before the first screen: the workspaces saved by the old build have no
 // owner, so any account that opens the editor would read them (#175). They are

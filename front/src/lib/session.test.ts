@@ -115,6 +115,27 @@ describe('session store', () => {
       expect(localStorage.getItem('kumite-token')).toBeNull()
     },
   )
+
+  // #175, achado #19: the cache outlived the session, so the next account on
+  // the same browser rendered the previous one's teams/rounds/rankings until a
+  // background refetch replaced them.
+  it.each(['manual', 'expired'] as const)(
+    'clearSession(%s) empties the React Query cache',
+    async (reason) => {
+      // Same `resetModules` registry as `loadSession`, so this is the very
+      // instance `clearSession` reaches for.
+      const { queryClient } = await import('./query-client')
+      const session = await loadSession()
+      session.setSession(fakeUser, 'tok-4')
+      queryClient.setQueryData(['teams'], [{ id: 't1', name: 'Time do Aluno 1' }])
+      expect(queryClient.getQueryCache().getAll()).toHaveLength(1)
+
+      session.clearSession(reason)
+
+      expect(queryClient.getQueryCache().getAll()).toHaveLength(0)
+      expect(queryClient.getQueryData(['teams'])).toBeUndefined()
+    },
+  )
 })
 
 // #179: a `GET /me` that rejects (network blip, back restarting) used to be

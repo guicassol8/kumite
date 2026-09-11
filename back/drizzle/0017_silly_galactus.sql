@@ -1,0 +1,1 @@
+ALTER TABLE "submissions" ALTER COLUMN "round_id" SET NOT NULL;

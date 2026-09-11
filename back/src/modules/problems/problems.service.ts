@@ -129,7 +129,10 @@ export async function getPublishedProblem(
   }
 
   const teamId = await findTeamIdForUser(db, userId)
-  const bestSubmission = teamId === null ? null : await getBestSubmission(db, teamId, id)
+  // Scored inside access.roundId, not across every round that ever used this
+  // problem (#176) — that round's leaderboard shows exactly the same number.
+  const bestSubmission =
+    teamId === null ? null : await getBestSubmission(db, teamId, id, access.roundId)
 
   return {
     id: problem.id,

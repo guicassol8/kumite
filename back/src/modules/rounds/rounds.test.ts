@@ -605,7 +605,44 @@ describe('rounds.service', () => {
       const closed = await closeRound(db, created.round.id)
       if (!closed.ok) throw new Error('expected close to succeed')
 
-      expect(await getProblemRoundAccess(db, problem.id)).toEqual({ status: 'closed' })
+      expect(await getProblemRoundAccess(db, problem.id)).toEqual({
+        status: 'closed',
+        roundId: created.round.id,
+      })
+    })
+
+    // #176: a reused problem sits in several closed rounds, and the score the
+    // problem page shows has to belong to one of them — the round the
+    // participant has just played.
+    it("returns 'closed' with the most recently opened round for a reused problem", async () => {
+      const problem = await insertPublishedProblem()
+
+      const first = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!first.ok) throw new Error('expected create to succeed')
+      const openedFirst = await openRound(db, first.round.id)
+      if (!openedFirst.ok) throw new Error('expected open to succeed')
+      const closedFirst = await closeRound(db, first.round.id)
+      if (!closedFirst.ok) throw new Error('expected close to succeed')
+
+      const second = await createRound(db, {
+        name: 'Round 2',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!second.ok) throw new Error('expected create to succeed')
+      const openedSecond = await openRound(db, second.round.id)
+      if (!openedSecond.ok) throw new Error('expected open to succeed')
+      const closedSecond = await closeRound(db, second.round.id)
+      if (!closedSecond.ok) throw new Error('expected close to succeed')
+
+      expect(await getProblemRoundAccess(db, problem.id)).toEqual({
+        status: 'closed',
+        roundId: second.round.id,
+      })
     })
 
     it("returns 'open' with the roundId for a problem in an open round", async () => {
@@ -808,6 +845,7 @@ describe('rounds.service', () => {
     }
 
     async function insertSubmission(
+      roundId: string,
       teamId: string,
       userId: string,
       problemId: string,
@@ -816,6 +854,7 @@ describe('rounds.service', () => {
     ) {
       await db.insert(submissionsTable).values({
         problemId,
+        roundId,
         userId,
         teamId,
         workspace: {},
@@ -858,7 +897,7 @@ describe('rounds.service', () => {
       if (!created.ok) throw new Error('expected create to succeed')
       const opened = await openRound(db, created.round.id)
       if (!opened.ok) throw new Error('expected open to succeed')
-      await insertSubmission(team.id, user.id, problem.id, 7, 1)
+      await insertSubmission(opened.round.id, team.id, user.id, problem.id, 7, 1)
 
       const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
 
@@ -880,9 +919,9 @@ describe('rounds.service', () => {
       if (!created.ok) throw new Error('expected create to succeed')
       const opened = await openRound(db, created.round.id)
       if (!opened.ok) throw new Error('expected open to succeed')
-      await insertSubmission(team.id, user.id, problem.id, 4, 1)
-      await insertSubmission(team.id, user.id, problem.id, 9, 2)
-      await insertSubmission(team.id, user.id, problem.id, 9, 3)
+      await insertSubmission(opened.round.id, team.id, user.id, problem.id, 4, 1)
+      await insertSubmission(opened.round.id, team.id, user.id, problem.id, 9, 2)
+      await insertSubmission(opened.round.id, team.id, user.id, problem.id, 9, 3)
       const closed = await closeRound(db, created.round.id)
       if (!closed.ok) throw new Error('expected close to succeed')
 

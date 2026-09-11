@@ -22,22 +22,33 @@ import type {
 // "Vale a melhor pontuação": the team's highest score on a problem, the moment
 // it was reached (the tiebreaker) and how many attempts it took. Grouped by
 // team, not user — the score belongs to the team (docs/product.md).
+//
+// Scoped to one round (#176), the same scope the leaderboard uses: a problem
+// reused across rounds has one best score *per round*, and the problem page
+// must show the round's own, or it contradicts that round's ranking.
 export async function getBestSubmission(
   db: Db,
   teamId: string,
   problemId: string,
+  roundId: string,
 ): Promise<BestSubmission | null> {
   const [best] = await db
     .select({
       score: submissionsTable.score,
       achievedAt: submissionsTable.createdAt,
       // Postgres evaluates window functions before LIMIT, so `count(*) over ()`
-      // is the full attempt count for this (team, problem) — one round trip
-      // for both the best row and the total.
+      // is the full attempt count for this (team, problem, round) — one round
+      // trip for both the best row and the total.
       attempts: sql<number>`count(*) over ()`.mapWith(Number),
     })
     .from(submissionsTable)
-    .where(and(eq(submissionsTable.teamId, teamId), eq(submissionsTable.problemId, problemId)))
+    .where(
+      and(
+        eq(submissionsTable.teamId, teamId),
+        eq(submissionsTable.problemId, problemId),
+        eq(submissionsTable.roundId, roundId),
+      ),
+    )
     // Ties go to the earliest submission: reaching the score first wins.
     .orderBy(desc(submissionsTable.score), asc(submissionsTable.createdAt))
     .limit(1)
@@ -265,6 +276,10 @@ export async function submitSolution(
         .insert(submissionsTable)
         .values({
           problemId: problem.id,
+          // The round the accept gate above validated, not one re-derived from
+          // the clock (#176): judging can outlive the round, and the row would
+          // otherwise land outside the window it was accepted in.
+          roundId: body.roundId,
           userId: identity.userId,
           teamId: identity.teamId,
           workspace: body.workspace,

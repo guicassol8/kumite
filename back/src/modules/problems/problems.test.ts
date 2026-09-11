@@ -563,6 +563,7 @@ describe('problems.service', () => {
       const achievedAt = new Date('2026-08-31T12:00:00.000Z')
       await db.insert(submissionsTable).values({
         problemId: id,
+        roundId,
         userId: user.id,
         teamId: team.id,
         workspace: {},

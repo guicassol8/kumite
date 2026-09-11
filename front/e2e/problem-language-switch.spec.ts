@@ -37,6 +37,11 @@ test.describe('switching the language inside the editor (#178)', () => {
   test('keeps the blocks on the canvas across PT → ES → EN and after a reload', async ({
     page,
   }) => {
+    // Four screenshots, two auto-save debounces, three Blockly re-renders and a
+    // full reload do not fit the 30s default — this one walkthrough is the
+    // whole acceptance criteria list of #178.
+    test.setTimeout(90_000)
+
     const host = page.getByTestId('blockly-workspace')
     const blocks = host.locator('g.blocklyDraggable:visible')
     const statement = page.getByTestId('problem-statement-panel')

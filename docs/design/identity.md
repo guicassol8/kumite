@@ -1,8 +1,10 @@
 # kumite — identidade visual (v1, 2026-09-10)
 
-Fonte da verdade da marca e da interface do kumite (epic de implementação: #214). Decidida com o organizador
-em 2026-09-10 (sessão de design; canvas navegável em `canvas/`, ver
-`README.md`). Mudanças aqui passam por PR e ganham entrada no `CHANGELOG.md`.
+A spec da marca e da interface do kumite (epic de implementação: #214):
+manda no que as telas fazem e cita **tokens**; quem manda nos **valores** é
+`tokens/kumite.tokens.json`. Decidida com o organizador em 2026-09-10
+(sessão de design; canvas navegável em `canvas/`, ver `README.md`). Mudanças
+aqui passam por PR e ganham entrada no `CHANGELOG.md`.
 
 ## 1. Conceito — dojo moderno
 

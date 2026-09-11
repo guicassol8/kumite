@@ -7,9 +7,9 @@ retocar o design abre `canvas/`.
 
 ```
 docs/design/
-├── identity.md          spec: conceito, paleta, tipografia, regras, componentes, Blockly
+├── identity.md          spec em prosa: conceito, paleta, tipografia, regras, componentes, Blockly
 ├── tokens/
-│   ├── kumite.tokens.json   fonte da verdade (W3C Design Tokens 2025.10)
+│   ├── kumite.tokens.json   fonte da verdade dos valores (W3C Design Tokens 2025.10)
 │   └── tokens.css           CSS derivado, pronto para front/src/index.css
 ├── logo/                SVG (fonte) + png/ (derivado por export.sh) + README com regras
 ├── logo-prompts.md      prompts de geração de imagem para explorar o símbolo
@@ -44,17 +44,32 @@ logo.
 
 ## Práticas adotadas (e por quê)
 
-- **Tokens em JSON no formato W3C DTCG** como fonte da verdade, CSS derivado.
-  É o formato que Figma, Penpot, Style Dictionary e Tokens Studio consomem;
-  quando a fundação do redesign entrar, `tokens.css` pode passar a ser gerado
-  por Style Dictionary em vez de mantido à mão.
+- **Tokens em JSON no formato W3C DTCG** como fonte da verdade dos valores,
+  CSS derivado. É o formato que Figma, Penpot, Style Dictionary e Tokens
+  Studio consomem; quando a fundação do redesign entrar, `tokens.css` pode
+  passar a ser gerado por Style Dictionary em vez de mantido à mão. Uma
+  hierarquia só, sem exceção: **`kumite.tokens.json` manda nos valores**,
+  `tokens.css` é derivado à mão a partir dele e `identity.md` é a spec em
+  prosa, que cita token e nunca valor.
+- **A #216 copia de `tokens.css` os blocos `:root`, `.dark` e `@theme inline`
+  para `front/src/index.css`, e mais nada.** Os `--block-*` são consumidos
+  por `@kumite/blocks`, não pelo tema do front.
+- **Os tokens são conferidos por script**, não no olho:
+  `python3 canvas/generate/check_tokens.py` falha se `tokens.css` e
+  `kumite.tokens.json` divergirem, se o `oklch` anotado não render o hex ao
+  lado, se algum `oklch` só chegar naquela cor por clipagem de gamut, ou se
+  a tabela de contraste de `identity.md` não bater com o que os valores
+  rendem.
 - **Camadas de token**: primitivos (`color.primitive.red-600`) → semânticos
   por modo (`color.light.brand`, `color.dark.brand`) → uso em componentes via
   as variáveis CSS do shadcn. Só os semânticos aparecem no código.
 - **SVG é fonte, PNG é build.** Nunca edite um PNG; edite o SVG e rode o
   script. O wordmark é contornado para não depender de fonte instalada.
 - **Contraste medido, não estimado**: a tabela em `identity.md` lista as
-  razões WCAG de todos os pares; um token novo entra com o número.
+  razões WCAG dos pares que a spec manda usar, recalculadas pelo
+  `check_tokens.py`; um token novo entra com o número, e um par que não
+  atinge o mínimo entra dizendo isso — a tabela nunca afirma cobertura que
+  não tem.
 - **Changelog de decisões** (`CHANGELOG.md`), uma entrada por mudança de
   direção, com o porquê. Versão da identidade (v1, v2…) independe da versão do
   app.

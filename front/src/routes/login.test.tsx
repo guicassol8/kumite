@@ -122,3 +122,31 @@ describe('LoginScreen', () => {
     })
   })
 })
+
+// #179: the root sends `notice=expired` here when hydration finds the stored
+// token dead. Without the banner the user is dropped on a login form with no
+// idea why the app stopped trusting them.
+describe('LoginScreen expired-session notice (#179)', () => {
+  it('explains why the user is back on the login screen', async () => {
+    renderLogin('/login?notice=expired')
+
+    await waitFor(() => expect(screen.getByTestId('login-expired-notice')).toBeDefined())
+  })
+
+  it('shows nothing when the user came here on their own', async () => {
+    renderLogin('/login')
+
+    await waitFor(() => screen.getByTestId('login-email-input'))
+    expect(screen.queryByTestId('login-expired-notice')).toBeNull()
+  })
+
+  it('still preserves the return route alongside the notice', async () => {
+    const router = renderLogin('/login?notice=expired&redirect=%2Fteams')
+
+    await waitFor(() => expect(screen.getByTestId('login-expired-notice')).toBeDefined())
+    expect(router.state.location.search).toMatchObject({
+      notice: 'expired',
+      redirect: '/teams',
+    })
+  })
+})

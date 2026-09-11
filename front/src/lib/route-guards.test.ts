@@ -1,8 +1,18 @@
 import { isRedirect } from '@tanstack/react-router'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// Only the #179 block below drives a real hydration; the rest of the file
+// never touches the API. The mock is here so that one can fail `/me` on
+// purpose without the jsdom network guard firing.
+vi.mock('./api', () => ({
+  api: { me: { $get: vi.fn() } },
+}))
+
+import { api } from './api'
 import { requireAuth, requireRole, requireSession } from './route-guards'
-import { clearSession, type SessionUser, setSession } from './session'
+import { clearSession, getState, retryHydration, type SessionUser, setSession } from './session'
+
+const mockedGetMe = vi.mocked(api.me.$get)
 
 const participant: SessionUser = {
   id: 'u1',
@@ -127,5 +137,120 @@ describe('forced password change (#143)', () => {
     }
 
     expect(caught).toMatchObject({ options: { to: '/login', search: { redirect: '/organizer' } } })
+  })
+})
+
+// #179: when hydration gives up, the root paints a full-screen retry card over
+// the outlet. Every guard therefore has to stand down — a redirect here would
+// swap that card for a login screen (or, for requireRole, for a "you are not
+// an organizer" banner) on the strength of a user object that was never
+// fetched.
+describe('hydration in the error state (#179)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    mockedGetMe.mockReset()
+  })
+
+  // The guards await `ensureHydrated()`, and from the error state that starts
+  // a fresh 0/500/1500ms cycle (the failed one is deliberately not cached) —
+  // so the fake clock has to be drained while the guard is in flight, not
+  // before it.
+  async function settle<T>(promise: Promise<T>): Promise<T> {
+    await vi.runAllTimersAsync()
+    return promise
+  }
+
+  // `setSession` + `retryHydration` is the only way in from outside the store:
+  // it parks a token in state and then fails every attempt on it.
+  async function enterErrorState(): Promise<void> {
+    setSession(participant, 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    await settle(retryHydration())
+    expect(getState().status).toBe('error')
+  }
+
+  // A cold deep link to a guarded route is the common case in the auditorium
+  // (F5 on /teams): the guard redirects before the root has mounted its
+  // subscriber, so the notice has to ride along here or nowhere.
+  it('a 401 during hydration sends the user to /login with the expired notice', async () => {
+    setSession(participant, 'tok-1')
+    mockedGetMe.mockResolvedValue({
+      status: 401,
+      json: async () => ({ error: 'unauthorized' }),
+      // biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stub
+    } as any)
+    await settle(retryHydration())
+
+    // No `settle` here: the store already settled, so `ensureHydrated()`
+    // returns its cached promise and no timer stands between the call and the
+    // redirect it throws.
+    let caught: unknown
+    try {
+      await requireSession(ctx)
+    } catch (error) {
+      caught = error
+    }
+
+    expect(isRedirect(caught)).toBe(true)
+    expect(caught).toMatchObject({
+      options: { to: '/login', search: { redirect: '/organizer', notice: 'expired' } },
+    })
+  })
+
+  it('a visitor who never had a session gets no expired notice', async () => {
+    clearSession('manual')
+
+    // No `settle` here: the store already settled, so `ensureHydrated()`
+    // returns its cached promise and no timer stands between the call and the
+    // redirect it throws.
+    let caught: unknown
+    try {
+      await requireSession(ctx)
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toMatchObject({ options: { to: '/login', search: { redirect: '/organizer' } } })
+    expect((caught as { options: { search: Record<string, unknown> } }).options.search.notice).toBe(
+      undefined,
+    )
+  })
+
+  it('requireSession resolves instead of redirecting to /login', async () => {
+    await enterErrorState()
+
+    await expect(settle(requireSession(ctx))).resolves.toBeUndefined()
+  })
+
+  it('requireAuth resolves instead of redirecting', async () => {
+    await enterErrorState()
+
+    await expect(settle(requireAuth(ctx))).resolves.toBeUndefined()
+  })
+
+  it('requireRole resolves instead of claiming the wrong role', async () => {
+    await enterErrorState()
+
+    await expect(settle(requireRole('organizer')(ctx))).resolves.toBeUndefined()
+  })
+
+  // Entering a guarded route while stuck in 'error' is itself a chance to
+  // recover: the guard's own `ensureHydrated()` tries `/me` again, and a back
+  // that came back up mid-navigation lets the user straight through.
+  it('a guard re-attempts hydration and lets a recovered session through', async () => {
+    await enterErrorState()
+    mockedGetMe.mockReset()
+    mockedGetMe.mockResolvedValue({
+      status: 200,
+      json: async () => participant,
+      // biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stub
+    } as any)
+
+    await expect(settle(requireSession(ctx))).resolves.toBeUndefined()
+    expect(getState().status).toBe('authenticated')
   })
 })

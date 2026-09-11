@@ -18,6 +18,15 @@
   "footer": {
     "contactLabel": "Questions? Talk to the organizers:"
   },
+  "session": {
+    "error": {
+      "title": "We couldn't load your session",
+      "body": "The connection to the server failed. Check your internet and try again — there is no need to reload the page.",
+      "retry": "Try again",
+      "retrying": "Trying…",
+      "signOut": "Sign out"
+    }
+  },
   "bugReport": {
     "trigger": "Report a bug",
     "title": "Report a bug",
@@ -614,6 +623,9 @@
         "emailInvalid": "Enter a valid email",
         "passwordRequired": "Enter your password",
         "invalidCredentials": "Incorrect email or password"
+      },
+      "notices": {
+        "expired": "Your session expired. Please sign in again."
       }
     },
     "resetPassword": {

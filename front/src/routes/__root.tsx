@@ -5,6 +5,8 @@ import { VercelAnalytics } from '@/components/analytics'
 import { BugReport } from '@/components/bug-report'
 import { Footer } from '@/components/footer'
 import { Header } from '@/components/header'
+import { SessionErrorScreen } from '@/components/session-error'
+import { useSession } from '@/hooks/use-session'
 import { ensureHydrated, getState, subscribe } from '@/lib/session'
 
 export const Route = createRootRoute({
@@ -13,6 +15,7 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   const router = useRouter()
+  const { status } = useSession()
 
   useEffect(() => {
     void ensureHydrated()
@@ -23,7 +26,13 @@ function RootComponent() {
     return subscribe(() => {
       const state = getState()
       if (state.status === 'anonymous' && state.reason === 'expired') {
-        router.navigate({ to: '/login', search: { redirect: router.state.location.href } })
+        // `notice` is what turns a silent bounce into an explanation (#179):
+        // the login screen says the session expired instead of appearing out
+        // of nowhere.
+        router.navigate({
+          to: '/login',
+          search: { redirect: router.state.location.href, notice: 'expired' },
+        })
         return
       }
 
@@ -45,7 +54,10 @@ function RootComponent() {
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <VercelAnalytics />
       <Header />
-      <Outlet />
+      {/* Hydration gave up (#179). The card takes the outlet's place rather
+          than the whole page: header and footer are how the user changes
+          language or reaches the organizers while nothing else works. */}
+      {status === 'error' ? <SessionErrorScreen /> : <Outlet />}
       <Footer />
       {/* Mounted at the root, so the trigger exists on every route and the
           draft survives closing the dialog (#145). */}

@@ -18,6 +18,15 @@
   "footer": {
     "contactLabel": "¿Dudas? Habla con la organización:"
   },
+  "session": {
+    "error": {
+      "title": "No pudimos cargar tu sesión",
+      "body": "Falló la conexión con el servidor. Revisa tu internet e inténtalo de nuevo — no hace falta recargar la página.",
+      "retry": "Intentar de nuevo",
+      "retrying": "Intentando…",
+      "signOut": "Salir"
+    }
+  },
   "bugReport": {
     "trigger": "Reportar error",
     "title": "Reportar un error",
@@ -614,6 +623,9 @@
         "emailInvalid": "Ingresa un correo electrónico válido",
         "passwordRequired": "Ingresa la contraseña",
         "invalidCredentials": "Correo o contraseña incorrectos"
+      },
+      "notices": {
+        "expired": "Tu sesión expiró. Inicia sesión de nuevo."
       }
     },
     "resetPassword": {

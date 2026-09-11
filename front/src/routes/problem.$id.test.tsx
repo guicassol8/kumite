@@ -416,7 +416,7 @@ describe('ProblemScreen', () => {
     })
 
     it('keeps the blocks on the canvas across a language switch', async () => {
-      saveWorkspaceState('p1', savedWorkspace('blocoDoAluno'))
+      saveWorkspaceState(fakeUser.id, 'p1', savedWorkspace('blocoDoAluno'))
       mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
 
       renderProblem()
@@ -433,7 +433,7 @@ describe('ProblemScreen', () => {
     })
 
     it('does not let the auto-save after a language switch overwrite the good copy', async () => {
-      saveWorkspaceState('p1', savedWorkspace('blocoDoAluno'))
+      saveWorkspaceState(fakeUser.id, 'p1', savedWorkspace('blocoDoAluno'))
       mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
 
       renderProblem()
@@ -447,14 +447,16 @@ describe('ProblemScreen', () => {
       // Whatever the switch queues up, what lands in storage still holds the
       // participant's block.
       await waitFor(() => {
-        expect(loadWorkspaceState('p1')?.blocks?.blocks).toHaveLength(2)
+        expect(loadWorkspaceState(fakeUser.id, 'p1')?.blocks?.blocks).toHaveLength(2)
       })
-      expect(blockIdsOf(loadWorkspaceState('p1'))).toEqual(expect.arrayContaining(['blocoDoAluno']))
+      expect(blockIdsOf(loadWorkspaceState(fakeUser.id, 'p1'))).toEqual(
+        expect.arrayContaining(['blocoDoAluno']),
+      )
     })
 
     it('remounts the editor with the other problem workspace when navigating p1 → p2 (#39)', async () => {
-      saveWorkspaceState('p1', savedWorkspace('blocoDeA'))
-      saveWorkspaceState('p2', savedWorkspace('blocoDeB'))
+      saveWorkspaceState(fakeUser.id, 'p1', savedWorkspace('blocoDeA'))
+      saveWorkspaceState(fakeUser.id, 'p2', savedWorkspace('blocoDeB'))
       mockedGet.mockImplementation(async (args: { param: { id: string } }) =>
         jsonResponse(
           200,

@@ -1,79 +1,110 @@
 {
   "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
-  "$description": "kumite — tokens da identidade visual (variante A · Hinomaru), formato W3C Design Tokens 2025.10. Fonte da verdade: este arquivo; tokens.css é derivado à mão até a fundação (#216) adotar Style Dictionary.",
+  "$description": "kumite — tokens da identidade visual (variante A · Hinomaru), formato W3C Design Tokens 2025.10. Este arquivo é a fonte da verdade e os valores de cor são hex; tokens.css é derivado à mão (o oklch fica no comentário, nunca no valor) e identity.md é a spec em prosa, que cita token e nunca valor. docs/design/canvas/generate/check_tokens.py confere os três.",
   "color": {
     "$type": "color",
     "primitive": {
-      "paper": { "$value": "#FCFAF7", "$description": "papel — oklch(0.985 0.004 75)" },
-      "paper-2": { "$value": "#F2F0EC", "$description": "papel 2 — oklch(0.955 0.006 75)" },
+      "paper": { "$value": "#FCFAF7", "$description": "papel — oklch(0.986 0.005 78)" },
+      "paper-2": { "$value": "#F2F0EC", "$description": "papel 2 — oklch(0.956 0.006 85)" },
       "white": { "$value": "#FFFFFF" },
       "paper-text": {
         "$value": "#F3F1EF",
-        "$description": "texto claro sobre carvão — oklch(0.96 0.004 75)"
+        "$description": "texto claro sobre carvão — oklch(0.96 0.0034 68)"
       },
-      "ink": { "$value": "#1C1716", "$description": "tinta — oklch(0.21 0.008 40)" },
-      "ink-2": { "$value": "#2A2523", "$description": "tinta 2 — oklch(0.27 0.008 40)" },
-      "ink-border": { "$value": "#312D2C", "$description": "oklch(0.30 0.006 40)" },
+      "ink": { "$value": "#1C1716", "$description": "tinta — oklch(0.21 0.008 31)" },
+      "ink-2": { "$value": "#2A2523", "$description": "tinta 2 — oklch(0.27 0.008 43)" },
+      "ink-border": { "$value": "#312D2C", "$description": "oklch(0.3 0.006 34)" },
       "charcoal-deep": {
         "$value": "#0E0C0B",
-        "$description": "chrome no escuro — oklch(0.14 0.005 40)"
+        "$description": "chrome no escuro — oklch(0.156 0.004 48)"
       },
-      "charcoal": { "$value": "#120F0D", "$description": "fundo escuro — oklch(0.17 0.006 40)" },
+      "charcoal": { "$value": "#120F0D", "$description": "fundo escuro — oklch(0.17 0.007 56)" },
       "charcoal-card": {
         "$value": "#1B1716",
-        "$description": "cartão escuro — oklch(0.21 0.006 40)"
+        "$description": "cartão escuro — oklch(0.21 0.007 34)"
       },
-      "gray-warm": { "$value": "#69615D", "$description": "oklch(0.50 0.012 50)" },
-      "gray-warm-light": { "$value": "#9D9792", "$description": "oklch(0.68 0.010 60)" },
-      "border-warm": { "$value": "#E1DDDA", "$description": "oklch(0.90 0.006 60)" },
+      "charcoal-surface": {
+        "$value": "#282322",
+        "$description": "superfície de estado do escuro (hover de linha, linha selecionada, botão fantasma e secundário) — um degrau acima do cartão — oklch(0.26 0.008 31)"
+      },
+      "gray-warm": { "$value": "#69615D", "$description": "oklch(0.5 0.012 48)" },
+      "gray-warm-light": { "$value": "#9D9792", "$description": "oklch(0.68 0.01 63)" },
+      "border-warm": { "$value": "#E1DDDA", "$description": "oklch(0.9 0.006 60)" },
       "red-600": { "$value": "#DD2824", "$description": "vermelho faixa — oklch(0.58 0.215 28)" },
       "red-700": { "$value": "#CE2320", "$description": "oklch(0.55 0.205 28)" },
-      "red-400": { "$value": "#F45246", "$description": "oklch(0.66 0.200 28)" },
-      "red-50": { "$value": "#FBE5E1", "$description": "oklch(0.95 0.025 28)" },
-      "red-950": { "$value": "#3A1A18", "$description": "oklch(0.28 0.060 28)" },
-      "crimson-600": { "$value": "#C1133A", "$description": "erro — oklch(0.52 0.200 18)" },
-      "crimson-400": { "$value": "#E8496A", "$description": "oklch(0.62 0.190 18)" },
-      "green-600": { "$value": "#008433", "$description": "oklch(0.53 0.160 150)" },
-      "green-400": { "$value": "#3DBA6A", "$description": "oklch(0.70 0.160 150)" },
+      "red-400": { "$value": "#F45246", "$description": "oklch(0.66 0.2 28)" },
+      "red-50": { "$value": "#FBE5E1", "$description": "oklch(0.94 0.0248 30)" },
+      "red-950": { "$value": "#3A1A18", "$description": "oklch(0.263 0.051 25)" },
+      "crimson-600": { "$value": "#C1133A", "$description": "erro no claro — oklch(0.52 0.2 18)" },
+      "crimson-300": {
+        "$value": "#EF5C7B",
+        "$description": "erro no escuro — oklch(0.673 0.182 10.6); claro o bastante para o texto do alerta passar AA sobre o cartão escuro mesmo na variante /90"
+      },
+      "green-600": { "$value": "#008433", "$description": "oklch(0.535 0.155 148)" },
+      "green-400": { "$value": "#3DBA6A", "$description": "oklch(0.7 0.1596 151.57)" },
       "amber-400": {
         "$value": "#ECAA0B",
-        "$description": "oklch(0.78 0.160 80) — nunca como texto no claro"
+        "$description": "oklch(0.78 0.16 80) — nunca como texto no claro"
       },
-      "amber-700": { "$value": "#A06700", "$description": "oklch(0.56 0.130 75)" },
-      "amber-300": { "$value": "#F5C044", "$description": "oklch(0.84 0.150 85)" }
+      "amber-700": { "$value": "#A06700", "$description": "oklch(0.562 0.121 72)" },
+      "amber-300": { "$value": "#F5C044", "$description": "oklch(0.834 0.148 85)" }
     },
     "light": {
       "$description": "modo claro (padrão)",
       "background": { "$value": "{color.primitive.paper}" },
       "background-2": { "$value": "{color.primitive.paper-2}" },
       "card": { "$value": "{color.primitive.white}" },
+      "card-foreground": { "$value": "{color.primitive.ink}" },
+      "popover": { "$value": "{color.primitive.white}" },
+      "popover-foreground": { "$value": "{color.primitive.ink}" },
       "foreground": { "$value": "{color.primitive.ink}" },
+      "muted": {
+        "$value": "{color.primitive.paper-2}",
+        "$description": "superfície de estado: hover de linha, linha selecionada, fundo mudo"
+      },
       "muted-foreground": { "$value": "{color.primitive.gray-warm}" },
       "border": { "$value": "{color.primitive.border-warm}" },
+      "input": {
+        "$value": "{color.primitive.border-warm}",
+        "$description": "borda de controle de formulário — reforço, nunca a única pista: quem identifica o campo é o rótulo e o preenchimento, e o foco é o anel em ring"
+      },
+      "ring": {
+        "$value": "{color.primitive.red-600}",
+        "$description": "anel de foco: borda de 1 px nesta cor + halo de 3 px a 50 %"
+      },
       "primary": { "$value": "{color.primitive.ink}", "$description": "botão primário" },
       "primary-foreground": { "$value": "{color.primitive.paper}" },
+      "secondary": { "$value": "{color.primitive.paper-2}" },
+      "secondary-foreground": { "$value": "{color.primitive.ink}" },
+      "accent": { "$value": "{color.primitive.paper-2}" },
+      "accent-foreground": { "$value": "{color.primitive.ink}" },
       "brand": {
         "$value": "{color.primitive.red-600}",
         "$description": "preenchimento: Submeter, Abrir rodada, badge Seu time, símbolo"
       },
       "brand-text": {
         "$value": "{color.primitive.red-600}",
-        "$description": "texto: ao vivo, timer, #1, × do pôster"
+        "$description": "texto vermelho sobre papel ou cartão: #1, × do pôster"
+      },
+      "brand-on-chrome": {
+        "$value": "{color.primitive.red-400}",
+        "$description": "texto vermelho sobre o chrome carvão, igual nos dois modos: chip ao vivo, contagem regressiva do header, × da tagline"
       },
       "brand-hover": { "$value": "{color.primitive.red-700}" },
       "brand-soft": {
         "$value": "{color.primitive.red-50}",
-        "$description": "linha do seu time, anel de foco"
+        "$description": "fundo da linha do seu time e halo — nunca o indicador de foco"
       },
       "brand-foreground": { "$value": "{color.primitive.white}" },
       "destructive": {
         "$value": "{color.primitive.crimson-600}",
         "$description": "erro e ação destrutiva — sempre contorno + texto, nunca preenchimento"
       },
+      "destructive-foreground": { "$value": "{color.primitive.white}" },
       "success": { "$value": "{color.primitive.green-600}" },
       "warning": {
         "$value": "{color.primitive.amber-400}",
-        "$description": "só ícone, borda e preenchimento"
+        "$description": "só preenchimento e borda decorativa (2,0:1 sobre papel) — ícone que informa sozinho usa warning-text"
       },
       "warning-text": { "$value": "{color.primitive.amber-700}" },
       "chrome": { "$value": "{color.primitive.ink}", "$description": "header e rodapé" },
@@ -86,17 +117,32 @@
       "background": { "$value": "{color.primitive.charcoal}" },
       "background-2": { "$value": "{color.primitive.charcoal-card}" },
       "card": { "$value": "{color.primitive.charcoal-card}" },
+      "card-foreground": { "$value": "{color.primitive.paper-text}" },
+      "popover": { "$value": "{color.primitive.charcoal-card}" },
+      "popover-foreground": { "$value": "{color.primitive.paper-text}" },
       "foreground": { "$value": "{color.primitive.paper-text}" },
+      "muted": {
+        "$value": "{color.primitive.charcoal-surface}",
+        "$description": "um degrau acima do cartão (1,15:1) — o estado se lê pelo degrau mais o hairline, nunca só pelo fundo"
+      },
       "muted-foreground": { "$value": "{color.primitive.gray-warm-light}" },
       "border": { "$value": "{color.primitive.ink-border}" },
+      "input": { "$value": "{color.primitive.ink-border}" },
+      "ring": { "$value": "{color.primitive.red-600}" },
       "primary": { "$value": "{color.primitive.paper-text}" },
       "primary-foreground": { "$value": "{color.primitive.ink}" },
+      "secondary": { "$value": "{color.primitive.charcoal-surface}" },
+      "secondary-foreground": { "$value": "{color.primitive.paper-text}" },
+      "accent": { "$value": "{color.primitive.charcoal-surface}" },
+      "accent-foreground": { "$value": "{color.primitive.paper-text}" },
       "brand": { "$value": "{color.primitive.red-600}" },
       "brand-text": { "$value": "{color.primitive.red-400}" },
+      "brand-on-chrome": { "$value": "{color.primitive.red-400}" },
       "brand-hover": { "$value": "{color.primitive.red-700}" },
       "brand-soft": { "$value": "{color.primitive.red-950}" },
       "brand-foreground": { "$value": "{color.primitive.white}" },
-      "destructive": { "$value": "{color.primitive.crimson-400}" },
+      "destructive": { "$value": "{color.primitive.crimson-300}" },
+      "destructive-foreground": { "$value": "{color.primitive.white}" },
       "success": { "$value": "{color.primitive.green-400}" },
       "warning": { "$value": "{color.primitive.amber-300}" },
       "warning-text": { "$value": "{color.primitive.amber-300}" },
@@ -106,13 +152,13 @@
       "chrome-border": { "$value": "{color.primitive.ink-border}" }
     },
     "block": {
-      "$description": "@kumite/blocks blockStyles — oklch L≈0,55 · C≈0,13, matiz por categoria; texto branco ≥ 4,5:1 em todos",
-      "logic": { "$value": "#2A75BA" },
-      "loops": { "$value": "#298646" },
-      "math": { "$value": "#6B64BA" },
-      "text": { "$value": "#008282" },
-      "lists": { "$value": "#8E57A5" },
-      "variables": { "$value": "#A76700" },
+      "$description": "@kumite/blocks blockStyles — oklch L≈0,55 · C≈0,13, matiz por categoria; texto branco ≥ 4,5:1 em todos. Texto e Variáveis tiveram o croma puxado para dentro do gamut sRGB (0,094 e 0,125); o hex é o valor.",
+      "logic": { "$value": "#2A75BA", "$description": "oklch(0.55 0.13 250)" },
+      "loops": { "$value": "#298646", "$description": "oklch(0.55 0.13 150)" },
+      "math": { "$value": "#6B64BA", "$description": "oklch(0.55 0.131 285)" },
+      "text": { "$value": "#008282", "$description": "oklch(0.55 0.094 195)" },
+      "lists": { "$value": "#8E57A5", "$description": "oklch(0.55 0.131 315)" },
+      "variables": { "$value": "#A76700", "$description": "oklch(0.57 0.125 68)" },
       "root": {
         "$value": "{color.primitive.ink-2}",
         "$description": "bloco resolver, texto paper-text"
@@ -151,7 +197,15 @@
     },
     "size": {
       "$type": "dimension",
-      "telao": { "$value": { "value": 84, "unit": "px" } },
+      "$description": "corpo da fonte (font-size), nunca largura",
+      "telao-title": {
+        "$value": { "value": 84, "unit": "px" },
+        "$description": "título do telão"
+      },
+      "telao-count": {
+        "$value": { "value": 96, "unit": "px" },
+        "$description": "contagem regressiva do telão"
+      },
       "h1": { "$value": { "value": 36, "unit": "px" } },
       "stat": { "$value": { "value": 44, "unit": "px" } },
       "h2": { "$value": { "value": 24, "unit": "px" } },
@@ -160,17 +214,26 @@
       "ui": { "$value": { "value": 14, "unit": "px" } },
       "small": { "$value": { "value": 13, "unit": "px" } },
       "eyebrow": { "$value": { "value": 13, "unit": "px" } },
-      "mono": { "$value": { "value": 13, "unit": "px" } }
+      "mono": { "$value": { "value": 13, "unit": "px" } },
+      "wordmark": {
+        "$value": { "value": 55, "unit": "px" },
+        "$description": "corpo do wordmark no lockup horizontal (make_logo.py FS = 55); a largura que sai disso é 212,09 px"
+      }
     }
   },
   "radius": {
     "$type": "dimension",
+    "$description": "control/card/pill são os nomes de spec; sm/md/lg/xl é a escala que tokens.css declara em absoluto, para não depender do calc() do shadcn em cima de --radius",
     "control": {
       "$value": { "value": 6, "unit": "px" },
-      "$description": "botões, inputs, badges retangulares"
+      "$description": "botões, inputs, badges retangulares (rounded-md)"
     },
-    "card": { "$value": { "value": 8, "unit": "px" } },
-    "pill": { "$value": { "value": 999, "unit": "px" } }
+    "card": { "$value": { "value": 8, "unit": "px" }, "$description": "cards (rounded-xl)" },
+    "pill": { "$value": { "value": 999, "unit": "px" } },
+    "sm": { "$value": { "value": 4, "unit": "px" } },
+    "md": { "$value": { "value": 6, "unit": "px" } },
+    "lg": { "$value": { "value": 8, "unit": "px" } },
+    "xl": { "$value": { "value": 8, "unit": "px" } }
   },
   "size": {
     "$type": "dimension",
@@ -185,7 +248,11 @@
     "header": { "$value": { "value": 56, "unit": "px" } },
     "mark-min": {
       "$value": { "value": 16, "unit": "px" },
-      "$description": "tamanho mínimo do símbolo"
+      "$description": "largura mínima do símbolo isolado"
+    },
+    "lockup-min-width": {
+      "$value": { "value": 96, "unit": "px" },
+      "$description": "largura mínima do lockup horizontal; o header é a exceção documentada (símbolo 24 px ≈ 80 px de lockup)"
     }
   }
 }

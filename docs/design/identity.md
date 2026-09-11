@@ -78,7 +78,9 @@ Vermilion quente, tinta sumi e papel levemente quente. Os valores vigentes
 estão em `tokens/kumite.tokens.json` — a fonte da verdade — e derivados à mão
 em `tokens/tokens.css`; as tabelas abaixo repetem o hex para leitura, e quem
 implementa cita **o token**, nunca o valor. `canvas/generate/check_tokens.py`
-confere os três arquivos.
+confere os quatro arquivos que repetem esses hex: os dois de `tokens/`, a
+tabela de contraste deste documento e `canvas/generate/common.py`, que desenha
+as pranchas.
 
 ### Modo claro
 

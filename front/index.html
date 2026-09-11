@@ -3,7 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- O chrome claro (--chrome de tokens.css). src/lib/theme.ts reescreve
+         este content quando o modo em tela e escuro, para a barra do
+         navegador no mobile nunca mentir sobre o que a pagina esta mostrando. -->
+    <meta name="theme-color" content="#1c1716" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>kumite</title>
+    <script>
+      // Anti-flash: roda antes do primeiro paint, entao antes do bundle. Sem
+      // ele, quem escolheu escuro leva um lampejo de papel a cada F5.
+      //
+      // A chave e a regra sao as mesmas de src/lib/theme.ts (que nao pode ser
+      // importado aqui: e um modulo, e modulo e deferido). Mudou uma, muda a
+      // outra — e2e/theme.spec.ts e o guarda dessa duplicacao.
+      try {
+        if (localStorage.getItem('kumite:theme') === 'dark') {
+          document.documentElement.classList.add('dark')
+        }
+      } catch {
+        // localStorage bloqueado (aba anonima, cookies desligados): claro.
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

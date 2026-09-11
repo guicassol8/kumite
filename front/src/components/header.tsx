@@ -1,6 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { Lockup } from '@/components/brand/lockup'
 import { LanguageSelector } from '@/components/language-selector'
 import { Button } from '@/components/ui/button'
 import { useSession } from '@/hooks/use-session'
@@ -17,9 +18,13 @@ export function Header() {
         to="/"
         data-testid="header-home-link"
         aria-label={t('header.homeLink')}
-        className="rounded-md font-bold text-xl tracking-tight outline-none transition-opacity hover:opacity-80 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
-        kumite
+        {/* Simbolo de 24px, o que da um lockup de ~80px: a excecao ao minimo
+            de 96px que a Regra 3 de docs/design/logo/README.md documenta para
+            o header. O SVG e aria-hidden, entao quem nomeia o link continua
+            sendo o aria-label traduzido acima. */}
+        <Lockup className="h-6 w-auto" />
       </Link>
       <div className="flex items-center gap-4">
         {/* Hydration failed, so we do not know who this is (#179). Offering

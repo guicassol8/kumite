@@ -8,53 +8,114 @@
    or the results band collapses to nothing (#155). */
 @custom-variant short (@media (max-height: 700px));
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Tokens da identidade visual — copiados de docs/design/tokens/tokens.css,
+   que é a fonte da verdade (spec em prosa: docs/design/identity.md). Mude lá
+   primeiro, depois espelhe aqui: src/test/design-parity.test.ts compara os
+   dois e falha nomeando o token que divergir.
+
+   Os valores são hex de propósito: fora do gamut sRGB o navegador não clipa
+   um oklch(), e a cor passaria a divergir do hex gêmeo usado nos SVGs do logo.
+   O oklch equivalente fica no comentário.
+   ───────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* A escala de raio (--radius-sm/md/lg/xl) NÃO mora aqui, ao contrário do
+     tokens.css: o Tailwind v4 só gera `rounded-*` a partir de variável de
+     tema, então ela vive dentro do @theme inline lá embaixo. Declarada só no
+     :root, `rounded-xl` continuaria nos 12px do default do Tailwind em vez
+     dos 8px que a spec pede para card. */
+  --radius: 0.375rem;
+
+  /* superfícies */
+  --background: #fcfaf7;                                /* oklch(0.986 0.005 78) papel */
+  --background-2: #f2f0ec;                              /* oklch(0.956 0.006 85) papel 2 */
+  --foreground: #1c1716;                                /* oklch(0.21 0.008 31) tinta */
+  --card: #ffffff;                                      /* oklch(1 0 90) cartão */
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --muted: var(--background-2);                         /* superfície de estado: hover de linha, linha selecionada */
+  --muted-foreground: #69615d;                          /* oklch(0.5 0.012 48) cinza texto */
+  --border: #e1ddda;                                    /* oklch(0.9 0.006 60) hairline */
+  --input: var(--border);
+
+  /* ações */
+  --primary: var(--foreground);                         /* botão primário = tinta */
+  --primary-foreground: var(--background);
+  --secondary: var(--background-2);
+  --secondary-foreground: var(--foreground);
+  --accent: var(--background-2);
+  --accent-foreground: var(--foreground);
+
+  /* marca — vermelho faixa. Preenchimento: Submeter, Abrir rodada, ao vivo, #1. */
+  --brand: #dd2824;                                     /* oklch(0.58 0.215 28) — texto branco 4,77:1, sobre papel 4,58:1 */
+  --brand-text: var(--brand);                           /* texto vermelho sobre papel/cartão (no escuro é mais claro) */
+  --brand-on-chrome: #f45246;                           /* oklch(0.66 0.2 28) — vermelho sobre o chrome carvão, IGUAL nos dois
+                                                           modos: chip ao vivo, contagem do header, × da tagline. O brand-text
+                                                           do claro só dá 3,72:1 ali. */
+  --brand-hover: #ce2320;                               /* oklch(0.55 0.205 28) */
+  --brand-soft: #fbe5e1;                                /* oklch(0.94 0.0248 30) — fundo da linha do seu time e halo, NUNCA o
+                                                           indicador de foco (1,2:1 sobre cartão) */
+  --brand-foreground: #ffffff;                          /* oklch(1 0 90) */
+  --ring: var(--brand);                                 /* foco = borda de 1 px em ring + halo de 3 px em ring/50 */
+
+  /* semânticos — erro nunca é preenchimento: contorno + ícone + texto */
+  --destructive: #c1133a;                               /* oklch(0.52 0.2 18) crimson (matiz 18°, distinto da marca em 28°) */
+  --destructive-foreground: #ffffff;                    /* oklch(1 0 90) */
+  --success: #008433;                                   /* oklch(0.535 0.155 148) — passa como texto (4,64:1) */
+  --warning: #ecaa0b;                                   /* oklch(0.78 0.16 80) — só preenchimento e borda (2,0:1: nunca texto,
+                                                           nunca ícone sozinho) */
+  --warning-text: #a06700;                              /* oklch(0.562 0.121 72) — âmbar para texto no claro (4,55:1) */
+
+  /* chrome — header e rodapé são carvão nos dois modos */
+  --chrome: var(--foreground);                          /* #1C1716 */
+  --chrome-foreground: #f3f1ef;                         /* oklch(0.96 0.0034 68) */
+  --chrome-muted: #9d9792;                              /* oklch(0.68 0.01 63) */
+  --chrome-border: #312d2c;                             /* oklch(0.3 0.006 34) */
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --background: #120f0d;                                /* oklch(0.17 0.007 56) */
+  --background-2: #1b1716;                              /* oklch(0.21 0.007 34) */
+  --foreground: #f3f1ef;                                /* oklch(0.96 0.0034 68) */
+  --card: var(--background-2);                          /* #1B1716 */
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --muted: #282322;                                     /* oklch(0.26 0.008 31) — um degrau ACIMA do cartão (1,15:1): sem ele
+                                                           hover de linha, linha selecionada, botão fantasma e secundário
+                                                           param de dar retorno. O estado se lê pelo degrau + o hairline. */
+  --muted-foreground: #9d9792;                          /* oklch(0.68 0.01 63) */
+  --border: #312d2c;                                    /* oklch(0.3 0.006 34) */
+  --input: var(--border);
+
+  --primary: var(--foreground);                         /* botão primário = papel */
+  --primary-foreground: #1c1716;                        /* oklch(0.21 0.008 31) */
+  --secondary: var(--muted);
+  --secondary-foreground: var(--foreground);
+  --accent: var(--muted);
+  --accent-foreground: var(--foreground);
+
+  --brand: #dd2824;                                     /* oklch(0.58 0.215 28) — preenchimento igual ao claro */
+  --brand-text: #f45246;                                /* oklch(0.66 0.2 28) — texto vermelho sobre o fundo escuro (5,58:1) */
+  --brand-hover: #ce2320;                               /* oklch(0.55 0.205 28) */
+  --brand-soft: #3a1a18;                                /* oklch(0.263 0.051 25) — fundo da linha do seu time */
+  --ring: var(--brand);
+
+  --destructive: #ef5c7b;                               /* oklch(0.673 0.182 10.6) — sobe de #E8496A, que sobre o cartão
+                                                           escuro dava 4,74:1 cheio e 4,07:1 na variante /90 da descrição
+                                                           do Alert. Agora: 5,49:1 e 4,67:1. */
+  --success: #3dba6a;                                   /* oklch(0.7 0.1596 151.57) */
+  --warning: #f5c044;                                   /* oklch(0.834 0.148 85) */
+  --warning-text: var(--warning);                       /* no escuro o âmbar já passa como texto (10,6:1 sobre cartão) */
+
+  --chrome: #0e0c0b;                                    /* oklch(0.156 0.004 48) — um passo mais escuro que o fundo */
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-2: var(--background-2);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
@@ -73,10 +134,32 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-brand: var(--brand);
+  --color-brand-text: var(--brand-text);
+  --color-brand-on-chrome: var(--brand-on-chrome);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --color-chrome: var(--chrome);
+  --color-chrome-foreground: var(--chrome-foreground);
+  --color-chrome-muted: var(--chrome-muted);
+  --color-chrome-border: var(--chrome-border);
+
+  /* Escala absoluta de propósito: o calc() do shadcn em cima de --radius
+     entregaria 4px em controle e 10px em card, o oposto da spec. Aqui dentro,
+     e não no :root, porque é daqui que o Tailwind v4 gera os `rounded-*`. */
+  --radius-sm: 4px;
+  --radius-md: 6px;                                     /* controles: rounded-md */
+  --radius-lg: 8px;
+  --radius-xl: 8px;                                     /* cards: rounded-xl */
+
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --font-sans: 'Barlow', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 @layer base {
@@ -84,6 +167,6 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground;
   }
 }

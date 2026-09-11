@@ -37,7 +37,9 @@ test.describe('header home link', () => {
 
     const link = page.getByTestId('header-home-link')
     await expect(link).toBeVisible()
-    await expect(link).toHaveText('kumite')
+    // The wordmark is the outlined lockup, aria-hidden: the accessible name
+    // comes from the label alone (#216).
+    await expect(link.getByTestId('brand-lockup')).toBeVisible()
     await expect(link).toHaveAttribute('href', '/')
     await expect(link).toHaveAttribute('aria-label', 'kumite — página inicial')
 
@@ -144,13 +146,13 @@ test.describe('header home link — visual walkthrough (#154)', () => {
     // 12 — es: the label changes, the visible wordmark does not.
     await page.getByTestId('language-option-es').click()
     await expect(link).toHaveAttribute('aria-label', 'kumite — página de inicio')
-    await expect(link).toHaveText('kumite')
+    await expect(link.getByTestId('brand-lockup')).toBeVisible()
     await page.screenshot({ path: evidence('12-rotulo-es'), clip: await headerClip(page) })
 
     // 13 — en, same wordmark.
     await page.getByTestId('language-option-en').click()
     await expect(link).toHaveAttribute('aria-label', 'kumite — home')
-    await expect(link).toHaveText('kumite')
+    await expect(link.getByTestId('brand-lockup')).toBeVisible()
     await page.screenshot({ path: evidence('13-rotulo-en'), clip: await headerClip(page) })
   })
 })

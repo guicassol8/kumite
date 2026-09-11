@@ -722,6 +722,7 @@
       "event": "Overall"
     },
     "lastClosedRoundLabel": "{{name}} — last closed round",
+    "notLiveBadge": "not live",
     "columns": {
       "rank": "#",
       "team": "Team",
@@ -730,7 +731,8 @@
     },
     "connection": {
       "connecting": "Connecting to the live leaderboard...",
-      "reconnecting": "Connection lost — reconnecting..."
+      "reconnecting": "Connection lost — reconnecting...",
+      "offline": "No live connection — showing the last loaded leaderboard. Reconnecting..."
     },
     "loading": "Loading leaderboard...",
     "error": {

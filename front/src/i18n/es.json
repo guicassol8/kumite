@@ -722,6 +722,7 @@
       "event": "General"
     },
     "lastClosedRoundLabel": "{{name}} — última ronda cerrada",
+    "notLiveBadge": "no en vivo",
     "columns": {
       "rank": "#",
       "team": "Equipo",
@@ -730,7 +731,8 @@
     },
     "connection": {
       "connecting": "Conectando al marcador en vivo...",
-      "reconnecting": "Conexión perdida — reconectando..."
+      "reconnecting": "Conexión perdida — reconectando...",
+      "offline": "Sin conexión en vivo — mostrando el último marcador cargado. Reconectando..."
     },
     "loading": "Cargando marcador...",
     "error": {

@@ -36,8 +36,11 @@ vi.mock('@vercel/speed-insights/react', () => ({
 
 import '@/i18n'
 
-import { clearSession, type SessionUser, setSession } from '@/lib/session'
+import { api } from '@/lib/api'
+import { clearSession, retryHydration, type SessionUser, setSession } from '@/lib/session'
 import { routeTree } from '@/routeTree.gen'
+
+const mockedGetMe = vi.mocked(api.me.$get)
 
 const fakeUser: SessionUser = {
   id: 'u1',
@@ -84,8 +87,11 @@ describe('root session bootstrap', () => {
     clearSession('expired')
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    // `notice` is the difference between a login screen that appeared for no
+    // reason and one that says why (#179).
     expect(router.state.location.search).toMatchObject({
       redirect: expect.stringContaining('/'),
+      notice: 'expired',
     })
   })
 
@@ -140,6 +146,46 @@ describe('root session bootstrap', () => {
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(router.state.location.pathname).toBe('/')
   })
+})
+
+// #179: the failure the user actually sees. Real timers here — the tree under
+// test is a live router, and the store's 0/500/1500ms backoff is the thing
+// being waited on, so these two run for ~2s each on purpose.
+describe('root session hydration failure (#179)', () => {
+  afterEach(() => {
+    mockedGetMe.mockReset()
+  })
+
+  // `setSession` + a non-awaited `retryHydration` is what puts a token in the
+  // store without authenticating it. Rendering while that cycle is in flight
+  // is deliberate: the root's own `ensureHydrated()` joins the same promise
+  // instead of starting a second round of attempts.
+  function startFailingHydration(): Promise<void> {
+    setSession(fakeUser, 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    return retryHydration()
+  }
+
+  it('replaces the route with the retry card when hydration gives up', async () => {
+    const hydrating = startFailingHydration()
+    renderApp('/')
+    await hydrating
+
+    await waitFor(() => expect(screen.getByTestId('session-error-card')).toBeDefined())
+    // The route below it is gone, not merely covered — nothing on the home
+    // screen should be firing queries against a session we could not load.
+    expect(screen.queryByTestId('home-round-card')).toBeNull()
+  }, 15_000)
+
+  it('keeps the header and the footer reachable behind the card', async () => {
+    const hydrating = startFailingHydration()
+    renderApp('/')
+    await hydrating
+
+    await waitFor(() => expect(screen.getByTestId('session-error-card')).toBeDefined())
+    expect(screen.getByTestId('app-header')).toBeDefined()
+    expect(screen.getByTestId('app-footer')).toBeDefined()
+  }, 15_000)
 })
 
 // The footer is the only contact channel during the event, so it must survive

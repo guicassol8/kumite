@@ -22,7 +22,12 @@ export function Header() {
         kumite
       </Link>
       <div className="flex items-center gap-4">
-        {status === 'authenticated' && user ? (
+        {/* Hydration failed, so we do not know who this is (#179). Offering
+            "Entrar/Cadastrar" would claim they are signed out — they may not
+            be — and the links go to screens the error card is covering
+            anyway. The language selector stays: it is what lets someone read
+            the error message at all. */}
+        {status === 'error' ? null : status === 'authenticated' && user ? (
           <>
             {user.role === 'organizer' && (
               <Link

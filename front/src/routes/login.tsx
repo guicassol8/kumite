@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { Info } from 'lucide-react'
 import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -23,7 +24,15 @@ import { setSession } from '@/lib/session'
 
 export const Route = createFileRoute('/login')({
   validateSearch: (search: Record<string, unknown>) =>
-    z.object({ redirect: z.string().optional() }).parse(search),
+    z
+      .object({
+        redirect: z.string().optional(),
+        // Set by the root when hydration finds the stored token dead (#179).
+        // Without it the user is dropped on a login form with no idea why the
+        // app stopped trusting them.
+        notice: z.enum(['expired']).optional(),
+      })
+      .parse(search),
   component: LoginScreen,
 })
 
@@ -94,6 +103,14 @@ function LoginScreen() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+              {search.notice === 'expired' && (
+                <Alert data-testid="login-expired-notice">
+                  {/* Without the icon the bordered box reads as one more empty
+                      input sitting above the email field. */}
+                  <Info />
+                  <AlertDescription>{t('auth.login.notices.expired')}</AlertDescription>
+                </Alert>
+              )}
               <FormField
                 control={form.control}
                 name="email"

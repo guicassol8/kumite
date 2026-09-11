@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Header } from '@/components/header'
 import i18n from '@/i18n'
 
-import { clearSession, getState, type SessionUser, setSession } from '@/lib/session'
+import { clearSession, getState, retryHydration, type SessionUser, setSession } from '@/lib/session'
 
 const fakeUser: SessionUser = {
   id: 'u1',
@@ -177,6 +177,45 @@ describe('Header', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
     await waitFor(() => expect(screen.getByTestId('header-login-link')).toBeDefined())
   })
+})
+
+// #179: hydration failed, so the header knows nothing about this visitor.
+// Showing "Entrar/Cadastrar" would assert they are signed out — which may
+// simply be false — and both links lead to screens the error card is covering.
+// Real timers: the 0/500/1500ms backoff is what these wait on.
+describe('Header while session hydration is in the error state (#179)', () => {
+  async function enterErrorState(): Promise<void> {
+    setSession(fakeUser, 'tok-1')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+    await retryHydration()
+    expect(getState().status).toBe('error')
+  }
+
+  it('offers no auth links and no user block', async () => {
+    await enterErrorState()
+    renderHeader('/teams')
+
+    await waitFor(() => expect(screen.getByTestId('app-header')).toBeDefined())
+    expect(screen.queryByTestId('header-login-link')).toBeNull()
+    expect(screen.queryByTestId('header-signup-link')).toBeNull()
+    expect(screen.queryByTestId('header-user-email')).toBeNull()
+    expect(screen.queryByTestId('header-logout-button')).toBeNull()
+  }, 15_000)
+
+  // The two things that still have to work: getting home, and reading the
+  // error message in a language the user speaks.
+  it('keeps the wordmark and the language selector', async () => {
+    await enterErrorState()
+    renderHeader('/teams')
+
+    await waitFor(() => expect(screen.getByTestId('header-home-link')).toBeDefined())
+    expect(screen.getByTestId('language-selector')).toBeDefined()
+  }, 15_000)
 })
 
 // TanStack Router tags the matching Link with a bare `active` class. Nothing

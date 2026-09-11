@@ -156,6 +156,12 @@ function LeaderboardScreen() {
       : (activeRoundRanking.data ?? stream.round ?? null)
     : (lastClosedRanking.data ?? null)
   const isLastClosedRound = !hasActiveRound && displayedRound !== null
+  // `rounds.data` comes straight off `.json()` with no zod parse, so its date
+  // fields are ISO strings at runtime despite the `Date` type — same caveat
+  // index.tsx already carries. Without SSE there is no `serverTime` either,
+  // so the countdown runs on an offset of 0.
+  const countdownClosesAt =
+    stream.closesAt ?? (restOpenRound?.closesAt ? new Date(restOpenRound.closesAt) : null)
   const eventRanking = stream.isLive
     ? (stream.event ?? eventRankingRest.data ?? null)
     : (eventRankingRest.data ?? stream.event ?? null)
@@ -214,6 +220,9 @@ function LeaderboardScreen() {
   const selectedTab = manualTab ?? defaultTab
 
   function retry() {
+    // Reopen the stream too: with /sse blocked the REST refetches alone would
+    // leave the screen permanently not-live even after the network recovers.
+    stream.reconnect()
     teams.refetch()
     rounds.refetch()
     lastClosedRanking.refetch()
@@ -243,17 +252,28 @@ function LeaderboardScreen() {
         >
           {isPresentation ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
         </Button>
-        {isPresentation && hasActiveRound && stream.closesAt !== null && (
-          <RoundCountdown closesAt={stream.closesAt} serverTimeOffsetMs={serverTimeOffsetMs} />
+        {stream.isOffline && (
+          <Badge
+            variant="outline"
+            data-testid="leaderboard-not-live-badge"
+            className={cn(isPresentation && 'text-xl')}
+          >
+            {t('leaderboard.notLiveBadge')}
+          </Badge>
+        )}
+        {isPresentation && hasActiveRound && countdownClosesAt !== null && (
+          <RoundCountdown closesAt={countdownClosesAt} serverTimeOffsetMs={serverTimeOffsetMs} />
         )}
       </div>
 
-      {stream.connectionStatus !== 'open' && (
+      {!stream.isLive && (
         <Alert data-testid="leaderboard-connection-banner">
           <AlertDescription>
-            {stream.connectionStatus === 'connecting'
-              ? t('leaderboard.connection.connecting')
-              : t('leaderboard.connection.reconnecting')}
+            {stream.isOffline
+              ? t('leaderboard.connection.offline')
+              : stream.connectionStatus === 'connecting'
+                ? t('leaderboard.connection.connecting')
+                : t('leaderboard.connection.reconnecting')}
           </AlertDescription>
         </Alert>
       )}

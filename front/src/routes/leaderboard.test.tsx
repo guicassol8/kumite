@@ -22,6 +22,7 @@ vi.mock('@/lib/api', () => ({
 
 import '@/i18n'
 
+import { OFFLINE_AFTER_MS } from '@/hooks/use-leaderboard-stream'
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import type { EventRanking, RoundRanking, SseEvent } from '@/lib/sse-schema'
@@ -625,6 +626,76 @@ describe('LeaderboardScreen — connection banner', () => {
   })
 })
 
+describe('LeaderboardScreen — offline signalling', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('switches the banner to the offline copy and raises the "not live" badge', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+    expect(screen.queryByTestId('leaderboard-not-live-badge')).toBeNull()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(OFFLINE_AFTER_MS)
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-not-live-badge')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-connection-banner').textContent).toContain(
+      'Sem conexão ao vivo',
+    )
+
+    emitStatus('open')
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-not-live-badge')).toBeNull())
+    expect(screen.queryByTestId('leaderboard-connection-banner')).toBeNull()
+  })
+})
+
+describe('LeaderboardScreen — the stream drops after connecting', () => {
+  // Acceptance #5: losing a stream that had already delivered a ranking must
+  // never send the venue's big screen back to the loading state.
+  it('keeps the last ranking on screen instead of falling back to loading', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emitStatus('open')
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+
+    emitStatus('reconnecting')
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-table')).toBeDefined()
+    expect(screen.queryByTestId('leaderboard-loading')).toBeNull()
+    expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('Time 1')
+  })
+})
+
+describe('LeaderboardScreen — retry', () => {
+  it('forces a stream reconnect on top of refetching every REST query', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(500, {}))
+    mockedRounds.mockResolvedValue(jsonResponse(500, {}))
+    mockedRoundRanking.mockResolvedValue(jsonResponse(500, {}))
+    mockedEventRanking.mockResolvedValue(jsonResponse(500, {}))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-error')).toBeDefined())
+    expect(connectEventStream).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByTestId('leaderboard-error-retry'))
+
+    await waitFor(() => expect(connectEventStream).toHaveBeenCalledTimes(2))
+  })
+})
+
 describe('LeaderboardScreen — empty state', () => {
   it('shows the empty state when the round has zero teams', async () => {
     renderLeaderboard()
@@ -735,6 +806,16 @@ describe('LeaderboardScreen — presentation mode', () => {
 
   it('shows the round countdown once presentation mode is toggled on', async () => {
     await renderWithActiveRound()
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    expect(screen.getByTestId('round-countdown')).toBeDefined()
+  })
+
+  it('shows the round countdown from the REST open round when the stream never connects', async () => {
+    mockedRounds.mockResolvedValue(jsonResponse(200, [openRoundSummary]))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
 
     fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
 

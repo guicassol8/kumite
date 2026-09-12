@@ -109,7 +109,9 @@ test.describe('round screen (#39)', () => {
     await expect(rowA).toContainText('—')
     await expect(rowB).toContainText('Produto')
     await expect(rowB).toContainText('—')
-    await expect(page.getByTestId('round-countdown')).toBeVisible()
+    // Scoped to <main>: the header (#217) renders its own round-countdown
+    // chip whenever a round is open.
+    await expect(page.getByRole('main').getByTestId('round-countdown')).toBeVisible()
     await page.screenshot({ path: evidence('02-problemas-sem-pontuacao'), fullPage: true })
 
     // 03 — closing it live flips the screen into the closed/read-only state

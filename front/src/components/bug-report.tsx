@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouterState } from '@tanstack/react-router'
-import { Bug } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -15,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import {
   Form,
@@ -75,15 +74,34 @@ function useBugReportSchema() {
  * `/change-password`, where #143 parks anyone on a temporary password: the
  * person who cannot get in is exactly the one with something to report.
  *
- * Living at the root is also what preserves a draft: the component never
- * unmounts, so closing the dialog and reopening it keeps what was typed.
- * Only a successful send clears it.
+ * Only the dialog lives here — the trigger(s) are `children`, so the header
+ * (#217) can render as many `<DialogTrigger asChild>` as it needs (one icon
+ * button on desktop). `open`/`onOpenChange` are controlled by the caller
+ * rather than owned here: the mobile menu row can't be a `<DialogTrigger>`
+ * of its own — it lives inside a `<SheetContent>`, and Sheet is built on the
+ * very same Radix `Dialog` primitive, so a `Dialog.Trigger` nested inside it
+ * binds to the Sheet's own context (the nearest `Dialog.Root`) instead of
+ * this one. The mobile row is a plain button that calls `onOpenChange(true)`
+ * directly after closing the sheet, and both triggers end up driving the
+ * same controlled `open` state.
+ *
+ * Mounted once inside the header, which itself lives in `__root.tsx`, so the
+ * trigger exists on every route and the draft survives closing the dialog
+ * (#145): the component never unmounts, so closing and reopening it keeps
+ * what was typed. Only a successful send clears it.
  */
-export function BugReport() {
+export function BugReport({
+  open,
+  onOpenChange: setOpen,
+  children,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  children: ReactNode
+}) {
   const { t } = useTranslation()
   const { user } = useSession()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const [open, setOpen] = useState(false)
   const [sent, setSent] = useState(false)
   const schema = useBugReportSchema()
 
@@ -153,17 +171,7 @@ export function BugReport() {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button
-          data-testid="bug-report-trigger"
-          variant="secondary"
-          size="sm"
-          className="fixed right-4 bottom-4 z-50 shadow-lg"
-        >
-          <Bug className="size-4" aria-hidden="true" />
-          {t('bugReport.trigger')}
-        </Button>
-      </DialogTrigger>
+      {children}
 
       <DialogContent data-testid="bug-report-dialog">
         <DialogHeader>

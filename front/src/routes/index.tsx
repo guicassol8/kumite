@@ -1,6 +1,6 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
@@ -8,7 +8,7 @@ import { RoundCountdown } from '@/components/round-countdown'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useEventStream } from '@/hooks/use-event-stream'
+import { useRoundStream } from '@/hooks/use-round-stream'
 import { useSession } from '@/hooks/use-session'
 import { formatDate } from '@/i18n/format'
 import { api } from '@/lib/api'
@@ -48,18 +48,24 @@ function Home() {
   })
   const myTeam = teams.data?.teams.find((team) => team.id === teams.data?.myTeamId) ?? null
 
-  // round.opened/round.closed refetch the list below so a newly opened
-  // round's name resolves and the closed-rounds list stays current — the
-  // countdown itself already updates from the pushed event, without this.
-  const invalidateRounds = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ROUNDS_QUERY_KEY })
-  }, [queryClient])
-  const eventStream = useEventStream(invalidateRounds)
+  const eventStream = useRoundStream()
   const rounds = useQuery({
     queryKey: ROUNDS_QUERY_KEY,
     queryFn: fetchRounds,
     enabled: isAuthenticated,
   })
+  // round.opened/round.closed refetch the list above so a newly opened
+  // round's name resolves and the closed-rounds list stays current — the
+  // countdown itself already updates from the pushed event, without this.
+  // `roundChangedAt` is shared by every consumer of the round stream
+  // (#217), so the ref skips the value it already saw on mount instead of
+  // invalidating on first render.
+  const lastRoundChangeRef = useRef(eventStream.roundChangedAt)
+  useEffect(() => {
+    if (eventStream.roundChangedAt === lastRoundChangeRef.current) return
+    lastRoundChangeRef.current = eventStream.roundChangedAt
+    queryClient.invalidateQueries({ queryKey: ROUNDS_QUERY_KEY })
+  }, [eventStream.roundChangedAt, queryClient])
   const openRound = rounds.data?.find((round) => round.id === eventStream.currentRoundId)
   // rounds.data comes straight from `.json()` (no client-side zod parsing,
   // unlike the SSE channel), so despite the `Date` type its fields are still

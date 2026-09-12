@@ -3,12 +3,14 @@ import { E2E_PARTICIPANT_NAME } from './support/rounds'
 
 // Visual walkthrough for #145, one screenshot per acceptance criterion.
 //
-// The floating trigger and its dialog are covered as units in
-// `src/components/bug-report.test.tsx`. What only a real browser can prove is
-// what lives here: that the trigger survives real routing on every route, that
-// a report actually reaches the API, and that the back's per-IP cooldown
-// answers 429 to the second one — the component test mocks `fetch` and so
-// cannot see any of that.
+// The dialog itself is covered as a unit in `src/components/bug-report.test.tsx`
+// and the desktop/mobile triggers in `src/components/header.test.tsx` (the FAB
+// this spec used to click is gone — the trigger moved into the header on
+// #217). What only a real browser can prove is what lives here: that the
+// trigger survives real routing on every route, that a report actually
+// reaches the API, and that the back's per-IP cooldown answers 429 to the
+// second one — the component tests mock `fetch` and so cannot see any of
+// that.
 const evidence = (name: string) => `e2e/evidence/145/${name}.png`
 
 const CONTACT_EMAIL = 'ligadealgoritmos@gmail.com'
@@ -26,17 +28,17 @@ test.describe('bug report — visual walkthrough (#145)', () => {
   test('shows the trigger on every anonymous route', async ({ page }) => {
     // 01 — home, anonymous.
     await page.goto('/')
-    await expect(page.getByTestId('bug-report-trigger')).toBeVisible()
+    await expect(page.getByTestId('header-bug-report-trigger')).toBeVisible()
     await page.screenshot({ path: evidence('01-gatilho-home-anonimo'), fullPage: true })
 
     // 02 — /login: whoever cannot get in is exactly who needs to report it.
     await page.goto('/login')
-    await expect(page.getByTestId('bug-report-trigger')).toBeVisible()
+    await expect(page.getByTestId('header-bug-report-trigger')).toBeVisible()
     await page.screenshot({ path: evidence('02-gatilho-login') })
 
     // 03 — /reset-password, still anonymous.
     await page.goto('/reset-password')
-    await expect(page.getByTestId('bug-report-trigger')).toBeVisible()
+    await expect(page.getByTestId('header-bug-report-trigger')).toBeVisible()
     await page.screenshot({ path: evidence('03-gatilho-reset-password') })
   })
 
@@ -45,7 +47,7 @@ test.describe('bug report — visual walkthrough (#145)', () => {
   // e-mail pré-preenchido."
   test('opens an empty dialog for an anonymous visitor', async ({ page }) => {
     await page.goto('/')
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
 
     await expect(page.getByTestId('bug-report-dialog')).toBeVisible()
     await expect(page.getByTestId('bug-report-description')).toHaveValue('')
@@ -59,7 +61,7 @@ test.describe('bug report — visual walkthrough (#145)', () => {
   // sem fechar o dialog."
   test('refuses an empty description without closing the dialog', async ({ page }) => {
     await page.goto('/')
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
     await page.getByTestId('bug-report-submit').click()
 
     // 05 — the dialog is still open, with the field-level message.
@@ -78,7 +80,7 @@ test.describe('bug report — visual walkthrough (#145)', () => {
   // zod is what refuses. Same boundary the component test documents.
   test('refuses an invalid reply-to address without closing the dialog', async ({ page }) => {
     await page.goto('/')
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
     await page.getByTestId('bug-report-description').fill('o editor de blocos travou')
 
     // 06 — the native guard: nothing is submitted and the dialog stays open.
@@ -118,7 +120,7 @@ test.describe('bug report — visual walkthrough (#145)', () => {
     await page.route('**/bug-reports', (route) => route.abort('failed'))
 
     await page.goto('/')
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
     const draft = 'a página de ranking não carrega no celular'
     await page.getByTestId('bug-report-description').fill(draft)
     await page.getByTestId('bug-report-submit').click()
@@ -142,7 +144,7 @@ test.describe('bug report — visual walkthrough (#145)', () => {
   // 200 immediately before it armed this IP's window.
   test('sends a real report, then is throttled on the second one', async ({ page }) => {
     await page.goto('/')
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
 
     // The payload the front builds itself — asserted here rather than trusted,
     // because `context` is attached automatically and is never a form field.
@@ -179,7 +181,7 @@ test.describe('bug report — visual walkthrough (#145)', () => {
 
     // A successful send is the only thing that clears the draft.
     await page.getByTestId('bug-report-close').click()
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
     await expect(page.getByTestId('bug-report-description')).toHaveValue('')
     // 11 — reopened after a success: the form is blank again, and the address
     // the reporter gave is kept so a second report costs less typing.
@@ -215,10 +217,10 @@ test.describe('bug report — visual walkthrough (#145)', () => {
     await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
 
     // 13 — the trigger is there for an authenticated participant too.
-    await expect(page.getByTestId('bug-report-trigger')).toBeVisible()
+    await expect(page.getByTestId('header-bug-report-trigger')).toBeVisible()
     await page.screenshot({ path: evidence('13-gatilho-autenticado'), fullPage: true })
 
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
     await expect(page.getByTestId('bug-report-description')).toHaveValue('')
     // 14 — the session address filled in, the description still blank.
     await expect(page.getByTestId('bug-report-email')).toHaveValue(email)
@@ -239,7 +241,7 @@ test.describe('bug report — visual walkthrough (#145)', () => {
 
     // 16 — pt, the suite's pinned browser locale. The error is produced by
     // submitting empty, so nothing is sent in any of the three passes.
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
     await expect(page.getByTestId('bug-report-dialog')).toContainText('Reportar um bug')
     await expect(page.getByTestId('bug-report-dialog')).toContainText('O que aconteceu?')
     await page.getByTestId('bug-report-submit').click()
@@ -249,7 +251,7 @@ test.describe('bug report — visual walkthrough (#145)', () => {
 
     // 17 — es.
     await page.getByTestId('language-option-es').click()
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
     await expect(page.getByTestId('bug-report-dialog')).toContainText('Reportar un error')
     await expect(page.getByTestId('bug-report-dialog')).toContainText('¿Qué pasó?')
     await page.getByTestId('bug-report-submit').click()
@@ -259,7 +261,7 @@ test.describe('bug report — visual walkthrough (#145)', () => {
 
     // 18 — en.
     await page.getByTestId('language-option-en').click()
-    await page.getByTestId('bug-report-trigger').click()
+    await page.getByTestId('header-bug-report-trigger').click()
     await expect(page.getByTestId('bug-report-dialog')).toContainText('Report a bug')
     await expect(page.getByTestId('bug-report-dialog')).toContainText('What happened?')
     await page.getByTestId('bug-report-submit').click()

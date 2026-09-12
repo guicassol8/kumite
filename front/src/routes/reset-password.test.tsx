@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +9,9 @@ vi.mock('@/lib/api', () => ({
       'request-password-reset': { $post: vi.fn() },
       'complete-password-reset': { $post: vi.fn() },
     },
+    // The footer (#217) is mounted on every route via `__root` and checks
+    // the API's health independently of anything this screen does.
+    health: { $get: vi.fn() },
   },
 }))
 
@@ -18,6 +22,7 @@ import { routeTree } from '@/routeTree.gen'
 
 const mockedRequest = vi.mocked(api.auth['request-password-reset'].$post)
 const mockedComplete = vi.mocked(api.auth['complete-password-reset'].$post)
+const mockedHealth = vi.mocked(api.health.$get)
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stub
 function jsonResponse(status: number, body: unknown = undefined): any {
@@ -29,7 +34,12 @@ function renderResetPassword() {
     routeTree,
     history: createMemoryHistory({ initialEntries: ['/reset-password'] }),
   })
-  render(<RouterProvider router={router} />)
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
   return router
 }
 
@@ -37,6 +47,8 @@ beforeEach(() => {
   mockedRequest.mockReset()
   mockedRequest.mockResolvedValue(jsonResponse(204))
   mockedComplete.mockReset()
+  mockedHealth.mockReset()
+  mockedHealth.mockReturnValue(new Promise(() => {}))
 })
 
 afterEach(() => {

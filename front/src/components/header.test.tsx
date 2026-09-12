@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createMemoryHistory,
   createRootRoute,
@@ -6,13 +7,29 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { Header } from '@/components/header'
-import i18n from '@/i18n'
+vi.mock('@/lib/api', () => ({
+  api: {
+    rounds: Object.assign(vi.fn(), { $get: vi.fn() }),
+  },
+}))
 
+const connectEventStream = vi.fn()
+vi.mock('@/lib/sse-client', () => ({
+  connectEventStream: (...args: unknown[]) => connectEventStream(...args),
+}))
+
+import { Header } from '@/components/header'
+import { RoundStreamProvider } from '@/hooks/use-round-stream'
+import i18n from '@/i18n'
+import { api } from '@/lib/api'
 import { clearSession, getState, retryHydration, type SessionUser, setSession } from '@/lib/session'
+import type { SseEvent } from '@/lib/sse-schema'
+import { setTheme } from '@/lib/theme'
+
+const mockedRounds = vi.mocked(api.rounds.$get)
 
 const fakeUser: SessionUser = {
   id: 'u1',
@@ -24,6 +41,16 @@ const fakeUser: SessionUser = {
   mustChangePassword: false,
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stubs
+function jsonResponse(status: number, body: unknown): any {
+  return { ok: status >= 200 && status < 300, status, json: async () => body }
+}
+
+function emitSse(event: SseEvent) {
+  const onEvent = connectEventStream.mock.calls.at(-1)?.[0] as (e: SseEvent) => void
+  act(() => onEvent(event))
 }
 
 // The header is exercised against a route tree of its own, not `routeTree.gen`
@@ -62,7 +89,14 @@ function renderHeader(initialEntry = '/login') {
     routeTree,
     history: createMemoryHistory({ initialEntries: [initialEntry] }),
   })
-  render(<RouterProvider router={router} />)
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RoundStreamProvider>
+        <RouterProvider router={router} />
+      </RoundStreamProvider>
+    </QueryClientProvider>,
+  )
   return router
 }
 
@@ -82,12 +116,22 @@ beforeEach(() => {
     ),
   )
   clearSession('manual')
+  mockedRounds.mockReset()
+  mockedRounds.mockResolvedValue(jsonResponse(200, []))
+  connectEventStream.mockReset()
+  connectEventStream.mockReturnValue(() => {})
+  localStorage.clear()
+  document.documentElement.className = ''
+  setTheme('system')
+  localStorage.clear()
 })
 
 afterEach(async () => {
   cleanup()
   vi.unstubAllGlobals()
   clearSession('manual')
+  localStorage.clear()
+  document.documentElement.className = ''
   // i18n is a module singleton: a test that switches language would otherwise
   // leak English/Spanish into every PT assertion that follows.
   await i18n.changeLanguage('pt')
@@ -179,6 +223,224 @@ describe('Header', () => {
   })
 })
 
+describe('Header — user menu (#217)', () => {
+  it('shows name and email at the top and a single change-password action', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    // A plain fireEvent.click does not open Radix's DropdownMenu in jsdom —
+    // its trigger opens on pointerdown/keyboard activation, and jsdom has no
+    // pointer-capture implementation for `fireEvent.pointerDown` to drive.
+    // Keyboard activation (Enter) is the interaction jsdom supports without
+    // pulling in @testing-library/user-event.
+    const trigger = await screen.findByTestId('header-user-menu-trigger')
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByText('Ada Lovelace')).toBeDefined()
+    expect(within(menu).getByText('ada@edu.pucrs.br')).toBeDefined()
+    const changePassword = within(menu).getByTestId('header-change-password-link')
+    expect(changePassword.getAttribute('href')).toBe('/change-password')
+  })
+
+  it('keeps language, theme and logout on the bar, not inside the menu', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    const trigger = await screen.findByTestId('header-user-menu-trigger')
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    const menu = await screen.findByRole('menu')
+
+    expect(within(menu).queryByTestId('language-selector')).toBeNull()
+    expect(within(menu).queryByTestId('header-theme-toggle')).toBeNull()
+    expect(within(menu).queryByTestId('header-logout-button')).toBeNull()
+    expect(screen.getByTestId('language-selector')).toBeDefined()
+    expect(screen.getByTestId('header-theme-toggle')).toBeDefined()
+    expect(screen.getByTestId('header-logout-button')).toBeDefined()
+  })
+})
+
+describe('Header — live round chip (#217)', () => {
+  it('is hidden with no open round and appears once state.sync reports one', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+    await waitFor(() => expect(connectEventStream).toHaveBeenCalledTimes(1))
+
+    expect(screen.queryByTestId('header-round-chip')).toBeNull()
+
+    emitSse({
+      type: 'state.sync',
+      serverTime: new Date('2026-09-02T12:00:00.000Z'),
+      round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
+    })
+
+    await waitFor(() => expect(screen.getByTestId('header-round-chip')).toBeDefined())
+  })
+
+  it('disappears again when the round closes', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+    await waitFor(() => expect(connectEventStream).toHaveBeenCalledTimes(1))
+
+    emitSse({
+      type: 'round.opened',
+      serverTime: new Date('2026-09-02T12:00:00.000Z'),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-02T12:30:00.000Z'),
+    })
+    await waitFor(() => expect(screen.getByTestId('header-round-chip')).toBeDefined())
+
+    emitSse({
+      type: 'round.closed',
+      serverTime: new Date('2026-09-02T12:30:00.000Z'),
+      roundId: 'r1',
+    })
+
+    await waitFor(() => expect(screen.queryByTestId('header-round-chip')).toBeNull())
+  })
+
+  it('does not render for an anonymous visitor', async () => {
+    renderHeader()
+
+    await waitFor(() => expect(screen.getByTestId('header-login-link')).toBeDefined())
+    expect(connectEventStream).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('header-round-chip')).toBeNull()
+  })
+})
+
+describe('Header — theme toggle (#217)', () => {
+  it('alternates the resolved theme and persists the choice', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    const toggle = await screen.findByTestId('header-theme-toggle')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+
+    fireEvent.click(toggle)
+    await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(true))
+
+    fireEvent.click(toggle)
+    await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(false))
+  })
+
+  it('is reachable while anonymous', async () => {
+    renderHeader()
+
+    expect(await screen.findByTestId('header-theme-toggle')).toBeDefined()
+  })
+})
+
+describe('Header — bug report trigger (#217)', () => {
+  it('opens the dialog from the desktop icon trigger', async () => {
+    renderHeader()
+
+    const trigger = await screen.findByTestId('header-bug-report-trigger')
+    fireEvent.click(trigger)
+
+    expect(await screen.findByTestId('bug-report-dialog')).toBeDefined()
+  })
+
+  // The mobile row is a plain button (#217), not a nested `<DialogTrigger>`
+  // — it lives inside the Sheet, which is built on the same Radix Dialog
+  // primitive, so a trigger nested in there would bind to the Sheet's own
+  // context instead of the bug-report dialog's. Clicking it closes the
+  // sheet and opens the same controlled dialog the desktop icon opens.
+  it('closes the menu panel and opens the dialog from the mobile row', async () => {
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    fireEvent.click(await screen.findByTestId('header-mobile-bug-report-trigger'))
+
+    expect(await screen.findByTestId('bug-report-dialog')).toBeDefined()
+    expect(screen.queryByTestId('header-mobile-user-block')).toBeNull()
+  })
+
+  it('shares one dialog and draft between the desktop and mobile triggers', async () => {
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-bug-report-trigger'))
+    fireEvent.change(await screen.findByTestId('bug-report-description'), {
+      target: { value: 'rascunho compartilhado' },
+    })
+    fireEvent.click(screen.getByTestId('bug-report-cancel'))
+    await waitFor(() => expect(screen.queryByTestId('bug-report-dialog')).toBeNull())
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    fireEvent.click(await screen.findByTestId('header-mobile-bug-report-trigger'))
+
+    expect(await screen.findByTestId<HTMLTextAreaElement>('bug-report-description')).toHaveProperty(
+      'value',
+      'rascunho compartilhado',
+    )
+  })
+})
+
+describe('Header — mobile menu panel (#217, closes #186/#198)', () => {
+  it('opens via the single menu trigger and shows Início, Trocar senha, Tema, Reportar bug and Sair', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    const panel = await screen.findByTestId('header-mobile-user-block')
+    expect(within(panel).getByText('Ada Lovelace')).toBeDefined()
+
+    expect(screen.getByTestId('header-mobile-home-link')).toBeDefined()
+    expect(screen.getByTestId('header-mobile-theme-toggle')).toBeDefined()
+    expect(screen.getByTestId('header-mobile-bug-report-trigger')).toBeDefined()
+    expect(screen.getByTestId('header-mobile-logout-button')).toBeDefined()
+    // Both the desktop dropdown item and the mobile panel row share this
+    // testid (#217) — only one exists in the DOM at a time because each
+    // lives inside its own closed-by-default Radix overlay, and only the
+    // mobile Sheet is open here.
+    expect(screen.getByTestId('header-change-password-link')).toBeDefined()
+  })
+
+  it('does not offer the language selector inside the panel — it stays on the bar at every width', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    await screen.findByTestId('header-mobile-user-block')
+
+    // A single instance on the bar, never duplicated inside the panel.
+    expect(screen.getAllByTestId('language-selector')).toHaveLength(1)
+  })
+
+  it('closes the panel when a nav link is clicked', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    await screen.findByTestId('header-mobile-home-link')
+
+    fireEvent.click(screen.getByTestId('header-mobile-home-link'))
+
+    await waitFor(() => expect(screen.queryByTestId('header-mobile-user-block')).toBeNull())
+  })
+
+  it('shows only public nav, theme and bug report for an anonymous visitor', async () => {
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    const panel = await screen
+      .findByTestId('header-mobile-bug-report-trigger')
+      .then((el) => el.closest('[role="dialog"]') as HTMLElement)
+
+    // Both the desktop bar and the mobile panel render login/signup with the
+    // same testid (#217) — the desktop copy stays in the DOM (jsdom ignores
+    // its `hidden md:flex`), so this scopes to the panel that is actually
+    // open.
+    expect(within(panel).getByTestId('header-login-link')).toBeDefined()
+    expect(within(panel).getByTestId('header-signup-link')).toBeDefined()
+    expect(screen.getByTestId('header-mobile-theme-toggle')).toBeDefined()
+    expect(screen.getByTestId('header-mobile-bug-report-trigger')).toBeDefined()
+    expect(screen.queryByTestId('header-mobile-user-block')).toBeNull()
+    expect(screen.queryByTestId('header-mobile-logout-button')).toBeNull()
+  })
+})
+
 // #179: hydration failed, so the header knows nothing about this visitor.
 // Showing "Entrar/Cadastrar" would assert they are signed out — which may
 // simply be false — and both links lead to screens the error card is covering.
@@ -205,6 +467,7 @@ describe('Header while session hydration is in the error state (#179)', () => {
     expect(screen.queryByTestId('header-signup-link')).toBeNull()
     expect(screen.queryByTestId('header-user-email')).toBeNull()
     expect(screen.queryByTestId('header-logout-button')).toBeNull()
+    expect(screen.queryByTestId('header-mobile-menu-trigger')).toBeNull()
   }, 15_000)
 
   // The two things that still have to work: getting home, and reading the

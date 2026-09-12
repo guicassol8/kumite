@@ -1,21 +1,25 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
   api: {
     'bug-reports': { $post: vi.fn() },
-    me: { $get: vi.fn() },
   },
-  authFetch: vi.fn(),
 }))
 
+import { BugReport } from '@/components/bug-report'
+import { DialogTrigger } from '@/components/ui/dialog'
 import i18n from '@/i18n'
-
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
-import { routeTree } from '@/routeTree.gen'
 
 const mockedPost = vi.mocked(api['bug-reports'].$post)
 
@@ -36,19 +40,37 @@ const fakeUser: SessionUser = {
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
 }
 
-// The component is mounted by __root.tsx, so the whole router is what puts it
-// on screen — which is also the assertion that it reaches every route.
+// The dialog only, mounted with a trigger of the test's own choosing (#217):
+// the real triggers (one per viewport) now live in the header, covered by
+// header.test.tsx. `useRouterState` still needs a router underneath, so this
+// is a route tree of its own — same pattern as header.test.tsx — rather than
+// the full `routeTree.gen`.
+function TestBugReport() {
+  // BugReport is a controlled dialog (#217): the mobile menu row can't be a
+  // `<DialogTrigger>` of its own (it lives inside a Sheet, built on the same
+  // Dialog primitive, so a nested trigger would bind to the Sheet's context
+  // instead), so the header owns `open` and this harness mirrors that.
+  const [open, setOpen] = useState(false)
+  return (
+    <BugReport open={open} onOpenChange={setOpen}>
+      <DialogTrigger data-testid="bug-report-trigger">abrir</DialogTrigger>
+    </BugReport>
+  )
+}
+
+const rootRoute = createRootRoute({ component: TestBugReport })
+const routeTree = rootRoute.addChildren(
+  ['/', '/login'].map((path) =>
+    createRoute({ getParentRoute: () => rootRoute, path, component: () => null }),
+  ),
+)
+
 function renderApp(initialEntry = '/login') {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: [initialEntry] }),
   })
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  )
+  render(<RouterProvider router={router} />)
   return router
 }
 
@@ -80,12 +102,6 @@ afterEach(async () => {
 })
 
 describe('BugReport', () => {
-  it('shows the trigger on any route, anonymous included', async () => {
-    renderApp('/')
-
-    expect(await screen.findByTestId('bug-report-trigger')).toBeDefined()
-  })
-
   it('opens with an empty description and an empty email when anonymous', async () => {
     renderApp()
     await openDialog()
@@ -247,15 +263,5 @@ describe('BugReport', () => {
 
     await openDialog()
     expect(screen.getByTestId<HTMLTextAreaElement>('bug-report-description').value).toBe('')
-  })
-
-  it.each([
-    ['es', 'Reportar error'],
-    ['en', 'Report a bug'],
-  ])('renders the trigger in %s', async (language, label) => {
-    await i18n.changeLanguage(language)
-    renderApp()
-
-    expect((await screen.findByTestId('bug-report-trigger')).textContent).toContain(label)
   })
 })

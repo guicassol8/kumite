@@ -1,13 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { RoundCountdown } from '@/components/round-countdown'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useEventStream } from '@/hooks/use-event-stream'
+import { useRoundStream } from '@/hooks/use-round-stream'
 import { formatDate } from '@/i18n/format'
 import { fetchRoundRanking } from '@/lib/ranking-query'
 import { fetchOrganizerStats, ORGANIZER_STATS_QUERY_KEY } from '@/lib/stats-query'
@@ -34,16 +34,25 @@ function OrganizerOverviewScreen() {
     refetchInterval: STATS_REFETCH_INTERVAL_MS,
   })
 
-  const invalidateStats = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ORGANIZER_STATS_QUERY_KEY })
-  }, [queryClient])
+  const eventStream = useRoundStream()
   // A round opening or closing changes both the numbers and which round the
-  // card is about, so the podium query goes stale with them.
-  const onRoundChange = useCallback(() => {
-    invalidateStats()
+  // card is about, so the podium query goes stale with them; a scored
+  // submission (ranking.updated) only changes the numbers. Both are shared
+  // signals off the app-wide stream (#217) — the refs skip the value each
+  // already saw on mount instead of invalidating on first render.
+  const lastRoundChangeRef = useRef(eventStream.roundChangedAt)
+  useEffect(() => {
+    if (eventStream.roundChangedAt === lastRoundChangeRef.current) return
+    lastRoundChangeRef.current = eventStream.roundChangedAt
+    queryClient.invalidateQueries({ queryKey: ORGANIZER_STATS_QUERY_KEY })
     queryClient.invalidateQueries({ queryKey: ['ranking'] })
-  }, [invalidateStats, queryClient])
-  const eventStream = useEventStream(onRoundChange, invalidateStats)
+  }, [eventStream.roundChangedAt, queryClient])
+  const lastRankingUpdateRef = useRef(eventStream.rankingUpdatedAt)
+  useEffect(() => {
+    if (eventStream.rankingUpdatedAt === lastRankingUpdateRef.current) return
+    lastRankingUpdateRef.current = eventStream.rankingUpdatedAt
+    queryClient.invalidateQueries({ queryKey: ORGANIZER_STATS_QUERY_KEY })
+  }, [eventStream.rankingUpdatedAt, queryClient])
 
   const activeRound = stats.data?.round.active ?? null
   const lastClosedRound = stats.data?.round.lastClosed ?? null

@@ -53,13 +53,25 @@ function jsonResponse(status: number, body: unknown): any {
   return { ok: status >= 200 && status < 300, status, json: async () => body }
 }
 
+// The screen owns a dedicated connection alongside the app-wide one opened by
+// `RoundStreamProvider` in `__root` (#217). That provider is a fixed ancestor
+// with no round.opened/round.closed/ranking.updated consumer of its own to
+// disambiguate by shape, but its connect effect commits right after the
+// screen's initial one and it never reconnects — so it is always exactly the
+// second call ever made, constant across the whole file. Excluding it leaves
+// only the leaderboard's own connection, including any later one opened by
+// `reconnect()`.
+function leaderboardConnectionCalls() {
+  return connectEventStream.mock.calls.filter((_, index) => index !== 1)
+}
+
 function emit(event: SseEvent) {
-  const onEvent = connectEventStream.mock.calls.at(-1)?.[0] as (e: SseEvent) => void
+  const onEvent = leaderboardConnectionCalls().at(-1)?.[0] as (e: SseEvent) => void
   act(() => onEvent(event))
 }
 
 function emitStatus(status: 'connecting' | 'open' | 'reconnecting') {
-  const onStatusChange = connectEventStream.mock.calls.at(-1)?.[1] as (s: string) => void
+  const onStatusChange = leaderboardConnectionCalls().at(-1)?.[1] as (s: string) => void
   act(() => onStatusChange(status))
 }
 
@@ -688,11 +700,11 @@ describe('LeaderboardScreen — retry', () => {
     renderLeaderboard()
 
     await waitFor(() => expect(screen.getByTestId('leaderboard-error')).toBeDefined())
-    expect(connectEventStream).toHaveBeenCalledTimes(1)
+    expect(leaderboardConnectionCalls()).toHaveLength(1)
 
     fireEvent.click(screen.getByTestId('leaderboard-error-retry'))
 
-    await waitFor(() => expect(connectEventStream).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(leaderboardConnectionCalls()).toHaveLength(2))
   })
 })
 

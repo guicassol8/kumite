@@ -66,6 +66,8 @@ describe('useEventStream', () => {
       closesAt: new Date('2026-09-02T12:30:00.000Z'),
       serverTime,
       status: 'connecting',
+      roundChangedAt: null,
+      rankingUpdatedAt: null,
     })
   })
 
@@ -183,6 +185,53 @@ describe('useEventStream', () => {
     unmount()
 
     expect(unsubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('roundChangedAt updates on round.opened and round.closed, not on state.sync or heartbeat', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useEventStream())
+
+    const syncTime = new Date('2026-09-02T12:00:00.000Z')
+    emit({
+      type: 'state.sync',
+      serverTime: syncTime,
+      round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
+    })
+    expect(result.current.roundChangedAt).toBeNull()
+
+    const heartbeatTime = new Date('2026-09-02T12:01:00.000Z')
+    emit({ type: 'heartbeat', serverTime: heartbeatTime })
+    expect(result.current.roundChangedAt).toBeNull()
+
+    const openedTime = new Date('2026-09-02T12:02:00.000Z')
+    emit({
+      type: 'round.opened',
+      serverTime: openedTime,
+      roundId: 'r1',
+      closesAt: new Date('2026-09-02T12:30:00.000Z'),
+    })
+    expect(result.current.roundChangedAt).toEqual(openedTime)
+
+    const closedTime = new Date('2026-09-02T12:03:00.000Z')
+    emit({ type: 'round.closed', serverTime: closedTime, roundId: 'r1' })
+    expect(result.current.roundChangedAt).toEqual(closedTime)
+  })
+
+  it('rankingUpdatedAt updates only on ranking.updated', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useEventStream())
+
+    emit({
+      type: 'round.opened',
+      serverTime: new Date('2026-09-02T12:00:00.000Z'),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-02T12:30:00.000Z'),
+    })
+    expect(result.current.rankingUpdatedAt).toBeNull()
+
+    const updatedTime = new Date('2026-09-02T12:05:00.000Z')
+    emit({ type: 'ranking.updated', serverTime: updatedTime, round: null, event: { teams: [] } })
+    expect(result.current.rankingUpdatedAt).toEqual(updatedTime)
   })
 
   it('tracks connection status changes reported by connectEventStream', () => {

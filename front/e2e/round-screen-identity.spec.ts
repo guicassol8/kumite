@@ -108,8 +108,10 @@ test.describe('round screen identity (#229)', () => {
     await expect(rowA).toContainText('Soma dos Pares')
     await expect(rowB).toContainText('B')
     await expect(rowB).toContainText('Contar Números Negativos')
-    await expect(page.getByTestId('round-countdown')).toBeVisible()
-    await expect(page.getByTestId('round-countdown-summary')).toHaveCount(1)
+    // Scoped to <main>: the header (#217) renders its own round-countdown
+    // chip (with its own sr-only summary) whenever a round is open.
+    await expect(page.getByRole('main').getByTestId('round-countdown')).toBeVisible()
+    await expect(page.getByRole('main').getByTestId('round-countdown-summary')).toHaveCount(1)
     await expect(page.getByTestId('round-problems-table')).toHaveAttribute('role', 'table')
     await page.screenshot({ path: evidence('01-desktop-aberta'), fullPage: true })
 

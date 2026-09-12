@@ -10,6 +10,8 @@ export type EventStreamState = {
   closesAt: Date | null
   serverTime: Date | null
   status: SseConnectionStatus
+  roundChangedAt: Date | null
+  rankingUpdatedAt: Date | null
 }
 
 const INITIAL_STATE: EventStreamState = {
@@ -17,6 +19,8 @@ const INITIAL_STATE: EventStreamState = {
   closesAt: null,
   serverTime: null,
   status: 'connecting',
+  roundChangedAt: null,
+  rankingUpdatedAt: null,
 }
 
 // Live current-round state for the home screen, sourced from the /sse
@@ -62,6 +66,7 @@ export function useEventStream(
               currentRoundId: event.roundId,
               closesAt: event.closesAt,
               serverTime: event.serverTime,
+              roundChangedAt: event.serverTime,
             }))
             onRoundChangeRef.current?.()
             return
@@ -75,12 +80,19 @@ export function useEventStream(
           case 'round.closed':
             setState((prev) =>
               prev.currentRoundId === event.roundId
-                ? { ...prev, currentRoundId: null, closesAt: null, serverTime: event.serverTime }
+                ? {
+                    ...prev,
+                    currentRoundId: null,
+                    closesAt: null,
+                    serverTime: event.serverTime,
+                    roundChangedAt: event.serverTime,
+                  }
                 : prev,
             )
             onRoundChangeRef.current?.()
             return
           case 'ranking.updated':
+            setState((prev) => ({ ...prev, rankingUpdatedAt: event.serverTime }))
             onRankingUpdateRef.current?.()
             return
           case 'heartbeat':

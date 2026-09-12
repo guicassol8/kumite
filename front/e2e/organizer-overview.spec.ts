@@ -192,7 +192,11 @@ test.describe('organizer overview', () => {
     const roundId = await seedRound(`Rodada Overview ${stamp}`, problemId)
     await roundSlot.open(auth, roundId)
     await expect(page.getByTestId('overview-round-name')).toContainText(`Rodada Overview ${stamp}`)
-    await expect(page.getByTestId('round-countdown')).toBeVisible()
+    // Scoped to the round card: the header (#217) renders its own
+    // round-countdown chip whenever a round is open.
+    await expect(
+      page.getByTestId('overview-round-card').getByTestId('round-countdown'),
+    ).toBeVisible()
     await page.screenshot({ path: evidence('03-round-open-timer'), fullPage: true })
 
     // 04 — a team submits while the round runs. The page is never reloaded:

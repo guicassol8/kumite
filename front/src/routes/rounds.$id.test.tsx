@@ -27,15 +27,17 @@ import { routeTree } from '@/routeTree.gen'
 const mockedGet = vi.mocked(api.rounds[':id'].$get)
 const sseUnsubscribe = vi.fn()
 
+// The screen owns a dedicated connection alongside the app-wide one opened by
+// `RoundStreamProvider` in `__root` (#217) — mounted as a descendant of the
+// provider, its effect commits first, so its call is always the first of the
+// two `connectEventStream` calls, never the last.
 function emitSse(event: SseEvent) {
-  const onEvent = connectEventStream.mock.calls.at(-1)?.[0] as (e: SseEvent) => void
+  const onEvent = connectEventStream.mock.calls[0]?.[0] as (e: SseEvent) => void
   act(() => onEvent(event))
 }
 
 function emitStatus(status: SseConnectionStatus) {
-  const onStatusChange = connectEventStream.mock.calls.at(-1)?.[1] as (
-    s: SseConnectionStatus,
-  ) => void
+  const onStatusChange = connectEventStream.mock.calls[0]?.[1] as (s: SseConnectionStatus) => void
   act(() => onStatusChange(status))
 }
 

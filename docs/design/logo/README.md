@@ -12,13 +12,15 @@ SVG? Rode `sh docs/design/logo/export.sh` e commite os dois.
 | `kumite-lockup-horizontal.svg` · `-dark.svg` | símbolo + wordmark lado a lado, fundo transparente | header, assinatura de e-mail, documentos |
 | `kumite-lockup-horizontal-on-paper.svg` · `-on-ink.svg` | idem, com placa de fundo e margem | redes sociais, slides, quando o fundo não é controlado |
 | `kumite-lockup-stacked.svg` · `-dark.svg` | símbolo sobre o wordmark | avatar quadrado, capa, pôster |
-| `kumite-app-icon.svg` | placa vermelha arredondada com o símbolo em papel + tinta | ícone de app, `apple-touch-icon` |
+| `kumite-app-icon.svg` | placa vermelha arredondada com o símbolo em papel + tinta | ícone de app, `apple-touch-icon`, `manifest.webmanifest` |
 | `favicon.svg` | símbolo que troca o bloco direito conforme `prefers-color-scheme` | `front/public/favicon.svg` |
+| `kumite-og-card.svg` | **segunda exceção à Regra 1** (fundo carvão, lockup em vermelho + papel — como as variantes `-dark`): lockup horizontal a 60% da largura de um card 1200×630, centrado | `og:image` / `twitter:image` (#230) |
 
-`png/` traz **36 arquivos**: o símbolo em 16, 24, 32, 64, 128, 256, 512 e
-1024 px (claro e escuro), o ícone de app em 512 e 1024, `favicon-32.png`,
-`apple-touch-icon-180.png` e cada lockup/wordmark em 1200 e 2400 px de largura.
-O 24 está na lista porque é o tamanho do símbolo no header.
+`png/` traz **38 arquivos**: o símbolo em 16, 24, 32, 64, 128, 256, 512 e
+1024 px (claro e escuro), o ícone de app em 192, 512 e 1024, `favicon-32.png`,
+`apple-touch-icon-180.png`, cada lockup/wordmark em 1200 e 2400 px de largura,
+e `kumite-og-card-1200.png` (único tamanho — nenhum crawler de preview de link
+pede variantes). O 24 está na lista porque é o tamanho do símbolo no header.
 
 No fim do export, `export.sh` chama `../canvas/generate/check_mark.py`, que abre
 os PNGs de 16, 24, 32 e 64 px, mede a linha central e **falha se os dois blocos

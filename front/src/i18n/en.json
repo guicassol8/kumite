@@ -522,6 +522,19 @@
       }
     }
   },
+  "shell": {
+    "notFound": {
+      "title": "Page not found",
+      "body": "That address doesn't exist on kumite.",
+      "home": "Back to the home page"
+    },
+    "error": {
+      "title": "Something went wrong",
+      "body": "This screen could not be displayed.",
+      "retry": "Try again",
+      "home": "Back to the home page"
+    }
+  },
   "teams": {
     "heading": "Teams",
     "loading": "Loading teams...",

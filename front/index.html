@@ -1,5 +1,8 @@
 <!doctype html>
-<html lang="pt-BR">
+<!-- lang parte de "pt" (o fallbackLng do i18n), nao "pt-BR": src/i18n/index.ts
+     (T11, #230) reescreve este atributo para o idioma resolvido assim que o
+     modulo carrega, e este e so o valor de partida ate la. -->
+<html lang="pt">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,6 +13,39 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>kumite</title>
+    <!-- Metadados de compartilhamento (#230). Unico texto do app que NAO passa
+         pelo i18n: o crawler que le og:/twitter: nao executa JS, entao nao ha
+         como servir estas tags no idioma ativo. PT porque e o fallbackLng do
+         i18n e a lingua da sede do evento. VITE_SITE_URL (src/lib/site-url.ts)
+         resolve {{SITE_URL}} no build; sem a var, cai no dominio de producao. -->
+    <meta
+      name="description"
+      content="Programação em blocos na Semana Acadêmica PUCRS × Mérida 2026: resolva os desafios, submeta sua solução e acompanhe o placar ao vivo."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="kumite" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:title" content="kumite — PUCRS × Mérida 2026" />
+    <meta
+      property="og:description"
+      content="Programação em blocos na Semana Acadêmica PUCRS × Mérida 2026: resolva os desafios, submeta sua solução e acompanhe o placar ao vivo."
+    />
+    <meta property="og:url" content="{{SITE_URL}}/" />
+    <meta property="og:image" content="{{SITE_URL}}/og-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Símbolo do kumite: dois blocos em guarda, um vermelho e um claro, sobre fundo carvão."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="kumite — PUCRS × Mérida 2026" />
+    <meta
+      name="twitter:description"
+      content="Programação em blocos na Semana Acadêmica PUCRS × Mérida 2026: resolva os desafios, submeta sua solução e acompanhe o placar ao vivo."
+    />
+    <meta name="twitter:image" content="{{SITE_URL}}/og-card.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       // Anti-flash: roda antes do primeiro paint, entao antes do bundle. Sem
       // ele, quem escolheu escuro leva um lampejo de papel a cada F5.

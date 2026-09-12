@@ -19,6 +19,7 @@ export default defineConfig({
       './src/test/blockly-jsdom.ts',
       './src/test/router-jsdom.ts',
       './src/test/radix-select-jsdom.ts',
+      './src/test/match-media-jsdom.ts',
     ],
     include: ['src/**/*.test.{ts,tsx}'],
   },

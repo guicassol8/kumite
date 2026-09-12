@@ -774,6 +774,12 @@
       "exit": "Exit presentation mode"
     }
   },
+  "roundCountdown": {
+    "summary_one": "{{name}} ends in {{count}} minute",
+    "summary_other": "{{name}} ends in {{count}} minutes",
+    "summaryNoName_one": "Ends in {{count}} minute",
+    "summaryNoName_other": "Ends in {{count}} minutes"
+  },
   "roundDetail": {
     "heading": "Round",
     "status": {

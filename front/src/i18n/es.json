@@ -774,6 +774,12 @@
       "exit": "Salir del modo presentación"
     }
   },
+  "roundCountdown": {
+    "summary_one": "{{name}} termina en {{count}} minuto",
+    "summary_other": "{{name}} termina en {{count}} minutos",
+    "summaryNoName_one": "Termina en {{count}} minuto",
+    "summaryNoName_other": "Termina en {{count}} minutos"
+  },
   "roundDetail": {
     "heading": "Ronda",
     "status": {

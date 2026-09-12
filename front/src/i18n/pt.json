@@ -774,6 +774,12 @@
       "exit": "Sair do modo apresentação"
     }
   },
+  "roundCountdown": {
+    "summary_one": "{{name}} termina em {{count}} minuto",
+    "summary_other": "{{name}} termina em {{count}} minutos",
+    "summaryNoName_one": "Termina em {{count}} minuto",
+    "summaryNoName_other": "Termina em {{count}} minutos"
+  },
   "roundDetail": {
     "heading": "Rodada",
     "status": {

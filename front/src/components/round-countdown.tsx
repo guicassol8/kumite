@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { cn } from '@/lib/utils'
+
 function formatRemaining(ms: number): string {
   const clamped = Math.max(0, ms)
   const totalSeconds = Math.floor(clamped / 1000)
@@ -19,9 +21,13 @@ function formatRemaining(ms: number): string {
 export function RoundCountdown({
   closesAt,
   serverTimeOffsetMs,
+  className,
+  roundName,
 }: {
   closesAt: Date
   serverTimeOffsetMs: number
+  className?: string
+  roundName?: string
 }) {
   const { t } = useTranslation()
   const [now, setNow] = useState(() => Date.now())
@@ -32,10 +38,18 @@ export function RoundCountdown({
   }, [])
 
   const remainingMs = closesAt.getTime() - (now + serverTimeOffsetMs)
+  const remainingMinutes = Math.ceil(Math.max(0, remainingMs) / 60_000)
 
   return (
-    <span data-testid="round-countdown">
-      {t('home.round.timeRemaining', { time: formatRemaining(remainingMs) })}
-    </span>
+    <>
+      <span data-testid="round-countdown" aria-live="off" className={cn(className)}>
+        {t('home.round.timeRemaining', { time: formatRemaining(remainingMs) })}
+      </span>
+      <span data-testid="round-countdown-summary" className="sr-only">
+        {roundName
+          ? t('roundCountdown.summary', { name: roundName, count: remainingMinutes })
+          : t('roundCountdown.summaryNoName', { count: remainingMinutes })}
+      </span>
+    </>
   )
 }

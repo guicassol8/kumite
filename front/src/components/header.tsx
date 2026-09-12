@@ -107,6 +107,7 @@ export function Header() {
   const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [bugReportOpen, setBugReportOpen] = useState(false)
   const isAuthenticated = status === 'authenticated' && user != null
 
   function logout() {
@@ -116,6 +117,15 @@ export function Header() {
 
   function closeMobileMenu() {
     setMobileMenuOpen(false)
+  }
+
+  // Closes the sheet first: two overlays open at once would be a confusing
+  // stack, and — see BugReport's own doc comment — a `<DialogTrigger>`
+  // nested inside the still-open Sheet would bind to the Sheet's own
+  // context instead of the bug-report dialog's.
+  function openBugReportFromMobileMenu() {
+    closeMobileMenu()
+    setBugReportOpen(true)
   }
 
   return (
@@ -151,7 +161,7 @@ export function Header() {
           // row) — Radix supports more than one trigger per root and they
           // need not be adjacent, and this is what keeps the draft and the
           // dialog's open state shared regardless of which one opened it.
-          <BugReport>
+          <BugReport open={bugReportOpen} onOpenChange={setBugReportOpen}>
             <div className="flex flex-1 items-center justify-end gap-2 md:gap-4">
               {/* Desktop (>=768px, size.breakpoint-cards). A single
                 `LanguageSelector` and a single mobile menu trigger sit
@@ -393,16 +403,15 @@ export function Header() {
                         />
                       </div>
 
-                      <DialogTrigger asChild>
-                        <button
-                          type="button"
-                          data-testid="header-mobile-bug-report-trigger"
-                          className="flex items-center gap-2 py-2 text-left text-sm"
-                        >
-                          <Bug className="size-4" aria-hidden="true" />
-                          {t('header.reportBug')}
-                        </button>
-                      </DialogTrigger>
+                      <button
+                        type="button"
+                        data-testid="header-mobile-bug-report-trigger"
+                        className="flex items-center gap-2 py-2 text-left text-sm"
+                        onClick={openBugReportFromMobileMenu}
+                      >
+                        <Bug className="size-4" aria-hidden="true" />
+                        {t('header.reportBug')}
+                      </button>
 
                       {isAuthenticated && (
                         <Button

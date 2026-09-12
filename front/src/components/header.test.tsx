@@ -341,6 +341,40 @@ describe('Header — bug report trigger (#217)', () => {
 
     expect(await screen.findByTestId('bug-report-dialog')).toBeDefined()
   })
+
+  // The mobile row is a plain button (#217), not a nested `<DialogTrigger>`
+  // — it lives inside the Sheet, which is built on the same Radix Dialog
+  // primitive, so a trigger nested in there would bind to the Sheet's own
+  // context instead of the bug-report dialog's. Clicking it closes the
+  // sheet and opens the same controlled dialog the desktop icon opens.
+  it('closes the menu panel and opens the dialog from the mobile row', async () => {
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    fireEvent.click(await screen.findByTestId('header-mobile-bug-report-trigger'))
+
+    expect(await screen.findByTestId('bug-report-dialog')).toBeDefined()
+    expect(screen.queryByTestId('header-mobile-user-block')).toBeNull()
+  })
+
+  it('shares one dialog and draft between the desktop and mobile triggers', async () => {
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-bug-report-trigger'))
+    fireEvent.change(await screen.findByTestId('bug-report-description'), {
+      target: { value: 'rascunho compartilhado' },
+    })
+    fireEvent.click(screen.getByTestId('bug-report-cancel'))
+    await waitFor(() => expect(screen.queryByTestId('bug-report-dialog')).toBeNull())
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    fireEvent.click(await screen.findByTestId('header-mobile-bug-report-trigger'))
+
+    expect(await screen.findByTestId<HTMLTextAreaElement>('bug-report-description')).toHaveProperty(
+      'value',
+      'rascunho compartilhado',
+    )
+  })
 })
 
 describe('Header — mobile menu panel (#217, closes #186/#198)', () => {

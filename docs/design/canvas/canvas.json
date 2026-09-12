@@ -162,6 +162,24 @@
       "w": 390,
       "h": 844,
       "page": "telas"
+    },
+    {
+      "file": "Rodada.dc.html",
+      "title": "Rodada",
+      "x": 0,
+      "y": 3738,
+      "w": 1280,
+      "h": 800,
+      "page": "telas"
+    },
+    {
+      "file": "RodadaCelular.dc.html",
+      "title": "Rodada · celular",
+      "x": 1360,
+      "y": 3738,
+      "w": 390,
+      "h": 844,
+      "page": "telas"
     }
   ],
   "annotations": [
@@ -196,6 +214,14 @@
       "w": 390,
       "page": "telas",
       "text": "Header mobile: lockup + idioma + menu (#186). Rodapé empilhado. Reportar bug: ícone no header no desktop, item do painel no celular — o FAB do canto não existe em largura nenhuma (#198, #217)."
+    },
+    {
+      "id": "nota-rodada",
+      "x": 0,
+      "y": 3638,
+      "w": 460,
+      "page": "telas",
+      "text": "Rodada (#229): letra da posição (A, B, C…) vem de problems[].position, mesma regra de positionLabel() no front. Abaixo do breakpoint de 768 px da #228, a implementação reflui um único DOM em vez de trocar de tabela para cards — aqui as duas pranchas só ilustram os dois enquadramentos."
     }
   ],
   "launch": {

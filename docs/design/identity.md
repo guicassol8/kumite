@@ -386,7 +386,8 @@ escuro. Implementação via `Blockly.Theme.defineTheme` dentro de
 ## 7. Telas de referência
 
 PNG de cada tela em `screens/` e artboards editáveis em `canvas/`:
-início, login (painel-pôster), cadastro no celular, editor claro e escuro,
+início, rodada (lista de problemas, desktop e celular), login (painel-pôster),
+cadastro no celular, editor claro e escuro,
 times, placar, telão, painel do organizador; pranchas de símbolo, paleta,
 tipografia, componentes e Blockly.
 

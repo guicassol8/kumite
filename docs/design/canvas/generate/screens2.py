@@ -159,3 +159,63 @@ def home(menu_open=False):
             '</div></div></div>'
             '</div></main>' + footer())
     return page("Menu do usuário" if menu_open else "Início", body)
+
+# ---------- Rodada (lista de problemas, #229) ----------
+# A letra vem de problems[].position (A, B, C…) — mesma regra que positionLabel
+# em front/src/lib/round-position.ts. As três dificuldades reusam exatamente os
+# badges que já existem em Componentes.dc.html, nunca placa preenchida (§5).
+ROUND_PROBLEMS = [
+    ("A", "Soma dos Pares", "easy", 100, None),
+    ("B", "Maior Valor da Lista", "medium", 100, 80),
+    ("C", "Contar Números Negativos", "hard", 150, None),
+]
+
+DIFFICULTY_LABEL = {"easy": "Fácil", "medium": "Médio", "hard": "Difícil"}
+
+def difficulty_badge(level):
+    if level == "easy": return '<span class="badge badge-success">Fácil</span>'
+    if level == "medium": return '<span class="badge" style="color: var(--warning-text); border-color: var(--warning);">Médio</span>'
+    return '<span class="badge" style="color: var(--destructive); border-color: var(--destructive);">Difícil</span>'
+
+def _round_status_badge(closed=False):
+    if closed: return '<span class="badge badge-muted">Encerrada</span>'
+    return '<span class="badge"><span class="dot"></span>Aberta</span>'
+
+def _round_header(closed=False):
+    status = _round_status_badge(closed)
+    sub = ('<span class="muted small">Encerrada às 13:00</span>' if closed else
+           '<span class="num" style="font-weight: 600; font-size: 24px; color: var(--brand-text);">41:07</span>')
+    return ('<div style="display: flex; flex-direction: column; gap: 6px;"><span class="eyebrow">Rodada</span>'
+            '<div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">'
+            f'<span class="display" style="font-weight: 700; font-size: 36px;">Rodada 2</span>{status}</div>{sub}</div>')
+
+def round_detail(mobile=False):
+    if not mobile:
+        rows = ""
+        for letter, title, level, points, best in ROUND_PROBLEMS:
+            b = score(best) if best is not None else '<span class="muted">—</span>'
+            rows += (f'<tr><td><span class="display" style="font-weight: 700; font-size: 20px;">{letter}</span></td>'
+                     f'<td style="font-weight: 500;">{title}</td><td>{difficulty_badge(level)}</td>'
+                     f'<td><span class="num" style="font-weight: 600;">{points}</span></td><td>{b}</td></tr>')
+        table = ('<div class="card" style="overflow: hidden;"><table class="table"><thead><tr>'
+                 '<th>Letra</th><th>Título</th><th>Dificuldade</th><th>Pontos</th><th>Melhor pontuação</th></tr></thead>'
+                 f'<tbody>{rows}</tbody></table></div>')
+        body = (header("participant") +
+                '<main style="flex: 1; padding: 32px 24px; display: flex; justify-content: center;">'
+                '<div style="width: 100%; max-width: 1040px; display: flex; flex-direction: column; gap: 24px;">'
+                f'{_round_header()}{table}</div></main>' + footer())
+        return page("Rodada", body)
+
+    cards = ""
+    for letter, title, level, points, best in ROUND_PROBLEMS:
+        best_s = best if best is not None else "—"
+        meta = f'{DIFFICULTY_LABEL[level]} · {points} pts · {best_s}'
+        cards += ('<div class="card" style="padding: 16px; display: flex; align-items: center; gap: 14px;">'
+                  f'<span class="display" style="font-weight: 700; font-size: 28px; width: 30px; flex: none;">{letter}</span>'
+                  '<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">'
+                  f'<span style="font-weight: 500;">{title}</span><span class="muted small">{meta}</span></div></div>')
+    body = (header("participant", compact=True) +
+            '<main style="flex: 1; padding: 20px 16px 24px; display: flex; flex-direction: column; gap: 20px;">'
+            f'{_round_header()}<div style="display: flex; flex-direction: column; gap: 10px;">{cards}</div>'
+            '</main>' + footer(compact=True))
+    return page("Rodada · celular", body)

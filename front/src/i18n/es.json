@@ -13,10 +13,29 @@
     "organizerLink": "Organizador",
     "teamsLink": "Equipos",
     "leaderboardLink": "Marcador",
-    "changePassword": "Cambiar contraseña"
+    "changePassword": "Cambiar contraseña",
+    "reportBug": "Reportar un problema",
+    "theme": {
+      "toggleToDark": "Cambiar a modo oscuro",
+      "toggleToLight": "Cambiar a modo claro",
+      "label": "Tema oscuro"
+    },
+    "menu": {
+      "open": "Abrir menú",
+      "close": "Cerrar menú",
+      "title": "Menú"
+    },
+    "nav": {
+      "home": "Inicio"
+    }
   },
   "footer": {
-    "contactLabel": "¿Dudas? Habla con la organización:"
+    "contactLabel": "¿Dudas? Habla con la organización:",
+    "status": {
+      "connected": "Conectado",
+      "error": "Sin conexión",
+      "connecting": "Conectando"
+    }
   },
   "session": {
     "error": {
@@ -28,7 +47,6 @@
     }
   },
   "bugReport": {
-    "trigger": "Reportar error",
     "title": "Reportar un error",
     "intro": "Cuéntanos qué pasó. Lo enviamos directo a la organización junto con la página en la que estás.",
     "descriptionLabel": "¿Qué pasó?",

@@ -13,10 +13,29 @@
     "organizerLink": "Organizer",
     "teamsLink": "Teams",
     "leaderboardLink": "Leaderboard",
-    "changePassword": "Change password"
+    "changePassword": "Change password",
+    "reportBug": "Report a problem",
+    "theme": {
+      "toggleToDark": "Switch to dark mode",
+      "toggleToLight": "Switch to light mode",
+      "label": "Dark theme"
+    },
+    "menu": {
+      "open": "Open menu",
+      "close": "Close menu",
+      "title": "Menu"
+    },
+    "nav": {
+      "home": "Home"
+    }
   },
   "footer": {
-    "contactLabel": "Questions? Talk to the organizers:"
+    "contactLabel": "Questions? Talk to the organizers:",
+    "status": {
+      "connected": "Connected",
+      "error": "No connection",
+      "connecting": "Connecting"
+    }
   },
   "session": {
     "error": {
@@ -28,7 +47,6 @@
     }
   },
   "bugReport": {
-    "trigger": "Report a bug",
     "title": "Report a bug",
     "intro": "Tell us what happened. We send it straight to the organizers, along with the page you are on.",
     "descriptionLabel": "What happened?",

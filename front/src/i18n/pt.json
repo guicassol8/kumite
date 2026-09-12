@@ -13,10 +13,29 @@
     "organizerLink": "Organizador",
     "teamsLink": "Times",
     "leaderboardLink": "Placar",
-    "changePassword": "Trocar senha"
+    "changePassword": "Trocar senha",
+    "reportBug": "Reportar um problema",
+    "theme": {
+      "toggleToDark": "Mudar para o modo escuro",
+      "toggleToLight": "Mudar para o modo claro",
+      "label": "Tema escuro"
+    },
+    "menu": {
+      "open": "Abrir menu",
+      "close": "Fechar menu",
+      "title": "Menu"
+    },
+    "nav": {
+      "home": "Início"
+    }
   },
   "footer": {
-    "contactLabel": "Dúvidas? Fale com a organização:"
+    "contactLabel": "Dúvidas? Fale com a organização:",
+    "status": {
+      "connected": "Conectado",
+      "error": "Sem conexão",
+      "connecting": "Conectando"
+    }
   },
   "session": {
     "error": {
@@ -28,7 +47,6 @@
     }
   },
   "bugReport": {
-    "trigger": "Reportar bug",
     "title": "Reportar um bug",
     "intro": "Conte o que aconteceu. Enviamos direto para a organização junto com a página em que você está.",
     "descriptionLabel": "O que aconteceu?",

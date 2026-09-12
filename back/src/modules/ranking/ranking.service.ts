@@ -229,8 +229,16 @@ export async function getRoundRanking(db: Db, roundId: string): Promise<RoundRan
     teams.map((team) => team.id),
   )
 
+  // A team with no attempts at all in this round never submitted — the
+  // per-round leaderboard only lists participants (#184). getEventRanking
+  // keeps every active team: a team that hasn't scored yet is still
+  // legitimate information there, so it doesn't share this filter.
+  const participatingTeams = teams.filter((team) =>
+    (entriesByTeam.get(team.id) ?? []).some((entry) => entry.attempts > 0),
+  )
+
   const ranked = rankTeams(
-    teams.map((team) => ({
+    participatingTeams.map((team) => ({
       teamId: team.id,
       teamName: team.name,
       entries: entriesByTeam.get(team.id) ?? [],

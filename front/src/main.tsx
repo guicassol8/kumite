@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { createRouter, RouterProvider } from '@tanstack/react-router'
+import { RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -7,22 +7,16 @@ import './fonts'
 import './i18n'
 import './index.css'
 import { queryClient } from './lib/query-client'
+import { createAppRouter } from './lib/router'
 import { applyTheme } from './lib/theme'
 import { purgeLegacyWorkspaceState } from './lib/workspace-storage'
-import { routeTree } from './routeTree.gen'
 
 // O script de index.html ja pos a classe dark no <html> antes do paint; esta
 // chamada e quem alinha a meta theme-color ao modo, que o HTML estatico so
 // consegue chutar como claro.
 applyTheme()
 
-const router = createRouter({ routeTree })
-
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router
-  }
-}
+const router = createAppRouter()
 
 // Before the first screen: the workspaces saved by the old build have no
 // owner, so any account that opens the editor would read them (#175). They are

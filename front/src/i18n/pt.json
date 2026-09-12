@@ -787,6 +787,7 @@
       "closed": "Encerrada"
     },
     "waiting": "Carregando a rodada...",
+    "closedAt": "Encerrada às {{time}}",
     "notFound": {
       "title": "Rodada não encontrada.",
       "backHome": "Voltar para o início"

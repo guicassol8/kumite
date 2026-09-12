@@ -16,8 +16,10 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useEventStream } from '@/hooks/use-event-stream'
+import { formatTime } from '@/i18n/format'
 import { fetchRound, RoundNotFoundError, roundQueryKey } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/rounds/$id')({
   beforeLoad: requireAuth,
@@ -101,7 +103,7 @@ function RoundDetailScreen() {
     : 0
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">
+    <main className="mx-auto flex max-w-4xl flex-col items-start gap-4 p-8">
       {eventStream.status === 'reconnecting' && (
         <Alert data-testid="round-connection-status">
           <AlertDescription>{t('roundDetail.connection.reconnecting')}</AlertDescription>
@@ -124,16 +126,45 @@ function RoundDetailScreen() {
         </Alert>
       )}
 
-      <div className="flex w-full items-center justify-between gap-4">
-        <h1 className="font-bold text-2xl">{round.data.name}</h1>
-        <Badge data-testid="round-detail-status-badge">
-          {t(`roundDetail.status.${round.data.status}`)}
-        </Badge>
+      <div className="flex w-full flex-col gap-1">
+        <span className="font-display text-[13px] font-semibold text-muted-foreground uppercase tracking-[0.12em]">
+          {t('roundDetail.heading')}
+        </span>
+        <div className="flex w-full items-center justify-between gap-4">
+          <h1 className="font-display font-bold text-4xl">{round.data.name}</h1>
+          <Badge
+            data-testid="round-detail-status-badge"
+            variant="outline"
+            className={cn(
+              'gap-1.5',
+              round.data.status === 'open' && 'border-brand text-brand-text',
+            )}
+          >
+            {round.data.status === 'open' && (
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-brand" />
+            )}
+            {t(`roundDetail.status.${round.data.status}`)}
+          </Badge>
+        </div>
       </div>
 
-      {showCountdown && closesAt && (
-        <RoundCountdown closesAt={closesAt} serverTimeOffsetMs={serverTimeOffsetMs} />
-      )}
+      {round.data.status === 'open'
+        ? showCountdown &&
+          closesAt && (
+            <RoundCountdown
+              closesAt={closesAt}
+              serverTimeOffsetMs={serverTimeOffsetMs}
+              roundName={round.data.name}
+              className="font-display font-semibold text-brand-text tabular-nums"
+            />
+          )
+        : round.data.closedAt && (
+            <span data-testid="round-detail-closed-at" className="text-muted-foreground text-sm">
+              {t('roundDetail.closedAt', {
+                time: formatTime(new Date(round.data.closedAt), locale),
+              })}
+            </span>
+          )}
 
       {round.data.problems.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t('roundDetail.emptyProblems')}</p>

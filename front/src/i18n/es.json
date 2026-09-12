@@ -787,6 +787,7 @@
       "closed": "Cerrada"
     },
     "waiting": "Cargando la ronda...",
+    "closedAt": "Cerrada a las {{time}}",
     "notFound": {
       "title": "Ronda no encontrada.",
       "backHome": "Volver al inicio"

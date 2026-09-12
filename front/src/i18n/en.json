@@ -787,6 +787,7 @@
       "closed": "Closed"
     },
     "waiting": "Loading the round...",
+    "closedAt": "Closed at {{time}}",
     "notFound": {
       "title": "Round not found.",
       "backHome": "Back to home"

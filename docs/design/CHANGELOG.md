@@ -3,6 +3,23 @@
 Registro datado das decisões de design. Uma entrada por mudança de direção,
 paleta, tipografia ou logo; ajustes de implementação ficam nos PRs.
 
+## v1.4 — 2026-09-12 — o card social e o ícone de 192 px (#230)
+
+Duas cascas globais (404, erro do router) e os metadados de compartilhamento
+não tinham dono — `og:image` em especial, porque o link do kumite vai
+circular por WhatsApp e Instagram e a alternativa era um retângulo cinza com a
+URL. Conceito, paleta e tipografia não mudam de direção aqui.
+
+- **`kumite-og-card.svg`, a segunda exceção à Regra 1.** Fundo carvão, lockup
+  em vermelho + papel — a mesma inversão que as variantes `-dark` já fazem,
+  não uma nova. 1200×630, lockup horizontal a 60% da largura (720 px),
+  centrado nos dois eixos. Sem tagline: o wordmark já é a peça inteira do
+  card. Gerado a partir do mesmo par (mark + wordmark 55px) que o lockup
+  horizontal usa, escalado — não é uma composição nova.
+- **`kumite-app-icon-192.png`.** O manifest do PWA (`front/manifest.webmanifest`,
+  #230) pede um ícone abaixo de 512, que não existia; 512 e 1024 continuam
+  servindo apple-touch-icon e splash/lojas.
+
 ## v1.3 — 2026-09-11 — o telão fora do instante único, o chrome inteiro e o breakpoint com número (#228)
 
 Auditoria do que as issues do epic mandam construir contra o que `identity.md`

@@ -143,6 +143,26 @@ def build_wordmark():
     open(f"{OUT}/kumite-lockup-stacked-dark.svg", "w").write(stacked(RED, PAPER, PAPER))
     print("lockup", LW, "stacked", SW, SH)
 
+    # ---- og card: 1200x630 (#230), a peça que os crawlers do WhatsApp/Slack/
+    # Instagram pedem quando o link do kumite é colado. Reusa o mesmo par
+    # (tx, ty, d, LW) do lockup horizontal em vez de recompute-lo: é o lockup
+    # "on-ink" (vermelho + papel), sem a margem própria dele, escalado para
+    # ocupar 60% da largura do card e centrado nos dois eixos.
+    def build_og_card():
+        card_w, card_h = 1200, 630
+        target_w = round(card_w * 0.6, 2)  # 720: ver identity.md — Regra 2 (respiro)
+        s = target_w / LW
+        scaled_h = round(64 * s, 3)
+        ox = round((card_w - target_w) / 2, 3)
+        oy = round((card_h - scaled_h) / 2, 3)
+        inner = mark_paths(RED, PAPER) + f'<path transform="translate({round(tx, 3)} {round(ty, 3)})" d="{d}" fill="{PAPER}"/>'
+        body = f'<g transform="translate({ox} {oy}) scale({round(s, 6)})">{inner}</g>'
+        open(f"{OUT}/kumite-og-card.svg", "w").write(
+            svg(card_w, card_h, body, bg=INK, title="kumite — PUCRS × Mérida 2026"))
+        print("og card", card_w, card_h, "lockup escalado", round(s, 3))
+
+    build_og_card()
+
 
 if __name__ == "__main__":
     build_marks()

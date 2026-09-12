@@ -19,7 +19,10 @@
 # that same 204 too, and that the current password keeps working until the
 # code is actually completed.
 #
-# This file spends 5 of the per-IP request budget and ~5 of the complete one.
+# This file spends 6 of the per-IP request budget (the 6th, #231's `locale`
+# coverage, lands after the address is already over its own per-email
+# ceiling — still a no-op 204, same as steps 6-7 before it) and ~5 of the
+# complete one.
 # It is not quite alone on these routes: users.hurl calls
 # /auth/complete-password-reset once (one more off the complete budget), on the
 # failure path only, to prove that a failed OTP reset leaves `mustChangePassword`
@@ -118,3 +121,20 @@ Content-Type: application/json
 HTTP 400
 [Asserts]
 jsonpath "$.error" == "invalid_otp"
+
+# 7. `locale` (#231) is optional and, when a supported one is sent, accepted
+# with no observable difference from outside — it only changes which
+# language the (unobservable, from here) notification email is rendered in.
+POST {{host}}/auth/request-password-reset
+Content-Type: application/json
+{ "email": "password-reset-e2e@edu.pucrs.br", "locale": "es" }
+HTTP 204
+
+# An unsupported locale is a validation failure, same envelope as every other
+# malformed body in this file.
+POST {{host}}/auth/request-password-reset
+Content-Type: application/json
+{ "email": "password-reset-e2e@edu.pucrs.br", "locale": "fr" }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"

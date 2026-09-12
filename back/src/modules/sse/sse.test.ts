@@ -6,7 +6,14 @@ import { app } from '../../app'
 import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
 import { k } from '../../context'
 import { createDb } from '../../db/client'
-import { roundsTable, teamsTable, usersTable } from '../../db/schema'
+import {
+  problemsTable,
+  roundProblemsTable,
+  roundsTable,
+  submissionsTable,
+  teamsTable,
+  usersTable,
+} from '../../db/schema'
 import { listRounds, resetPendingRoundClosures } from '../rounds/rounds.service'
 
 // #176: the hold on round.closed keys off judging still in flight. The real
@@ -216,7 +223,9 @@ describe('sse.service', () => {
     beforeEach(async () => {
       judging.rounds.clear()
       resetPendingRoundClosures()
-      await db.execute(sql`truncate table ${roundsTable}, ${teamsTable} restart identity cascade`)
+      await db.execute(
+        sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemsTable}, ${teamsTable}, ${usersTable} restart identity cascade`,
+      )
     })
 
     afterAll(async () => {
@@ -416,6 +425,66 @@ describe('sse.service', () => {
         expect(event.type).toBe('ranking.updated')
         expect(event.round?.roundId).toBe(round.id)
         expect(event.event).toEqual({ teams: [] })
+      })
+
+      // #184: a team that never submitted must not show up on the round
+      // ranking carried over SSE — same rule as the HTTP endpoint, since
+      // this just wraps getRoundRanking. The event-wide ranking keeps every
+      // active team, which is the assertion that would catch a regression
+      // leaking the round filter into the aggregate.
+      it('omits a team that never submitted from the round ranking, but not from the event ranking', async () => {
+        const [problem] = await db
+          .insert(problemsTable)
+          .values({ difficulty: 'easy', status: 'published', points: 100 })
+          .returning()
+        if (!problem) throw new Error('expected fixture')
+
+        const [round] = await db
+          .insert(roundsTable)
+          .values({
+            name: 'Round 1',
+            durationMinutes: 30,
+            status: 'open',
+            openedAt: new Date(),
+            closesAt: new Date(Date.now() + 60_000),
+          })
+          .returning()
+        if (!round) throw new Error('expected fixture')
+        await db
+          .insert(roundProblemsTable)
+          .values({ roundId: round.id, problemId: problem.id, position: 0 })
+
+        const [teamA] = await db.insert(teamsTable).values({ name: 'Time A' }).returning()
+        const [teamB] = await db.insert(teamsTable).values({ name: 'Time B' }).returning()
+        if (!teamA || !teamB) throw new Error('expected fixture')
+
+        const [user] = await db
+          .insert(usersTable)
+          .values({
+            email: 'sse-ranking-fixture@edu.pucrs.br',
+            passwordHash: 'hash',
+            role: 'participant',
+            university: 'pucrs',
+          })
+          .returning()
+        if (!user) throw new Error('expected fixture')
+
+        await db.insert(submissionsTable).values({
+          problemId: problem.id,
+          roundId: round.id,
+          teamId: teamA.id,
+          userId: user.id,
+          workspace: {},
+          generatedCode: '',
+          caseResults: [],
+          score: 100,
+          attemptNumber: 1,
+        })
+
+        const event = await buildRankingUpdatedEvent(db)
+
+        expect(event.round?.teams.map((team) => team.teamName)).toEqual(['Time A'])
+        expect(event.event.teams.map((team) => team.teamName).sort()).toEqual(['Time A', 'Time B'])
       })
 
       it('carries a null round and a populated event ranking when nothing is open', async () => {

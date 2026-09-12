@@ -522,6 +522,19 @@
       }
     }
   },
+  "shell": {
+    "notFound": {
+      "title": "Página no encontrada",
+      "body": "Esa dirección no existe en kumite.",
+      "home": "Volver a la página de inicio"
+    },
+    "error": {
+      "title": "Algo salió mal",
+      "body": "No se pudo mostrar esta pantalla.",
+      "retry": "Intentar de nuevo",
+      "home": "Volver a la página de inicio"
+    }
+  },
   "teams": {
     "heading": "Equipos",
     "loading": "Cargando equipos...",

@@ -522,6 +522,19 @@
       }
     }
   },
+  "shell": {
+    "notFound": {
+      "title": "Página não encontrada",
+      "body": "Esse endereço não existe no kumite.",
+      "home": "Voltar para a página inicial"
+    },
+    "error": {
+      "title": "Algo deu errado",
+      "body": "Não foi possível exibir esta tela.",
+      "retry": "Tentar de novo",
+      "home": "Voltar para a página inicial"
+    }
+  },
   "teams": {
     "heading": "Times",
     "loading": "Carregando times...",

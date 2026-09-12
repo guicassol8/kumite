@@ -28,6 +28,13 @@ const INDEX_CSS = path.join(REPO_ROOT, 'front/src/index.css')
 const COPIED_ICONS = [
   ['docs/design/logo/favicon.svg', 'front/public/favicon.svg'],
   ['docs/design/logo/png/apple-touch-icon-180.png', 'front/public/apple-touch-icon.png'],
+  // og:image e ícones do manifest.webmanifest (#230) — mesma história: um
+  // export.sh rodado sem atualizar a cópia vira card ou ícone velho no ar,
+  // e nada além deste teste percebe.
+  ['docs/design/logo/png/kumite-og-card-1200.png', 'front/public/og-card.png'],
+  ['docs/design/logo/png/kumite-app-icon-192.png', 'front/public/icons/app-icon-192.png'],
+  ['docs/design/logo/png/kumite-app-icon-512.png', 'front/public/icons/app-icon-512.png'],
+  ['docs/design/logo/png/kumite-app-icon-1024.png', 'front/public/icons/app-icon-1024.png'],
 ] as const
 
 /** Blockly's palette (#218) is consumed by `@kumite/blocks`, not by the theme. */

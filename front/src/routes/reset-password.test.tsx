@@ -81,7 +81,9 @@ describe('ResetPasswordScreen — step 1, requesting a code', () => {
     renderResetPassword()
     await requestCode()
 
-    expect(mockedRequest).toHaveBeenCalledWith({ json: { email: 'ada@edu.pucrs.br' } })
+    expect(mockedRequest).toHaveBeenCalledWith({
+      json: { email: 'ada@edu.pucrs.br', locale: 'pt' },
+    })
     const emailInput = screen.getByTestId('reset-password-email-input') as HTMLInputElement
     expect(emailInput.value).toBe('ada@edu.pucrs.br')
   })

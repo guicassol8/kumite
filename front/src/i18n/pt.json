@@ -789,10 +789,12 @@
     "waiting": "Carregando a rodada...",
     "closedAt": "Encerrada às {{time}}",
     "notFound": {
+      "alertTitle": "Rodada não encontrada",
       "title": "Rodada não encontrada.",
       "backHome": "Voltar para o início"
     },
     "loadError": {
+      "alertTitle": "Não foi possível carregar",
       "message": "Não foi possível carregar a rodada.",
       "retry": "Tentar novamente"
     },

@@ -238,6 +238,15 @@ describe('RoundDetailScreen', () => {
     expect(screen.queryByTestId('round-just-closed-notice')).toBeNull()
   })
 
+  it('shows the empty-round card when the round has no problems', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, roundDetail({ problems: [] })))
+
+    renderRound()
+
+    expect(await screen.findByTestId('round-detail-empty')).toBeDefined()
+    expect(screen.queryByTestId('round-problems-table')).toBeNull()
+  })
+
   it('does not show the just-closed notice when the round is already closed on first load', async () => {
     mockedGet.mockResolvedValue(
       jsonResponse(200, roundDetail({ status: 'closed', closedAt: '2026-09-02T13:00:00.000Z' })),

@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { SearchX, TriangleAlert, WifiOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { RoundCountdown } from '@/components/round-countdown'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useEventStream } from '@/hooks/use-event-stream'
@@ -65,24 +66,32 @@ function RoundDetailScreen() {
     return (
       <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">
         {round.error instanceof RoundNotFoundError ? (
-          <div data-testid="round-detail-not-found" className="flex flex-col items-start gap-2">
-            <p>{t('roundDetail.notFound.title')}</p>
-            <Link to="/" className="text-primary text-sm underline">
-              {t('roundDetail.notFound.backHome')}
-            </Link>
-          </div>
+          <Alert variant="destructive" data-testid="round-detail-not-found">
+            <SearchX />
+            <AlertTitle>{t('roundDetail.notFound.alertTitle')}</AlertTitle>
+            <AlertDescription>
+              <p>{t('roundDetail.notFound.title')}</p>
+              <Link to="/" className="text-primary text-sm underline">
+                {t('roundDetail.notFound.backHome')}
+              </Link>
+            </AlertDescription>
+          </Alert>
         ) : (
-          <div data-testid="round-detail-load-error" className="flex flex-col items-start gap-2">
-            <p>{t('roundDetail.loadError.message')}</p>
-            <Button
-              type="button"
-              variant="outline"
-              data-testid="round-detail-load-retry"
-              onClick={() => round.refetch()}
-            >
-              {t('roundDetail.loadError.retry')}
-            </Button>
-          </div>
+          <Alert variant="destructive" data-testid="round-detail-load-error">
+            <TriangleAlert />
+            <AlertTitle>{t('roundDetail.loadError.alertTitle')}</AlertTitle>
+            <AlertDescription>
+              <p>{t('roundDetail.loadError.message')}</p>
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="round-detail-load-retry"
+                onClick={() => round.refetch()}
+              >
+                {t('roundDetail.loadError.retry')}
+              </Button>
+            </AlertDescription>
+          </Alert>
         )}
       </main>
     )
@@ -90,8 +99,16 @@ function RoundDetailScreen() {
 
   if (round.isPending) {
     return (
-      <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">
-        <p data-testid="round-detail-loading">{t('roundDetail.waiting')}</p>
+      <main className="mx-auto flex max-w-4xl flex-col items-start gap-4 p-8">
+        <span className="font-display text-[13px] font-semibold text-muted-foreground uppercase tracking-[0.12em]">
+          {t('roundDetail.heading')}
+        </span>
+        <div data-testid="round-detail-loading" className="flex w-full flex-col gap-3">
+          <p className="text-muted-foreground text-sm">{t('roundDetail.waiting')}</p>
+          <div className="h-9 w-1/3 animate-pulse rounded-md bg-background-2" />
+          <div className="h-16 w-full animate-pulse rounded-md bg-background-2" />
+          <div className="h-16 w-full animate-pulse rounded-md bg-background-2" />
+        </div>
       </main>
     )
   }
@@ -106,7 +123,8 @@ function RoundDetailScreen() {
   return (
     <main className="mx-auto flex max-w-4xl flex-col items-start gap-4 p-8">
       {eventStream.status === 'reconnecting' && (
-        <Alert data-testid="round-connection-status">
+        <Alert variant="warning" data-testid="round-connection-status">
+          <WifiOff />
           <AlertDescription>{t('roundDetail.connection.reconnecting')}</AlertDescription>
         </Alert>
       )}
@@ -168,7 +186,12 @@ function RoundDetailScreen() {
           )}
 
       {round.data.problems.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t('roundDetail.emptyProblems')}</p>
+        <div
+          data-testid="round-detail-empty"
+          className="flex w-full flex-col items-center justify-center gap-1 rounded-xl border p-10 text-center"
+        >
+          <p className="text-muted-foreground text-sm">{t('roundDetail.emptyProblems')}</p>
+        </div>
       ) : (
         <div role="table" data-testid="round-problems-table" className="w-full">
           <div

@@ -789,10 +789,12 @@
     "waiting": "Loading the round...",
     "closedAt": "Closed at {{time}}",
     "notFound": {
+      "alertTitle": "Round not found",
       "title": "Round not found.",
       "backHome": "Back to home"
     },
     "loadError": {
+      "alertTitle": "Could not load",
       "message": "Could not load the round.",
       "retry": "Retry"
     },

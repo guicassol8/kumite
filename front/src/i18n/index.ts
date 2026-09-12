@@ -53,4 +53,14 @@ i18n
     interpolation: { escapeValue: false },
   })
 
+// #230: index.html ships a static lang="pt" as the starting guess (it has to
+// pick something before any module runs); this is what keeps it honest once
+// i18n resolves — here, not in a component, because it has to run before
+// React mounts and doesn't depend on any tree being alive.
+function syncHtmlLang(language: string) {
+  document.documentElement.lang = language
+}
+i18n.on('languageChanged', syncHtmlLang)
+syncHtmlLang(i18n.resolvedLanguage ?? 'pt')
+
 export default i18n

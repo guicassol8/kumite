@@ -79,4 +79,59 @@ describe('ProblemPanels', () => {
 
     expect(screen.queryByTestId('problem-statement-rail')).toBeNull()
   })
+
+  it('collapses the results band on a toggle click, and reopens it when a new run lands', () => {
+    setMatchMediaMatches(DESKTOP_QUERY, true)
+
+    const { rerender } = render(
+      <ProblemPanels
+        problem={problem}
+        hasResults
+        editor={<div data-testid="fake-editor" />}
+        results={<div data-testid="fake-results" />}
+        actionsBar={<div data-testid="fake-actions" />}
+        resultsVersion={1}
+      />,
+    )
+
+    const toggle = screen.getByTestId('problem-results-toggle')
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+
+    rerender(
+      <ProblemPanels
+        problem={problem}
+        hasResults
+        editor={<div data-testid="fake-editor" />}
+        results={<div data-testid="fake-results" />}
+        actionsBar={<div data-testid="fake-actions" />}
+        resultsVersion={2}
+      />,
+    )
+
+    expect(screen.getByTestId('problem-results-toggle').getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('keeps the results split disabled and the toggle hidden before there is anything to show', () => {
+    setMatchMediaMatches(DESKTOP_QUERY, true)
+
+    render(
+      <ProblemPanels
+        problem={problem}
+        hasResults={false}
+        editor={<div data-testid="fake-editor" />}
+        actionsBar={<div data-testid="fake-actions" />}
+      />,
+    )
+
+    expect(screen.queryByTestId('problem-results-toggle')).toBeNull()
+    // The canvas/results Separator and Panel stay mounted throughout (the
+    // library does not expect a Group's panel count to change after mount —
+    // adding them only once results exist crashed the whole route). Before
+    // that, they are simply disabled and sized to 0%.
+    const handle = screen.getByTestId('problem-results-handle')
+    expect(handle.getAttribute('aria-disabled')).toBe('true')
+  })
 })

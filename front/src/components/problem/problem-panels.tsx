@@ -1,9 +1,10 @@
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PanelImperativeHandle } from 'react-resizable-panels'
 
+import { ResultsPanel, ResultsToggle } from '@/components/problem/results-band'
 import { StatementCard } from '@/components/problem/statement-card'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
@@ -22,6 +23,12 @@ export type ProblemPanelsProps = {
   editor: ReactNode
   results?: ReactNode
   actionsBar: ReactNode
+  /**
+   * Changes identity every time a fresh run or submission lands — the
+   * desktop layout reopens a collapsed results band on each one (#203, T8).
+   * Not meaningful on its own, only as an effect dependency.
+   */
+  resultsVersion?: number
 }
 
 // Below this, the stacked (mobile) layout of #155/#178 is untouched — the
@@ -41,78 +48,89 @@ export function ProblemPanels({
   editor,
   results,
   actionsBar,
+  resultsVersion,
 }: ProblemPanelsProps) {
   const isDesktop = useMediaQuery(DESKTOP_QUERY)
-
-  const workspaceColumn = (
-    <div
-      data-testid="problem-workspace-panel"
-      // `h-full` is redundant but harmless on the stacked (mobile) layout,
-      // where `grow`/`basis-0` already size this against its flex-column
-      // parent. Inside the desktop "editor" Panel there is no such flex
-      // context (react-resizable-panels' own inner wrapper is a plain
-      // block box) — without an explicit height, this column shrinks to
-      // its content instead of the space actually available, and adding
-      // the results band pushes the actions bar down instead of the
-      // canvas giving up the room (caught by e2e/problem-layout.spec.ts).
-      className="flex h-full min-h-0 min-w-0 grow basis-0 flex-col gap-4"
-    >
-      {closedNotice}
-      {submitBanner}
-      <div
-        className={cn(
-          'min-w-0 grow basis-0 overflow-hidden rounded-md border',
-          // The floor that keeps the editor usable. Once results are on
-          // screen the participant is reading, not dragging, so on a short
-          // phone the canvas lends the band part of it.
-          hasResults ? 'min-h-44 short:min-h-32' : 'min-h-44',
-        )}
-      >
-        {editor}
-      </div>
-      {hasResults && (
-        // The one scrollable strip of the panel: results grow into it and it
-        // gives way (up to 45% of the panel) instead of pushing the bar off
-        // screen (#155).
-        <div
-          data-testid="problem-results-band"
-          className="flex max-h-[45%] min-h-0 shrink flex-col gap-4 overflow-auto"
-        >
-          {results}
-        </div>
-      )}
-      {/* Last in the panel and never shrinking: that is what keeps Executar,
-          Limpar and Enviar on screen whatever the results do. */}
-      {actionsBar}
-    </div>
-  )
 
   if (!isDesktop) {
     return (
       <>
         <StatementCard problem={problem} hasResults={hasResults} />
-        {workspaceColumn}
+        <div
+          data-testid="problem-workspace-panel"
+          className="flex min-h-0 min-w-0 grow basis-0 flex-col gap-4"
+        >
+          {closedNotice}
+          {submitBanner}
+          <div
+            className={cn(
+              'min-w-0 grow basis-0 overflow-hidden rounded-md border',
+              // The floor that keeps the editor usable. Once results are on
+              // screen the participant is reading, not dragging, so on a
+              // short phone the canvas lends the band part of it.
+              hasResults ? 'min-h-44 short:min-h-32' : 'min-h-44',
+            )}
+          >
+            {editor}
+          </div>
+          {hasResults && (
+            // The one scrollable strip of the panel: results grow into it
+            // and it gives way (up to 45% of the panel) instead of pushing
+            // the bar off screen (#155).
+            <div
+              data-testid="problem-results-band"
+              className="flex max-h-[45%] min-h-0 shrink flex-col gap-4 overflow-auto"
+            >
+              {results}
+            </div>
+          )}
+          {/* Last in the panel and never shrinking: that is what keeps
+              Executar, Limpar and Enviar on screen whatever the results do. */}
+          {actionsBar}
+        </div>
       </>
     )
   }
 
   return (
-    <DesktopPanels problem={problem} hasResults={hasResults} workspaceColumn={workspaceColumn} />
+    <DesktopPanels
+      problem={problem}
+      hasResults={hasResults}
+      closedNotice={closedNotice}
+      submitBanner={submitBanner}
+      editor={editor}
+      results={results}
+      actionsBar={actionsBar}
+      resultsVersion={resultsVersion}
+    />
   )
 }
 
 function DesktopPanels({
   problem,
   hasResults,
-  workspaceColumn,
-}: {
-  problem: Problem
-  hasResults: boolean
-  workspaceColumn: ReactNode
-}) {
+  closedNotice,
+  submitBanner,
+  editor,
+  results,
+  actionsBar,
+  resultsVersion,
+}: Omit<ProblemPanelsProps, 'problem'> & { problem: Problem }) {
   const { t } = useTranslation()
   const [statementCollapsed, setStatementCollapsed] = useState(false)
   const statementPanelRef = useRef<PanelImperativeHandle>(null)
+  const [resultsCollapsed, setResultsCollapsed] = useState(false)
+  const resultsPanelRef = useRef<PanelImperativeHandle>(null)
+
+  // Reopens the band on every fresh run or submission, even one the
+  // participant collapsed earlier — `expand()` is a no-op if already open.
+  // Depends on `resultsVersion` rather than `hasResults`, which flips true
+  // only once (on the very first run) and would never fire again after that.
+  useEffect(() => {
+    if (!hasResults) return
+    resultsPanelRef.current?.expand()
+    setResultsCollapsed(false)
+  }, [resultsVersion, hasResults])
 
   return (
     <>
@@ -176,8 +194,48 @@ function DesktopPanels({
           id="problem-statement-handle"
           aria-label={t('problem.panels.statementHandle')}
         />
-        <ResizablePanel id="editor" minSize="50%" className="min-h-0">
-          {workspaceColumn}
+        <ResizablePanel id="editor" minSize="50%" className="flex h-full min-h-0 flex-col gap-2">
+          {closedNotice}
+          {submitBanner}
+          {/* Canvas, handle and results Panel all stay mounted whether or
+              not there are results yet — react-resizable-panels does not
+              expect a Group's panel *count* to change after mount (it threw
+              "No layout data found for index" the one time this tried
+              conditionally adding the results Panel later). Before the
+              first run, `results` is `undefined` and the results Panel
+              starts at 0% (disabled, so there's nothing to drag open onto
+              emptiness) — visually identical to no split at all, and the
+              canvas itself never remounts, which is the one thing #178
+              already fixed this file to avoid. */}
+          <ResizablePanelGroup orientation="vertical" id="problem-v" className="min-h-0 grow">
+            <ResizablePanel id="canvas" minSize="50%" className="flex h-full min-h-0">
+              {editor}
+            </ResizablePanel>
+            <ResizableHandle withHandle id="problem-results-handle" disabled={!hasResults} />
+            <ResultsPanel
+              disabled={!hasResults}
+              defaultSize={hasResults ? '25%' : '0%'}
+              panelRef={resultsPanelRef}
+              onResize={(panelSize) => setResultsCollapsed(panelSize.asPercentage === 0)}
+            >
+              {results}
+            </ResultsPanel>
+          </ResizablePanelGroup>
+          {hasResults && (
+            <ResultsToggle
+              collapsed={resultsCollapsed}
+              onToggle={() => {
+                if (resultsCollapsed) {
+                  resultsPanelRef.current?.expand()
+                  setResultsCollapsed(false)
+                } else {
+                  resultsPanelRef.current?.collapse()
+                  setResultsCollapsed(true)
+                }
+              }}
+            />
+          )}
+          {actionsBar}
         </ResizablePanel>
       </ResizablePanelGroup>
     </>

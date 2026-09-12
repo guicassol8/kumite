@@ -1,7 +1,7 @@
 import { emptyWorkspaceState, withRootBlock } from '@kumite/blocks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   BlocklyWorkspace,
@@ -83,6 +83,18 @@ function ProblemScreen() {
 
   const [verdict, setVerdict] = useState<SubmissionResult | null>(null)
   const [submitBanner, setSubmitBanner] = useState<SubmitBanner | null>(null)
+
+  // Bumped by every fresh run and every fresh verdict — the desktop layout
+  // (#203, T8) uses it to reopen a results band the participant collapsed
+  // earlier. `hasResults` itself only flips false→true once per screen, so it
+  // cannot signal "there's a *new* result" on its own.
+  const [resultsVersion, setResultsVersion] = useState(0)
+  useEffect(() => {
+    if (runState.status !== 'idle') setResultsVersion((version) => version + 1)
+  }, [runState.status])
+  useEffect(() => {
+    if (verdict) setResultsVersion((version) => version + 1)
+  }, [verdict])
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -296,6 +308,7 @@ function ProblemScreen() {
         editor={blocklyWorkspace}
         results={hasResults ? resultsContent : undefined}
         actionsBar={actionsBar}
+        resultsVersion={resultsVersion}
       />
     </main>
   )

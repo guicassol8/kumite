@@ -19,7 +19,13 @@ export const requestPasswordResetRoute = defineRoute({
   input: { body: RequestPasswordResetBodySchema },
   output: { 204: NoContentSchema },
   handler: async (c) => {
-    await requestPasswordReset(c.get('db'), c.input.body.email, clientIp(c.raw))
+    await requestPasswordReset(
+      c.get('db'),
+      c.input.body.email,
+      clientIp(c.raw),
+      undefined,
+      c.input.body.locale,
+    )
     return c.json(undefined, 204)
   },
 })

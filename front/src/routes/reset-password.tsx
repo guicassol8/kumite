@@ -24,6 +24,13 @@ export const Route = createFileRoute('/reset-password')({
   component: ResetPasswordScreen,
 })
 
+// Narrows i18next's free-form language string to the back's Locale enum
+// (#231) — the back has no `locale` column on `users`, so the reset email
+// speaks whatever the requester's UI was set to when they asked.
+function toApiLocale(language: string): 'pt' | 'es' | 'en' {
+  return language === 'es' || language === 'en' ? language : 'pt'
+}
+
 type RequestFormValues = {
   email: string
 }
@@ -66,7 +73,7 @@ function useResetPasswordSchema() {
 }
 
 function ResetPasswordScreen() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   // Two steps in one screen: ask for a code, then spend it. `sentTo` is what
   // step 2 echoes back — the email the code actually went to, which the user
   // may still edit in the form below it.
@@ -85,7 +92,12 @@ function ResetPasswordScreen() {
 
   async function onRequestSubmit(values: RequestFormValues) {
     try {
-      const res = await api.auth['request-password-reset'].$post({ json: { email: values.email } })
+      const res = await api.auth['request-password-reset'].$post({
+        json: {
+          email: values.email,
+          locale: toApiLocale(i18n.resolvedLanguage ?? i18n.language),
+        },
+      })
       if (res.status !== 204) {
         requestForm.setError('root', {
           message: t('auth.resetPassword.request.errors.unexpected'),

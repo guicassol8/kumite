@@ -8,68 +8,156 @@ import {
   SES_REGION,
   SES_SECRET_ACCESS_KEY,
 } from '../../config'
+import type { Locale } from '../../lib/locale'
 
 import type { BugReportNotice, PasswordResetNotice } from './notifications.schema'
 import { BugReportNoticeSchema, PasswordResetNoticeSchema } from './notifications.schema'
 
-// Both bodies of the password-reset email (#162). Email clients strip <style>
-// blocks and external stylesheets, so every rule is inline and the layout is
-// a <table> — the only thing rendered consistently across Gmail, Outlook and
-// Apple Mail. No <img>: clients block remote images by default, so the visual
-// identity has to survive on CSS alone.
+// The password-reset email's inline symbol (#231): a base64 copy of
+// docs/design/logo/png/kumite-mark-dark-128.png (the variant meant for the
+// charcoal/chrome header). Generated once with
+//   python3 -c "import base64;print(base64.b64encode(open('docs/design/logo/png/kumite-mark-dark-128.png','rb').read()).decode())"
+// and committed here because back/Dockerfile only copies `back/` and
+// `blocks/` into the production image — `docs/` never reaches runtime.
+// notifications.test.ts checks this string still matches the PNG on disk, so
+// a regenerated logo without a matching update here fails the suite. Kept in
+// this file rather than its own (kata/schema-file-naming, ADR-0018 forbids
+// ad-hoc file names inside a domain module).
+export const KUMITE_MARK_DARK_128_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAABmJLR0QA/wD/AP+gvaeTAAAETElEQVR4nO3dP28cRRjH8WeW6Hze9dl3KazTlZACZCkNrwKSklhUKAU9pAG/BEPj0Kew0kVJFxHxJtJYshQk054sF7Gdu12fLbhBEx9QQLjbPzO3m+f7qXd2x9rfPc+MtxgRAAAAAAAAAAAAAAAAAAAANJ7x/YDDra1W+4/LXRG5LyK9nMNPRWR/8sHKztbh4ZWnKap2w/cD2tPJjyLmm4LDXWAetKeTSES+rXhq8F0Bhp8O4os0PhGRpOSt0tUk2xy8HGYVTQ0z7pflzWQcf17By3eS2b3QpBZgI9kWW829ppHcE5FnEpi1tjV6c7Zr8q1hTq3Ifme9u2OMuarzc00Dyv9fsqQVb/YPDlIJaHR+uldi/fFTZ6NXaOzo/PShiBRdOz3sbPQeLLUFTMbxnQpfvhNnl9lnEt5XRQcaka/tcBjnHefGuLEh5uwtAPa6ZFdq1gZCu1l0oBVJxnH+tYsb48aGmHPkq/yLlcoXbcbK3ePbt6usKv6Zaf7QRnbby1z+61ENKf/LbgMlmLvHx8dJrvLv4ccTNAA+yv+S20AZcdJuLxzacRzfKVn+lxsAX+VfTRuIbNCAm0D/0w+tsm8Io3O3tS4tSy8uN/v9fjqv/KfJ6kkVFaCz0TOVVoD275c/uP/LN+Dl//MN4XrOjWkD48DlP18LMMX3w0tTpzmbBdpA4PL/9pEh9sNLdLMpuwEbePUf7HMw/hYnqyvj0blbnvzbWN7Dr4GoPwKgHAFQjgAoRwCUIwDKEQDlCIByBEA5AqAcAVCOAChHAJQjAMoRAOUIgHIEQDkCoBwBUI4AKEcAlCMAyhEA5QiAcgRAOQKgHAFQjgAoRwCUIwDKEQDlCIByBEA5AqAcAVCOAChHAJQjAMoRAOUIgHIEQDkCoBwBUI4AKEcAlCMAyhEA5QiAcgRAOQKgHAFQjgAoRwCUW8apYVnSijf7Bwfpu46evUjjE0+HT2PZFcBYef6ul+8MXg4za+RnqY/X0jyvaxsAa8zTeddEU5l7TUCPpXke1zUAWdJa/WXeRe217IWI/O9By6GsrXe/tyJ7swOp686ddL3n5lz56eG/fXyr9CnaxsqTD389+nKRa48+ufXEWNku+8yPXh0t/DeWUeXJ32VOIM8rqlv5r2kbmMsMBpkV63HtYp9X/fJDB2Ch8l/HNrAwGz1t2r2juqz+G7AbmGsty14YP6HN0slk4R9PXSvAs7wDaAN+y3/eAJTZD6ezkp5LBW0g/B7eeijVHlvL4gGwJfbDxj5yJT3vsLdjjH1U+Lll5lyfNuCt/OcKwOTGittb5t0Pu2v3JlH7u2LTE5mNLfbc6zk3fDdgvZV/J8geWZvR2dkXYmw1Zduae51uN/f6aVF8DaxxG3D3cPcSjwiAtzYgxdcuM+4e7l7iES3AE2tta/TmbNeI3BeRXoH/6e931rs7xpgrT1MEAAAAAAAAAAAAAAAAAADA++JP4o5mk6JC0UYAAAAASUVORK5CYII='
+
+// pt/es/en copy for the password-reset email (#231). The product name is
+// always lowercase `kumite`, even mid-sentence (identity.md §8); "PUCRS ×
+// Mérida 2026" stays out of this table since it's a proper name, identical
+// in all three languages. Kept in this file for the same ADR-0018 reason as
+// the symbol above — notifications.locales.test.ts covers it independently.
+type PasswordResetEmailCopy = {
+  subject: string
+  htmlLang: string
+  heading: string
+  intro: string
+  otpExpiry: string
+  cta: string
+  fallbackIntro: string
+  ignoreNotice: string
+  textTitle: string
+  textCodeLine: string
+  textLinkLine: string
+}
+
+export const passwordResetEmailCopy: Record<Locale, PasswordResetEmailCopy> = {
+  pt: {
+    subject: 'Código de redefinição de senha — kumite',
+    htmlLang: 'pt-BR',
+    heading: 'Redefinição de senha',
+    intro: 'Recebemos um pedido para redefinir a sua senha. Use o código abaixo para concluir.',
+    otpExpiry: 'O código expira em 15 minutos.',
+    cta: 'Redefinir minha senha',
+    fallbackIntro: 'Se o botão não funcionar, copie e cole este endereço no navegador:',
+    ignoreNotice: 'Se não foi você quem pediu, ignore este e-mail — sua senha continua a mesma.',
+    textTitle: 'Redefinição de senha — kumite',
+    textCodeLine: 'Seu código de redefinição de senha é',
+    textLinkLine: 'Informe esse código junto com sua nova senha em',
+  },
+  es: {
+    subject: 'Código para restablecer tu contraseña — kumite',
+    htmlLang: 'es',
+    heading: 'Restablecimiento de contraseña',
+    intro:
+      'Recibimos una solicitud para restablecer tu contraseña. Usa el código de abajo para completarla.',
+    otpExpiry: 'El código vence en 15 minutos.',
+    cta: 'Restablecer mi contraseña',
+    fallbackIntro: 'Si el botón no funciona, copia y pega esta dirección en el navegador:',
+    ignoreNotice: 'Si no fuiste tú quien lo pidió, ignora este correo — tu contraseña sigue igual.',
+    textTitle: 'Restablecimiento de contraseña — kumite',
+    textCodeLine: 'Tu código para restablecer la contraseña es',
+    textLinkLine: 'Ingresa ese código junto con tu nueva contraseña en',
+  },
+  en: {
+    subject: 'Password reset code — kumite',
+    htmlLang: 'en',
+    heading: 'Password reset',
+    intro: 'We received a request to reset your password. Use the code below to finish.',
+    otpExpiry: 'The code expires in 15 minutes.',
+    cta: 'Reset my password',
+    fallbackIntro: "If the button doesn't work, copy and paste this address into your browser:",
+    ignoreNotice: "If you didn't ask for this, ignore this email — your password stays the same.",
+    textTitle: 'Password reset — kumite',
+    textCodeLine: 'Your password reset code is',
+    textLinkLine: 'Enter that code together with your new password at',
+  },
+}
+
+// Both bodies of the password-reset email (#162, redressed in the kumite
+// identity by #231). Email clients strip <style> blocks and external
+// stylesheets, so every rule is inline and the layout is a <table> — the
+// only thing rendered consistently across Gmail, Outlook and Apple Mail.
+// The symbol is a base64 `<img>` (clients block remote images by default,
+// so it can't be a URL) and the wordmark is plain text right next to it —
+// the lockup still reads as "kumite" with the image stripped or blocked.
 //
 // `baseUrl` is a parameter rather than a direct read of APP_BASE_URL so the
 // function stays pure and testable with and without a trailing slash.
-export function renderPasswordResetEmail({ otp, baseUrl }: { otp: string; baseUrl: string }): {
+export function renderPasswordResetEmail({
+  otp,
+  baseUrl,
+  locale,
+}: {
+  otp: string
+  baseUrl: string
+  locale?: Locale
+}): {
   html: string
   text: string
 } {
   const resetUrl = `${baseUrl.replace(/\/+$/, '')}/reset-password`
+  const copy = passwordResetEmailCopy[locale ?? 'pt']
 
   // The code is a single run of digits on purpose: the spacing is drawn by
   // letter-spacing, so copying it out of the email yields "482917", never
   // "4 8 2 9 1 7".
   const html = `<!doctype html>
-<html lang="pt-BR">
-  <body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #171717;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f5f5f5; padding: 32px 12px;">
+<html lang="${copy.htmlLang}">
+  <body style="margin: 0; padding: 0; background-color: #FCFAF7; font-family: 'Barlow', 'Inter', system-ui, sans-serif; color: #1C1716;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #FCFAF7; padding: 32px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 480px; background-color: #ffffff; border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 480px; background-color: #FFFFFF; border: 1px solid #E1DDDA; border-radius: 12px; overflow: hidden;">
             <tr>
-              <td style="background-color: #171717; padding: 20px 32px;">
-                <span style="color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: 1px;">kumite</span>
+              <td style="background-color: #1C1716; padding: 20px 32px;">
+                <img src="data:image/png;base64,${KUMITE_MARK_DARK_128_BASE64}" width="24" height="24" alt="kumite" style="vertical-align: middle; margin-right: 8px;" />
+                <span style="color: #F3F1EF; font-size: 20px; font-weight: 700; letter-spacing: 1px; font-family: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif; vertical-align: middle;">kumite</span>
               </td>
             </tr>
             <tr>
               <td style="padding: 32px;">
-                <h1 style="margin: 0 0 12px; font-size: 20px; font-weight: 600; color: #171717;">Redefinição de senha</h1>
-                <p style="margin: 0 0 24px; font-size: 15px; line-height: 22px; color: #525252;">
-                  Recebemos um pedido para redefinir a sua senha. Use o código abaixo para concluir.
+                <h1 style="margin: 0 0 12px; font-size: 20px; font-weight: 600; color: #1C1716;">${copy.heading}</h1>
+                <p style="margin: 0 0 24px; font-size: 15px; line-height: 22px; color: #69615D;">
+                  ${copy.intro}
                 </p>
-                <div style="margin: 0 0 12px; padding: 20px; background-color: #f5f5f5; border: 1px solid #e5e5e5; border-radius: 8px; text-align: center; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 30px; font-weight: 700; letter-spacing: 8px; color: #171717;">${otp}</div>
-                <p style="margin: 0 0 28px; font-size: 13px; line-height: 20px; color: #737373; text-align: center;">
-                  O código expira em 15 minutos.
+                <div style="margin: 0 0 12px; padding: 20px; background-color: #F2F0EC; border: 1px solid #E1DDDA; border-radius: 8px; text-align: center; font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 30px; font-weight: 700; letter-spacing: 8px; color: #1C1716;">${otp}</div>
+                <p style="margin: 0 0 28px; font-size: 13px; line-height: 20px; color: #69615D; text-align: center;">
+                  ${copy.otpExpiry}
                 </p>
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                   <tr>
                     <td align="center">
-                      <a href="${resetUrl}" style="display: inline-block; padding: 12px 28px; background-color: #171717; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 8px;">Redefinir minha senha</a>
+                      <a href="${resetUrl}" style="display: inline-block; padding: 12px 28px; background-color: #DD2824; color: #FFFFFF; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 8px;">${copy.cta}</a>
                     </td>
                   </tr>
                 </table>
-                <p style="margin: 24px 0 0; font-size: 13px; line-height: 20px; color: #737373;">
-                  Se o botão não funcionar, copie e cole este endereço no navegador:<br />
-                  <a href="${resetUrl}" style="color: #171717;">${resetUrl}</a>
+                <p style="margin: 24px 0 0; font-size: 13px; line-height: 20px; color: #69615D;">
+                  ${copy.fallbackIntro}<br />
+                  <a href="${resetUrl}" style="color: #DD2824;">${resetUrl}</a>
                 </p>
-                <p style="margin: 24px 0 0; font-size: 13px; line-height: 20px; color: #737373;">
-                  Se não foi você quem pediu, ignore este e-mail — sua senha continua a mesma.
+                <p style="margin: 24px 0 0; font-size: 13px; line-height: 20px; color: #69615D;">
+                  ${copy.ignoreNotice}
                 </p>
               </td>
             </tr>
             <tr>
-              <td style="padding: 20px 32px; border-top: 1px solid #e5e5e5; font-size: 12px; color: #a3a3a3; text-align: center;">
-                Liga de Algoritmos — PUCRS
+              <td style="padding: 20px 32px; border-top: 1px solid #E1DDDA; font-size: 12px; color: #69615D; text-align: center;">
+                PUCRS × Mérida 2026
               </td>
             </tr>
           </table>
@@ -80,15 +168,15 @@ export function renderPasswordResetEmail({ otp, baseUrl }: { otp: string; baseUr
 </html>`
 
   const text = [
-    'Redefinição de senha — Kumite',
+    copy.textTitle,
     '',
-    `Seu código de redefinição de senha é ${otp}.`,
-    `Informe esse código junto com sua nova senha em ${resetUrl}`,
-    'O código expira em 15 minutos.',
+    `${copy.textCodeLine} ${otp}.`,
+    `${copy.textLinkLine} ${resetUrl}`,
+    copy.otpExpiry,
     '',
-    'Se não foi você quem pediu, ignore este e-mail — sua senha continua a mesma.',
+    copy.ignoreNotice,
     '',
-    'Liga de Algoritmos — PUCRS',
+    'PUCRS × Mérida 2026',
   ].join('\n')
 
   return { html, text }
@@ -99,7 +187,7 @@ export function renderPasswordResetEmail({ otp, baseUrl }: { otp: string; baseUr
 // dev and CI's hurl job run with (no AWS secrets available there, and
 // .github/workflows/ is protected, so this can't be worked around in CI).
 export async function sendPasswordResetNotice(notice: PasswordResetNotice): Promise<void> {
-  const { email, otp } = PasswordResetNoticeSchema.parse(notice)
+  const { email, otp, locale } = PasswordResetNoticeSchema.parse(notice)
 
   if (!SES_REGION || !SES_ACCESS_KEY_ID || !SES_SECRET_ACCESS_KEY) {
     console.log(`[notifications] password reset OTP for ${email}: ${otp}`)
@@ -111,7 +199,7 @@ export async function sendPasswordResetNotice(notice: PasswordResetNotice): Prom
     credentials: { accessKeyId: SES_ACCESS_KEY_ID, secretAccessKey: SES_SECRET_ACCESS_KEY },
   })
 
-  const { html, text } = renderPasswordResetEmail({ otp, baseUrl: APP_BASE_URL })
+  const { html, text } = renderPasswordResetEmail({ otp, baseUrl: APP_BASE_URL, locale })
 
   await client.send(
     new SendEmailCommand({
@@ -121,7 +209,7 @@ export async function sendPasswordResetNotice(notice: PasswordResetNotice): Prom
         // Charset is explicit on all three: without it SES assumes 7-bit
         // ASCII and every accented word ("Código", "redefinição") arrives
         // mangled.
-        Subject: { Data: 'Código de redefinição de senha — Kumite', Charset: 'UTF-8' },
+        Subject: { Data: passwordResetEmailCopy[locale ?? 'pt'].subject, Charset: 'UTF-8' },
         Body: {
           Text: { Data: text, Charset: 'UTF-8' },
           Html: { Data: html, Charset: 'UTF-8' },

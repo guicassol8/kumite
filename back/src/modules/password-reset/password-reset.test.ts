@@ -99,6 +99,14 @@ describe('issuePasswordResetOtp', () => {
     const result = await issuePasswordResetOtp(db, '00000000-0000-0000-0000-000000000000')
     expect(result).toEqual({ ok: false, error: 'not_found' })
   })
+
+  it('passes the locale through to the notice (#231)', async () => {
+    const user = await createTestUser()
+    await issuePasswordResetOtp(db, user.id, 'es')
+
+    const [notice] = sendPasswordResetNotice.mock.calls[0] as [{ locale?: string }]
+    expect(notice.locale).toBe('es')
+  })
 })
 
 describe('consumePasswordResetBudget', () => {

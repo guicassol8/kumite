@@ -10,6 +10,7 @@ import {
 } from '../../config'
 import type { Db } from '../../db/client'
 import { passwordResetOtpsTable, passwordResetRequestsTable, usersTable } from '../../db/schema'
+import type { Locale } from '../../lib/locale'
 import { generateOtp, generateTemporaryPassword } from '../../lib/random'
 import { sendPasswordResetNotice } from '../notifications/notifications.service'
 import { findUserByEmail, findUserById } from '../users/users.service'
@@ -121,7 +122,11 @@ export type IssueOtpResult = { ok: true } | { ok: false; error: 'not_found' }
 // `completePasswordReset` succeeds — issuing must not lock anyone out, since
 // `/auth/request-password-reset` is public and takes nothing but an email.
 // A second call for the same user replaces any pending OTP.
-export async function issuePasswordResetOtp(db: Db, userId: string): Promise<IssueOtpResult> {
+export async function issuePasswordResetOtp(
+  db: Db,
+  userId: string,
+  locale?: Locale,
+): Promise<IssueOtpResult> {
   const user = await findUserById(db, userId)
   if (!user) return { ok: false, error: 'not_found' }
 
@@ -140,7 +145,7 @@ export async function issuePasswordResetOtp(db: Db, userId: string): Promise<Iss
   // Deliberately not awaited: SES latency lands only on the path where an
   // account exists, which would time-leak exactly what the identical 204 is
   // there to hide. Nothing downstream depends on the send having finished.
-  void sendPasswordResetNotice({ email: user.email, otp }).catch((error: unknown) => {
+  void sendPasswordResetNotice({ email: user.email, otp, locale }).catch((error: unknown) => {
     console.error('[password-reset] failed to send the reset notice', error)
   })
 
@@ -165,6 +170,7 @@ export async function requestPasswordReset(
   email: string,
   ip: string,
   now = Date.now(),
+  locale?: Locale,
 ): Promise<void> {
   // `findUserByEmail` matches on `lower()`, so without normalising here
   // `Ada@x` and `ada@x` would count against two separate buckets and the
@@ -187,7 +193,7 @@ export async function requestPasswordReset(
     return
   }
 
-  await issuePasswordResetOtp(db, user.id)
+  await issuePasswordResetOtp(db, user.id, locale)
 }
 
 export type CompletePasswordResetResult = { ok: true } | { ok: false; error: 'invalid_otp' }

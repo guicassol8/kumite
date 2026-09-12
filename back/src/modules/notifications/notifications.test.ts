@@ -1,4 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { KUMITE_MARK_DARK_128_BASE64 } from './notifications.service'
 
 const mockSend = vi.fn().mockResolvedValue({})
 
@@ -47,12 +52,63 @@ describe('notifications.service renderPasswordResetEmail (#162)', () => {
     expect(html).toContain('letter-spacing')
   })
 
-  it('embeds no external image — clients block them by default', async () => {
+  it('embeds the symbol inline, never as a remote image (#231)', async () => {
     const { renderPasswordResetEmail } = await import('./notifications.service')
 
     const { html } = renderPasswordResetEmail({ otp: '482917', baseUrl })
 
-    expect(html).not.toMatch(/<img\b/i)
+    expect(html).toMatch(/<img\b/i)
+    expect(html).toContain('src="data:image/png;base64,')
+    expect(html).not.toMatch(/src="https?:/i)
+    expect(html).toMatch(/alt="[^"]+"/)
+  })
+
+  it('shows the kumite wordmark as plain text, independent of the image (#231)', async () => {
+    const { renderPasswordResetEmail } = await import('./notifications.service')
+
+    const { html } = renderPasswordResetEmail({ otp: '482917', baseUrl })
+
+    expect(html).toContain('>kumite<')
+  })
+
+  it('signs off with "PUCRS × Mérida 2026", never the old organization name (#231)', async () => {
+    const { renderPasswordResetEmail } = await import('./notifications.service')
+
+    const { html, text } = renderPasswordResetEmail({ otp: '482917', baseUrl })
+
+    expect(html).toContain('PUCRS × Mérida 2026')
+    expect(text).toContain('PUCRS × Mérida 2026')
+    expect(html).not.toContain('Liga de Algoritmos')
+    expect(text).not.toContain('Liga de Algoritmos')
+  })
+
+  it('defaults to pt when no locale is given (#231)', async () => {
+    const { renderPasswordResetEmail } = await import('./notifications.service')
+
+    const { html } = renderPasswordResetEmail({ otp: '482917', baseUrl })
+
+    expect(html).toContain('<html lang="pt-BR">')
+    expect(html).toContain('Redefinição de senha')
+  })
+
+  it('renders in Spanish when locale is es (#231)', async () => {
+    const { renderPasswordResetEmail } = await import('./notifications.service')
+
+    const { html, text } = renderPasswordResetEmail({ otp: '482917', baseUrl, locale: 'es' })
+
+    expect(html).toContain('<html lang="es">')
+    expect(html).toContain('Restablecimiento de contraseña')
+    expect(text).toContain('Restablecimiento de contraseña')
+  })
+
+  it('renders in English when locale is en (#231)', async () => {
+    const { renderPasswordResetEmail } = await import('./notifications.service')
+
+    const { html, text } = renderPasswordResetEmail({ otp: '482917', baseUrl, locale: 'en' })
+
+    expect(html).toContain('<html lang="en">')
+    expect(html).toContain('Password reset')
+    expect(text).toContain('Password reset')
   })
 
   it('repeats code, link and validity in the plain-text fallback', async () => {
@@ -148,7 +204,7 @@ describe('notifications.service sendPasswordResetNotice (SES configured)', () =>
     const [command] = mockSend.mock.calls[0] ?? []
     const { Message } = (command as { input: { Message: SentMessage } }).input
 
-    expect(Message.Subject.Data).toBe('Código de redefinição de senha — Kumite')
+    expect(Message.Subject.Data).toBe('Código de redefinição de senha — kumite')
     expect(Message.Subject.Charset).toBe('UTF-8')
 
     expect(Message.Body.Html?.Data).toContain('654321')
@@ -158,6 +214,18 @@ describe('notifications.service sendPasswordResetNotice (SES configured)', () =>
     expect(Message.Body.Text?.Data).toContain('654321')
     expect(Message.Body.Text?.Data).toContain('https://kumite.ligadealgoritmos.com/reset-password')
     expect(Message.Body.Text?.Charset).toBe('UTF-8')
+  })
+
+  it('changes the subject language with notice.locale (#231)', async () => {
+    process.env.APP_BASE_URL = 'https://kumite.ligadealgoritmos.com'
+    const { sendPasswordResetNotice } = await import('./notifications.service')
+
+    await sendPasswordResetNotice({ email: 'ada@example.com', otp: '654321', locale: 'en' })
+
+    const [command] = mockSend.mock.calls[0] ?? []
+    const { Message } = (command as { input: { Message: SentMessage } }).input
+
+    expect(Message.Subject.Data).toBe('Password reset code — kumite')
   })
 })
 
@@ -382,5 +450,17 @@ describe('notifications.service sendBugReportNotice (SES configured)', () => {
     const input = (command as { input: Record<string, unknown> }).input
 
     expect(input.ReplyToAddresses).toBeUndefined()
+  })
+})
+
+describe('KUMITE_MARK_DARK_128_BASE64 (#231)', () => {
+  it('matches docs/design/logo/png/kumite-mark-dark-128.png byte for byte', () => {
+    const pngPath = join(
+      import.meta.dirname,
+      '../../../../docs/design/logo/png/kumite-mark-dark-128.png',
+    )
+    const expected = readFileSync(pngPath).toString('base64')
+
+    expect(KUMITE_MARK_DARK_128_BASE64).toBe(expected)
   })
 })

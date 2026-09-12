@@ -1,8 +1,11 @@
 import { z } from 'zod'
 
+import { LocaleSchema } from '../../lib/locale'
+
 export const PasswordResetNoticeSchema = z.object({
   email: z.string().email(),
   otp: z.string().length(6),
+  locale: LocaleSchema.optional(),
 })
 
 export type PasswordResetNotice = z.infer<typeof PasswordResetNoticeSchema>

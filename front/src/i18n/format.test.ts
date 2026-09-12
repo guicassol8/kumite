@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatDate, formatNumber } from './format'
+import { formatDate, formatNumber, formatTime } from './format'
 
 const NUMBER = 1234.5
 const DATE = new Date(2026, 7, 27)
+const DATE_TIME = new Date(2026, 7, 27, 13, 5)
 
 describe('formatNumber', () => {
   it('formats with pt-BR grouping/decimal separators', () => {
@@ -30,5 +31,19 @@ describe('formatDate', () => {
 
   it('formats as en-US month/day/year', () => {
     expect(formatDate(DATE, 'en')).toBe('8/27/2026')
+  })
+})
+
+describe('formatTime', () => {
+  it('formats as pt-BR 24h time', () => {
+    expect(formatTime(DATE_TIME, 'pt')).toBe('13:05')
+  })
+
+  it('formats as es-MX 12h time', () => {
+    expect(formatTime(DATE_TIME, 'es')).toBe('01:05 p.m.')
+  })
+
+  it('formats as en-US 12h time', () => {
+    expect(formatTime(DATE_TIME, 'en')).toBe('01:05 PM')
   })
 })

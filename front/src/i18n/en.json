@@ -774,6 +774,12 @@
       "exit": "Exit presentation mode"
     }
   },
+  "roundCountdown": {
+    "summary_one": "{{name}} ends in {{count}} minute",
+    "summary_other": "{{name}} ends in {{count}} minutes",
+    "summaryNoName_one": "Ends in {{count}} minute",
+    "summaryNoName_other": "Ends in {{count}} minutes"
+  },
   "roundDetail": {
     "heading": "Round",
     "status": {
@@ -781,15 +787,19 @@
       "closed": "Closed"
     },
     "waiting": "Loading the round...",
+    "closedAt": "Closed at {{time}}",
     "notFound": {
+      "alertTitle": "Round not found",
       "title": "Round not found.",
       "backHome": "Back to home"
     },
     "loadError": {
+      "alertTitle": "Could not load",
       "message": "Could not load the round.",
       "retry": "Retry"
     },
     "columns": {
+      "position": "No.",
       "title": "Title",
       "difficulty": "Difficulty",
       "points": "Points",

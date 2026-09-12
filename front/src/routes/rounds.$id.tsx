@@ -1,23 +1,30 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { SearchX, TriangleAlert, WifiOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { RoundCountdown } from '@/components/round-countdown'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { useEventStream } from '@/hooks/use-event-stream'
+import { formatTime } from '@/i18n/format'
+import { positionLabel } from '@/lib/round-position'
 import { fetchRound, RoundNotFoundError, roundQueryKey } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
+import { cn } from '@/lib/utils'
+
+const GRID_COLS = 'md:grid-cols-[3rem_1fr_8rem_5rem_10rem]'
+
+const DIFFICULTY_BADGE_STYLE: Record<
+  'easy' | 'medium' | 'hard',
+  { variant: 'success' | 'warning' | 'outline'; className?: string }
+> = {
+  easy: { variant: 'success' },
+  medium: { variant: 'warning' },
+  hard: { variant: 'outline', className: 'border-destructive text-destructive' },
+}
 
 export const Route = createFileRoute('/rounds/$id')({
   beforeLoad: requireAuth,
@@ -62,24 +69,32 @@ function RoundDetailScreen() {
     return (
       <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">
         {round.error instanceof RoundNotFoundError ? (
-          <div data-testid="round-detail-not-found" className="flex flex-col items-start gap-2">
-            <p>{t('roundDetail.notFound.title')}</p>
-            <Link to="/" className="text-primary text-sm underline">
-              {t('roundDetail.notFound.backHome')}
-            </Link>
-          </div>
+          <Alert variant="destructive" data-testid="round-detail-not-found">
+            <SearchX />
+            <AlertTitle>{t('roundDetail.notFound.alertTitle')}</AlertTitle>
+            <AlertDescription>
+              <p>{t('roundDetail.notFound.title')}</p>
+              <Link to="/" className="text-primary text-sm underline">
+                {t('roundDetail.notFound.backHome')}
+              </Link>
+            </AlertDescription>
+          </Alert>
         ) : (
-          <div data-testid="round-detail-load-error" className="flex flex-col items-start gap-2">
-            <p>{t('roundDetail.loadError.message')}</p>
-            <Button
-              type="button"
-              variant="outline"
-              data-testid="round-detail-load-retry"
-              onClick={() => round.refetch()}
-            >
-              {t('roundDetail.loadError.retry')}
-            </Button>
-          </div>
+          <Alert variant="destructive" data-testid="round-detail-load-error">
+            <TriangleAlert />
+            <AlertTitle>{t('roundDetail.loadError.alertTitle')}</AlertTitle>
+            <AlertDescription>
+              <p>{t('roundDetail.loadError.message')}</p>
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="round-detail-load-retry"
+                onClick={() => round.refetch()}
+              >
+                {t('roundDetail.loadError.retry')}
+              </Button>
+            </AlertDescription>
+          </Alert>
         )}
       </main>
     )
@@ -87,8 +102,16 @@ function RoundDetailScreen() {
 
   if (round.isPending) {
     return (
-      <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">
-        <p data-testid="round-detail-loading">{t('roundDetail.waiting')}</p>
+      <main className="mx-auto flex max-w-4xl flex-col items-start gap-4 p-8">
+        <span className="font-display text-[13px] font-semibold text-muted-foreground uppercase tracking-[0.12em]">
+          {t('roundDetail.heading')}
+        </span>
+        <div data-testid="round-detail-loading" className="flex w-full flex-col gap-3">
+          <p className="text-muted-foreground text-sm">{t('roundDetail.waiting')}</p>
+          <div className="h-9 w-1/3 animate-pulse rounded-md bg-background-2" />
+          <div className="h-16 w-full animate-pulse rounded-md bg-background-2" />
+          <div className="h-16 w-full animate-pulse rounded-md bg-background-2" />
+        </div>
       </main>
     )
   }
@@ -101,9 +124,10 @@ function RoundDetailScreen() {
     : 0
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">
+    <main className="mx-auto flex max-w-4xl flex-col items-start gap-4 p-8">
       {eventStream.status === 'reconnecting' && (
-        <Alert data-testid="round-connection-status">
+        <Alert variant="warning" data-testid="round-connection-status">
+          <WifiOff />
           <AlertDescription>{t('roundDetail.connection.reconnecting')}</AlertDescription>
         </Alert>
       )}
@@ -124,52 +148,122 @@ function RoundDetailScreen() {
         </Alert>
       )}
 
-      <div className="flex w-full items-center justify-between gap-4">
-        <h1 className="font-bold text-2xl">{round.data.name}</h1>
-        <Badge data-testid="round-detail-status-badge">
-          {t(`roundDetail.status.${round.data.status}`)}
-        </Badge>
+      <div className="flex w-full flex-col gap-1">
+        <span className="font-display text-[13px] font-semibold text-muted-foreground uppercase tracking-[0.12em]">
+          {t('roundDetail.heading')}
+        </span>
+        <div className="flex w-full items-center justify-between gap-4">
+          <h1 className="font-display font-bold text-4xl">{round.data.name}</h1>
+          <Badge
+            data-testid="round-detail-status-badge"
+            variant="outline"
+            className={cn(
+              'gap-1.5',
+              round.data.status === 'open' && 'border-brand text-brand-text',
+            )}
+          >
+            {round.data.status === 'open' && (
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-brand" />
+            )}
+            {t(`roundDetail.status.${round.data.status}`)}
+          </Badge>
+        </div>
       </div>
 
-      {showCountdown && closesAt && (
-        <RoundCountdown closesAt={closesAt} serverTimeOffsetMs={serverTimeOffsetMs} />
-      )}
+      {round.data.status === 'open'
+        ? showCountdown &&
+          closesAt && (
+            <RoundCountdown
+              closesAt={closesAt}
+              serverTimeOffsetMs={serverTimeOffsetMs}
+              roundName={round.data.name}
+              className="font-display font-semibold text-brand-text tabular-nums"
+            />
+          )
+        : round.data.closedAt && (
+            <span data-testid="round-detail-closed-at" className="text-muted-foreground text-sm">
+              {t('roundDetail.closedAt', {
+                time: formatTime(new Date(round.data.closedAt), locale),
+              })}
+            </span>
+          )}
 
       {round.data.problems.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t('roundDetail.emptyProblems')}</p>
+        <div
+          data-testid="round-detail-empty"
+          className="flex w-full flex-col items-center justify-center gap-1 rounded-xl border p-10 text-center"
+        >
+          <p className="text-muted-foreground text-sm">{t('roundDetail.emptyProblems')}</p>
+        </div>
       ) : (
-        <Table data-testid="round-problems-table" className="w-full">
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('roundDetail.columns.title')}</TableHead>
-              <TableHead>{t('roundDetail.columns.difficulty')}</TableHead>
-              <TableHead>{t('roundDetail.columns.points')}</TableHead>
-              <TableHead>{t('roundDetail.columns.bestScore')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {round.data.problems.map((problem) => (
-              <TableRow key={problem.problemId} data-testid={`round-problem-${problem.problemId}`}>
-                <TableCell>
-                  <Link
-                    to="/problem/$id"
-                    params={{ id: problem.problemId }}
-                    className="text-primary underline"
-                  >
-                    {problem.title}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">
-                    {t(`roundDetail.difficulty.${problem.difficulty}`)}
-                  </Badge>
-                </TableCell>
-                <TableCell>{problem.points}</TableCell>
-                <TableCell>{problem.bestScore ?? t('roundDetail.bestScore.hidden')}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div role="table" data-testid="round-problems-table" className="w-full">
+          <div
+            role="row"
+            className={cn(
+              'hidden border-b pb-2 text-muted-foreground text-xs uppercase tracking-wide',
+              'md:grid md:gap-4',
+              GRID_COLS,
+            )}
+          >
+            <span role="columnheader">{t('roundDetail.columns.position')}</span>
+            <span role="columnheader">{t('roundDetail.columns.title')}</span>
+            <span role="columnheader">{t('roundDetail.columns.difficulty')}</span>
+            <span role="columnheader">{t('roundDetail.columns.points')}</span>
+            <span role="columnheader">{t('roundDetail.columns.bestScore')}</span>
+          </div>
+          <div className="flex flex-col gap-3 md:gap-0">
+            {round.data.problems
+              .slice()
+              .sort((a, b) => a.position - b.position)
+              .map((problem) => (
+                <div
+                  key={problem.problemId}
+                  role="row"
+                  data-testid={`round-problem-${problem.problemId}`}
+                  className={cn(
+                    'relative flex flex-col gap-1 rounded-xl border p-4',
+                    'md:grid md:items-center md:gap-4 md:rounded-none md:border-x-0 md:border-t-0 md:border-b md:p-3',
+                    GRID_COLS,
+                  )}
+                >
+                  <span role="cell" className="font-display text-lg md:text-base">
+                    <span className="sr-only md:hidden">{t('roundDetail.columns.position')}: </span>
+                    {positionLabel(problem.position)}
+                  </span>
+                  <span role="cell" className="font-medium">
+                    <Link
+                      to="/problem/$id"
+                      params={{ id: problem.problemId }}
+                      className="after:absolute after:inset-0"
+                    >
+                      {problem.title}
+                    </Link>
+                  </span>
+                  <span role="cell">
+                    <span className="sr-only md:hidden">
+                      {t('roundDetail.columns.difficulty')}:{' '}
+                    </span>
+                    <Badge
+                      variant={DIFFICULTY_BADGE_STYLE[problem.difficulty].variant}
+                      className={DIFFICULTY_BADGE_STYLE[problem.difficulty].className}
+                    >
+                      {t(`roundDetail.difficulty.${problem.difficulty}`)}
+                    </Badge>
+                  </span>
+                  <span role="cell" className="tabular-nums">
+                    <span className="sr-only md:hidden">{t('roundDetail.columns.points')}: </span>
+                    {problem.points}
+                  </span>
+                  <span role="cell" className="tabular-nums">
+                    <span className="sr-only md:hidden">
+                      {t('roundDetail.columns.bestScore')}:{' '}
+                    </span>
+                    {problem.bestScore ?? t('roundDetail.bestScore.hidden')}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
       )}
     </main>
   )

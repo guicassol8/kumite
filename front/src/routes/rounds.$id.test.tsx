@@ -238,6 +238,15 @@ describe('RoundDetailScreen', () => {
     expect(screen.queryByTestId('round-just-closed-notice')).toBeNull()
   })
 
+  it('shows the empty-round card when the round has no problems', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, roundDetail({ problems: [] })))
+
+    renderRound()
+
+    expect(await screen.findByTestId('round-detail-empty')).toBeDefined()
+    expect(screen.queryByTestId('round-problems-table')).toBeNull()
+  })
+
   it('does not show the just-closed notice when the round is already closed on first load', async () => {
     mockedGet.mockResolvedValue(
       jsonResponse(200, roundDetail({ status: 'closed', closedAt: '2026-09-02T13:00:00.000Z' })),
@@ -247,5 +256,77 @@ describe('RoundDetailScreen', () => {
 
     await screen.findByTestId('round-problem-p1')
     expect(screen.queryByTestId('round-just-closed-notice')).toBeNull()
+  })
+
+  it('shows the countdown and hides the closed-at time for an open round', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, roundDetail()))
+
+    renderRound()
+    await screen.findByTestId('round-problem-p1')
+
+    emitSse({
+      type: 'state.sync',
+      serverTime: new Date('2026-09-02T12:10:00.000Z'),
+      round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
+    })
+
+    expect(await screen.findByTestId('round-countdown')).toBeDefined()
+    expect(screen.queryByTestId('round-detail-closed-at')).toBeNull()
+    expect(screen.getByTestId('round-detail-status-badge').textContent).toBe('Aberta')
+  })
+
+  it('marks the problems table with role="table" and labels each row with its position letter', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, roundDetail()))
+
+    renderRound()
+
+    expect((await screen.findByTestId('round-problems-table')).getAttribute('role')).toBe('table')
+    expect(screen.getByTestId('round-problem-p1').textContent).toContain('A')
+  })
+
+  it('labels rows A, B in position order even when the API returns them out of order', async () => {
+    mockedGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        roundDetail({
+          problems: [
+            {
+              problemId: 'p2',
+              position: 1,
+              title: 'Produto',
+              difficulty: 'medium',
+              points: 20,
+              bestScore: null,
+            },
+            {
+              problemId: 'p1',
+              position: 0,
+              title: 'Soma',
+              difficulty: 'easy',
+              points: 10,
+              bestScore: null,
+            },
+          ],
+        }),
+      ),
+    )
+
+    renderRound()
+
+    expect(await screen.findByTestId('round-problem-p1')).toBeDefined()
+    expect(screen.getByTestId('round-problem-p1').textContent).toContain('A')
+    expect(screen.getByTestId('round-problem-p2').textContent).toContain('B')
+  })
+
+  it('shows the closed-at time and hides the countdown for a closed round', async () => {
+    mockedGet.mockResolvedValue(
+      jsonResponse(200, roundDetail({ status: 'closed', closedAt: '2026-09-02T13:05:00.000Z' })),
+    )
+
+    renderRound()
+
+    expect(await screen.findByTestId('round-detail-closed-at')).toBeDefined()
+    expect(screen.queryByTestId('round-countdown')).toBeNull()
+    expect(screen.getByTestId('round-detail-status-badge').textContent).toBe('Encerrada')
   })
 })

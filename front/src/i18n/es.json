@@ -774,6 +774,12 @@
       "exit": "Salir del modo presentación"
     }
   },
+  "roundCountdown": {
+    "summary_one": "{{name}} termina en {{count}} minuto",
+    "summary_other": "{{name}} termina en {{count}} minutos",
+    "summaryNoName_one": "Termina en {{count}} minuto",
+    "summaryNoName_other": "Termina en {{count}} minutos"
+  },
   "roundDetail": {
     "heading": "Ronda",
     "status": {
@@ -781,15 +787,19 @@
       "closed": "Cerrada"
     },
     "waiting": "Cargando la ronda...",
+    "closedAt": "Cerrada a las {{time}}",
     "notFound": {
+      "alertTitle": "Ronda no encontrada",
       "title": "Ronda no encontrada.",
       "backHome": "Volver al inicio"
     },
     "loadError": {
+      "alertTitle": "No fue posible cargar",
       "message": "No fue posible cargar la ronda.",
       "retry": "Intentar de nuevo"
     },
     "columns": {
+      "position": "N.º",
       "title": "Título",
       "difficulty": "Dificultad",
       "points": "Puntos",

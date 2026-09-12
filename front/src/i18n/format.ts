@@ -15,3 +15,9 @@ export function formatNumber(value: number, lang: string): string {
 export function formatDate(value: Date, lang: string): string {
   return new Intl.DateTimeFormat(toBcp47(lang)).format(value)
 }
+
+export function formatTime(value: Date, lang: string): string {
+  return new Intl.DateTimeFormat(toBcp47(lang), { hour: '2-digit', minute: '2-digit' }).format(
+    value,
+  )
+}

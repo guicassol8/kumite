@@ -3,7 +3,7 @@ import json, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 CANVAS = os.path.normpath(os.path.join(HERE, ".."))  # docs/design/canvas
 from screens import editor, login, signup_mobile, teams, mobile_menu
-from screens2 import leaderboard, telao, telao_geral, organizer, home
+from screens2 import leaderboard, telao, telao_geral, organizer, home, round_detail
 from identity import logo_board, palette_board, type_board, components_board, blockly_board
 
 OUT = CANVAS
@@ -21,6 +21,8 @@ files = {
     "Inicio.dc.html": home(),
     "MenuUsuario.dc.html": home(menu_open=True),
     "MenuCelular.dc.html": mobile_menu(),
+    "Rodada.dc.html": round_detail(),
+    "RodadaCelular.dc.html": round_detail(mobile=True),
     "Simbolo.dc.html": logo_board(),
     "Paleta.dc.html": palette_board(),
     "Tipografia.dc.html": type_board(),
@@ -58,12 +60,15 @@ canvas = {
     {"file": "TelaoGeral.dc.html", "title": "Telão · sem rodada aberta", "x": 0, "y": 2774, "w": 1440, "h": 810, "page": "telas"},
     {"file": "MenuUsuario.dc.html", "title": "Menu do usuário · desktop", "x": 1520, "y": 2774, "w": 1280, "h": 800, "page": "telas"},
     {"file": "MenuCelular.dc.html", "title": "Menu · celular", "x": 2880, "y": 2774, "w": 390, "h": 844, "page": "telas"},
+    {"file": "Rodada.dc.html", "title": "Rodada", "x": 0, "y": 3738, "w": 1280, "h": 800, "page": "telas"},
+    {"file": "RodadaCelular.dc.html", "title": "Rodada · celular", "x": 1360, "y": 3738, "w": 390, "h": 844, "page": "telas"},
   ],
   "annotations": [
     {"id": "nota-paleta", "x": 1280, "y": -150, "w": 420, "page": "identidade", "text": "Variante A (Hinomaru): decisão fechada em 2026-09-10. B e C ficam no artboard só como registro das alternativas descartadas — ver identity.md § 3 e o CHANGELOG."},
     {"id": "nota-editor", "x": 0, "y": 830, "w": 460, "page": "telas", "text": "Editor: enunciado e resultados colapsáveis (#203), barra de ações ancorada (#160), recentrar junto ao zoom (#205), blocos harmonizados (@kumite/blocks)."},
     {"id": "nota-placar", "x": 0, "y": 1784, "w": 460, "page": "telas", "text": "Placar: colunas A/B/C com legenda (#207), coluna do time fixa, linha do seu time em vermelho-suave. Modo telão = restyle do modo apresentação que já existe."},
     {"id": "nota-mobile", "x": 2720, "y": -150, "w": 390, "page": "telas", "text": "Header mobile: lockup + idioma + menu (#186). Rodapé empilhado. Reportar bug: ícone no header no desktop, item do painel no celular — o FAB do canto não existe em largura nenhuma (#198, #217)."},
+    {"id": "nota-rodada", "x": 0, "y": 3638, "w": 460, "page": "telas", "text": "Rodada (#229): letra da posição (A, B, C…) vem de problems[].position, mesma regra de positionLabel() no front. Abaixo do breakpoint de 768 px da #228, a implementação reflui um único DOM em vez de trocar de tabela para cards — aqui as duas pranchas só ilustram os dois enquadramentos."},
   ],
   "launch": {"view": "canvas", "page": "identidade"}
 }

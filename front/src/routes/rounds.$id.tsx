@@ -17,11 +17,14 @@ import { cn } from '@/lib/utils'
 
 const GRID_COLS = 'md:grid-cols-[3rem_1fr_8rem_5rem_10rem]'
 
-const DIFFICULTY_BADGE_VARIANT = {
-  easy: 'success',
-  medium: 'warning',
-  hard: 'destructive',
-} as const
+const DIFFICULTY_BADGE_STYLE: Record<
+  'easy' | 'medium' | 'hard',
+  { variant: 'success' | 'warning' | 'outline'; className?: string }
+> = {
+  easy: { variant: 'success' },
+  medium: { variant: 'warning' },
+  hard: { variant: 'outline', className: 'border-destructive text-destructive' },
+}
 
 export const Route = createFileRoute('/rounds/$id')({
   beforeLoad: requireAuth,
@@ -240,7 +243,10 @@ function RoundDetailScreen() {
                     <span className="sr-only md:hidden">
                       {t('roundDetail.columns.difficulty')}:{' '}
                     </span>
-                    <Badge variant={DIFFICULTY_BADGE_VARIANT[problem.difficulty]}>
+                    <Badge
+                      variant={DIFFICULTY_BADGE_STYLE[problem.difficulty].variant}
+                      className={DIFFICULTY_BADGE_STYLE[problem.difficulty].className}
+                    >
                       {t(`roundDetail.difficulty.${problem.difficulty}`)}
                     </Badge>
                   </span>

@@ -55,12 +55,9 @@ function OrganizerOverviewScreen() {
     queryFn: () => fetchRoundRanking(podiumRoundId as string),
     enabled: podiumRoundId !== null,
   })
-  // getRoundRanking (#43) returns every current team for every closed round,
-  // including ones that never submitted in it — a 0-attempt team is not a
-  // podium finisher (#131).
-  const podium = (podiumRanking.data?.teams ?? [])
-    .filter((team) => team.totalAttempts > 0)
-    .slice(0, 3)
+  // getRoundRanking (#184) already omits a team that never submitted in the
+  // round, so the ranking itself is the podium's source, just capped to top 3.
+  const podium = (podiumRanking.data?.teams ?? []).slice(0, 3)
 
   // stats.data comes straight from `.json()`, so its date fields are still
   // wire-format ISO strings at runtime despite the `Date` type — re-wrap

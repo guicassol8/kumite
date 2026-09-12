@@ -59,23 +59,32 @@ export function Footer() {
   return (
     <footer
       data-testid="app-footer"
-      className="border-chrome-border border-t bg-chrome p-4 text-chrome-foreground"
+      className="border-chrome-border border-t bg-chrome p-3 text-chrome-foreground short:py-2 md:p-4"
     >
-      <div className="flex flex-col items-center gap-4 text-center md:flex-row md:items-center md:justify-between md:text-left">
-        <p className="text-sm">
-          {t('footer.contactLabel')}{' '}
-          <a
-            data-testid="footer-contact-email"
-            href={`mailto:${CONTACT_EMAIL}`}
-            className="underline"
-          >
-            {CONTACT_EMAIL}
-          </a>
-        </p>
+      {/* Stacks on mobile (identity §5), but as two rows, not three: a
+          problem editor screen (#155) tunes its own layout against a razor
+          thin vertical budget on short phones, and a taller footer eats
+          straight into it. Contact and status share a row (they're both
+          short), so only the mark+event line gets one of its own; `short:`
+          (<=700px tall, same variant #155 itself uses) shaves the last few
+          px off the gap between the two rows. */}
+      <div className="flex flex-col gap-2 text-center short:gap-1 md:flex-row md:items-center md:justify-between md:gap-4 md:text-left">
+        <div className="flex items-center justify-between gap-4 md:contents">
+          <p className="text-sm">
+            {t('footer.contactLabel')}{' '}
+            <a
+              data-testid="footer-contact-email"
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="underline"
+            >
+              {CONTACT_EMAIL}
+            </a>
+          </p>
 
-        <ApiStatusIndicator />
+          <ApiStatusIndicator />
+        </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-2 md:justify-start">
           <Mark className="h-4 w-auto" />
           <span className="font-display text-sm uppercase tracking-wide">{EVENT_LABEL}</span>
         </div>

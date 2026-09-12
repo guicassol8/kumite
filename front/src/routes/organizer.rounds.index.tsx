@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { RoundCountdown } from '@/components/round-countdown'
@@ -35,7 +35,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { useEventStream } from '@/hooks/use-event-stream'
+import { useRoundStream } from '@/hooks/use-round-stream'
 import { formatDate } from '@/i18n/format'
 import { api } from '@/lib/api'
 
@@ -76,7 +76,16 @@ function OrganizerRoundsList() {
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ORGANIZER_ROUNDS_QUERY_KEY })
   }, [queryClient])
-  const eventStream = useEventStream(invalidate)
+  const eventStream = useRoundStream()
+  // round.opened/round.closed on the app-wide stream (#217) refetch the list
+  // the same way a mutation's `onSettled: invalidate` does; the ref skips the
+  // value already seen on mount instead of invalidating on first render.
+  const lastRoundChangeRef = useRef(eventStream.roundChangedAt)
+  useEffect(() => {
+    if (eventStream.roundChangedAt === lastRoundChangeRef.current) return
+    lastRoundChangeRef.current = eventStream.roundChangedAt
+    invalidate()
+  }, [eventStream.roundChangedAt, invalidate])
 
   const rounds = useQuery({
     queryKey: ORGANIZER_ROUNDS_QUERY_KEY,

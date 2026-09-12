@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,7 +10,16 @@ vi.mock('@/lib/api', () => ({
       login: { $post: vi.fn() },
     },
     me: { $get: vi.fn() },
+    // The footer (#217) is mounted on every route via `__root` and checks
+    // the API's health independently of anything this screen does.
+    health: { $get: vi.fn() },
   },
+}))
+
+// A successful signup navigates to `/`, mounting the real `__root` — which
+// now (#217) always opens the shared round SSE stream while authenticated.
+vi.mock('@/lib/sse-client', () => ({
+  connectEventStream: vi.fn(() => () => {}),
 }))
 
 import '@/i18n'
@@ -21,6 +31,7 @@ import { routeTree } from '@/routeTree.gen'
 const mockedSignup = vi.mocked(api.auth.signup.$post)
 const mockedLogin = vi.mocked(api.auth.login.$post)
 const mockedMe = vi.mocked(api.me.$get)
+const mockedHealth = vi.mocked(api.health.$get)
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stubs
 function jsonResponse(status: number, body: unknown): any {
@@ -42,7 +53,12 @@ function renderSignup() {
     routeTree,
     history: createMemoryHistory({ initialEntries: ['/signup'] }),
   })
-  render(<RouterProvider router={router} />)
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
   return router
 }
 
@@ -50,6 +66,8 @@ beforeEach(() => {
   mockedSignup.mockReset()
   mockedLogin.mockReset()
   mockedMe.mockReset()
+  mockedHealth.mockReset()
+  mockedHealth.mockReturnValue(new Promise(() => {}))
   clearSession('manual')
 })
 

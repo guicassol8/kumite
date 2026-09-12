@@ -20,6 +20,12 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+// Rendered authenticated, so the real `__root` (#217) always opens the
+// shared round SSE stream.
+vi.mock('@/lib/sse-client', () => ({
+  connectEventStream: vi.fn(() => () => {}),
+}))
+
 import '@/i18n'
 
 import { api } from '@/lib/api'

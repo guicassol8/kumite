@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
@@ -262,6 +262,13 @@ describe('OrganizerRoundsList', () => {
       })
     })
 
-    await waitFor(() => expect(screen.getByTestId('round-countdown')).toBeDefined())
+    // Scoped to the table: the header (#217) renders its own `round-countdown`
+    // chip whenever a round is open, so the bare testid matches two elements
+    // once both are mounted.
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('organizer-rounds-table')).getByTestId('round-countdown'),
+      ).toBeDefined(),
+    )
   })
 })

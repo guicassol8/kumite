@@ -135,7 +135,9 @@ test.describe('leaderboard (#45)', () => {
 
     // 02 — the organizer opens a round with a problem while this page stays
     // open; the SSE push (#44) must update the grid without a reload
-    // (Acceptance #1), and my team's row is marked.
+    // (Acceptance #1). Nobody has submitted yet, so #250's participation
+    // filter applies to every team — including my own — and the round-scope
+    // empty state shows instead of a table (see leaderboard-phantom-teams.spec.ts).
     const problemId = await apiCreatePublishedProblem()
     const roundId = await createRound(auth, {
       name: roundName,
@@ -144,15 +146,19 @@ test.describe('leaderboard (#45)', () => {
     })
     await roundSlot.open(auth, roundId)
 
-    await expect(page.getByTestId('leaderboard-table')).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByTestId('leaderboard-your-team-badge')).toBeVisible()
-    await page.screenshot({ path: evidence('02-rodada-aberta-ao-vivo'), fullPage: true })
+    await expect(page.getByTestId('leaderboard-empty')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('leaderboard-empty')).toContainText(
+      'Ninguém submeteu nesta rodada ainda.',
+    )
+    await page.screenshot({ path: evidence('02-rodada-aberta-sem-submissoes'), fullPage: true })
 
-    // 03 — the team submits a solution via the API; the score updates live,
-    // with no interaction on this page (Acceptance #1 again, this time the
-    // cell value itself).
+    // 03 — the team submits a solution via the API; the live SSE push now
+    // brings the table itself into view (Acceptance #1 again, my team's row
+    // marked), and the score updates with no interaction on this page.
     const token = await loginToken(participantEmail)
     await apiSubmitSolution(token, problemId, roundId)
+    await expect(page.getByTestId('leaderboard-table')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('leaderboard-your-team-badge')).toBeVisible()
     const myRow = page.locator('[data-testid^="leaderboard-row-"]', {
       has: page.getByTestId('leaderboard-your-team-badge'),
     })

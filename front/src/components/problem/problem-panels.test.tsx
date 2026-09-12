@@ -23,6 +23,7 @@ const problem = {
 afterEach(() => {
   cleanup()
   setMatchMediaMatches(DESKTOP_QUERY, false)
+  localStorage.clear()
 })
 
 describe('ProblemPanels', () => {
@@ -134,4 +135,36 @@ describe('ProblemPanels', () => {
     const handle = screen.getByTestId('problem-results-handle')
     expect(handle.getAttribute('aria-disabled')).toBe('true')
   })
+
+  it('restores a layout pre-seeded in storage instead of the hardcoded default sizes', () => {
+    setMatchMediaMatches(DESKTOP_QUERY, true)
+    // Written under the same key react-resizable-panels' own useDefaultLayout
+    // reads/writes (`layoutStorage` just prefixes it) — this is what a
+    // previous session's drag would have left behind.
+    localStorage.setItem(
+      'kumite:problem-layout:react-resizable-panels:problem-h',
+      JSON.stringify({ statement: 40, editor: 60 }),
+    )
+
+    render(
+      <ProblemPanels
+        problem={problem}
+        hasResults={false}
+        editor={<div data-testid="fake-editor" />}
+        actionsBar={<div data-testid="fake-actions" />}
+      />,
+    )
+
+    // react-resizable-panels sets a Panel's own data-testid from its id, so
+    // "statement" (not "problem-statement-panel", which is the Card inside
+    // it) is the element actually carrying the computed flex-grow.
+    expect(screen.getByTestId('statement').style.flexGrow).toBe('40')
+  })
+
+  // Persisting an actual drag needs a real pointer gesture on the separator
+  // (`isUserInteraction: true` is exactly what `onlySaveAfterUserInteractions`
+  // gates on, and — correctly — an imperative `.collapse()`/`.expand()` call
+  // does not count, or a window resize would overwrite the participant's
+  // choice too). jsdom cannot drive that gesture; e2e/problem-panels.spec.ts
+  // (T10) is where the write path is actually exercised, across a reload.
 })

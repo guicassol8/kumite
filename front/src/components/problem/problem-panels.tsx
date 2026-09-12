@@ -2,13 +2,14 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { PanelImperativeHandle } from 'react-resizable-panels'
+import { type PanelImperativeHandle, useDefaultLayout } from 'react-resizable-panels'
 
 import { ResultsPanel, ResultsToggle } from '@/components/problem/results-band'
 import { StatementCard } from '@/components/problem/statement-card'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { useMediaQuery } from '@/hooks/use-media-query'
+import { layoutStorage } from '@/lib/layout-storage'
 import type { fetchProblem } from '@/lib/problems-query'
 import { cn } from '@/lib/utils'
 
@@ -122,6 +123,23 @@ function DesktopPanels({
   const [resultsCollapsed, setResultsCollapsed] = useState(false)
   const resultsPanelRef = useRef<PanelImperativeHandle>(null)
 
+  // One participant preference, not per-problem (`layoutStorage`, #203, T9).
+  // `onlySaveAfterUserInteractions` is what keeps a window resize — or the
+  // reopen effect above, an imperative call with no pointer/keyboard behind
+  // it — from overwriting a size the participant actually chose.
+  const { defaultLayout: statementDefaultLayout, onLayoutChanged: onStatementLayoutChanged } =
+    useDefaultLayout({
+      id: 'problem-h',
+      storage: layoutStorage,
+      onlySaveAfterUserInteractions: true,
+    })
+  const { defaultLayout: resultsDefaultLayout, onLayoutChanged: onResultsLayoutChanged } =
+    useDefaultLayout({
+      id: 'problem-v',
+      storage: layoutStorage,
+      onlySaveAfterUserInteractions: true,
+    })
+
   // Reopens the band on every fresh run or submission, even one the
   // participant collapsed earlier — `expand()` is a no-op if already open.
   // Depends on `resultsVersion` rather than `hasResults`, which flips true
@@ -151,7 +169,13 @@ function DesktopPanels({
           <span className="[writing-mode:vertical-rl]">{t('problem.panels.statementRail')}</span>
         </button>
       )}
-      <ResizablePanelGroup orientation="horizontal" id="problem-h" className="min-h-0 min-w-0 grow">
+      <ResizablePanelGroup
+        orientation="horizontal"
+        id="problem-h"
+        className="min-h-0 min-w-0 grow"
+        defaultLayout={statementDefaultLayout}
+        onLayoutChanged={onStatementLayoutChanged}
+      >
         <ResizablePanel
           id="statement"
           collapsible
@@ -207,7 +231,13 @@ function DesktopPanels({
               emptiness) — visually identical to no split at all, and the
               canvas itself never remounts, which is the one thing #178
               already fixed this file to avoid. */}
-          <ResizablePanelGroup orientation="vertical" id="problem-v" className="min-h-0 grow">
+          <ResizablePanelGroup
+            orientation="vertical"
+            id="problem-v"
+            className="min-h-0 grow"
+            defaultLayout={resultsDefaultLayout}
+            onLayoutChanged={onResultsLayoutChanged}
+          >
             <ResizablePanel id="canvas" minSize="50%" className="flex h-full min-h-0">
               {editor}
             </ResizablePanel>

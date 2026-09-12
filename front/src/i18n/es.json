@@ -753,7 +753,8 @@
     },
     "empty": {
       "title": "Todavía no hay equipos en el marcador.",
-      "noRoundEver": "Todavía no se abrió ninguna ronda en esta competencia."
+      "noRoundEver": "Todavía no se abrió ninguna ronda en esta competencia.",
+      "noSubmissionsYet": "Nadie envió nada en esta ronda todavía."
     },
     "presentation": {
       "enter": "Activar modo presentación",

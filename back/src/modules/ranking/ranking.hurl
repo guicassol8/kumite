@@ -12,7 +12,9 @@
 # with: docker compose down -v && docker compose up -d && pnpm db:migrate && pnpm db:seed
 
 # 0. Three participants, each with their own team. Team A and Team B submit
-#    below with different scores; Team C never submits at all.
+#    below with different scores; Team C never submits at all in the round
+#    below and must not show up in its ranking (#184) — it only reappears in
+#    the event-wide ranking (step 8), which keeps every active team.
 POST {{host}}/auth/signup
 Content-Type: application/json
 { "name": "Rafael Ranking", "email": "ranking-e2e-a@edu.pucrs.br", "password": "supersecret", "code": "PUCRS2026" }
@@ -171,15 +173,16 @@ HTTP 201
 [Asserts]
 jsonpath "$.score" == 50
 
-# 4. Team C never submits — it must still show up, zeroed, at the end.
+# 4. Team C never submits — it must be absent from the round ranking below.
 
-# 5. The round ranking: A first, B second, C last with zero, ranks 1..3.
+# 5. The round ranking: A first, B second; Team C never submitted, so it's
+#    absent, not zeroed.
 GET {{host}}/rounds/{{round_id}}/ranking
 Authorization: Bearer {{token_a}}
 HTTP 200
 [Asserts]
 jsonpath "$.problemIds" count == 1
-jsonpath "$.teams" count == 3
+jsonpath "$.teams" count == 2
 jsonpath "$.teams[0].teamName" == "Ranking E2E Time A"
 jsonpath "$.teams[0].totalScore" == 100
 jsonpath "$.teams[0].rank" == 1
@@ -187,9 +190,7 @@ jsonpath "$.teams[0].problems[0].score" == 100
 jsonpath "$.teams[1].teamName" == "Ranking E2E Time B"
 jsonpath "$.teams[1].totalScore" == 50
 jsonpath "$.teams[1].rank" == 2
-jsonpath "$.teams[2].teamName" == "Ranking E2E Time C"
-jsonpath "$.teams[2].totalScore" == 0
-jsonpath "$.teams[2].rank" == 3
+jsonpath "$.teams[?(@.teamName=='Ranking E2E Time C')]" not exists
 
 # 6. An id that names no round at all -> 404.
 GET {{host}}/rounds/00000000-0000-0000-0000-000000000000/ranking
@@ -274,26 +275,26 @@ HTTP 200
 [Asserts]
 jsonpath "$.status" == "closed"
 
-# 12. The second round sees only its own submission: C scored, A and B did not.
+# 12. The second round sees only its own submission: only C submitted, so A
+#     and B are absent from it.
 GET {{host}}/rounds/{{draft_round_id}}/ranking
 Authorization: Bearer {{token_c}}
 HTTP 200
 [Asserts]
-jsonpath "$.teams" count == 3
+jsonpath "$.teams" count == 1
 jsonpath "$.teams[0].teamName" == "Ranking E2E Time C"
 jsonpath "$.teams[0].totalScore" == 50
 jsonpath "$.teams[0].rank" == 1
-jsonpath "$.teams[?(@.teamName=='Ranking E2E Time A')].totalScore" == 0
-jsonpath "$.teams[?(@.teamName=='Ranking E2E Time B')].totalScore" == 0
 
-# 13. And the first round is untouched by that submission.
+# 13. And the first round is untouched by that submission: C is still absent
+#     from it, not zeroed.
 GET {{host}}/rounds/{{round_id}}/ranking
 Authorization: Bearer {{token_a}}
 HTTP 200
 [Asserts]
 jsonpath "$.teams[0].teamName" == "Ranking E2E Time A"
 jsonpath "$.teams[0].totalScore" == 100
-jsonpath "$.teams[?(@.teamName=='Ranking E2E Time C')].totalScore" == 0
+jsonpath "$.teams[?(@.teamName=='Ranking E2E Time C')]" not exists
 
 # 14. AC3: the problem page shows the score of the round just played (the most
 #     recently opened one containing the problem) — the same 50 the round

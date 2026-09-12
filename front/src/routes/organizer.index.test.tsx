@@ -227,12 +227,11 @@ describe('organizer overview', () => {
         roundId: 'r-closed',
         roundName: 'Rodada 2',
         problemIds: [],
+        // getRoundRanking (#184) already omits a team that never submitted
+        // in the round — no "Fantasma" entry to filter out here.
         teams: [
           rankingTeam(),
           rankingTeam({ teamId: 't2', teamName: 'Loop Masters', rank: 2, totalScore: 200 }),
-          // getRoundRanking lists every team for every closed round (#43);
-          // one that never submitted is not a podium finisher (#131).
-          rankingTeam({ teamId: 't3', teamName: 'Fantasma', rank: 3, totalAttempts: 0 }),
         ],
       }),
     )

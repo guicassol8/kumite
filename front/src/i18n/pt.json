@@ -753,7 +753,8 @@
     },
     "empty": {
       "title": "Nenhum time no placar ainda.",
-      "noRoundEver": "Nenhuma rodada foi aberta ainda nesta competição."
+      "noRoundEver": "Nenhuma rodada foi aberta ainda nesta competição.",
+      "noSubmissionsYet": "Ninguém submeteu nesta rodada ainda."
     },
     "presentation": {
       "enter": "Ativar modo apresentação",

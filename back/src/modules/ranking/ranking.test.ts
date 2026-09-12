@@ -273,11 +273,11 @@ describe('getRoundRanking', () => {
     expect(await getRoundRanking(db, created.round.id)).toBeNull()
   })
 
-  it('orders teams by score, zeroes a team that never submitted', async () => {
+  it('omits teams that never submitted in the round', async () => {
     const problem = await insertProblem()
     const teamA = await insertTeam('Time A')
     const teamB = await insertTeam('Time B')
-    const teamC = await insertTeam('Time C')
+    await insertTeam('Time C')
     const created = await createRound(db, {
       name: 'Rodada 1',
       durationMinutes: 30,
@@ -296,11 +296,68 @@ describe('getRoundRanking', () => {
     expect(ranking?.teams.map((team) => [team.teamName, team.totalScore, team.rank])).toEqual([
       ['Time A', 100, 1],
       ['Time B', 50, 2],
-      ['Time C', 0, 3],
     ])
     expect(ranking?.teams[0]?.problems).toEqual([
       { problemId: problem.id, score: 100, attempts: 1 },
     ])
+  })
+
+  it('keeps a team that submitted and scored zero ahead of one that never submitted', async () => {
+    const problem = await insertProblem()
+    const teamA = await insertTeam('Time A')
+    await insertTeam('Time B')
+    const created = await createRound(db, {
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!created.ok) throw new Error('expected create to succeed')
+    const opened = await openRound(db, created.round.id)
+    if (!opened.ok) throw new Error('expected open to succeed')
+
+    await submit(opened.round.id, teamA.id, problem.id, 0)
+
+    const ranking = await getRoundRanking(db, opened.round.id)
+
+    expect(ranking?.teams.map((team) => [team.teamName, team.rank])).toEqual([['Time A', 1]])
+  })
+
+  it('returns an empty team list with problemIds still populated when no one submitted', async () => {
+    const problem = await insertProblem()
+    await insertTeam('Time A')
+    const created = await createRound(db, {
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!created.ok) throw new Error('expected create to succeed')
+    const opened = await openRound(db, created.round.id)
+    if (!opened.ok) throw new Error('expected open to succeed')
+
+    const ranking = await getRoundRanking(db, opened.round.id)
+
+    expect(ranking?.problemIds).toEqual([problem.id])
+    expect(ranking?.teams).toEqual([])
+  })
+
+  it('shows a team in an open round as soon as it makes its first submission', async () => {
+    const problem = await insertProblem()
+    const teamA = await insertTeam('Time A')
+    await insertTeam('Time B')
+    const created = await createRound(db, {
+      name: 'Rodada 1',
+      durationMinutes: 30,
+      problemIds: [problem.id],
+    })
+    if (!created.ok) throw new Error('expected create to succeed')
+    const opened = await openRound(db, created.round.id)
+    if (!opened.ok) throw new Error('expected open to succeed')
+
+    await submit(opened.round.id, teamA.id, problem.id, 70)
+
+    const ranking = await getRoundRanking(db, opened.round.id)
+
+    expect(ranking?.teams.map((team) => team.teamName)).toEqual(['Time A'])
   })
 
   it('counts each submission in the round it was stamped with, even for a reused problem', async () => {

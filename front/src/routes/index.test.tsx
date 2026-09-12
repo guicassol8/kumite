@@ -361,25 +361,14 @@ describe('Home — closed rounds card (#40)', () => {
         }),
       ]),
     )
-    // getRoundRanking (#43) returns every current team for every closed
-    // round, even ones that never submitted in it — this is what that looks
-    // like: present in the ranking, zero attempts.
+    // getRoundRanking (#184) omits a team from a round it never submitted
+    // in — this is what that looks like: an empty ranking.
     mockedRoundRanking.mockResolvedValue(
       jsonResponse(200, {
         roundId: 'r9',
         roundName: 'Rodada Encerrada',
         problemIds: [],
-        teams: [
-          {
-            teamId: 't1',
-            teamName: 'Blockly Busters',
-            rank: 1,
-            totalScore: 0,
-            totalAttempts: 0,
-            tiebreakTimeMs: 0,
-            problems: [],
-          },
-        ],
+        teams: [],
       }),
     )
     renderHome()

@@ -324,13 +324,6 @@ function LeaderboardScreen() {
               >
                 <p className="text-muted-foreground">{t('leaderboard.empty.noRoundEver')}</p>
               </div>
-            ) : displayedRound.teams.length === 0 ? (
-              <div
-                data-testid="leaderboard-empty"
-                className="flex flex-col items-center gap-2 p-8 text-center"
-              >
-                <p className="text-muted-foreground">{t('leaderboard.empty.title')}</p>
-              </div>
             ) : (
               <div className="flex flex-col gap-2">
                 {isLastClosedRound && (
@@ -341,65 +334,76 @@ function LeaderboardScreen() {
                     {t('leaderboard.lastClosedRoundLabel', { name: displayedRound.roundName })}
                   </p>
                 )}
-                <Table
-                  data-testid="leaderboard-table"
-                  className={cn(isPresentation && '[&_td]:text-3xl [&_th]:text-2xl')}
-                >
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead data-testid="leaderboard-column-rank">
-                        {t('leaderboard.columns.rank')}
-                      </TableHead>
-                      <TableHead data-testid="leaderboard-column-team">
-                        {t('leaderboard.columns.team')}
-                      </TableHead>
-                      {problemIds.map((problemId) => (
-                        <TableHead
-                          key={problemId}
-                          data-testid={`leaderboard-column-problem-${problemId}`}
-                        >
-                          {problemTitleById.get(problemId)}
+                {displayedRound.teams.length === 0 ? (
+                  <div
+                    data-testid="leaderboard-empty"
+                    className="flex flex-col items-center gap-2 p-8 text-center"
+                  >
+                    <p className="text-muted-foreground">
+                      {t('leaderboard.empty.noSubmissionsYet')}
+                    </p>
+                  </div>
+                ) : (
+                  <Table
+                    data-testid="leaderboard-table"
+                    className={cn(isPresentation && '[&_td]:text-3xl [&_th]:text-2xl')}
+                  >
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead data-testid="leaderboard-column-rank">
+                          {t('leaderboard.columns.rank')}
                         </TableHead>
-                      ))}
-                      <TableHead data-testid="leaderboard-column-total">
-                        {t('leaderboard.columns.total')}
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {displayedRound.teams.map((team: RoundRankingTeam) => (
-                      <motion.tr
-                        key={team.teamId}
-                        layout
-                        transition={ROW_TRANSITION}
-                        data-testid={`leaderboard-row-${team.teamId}`}
-                        className={ROW_CLASSNAME}
-                      >
-                        <TableCell>{team.rank}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span>{team.teamName}</span>
-                            {team.teamId === myTeamId && (
-                              <Badge data-testid="leaderboard-your-team-badge">
-                                {t('teams.yourTeamBadge')}
-                              </Badge>
-                            )}
-                            {universitiesForTeam(team.teamId, teamsById).map((university) => (
-                              <UniversityBadge key={university} university={university} />
-                            ))}
-                          </div>
-                        </TableCell>
+                        <TableHead data-testid="leaderboard-column-team">
+                          {t('leaderboard.columns.team')}
+                        </TableHead>
                         {problemIds.map((problemId) => (
-                          <TableCell key={problemId}>
-                            {team.problems.find((problem) => problem.problemId === problemId)
-                              ?.score ?? 0}
-                          </TableCell>
+                          <TableHead
+                            key={problemId}
+                            data-testid={`leaderboard-column-problem-${problemId}`}
+                          >
+                            {problemTitleById.get(problemId)}
+                          </TableHead>
                         ))}
-                        <TableCell className="font-medium">{team.totalScore}</TableCell>
-                      </motion.tr>
-                    ))}
-                  </TableBody>
-                </Table>
+                        <TableHead data-testid="leaderboard-column-total">
+                          {t('leaderboard.columns.total')}
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {displayedRound.teams.map((team: RoundRankingTeam) => (
+                        <motion.tr
+                          key={team.teamId}
+                          layout
+                          transition={ROW_TRANSITION}
+                          data-testid={`leaderboard-row-${team.teamId}`}
+                          className={ROW_CLASSNAME}
+                        >
+                          <TableCell>{team.rank}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <span>{team.teamName}</span>
+                              {team.teamId === myTeamId && (
+                                <Badge data-testid="leaderboard-your-team-badge">
+                                  {t('teams.yourTeamBadge')}
+                                </Badge>
+                              )}
+                              {universitiesForTeam(team.teamId, teamsById).map((university) => (
+                                <UniversityBadge key={university} university={university} />
+                              ))}
+                            </div>
+                          </TableCell>
+                          {problemIds.map((problemId) => (
+                            <TableCell key={problemId}>
+                              {team.problems.find((problem) => problem.problemId === problemId)
+                                ?.score ?? 0}
+                            </TableCell>
+                          ))}
+                          <TableCell className="font-medium">{team.totalScore}</TableCell>
+                        </motion.tr>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </div>
             )}
           </TabsContent>

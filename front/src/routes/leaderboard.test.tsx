@@ -697,7 +697,13 @@ describe('LeaderboardScreen — retry', () => {
 })
 
 describe('LeaderboardScreen — empty state', () => {
-  it('shows the empty state when the round has zero teams', async () => {
+  it('shows the round-specific empty copy when the round has zero teams', async () => {
+    // The REST fallback (activeRoundRanking) fetches as soon as an active
+    // round id shows up, regardless of stream.isLive in a test that never
+    // emits a connection-status event — it must agree with the empty round
+    // below, or the screen flips to the default non-empty fixture once that
+    // fetch resolves.
+    mockedRoundRanking.mockResolvedValue(jsonResponse(200, { ...roundRanking, teams: [] }))
     renderLeaderboard()
     await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
     emit({
@@ -707,7 +713,73 @@ describe('LeaderboardScreen — empty state', () => {
       event: { teams: [] },
     })
 
+    await waitFor(() =>
+      expect(screen.getByTestId('leaderboard-empty').textContent).toContain(
+        'Ninguém submeteu nesta rodada ainda.',
+      ),
+    )
+  })
+
+  // #184: a closed round with no submissions must still identify itself by
+  // name via the last-closed label — that label used to live only inside the
+  // table branch, so a closed-but-empty round showed neither the table nor
+  // any indication of which round this was.
+  it('shows the last-closed label alongside the empty state for a closed round with zero teams', async () => {
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        {
+          id: 'r1',
+          name: 'Rodada 1',
+          status: 'closed',
+          durationMinutes: 30,
+          openedAt: new Date('2026-09-01T10:00:00.000Z'),
+          closesAt: null,
+          closedAt: new Date('2026-09-01T10:30:00.000Z'),
+          createdAt: new Date('2026-09-01T09:00:00.000Z'),
+          updatedAt: new Date('2026-09-01T10:30:00.000Z'),
+          problemCount: 1,
+        },
+      ]),
+    )
+    mockedRoundRanking.mockResolvedValue(jsonResponse(200, { ...roundRanking, teams: [] }))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({ type: 'ranking.updated', serverTime: new Date(), round: null, event: eventRanking })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-tabs')).toBeDefined())
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-round'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('leaderboard-last-closed-label').textContent).toContain('Rodada 1'),
+    )
     await waitFor(() => expect(screen.getByTestId('leaderboard-empty')).toBeDefined())
+  })
+
+  // The "Geral" tab keeps the generic copy — a team with zero points there is
+  // legitimate (it just hasn't scored yet), not a filtered-out non-participant.
+  it('keeps the generic empty copy on the "Geral" tab', async () => {
+    // Same REST-fallback race as above, on the event-ranking side: eventRankingRest
+    // fetches whenever the stream isn't marked live, so it must agree with
+    // the empty event ranking below.
+    mockedRoundRanking.mockResolvedValue(jsonResponse(200, { ...roundRanking, teams: [] }))
+    mockedEventRanking.mockResolvedValue(jsonResponse(200, { teams: [] }))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: { ...roundRanking, teams: [] },
+      event: { teams: [] },
+    })
+    await waitFor(() => expect(screen.getByTestId('leaderboard-tabs')).toBeDefined())
+
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('leaderboard-empty').textContent).toContain(
+        'Nenhum time no placar ainda.',
+      ),
+    )
   })
 })
 

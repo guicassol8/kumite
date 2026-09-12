@@ -173,7 +173,9 @@ test.describe('home (#40)', () => {
     await expect(page.getByTestId('home-round-card')).toContainText(roundName, {
       timeout: 15_000,
     })
-    await expect(page.getByTestId('round-countdown')).toBeVisible()
+    // Scoped to the home card: the header (#217) renders its own
+    // round-countdown chip whenever a round is open.
+    await expect(page.getByTestId('home-round-card').getByTestId('round-countdown')).toBeVisible()
     await page.screenshot({ path: evidence('02-rodada-aberta-ao-vivo'), fullPage: true })
 
     // 03 — closing it live moves it into the closed-rounds list, no score

@@ -174,7 +174,9 @@ test.describe('leaderboard (#45)', () => {
       'true',
     )
     await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
-    await expect(page.getByTestId('round-countdown')).toBeVisible()
+    // Scoped to <main>: the header (#217) renders its own round-countdown
+    // chip whenever a round is open.
+    await expect(page.getByRole('main').getByTestId('round-countdown')).toBeVisible()
     await page.screenshot({ path: evidence46('01-modo-apresentacao'), fullPage: true })
 
     // 46-02 (#46) — Esc exits fullscreen natively in a real browser, which
@@ -190,7 +192,7 @@ test.describe('leaderboard (#45)', () => {
       'aria-pressed',
       'false',
     )
-    await expect(page.getByTestId('round-countdown')).toBeHidden()
+    await expect(page.getByRole('main').getByTestId('round-countdown')).toBeHidden()
     await page.screenshot({ path: evidence46('02-modo-normal'), fullPage: true })
 
     // 04 — switching to "Geral" changes the scope without a reload

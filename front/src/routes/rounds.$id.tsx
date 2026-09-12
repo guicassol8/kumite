@@ -7,19 +7,20 @@ import { RoundCountdown } from '@/components/round-countdown'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { useEventStream } from '@/hooks/use-event-stream'
 import { formatTime } from '@/i18n/format'
+import { positionLabel } from '@/lib/round-position'
 import { fetchRound, RoundNotFoundError, roundQueryKey } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
 import { cn } from '@/lib/utils'
+
+const GRID_COLS = 'md:grid-cols-[3rem_1fr_8rem_5rem_10rem]'
+
+const DIFFICULTY_BADGE_VARIANT = {
+  easy: 'success',
+  medium: 'warning',
+  hard: 'destructive',
+} as const
 
 export const Route = createFileRoute('/rounds/$id')({
   beforeLoad: requireAuth,
@@ -169,38 +170,71 @@ function RoundDetailScreen() {
       {round.data.problems.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t('roundDetail.emptyProblems')}</p>
       ) : (
-        <Table data-testid="round-problems-table" className="w-full">
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('roundDetail.columns.title')}</TableHead>
-              <TableHead>{t('roundDetail.columns.difficulty')}</TableHead>
-              <TableHead>{t('roundDetail.columns.points')}</TableHead>
-              <TableHead>{t('roundDetail.columns.bestScore')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {round.data.problems.map((problem) => (
-              <TableRow key={problem.problemId} data-testid={`round-problem-${problem.problemId}`}>
-                <TableCell>
-                  <Link
-                    to="/problem/$id"
-                    params={{ id: problem.problemId }}
-                    className="text-primary underline"
-                  >
-                    {problem.title}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">
-                    {t(`roundDetail.difficulty.${problem.difficulty}`)}
-                  </Badge>
-                </TableCell>
-                <TableCell>{problem.points}</TableCell>
-                <TableCell>{problem.bestScore ?? t('roundDetail.bestScore.hidden')}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div role="table" data-testid="round-problems-table" className="w-full">
+          <div
+            role="row"
+            className={cn(
+              'hidden border-b pb-2 text-muted-foreground text-xs uppercase tracking-wide',
+              'md:grid md:gap-4',
+              GRID_COLS,
+            )}
+          >
+            <span role="columnheader">{t('roundDetail.columns.position')}</span>
+            <span role="columnheader">{t('roundDetail.columns.title')}</span>
+            <span role="columnheader">{t('roundDetail.columns.difficulty')}</span>
+            <span role="columnheader">{t('roundDetail.columns.points')}</span>
+            <span role="columnheader">{t('roundDetail.columns.bestScore')}</span>
+          </div>
+          <div className="flex flex-col gap-3 md:gap-0">
+            {round.data.problems
+              .slice()
+              .sort((a, b) => a.position - b.position)
+              .map((problem) => (
+                <div
+                  key={problem.problemId}
+                  role="row"
+                  data-testid={`round-problem-${problem.problemId}`}
+                  className={cn(
+                    'relative flex flex-col gap-1 rounded-xl border p-4',
+                    'md:grid md:items-center md:gap-4 md:rounded-none md:border-x-0 md:border-t-0 md:border-b md:p-3',
+                    GRID_COLS,
+                  )}
+                >
+                  <span role="cell" className="font-display text-lg md:text-base">
+                    <span className="sr-only md:hidden">{t('roundDetail.columns.position')}: </span>
+                    {positionLabel(problem.position)}
+                  </span>
+                  <span role="cell" className="font-medium">
+                    <Link
+                      to="/problem/$id"
+                      params={{ id: problem.problemId }}
+                      className="after:absolute after:inset-0"
+                    >
+                      {problem.title}
+                    </Link>
+                  </span>
+                  <span role="cell">
+                    <span className="sr-only md:hidden">
+                      {t('roundDetail.columns.difficulty')}:{' '}
+                    </span>
+                    <Badge variant={DIFFICULTY_BADGE_VARIANT[problem.difficulty]}>
+                      {t(`roundDetail.difficulty.${problem.difficulty}`)}
+                    </Badge>
+                  </span>
+                  <span role="cell" className="tabular-nums">
+                    <span className="sr-only md:hidden">{t('roundDetail.columns.points')}: </span>
+                    {problem.points}
+                  </span>
+                  <span role="cell" className="tabular-nums">
+                    <span className="sr-only md:hidden">
+                      {t('roundDetail.columns.bestScore')}:{' '}
+                    </span>
+                    {problem.bestScore ?? t('roundDetail.bestScore.hidden')}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
       )}
     </main>
   )

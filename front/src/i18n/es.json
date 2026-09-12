@@ -797,6 +797,7 @@
       "retry": "Intentar de nuevo"
     },
     "columns": {
+      "position": "N.º",
       "title": "Título",
       "difficulty": "Dificultad",
       "points": "Puntos",

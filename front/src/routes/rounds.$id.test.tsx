@@ -266,6 +266,49 @@ describe('RoundDetailScreen', () => {
     expect(screen.getByTestId('round-detail-status-badge').textContent).toBe('Aberta')
   })
 
+  it('marks the problems table with role="table" and labels each row with its position letter', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, roundDetail()))
+
+    renderRound()
+
+    expect((await screen.findByTestId('round-problems-table')).getAttribute('role')).toBe('table')
+    expect(screen.getByTestId('round-problem-p1').textContent).toContain('A')
+  })
+
+  it('labels rows A, B in position order even when the API returns them out of order', async () => {
+    mockedGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        roundDetail({
+          problems: [
+            {
+              problemId: 'p2',
+              position: 1,
+              title: 'Produto',
+              difficulty: 'medium',
+              points: 20,
+              bestScore: null,
+            },
+            {
+              problemId: 'p1',
+              position: 0,
+              title: 'Soma',
+              difficulty: 'easy',
+              points: 10,
+              bestScore: null,
+            },
+          ],
+        }),
+      ),
+    )
+
+    renderRound()
+
+    expect(await screen.findByTestId('round-problem-p1')).toBeDefined()
+    expect(screen.getByTestId('round-problem-p1').textContent).toContain('A')
+    expect(screen.getByTestId('round-problem-p2').textContent).toContain('B')
+  })
+
   it('shows the closed-at time and hides the countdown for a closed round', async () => {
     mockedGet.mockResolvedValue(
       jsonResponse(200, roundDetail({ status: 'closed', closedAt: '2026-09-02T13:05:00.000Z' })),

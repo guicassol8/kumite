@@ -1,21 +1,21 @@
 import { emptyWorkspaceState, withRootBlock } from '@kumite/blocks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
 import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
 } from '@/components/blockly/blockly-workspace'
+import { ActionsBar } from '@/components/problem/actions-bar'
 import { ExampleResults, type ExampleResultsNotice } from '@/components/problem/example-results'
+import { ProblemPanels } from '@/components/problem/problem-panels'
 import {
   type SubmissionResult,
   SubmissionResultPanel,
 } from '@/components/problem/submission-result'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useBlocklyLocale } from '@/hooks/use-blockly-locale'
 import { useEventStream } from '@/hooks/use-event-stream'
 import { type ExampleRunState, useExampleRun } from '@/hooks/use-example-run'
@@ -83,6 +83,18 @@ function ProblemScreen() {
 
   const [verdict, setVerdict] = useState<SubmissionResult | null>(null)
   const [submitBanner, setSubmitBanner] = useState<SubmitBanner | null>(null)
+
+  // Bumped by every fresh run and every fresh verdict — the desktop layout
+  // (#203, T8) uses it to reopen a results band the participant collapsed
+  // earlier. `hasResults` itself only flips false→true once per screen, so it
+  // cannot signal "there's a *new* result" on its own.
+  const [resultsVersion, setResultsVersion] = useState(0)
+  useEffect(() => {
+    if (runState.status !== 'idle') setResultsVersion((version) => version + 1)
+  }, [runState.status])
+  useEffect(() => {
+    if (verdict) setResultsVersion((version) => version + 1)
+  }, [verdict])
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -182,194 +194,122 @@ function ProblemScreen() {
   // for it on the stacked (mobile) layout.
   const hasResults = runState.status !== 'idle' || verdict !== null
 
+  // Built once so the two layout branches (T7) hand the exact same element
+  // to `<BlocklyWorkspace>` — identical props by construction, not by two
+  // call sites kept in sync by hand.
+  const blocklyWorkspace = (
+    <BlocklyWorkspace
+      // The editor's identity is the problem (same reason as
+      // organizer.problems.$id.edit.tsx and organizer.rounds.$id.edit.tsx):
+      // going from /problem/A to /problem/B has to rebuild it around B's
+      // workspace instead of keeping A's blocks on the canvas (#39).
+      key={id}
+      ref={workspaceRef}
+      toolbox={toolbox}
+      options={workspaceOptions}
+      // A state saved before the root became undeletable may not have it,
+      // and the toolbox never offers it back — re-seed instead of losing
+      // the blocks.
+      initialState={withRootBlock(initialState)}
+      onChange={handleChange}
+      onReady={onWorkspaceReady}
+    />
+  )
+
+  const closedNotice = isClosed && (
+    <Alert
+      data-testid="problem-closed-notice"
+      className={cn(
+        'shrink-0',
+        // Three lines of static text cost as much as a readable results
+        // band. On a short phone it scrolls inside itself instead.
+        hasResults && 'short:max-h-16 short:overflow-auto',
+      )}
+    >
+      <AlertDescription className="flex flex-col gap-1">
+        <span>{t('problem.closedRound.notice')}</span>
+        {data.bestSubmission ? (
+          <span data-testid="problem-closed-best-score">
+            {t('problem.closedRound.bestScore', {
+              score: data.bestSubmission.score,
+              attempts: data.bestSubmission.attempts,
+              date: formatDate(new Date(data.bestSubmission.achievedAt), lang),
+            })}
+          </span>
+        ) : (
+          <span data-testid="problem-closed-never-submitted">
+            {t('problem.closedRound.neverSubmitted')}
+          </span>
+        )}
+      </AlertDescription>
+    </Alert>
+  )
+
+  const submitBannerAlert = submitBanner && (
+    <Alert
+      variant="destructive"
+      className="shrink-0"
+      data-testid={
+        'key' in submitBanner && submitBanner.key === 'problem.submitError.cooldown'
+          ? 'problem-cooldown-banner'
+          : 'problem-submit-error-banner'
+      }
+    >
+      <AlertDescription className="flex items-center justify-between gap-4">
+        <span>{'key' in submitBanner ? t(submitBanner.key) : submitBanner.message}</span>
+        <Button type="button" variant="outline" size="sm" onClick={() => setSubmitBanner(null)}>
+          {t('problem.submitError.dismiss')}
+        </Button>
+      </AlertDescription>
+    </Alert>
+  )
+
+  const resultsContent = (
+    <>
+      {runState.status !== 'idle' && (
+        <ExampleResults
+          examples={examples}
+          outcomes={outcomesOf(runState)}
+          notice={noticeFor(runState)}
+        />
+      )}
+      {verdict && <SubmissionResultPanel result={verdict} />}
+    </>
+  )
+
+  const actionsBar = (
+    <ActionsBar
+      isRunning={isRunning}
+      onRun={() => {
+        // The run owns its own errors and settles into a state — nothing
+        // here has to await it.
+        void run(workspaceRef.current?.serialize() ?? {})
+      }}
+      onClear={() => {
+        // The root block isn't offered by the toolbox (it's seeded, not
+        // dragged in), so "clear" resets to it rather than to nothing — an
+        // empty workspace would leave no way back in.
+        workspaceRef.current?.deserialize(emptyWorkspaceState)
+        clearSaved()
+      }}
+      isClosed={isClosed}
+      isSubmitting={submit.isPending}
+      onSubmit={() => void handleSubmit()}
+    />
+  )
+
   return (
     <main className="flex min-h-0 grow basis-0 flex-col gap-4 overflow-hidden p-4 md:flex-row">
-      <Card
-        data-testid="problem-statement-panel"
-        aria-label={t('problem.statementLabel')}
-        className={cn(
-          'overflow-auto md:max-h-none md:w-96 md:shrink-0',
-          // Stacked layout only: the side column on md+ owns a whole column
-          // and never competes with the band for height. On a short phone it
-          // gives up a second slice, because the band has nowhere else to
-          // take height from.
-          hasResults ? 'max-h-36 short:max-h-20' : 'max-h-64',
-        )}
-      >
-        <CardHeader>
-          <CardTitle>{data.title}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 text-sm">
-          <p>{data.statementMd}</p>
-          <div>
-            <h2 className="mb-2 font-semibold">{t('problem.examplesHeading')}</h2>
-            <ul className="flex flex-col gap-2">
-              {data.examples.map((example, index) => (
-                <li
-                  key={index}
-                  data-testid={`problem-example-${index}`}
-                  className="rounded-md border p-2"
-                >
-                  <div>
-                    <span className="font-medium">{t('problem.exampleInput')}: </span>
-                    {JSON.stringify(example.input)}
-                  </div>
-                  <div>
-                    <span className="font-medium">{t('problem.exampleOutput')}: </span>
-                    {JSON.stringify(example.expected)}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
-      <div
-        data-testid="problem-workspace-panel"
-        className="flex min-h-0 min-w-0 grow basis-0 flex-col gap-4"
-      >
-        {isClosed && (
-          <Alert
-            data-testid="problem-closed-notice"
-            className={cn(
-              'shrink-0',
-              // Three lines of static text cost as much as a readable results
-              // band. On a short phone it scrolls inside itself instead.
-              hasResults && 'short:max-h-16 short:overflow-auto',
-            )}
-          >
-            <AlertDescription className="flex flex-col gap-1">
-              <span>{t('problem.closedRound.notice')}</span>
-              {data.bestSubmission ? (
-                <span data-testid="problem-closed-best-score">
-                  {t('problem.closedRound.bestScore', {
-                    score: data.bestSubmission.score,
-                    attempts: data.bestSubmission.attempts,
-                    date: formatDate(new Date(data.bestSubmission.achievedAt), lang),
-                  })}
-                </span>
-              ) : (
-                <span data-testid="problem-closed-never-submitted">
-                  {t('problem.closedRound.neverSubmitted')}
-                </span>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {submitBanner && (
-          <Alert
-            variant="destructive"
-            className="shrink-0"
-            data-testid={
-              'key' in submitBanner && submitBanner.key === 'problem.submitError.cooldown'
-                ? 'problem-cooldown-banner'
-                : 'problem-submit-error-banner'
-            }
-          >
-            <AlertDescription className="flex items-center justify-between gap-4">
-              <span>{'key' in submitBanner ? t(submitBanner.key) : submitBanner.message}</span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setSubmitBanner(null)}
-              >
-                {t('problem.submitError.dismiss')}
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div
-          className={cn(
-            'min-w-0 grow basis-0 overflow-hidden rounded-md border',
-            // The floor that keeps the editor usable. Once results are on
-            // screen the participant is reading, not dragging, so on a short
-            // phone the canvas lends the band part of it.
-            hasResults ? 'min-h-44 short:min-h-32' : 'min-h-44',
-          )}
-        >
-          <BlocklyWorkspace
-            // The editor's identity is the problem (same reason as
-            // organizer.problems.$id.edit.tsx and organizer.rounds.$id.edit.tsx):
-            // going from /problem/A to /problem/B has to rebuild it around B's
-            // workspace instead of keeping A's blocks on the canvas (#39).
-            key={id}
-            ref={workspaceRef}
-            toolbox={toolbox}
-            options={workspaceOptions}
-            // A state saved before the root became undeletable may not have it,
-            // and the toolbox never offers it back — re-seed instead of losing
-            // the blocks.
-            initialState={withRootBlock(initialState)}
-            onChange={handleChange}
-            onReady={onWorkspaceReady}
-          />
-        </div>
-        {hasResults && (
-          // The one scrollable strip of the panel: results grow into it and it
-          // gives way (up to 45% of the panel) instead of pushing the bar off
-          // screen (#155).
-          <div
-            data-testid="problem-results-band"
-            className="flex max-h-[45%] min-h-0 shrink flex-col gap-4 overflow-auto"
-          >
-            {runState.status !== 'idle' && (
-              <ExampleResults
-                examples={examples}
-                outcomes={outcomesOf(runState)}
-                notice={noticeFor(runState)}
-              />
-            )}
-            {verdict && <SubmissionResultPanel result={verdict} />}
-          </div>
-        )}
-        {/* Last in the panel and never shrinking: that is what keeps Executar,
-            Limpar and Enviar on screen whatever the results do. */}
-        <div
-          data-testid="problem-actions-bar"
-          className="flex shrink-0 items-center gap-2 border-t pt-4"
-        >
-          <Button
-            type="button"
-            data-testid="problem-run-button"
-            disabled={isRunning}
-            onClick={() => {
-              // The run owns its own errors and settles into a state — nothing
-              // here has to await it.
-              void run(workspaceRef.current?.serialize() ?? {})
-            }}
-          >
-            {isRunning ? t('problem.executeRunning') : t('problem.executeButton')}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            data-testid="problem-clear-button"
-            onClick={() => {
-              if (!window.confirm(t('problem.clearConfirm'))) return
-              // The root block isn't offered by the toolbox (it's seeded, not
-              // dragged in), so "clear" resets to it rather than to nothing —
-              // an empty workspace would leave no way back in.
-              workspaceRef.current?.deserialize(emptyWorkspaceState)
-              clearSaved()
-            }}
-          >
-            {t('problem.clearButton')}
-          </Button>
-          {!isClosed && (
-            <Button
-              type="button"
-              data-testid="problem-submit-button"
-              disabled={submit.isPending}
-              onClick={() => void handleSubmit()}
-            >
-              {submit.isPending ? t('problem.submitProgress') : t('problem.submitButton')}
-            </Button>
-          )}
-        </div>
-      </div>
+      <ProblemPanels
+        problem={data}
+        hasResults={hasResults}
+        closedNotice={closedNotice}
+        submitBanner={submitBannerAlert}
+        editor={blocklyWorkspace}
+        results={hasResults ? resultsContent : undefined}
+        actionsBar={actionsBar}
+        resultsVersion={resultsVersion}
+      />
     </main>
   )
 }

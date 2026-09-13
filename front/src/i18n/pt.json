@@ -756,6 +756,15 @@
       "obtained": "obtido",
       "timeout": "Tempo esgotado",
       "runtimeError": "Erro: {{detail}}"
+    },
+    "panels": {
+      "statementRail": "Enunciado",
+      "collapseStatement": "Recolher enunciado",
+      "expandStatement": "Mostrar enunciado",
+      "collapseResults": "Recolher resultados",
+      "expandResults": "Mostrar resultados",
+      "statementHandle": "Redimensionar enunciado e editor",
+      "resultsHandle": "Redimensionar editor e resultados"
     }
   },
   "leaderboard": {

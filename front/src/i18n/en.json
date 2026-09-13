@@ -756,6 +756,15 @@
       "obtained": "got",
       "timeout": "Timed out",
       "runtimeError": "Error: {{detail}}"
+    },
+    "panels": {
+      "statementRail": "Statement",
+      "collapseStatement": "Collapse statement",
+      "expandStatement": "Show statement",
+      "collapseResults": "Collapse results",
+      "expandResults": "Show results",
+      "statementHandle": "Resize statement and editor",
+      "resultsHandle": "Resize editor and results"
     }
   },
   "leaderboard": {

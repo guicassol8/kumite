@@ -12,6 +12,10 @@ explicitly preferred over one silent assumption.
 
 ## Skills
 
+These are Claude Code's slash-command shortcut over the agent-agnostic
+process in `docs/task-workflow/` (see `AGENTS.md` § Map) — use them when
+running inside Claude Code; the docs are the source of truth.
+
 | Skill | Use when |
 |---|---|
 | creating-tasks | turning ideas/specs into GitHub Issues |
@@ -22,7 +26,7 @@ explicitly preferred over one silent assumption.
 
 Each step is its own chat: every skill ends by printing the next step's command,
 ready to paste into a new session. The full chain is in `docs/workflow.md`
-§ One step, one chat.
+§ One step, one session.
 
 ## Claude-specific notes
 

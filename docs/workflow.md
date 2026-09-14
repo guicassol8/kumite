@@ -1,28 +1,44 @@
 # kumite — task workflow
 
-Tasks are **GitHub Issues** in this repo, driven by the five skills in
-`.claude/skills/`: creating-tasks → picking-next-task → planning-tasks →
-implementing-tasks → reviewing-tasks.
+Tasks are **GitHub Issues** in this repo, driven by five steps:
+creating tasks → picking the next task → planning a task → implementing a
+task → reviewing a task. This file holds the mechanical conventions shared by
+every step (labels, issue format, ready-work rules, worktrees, branches/PRs,
+releases); the step-by-step process for each one is agent-agnostic prose in
+`docs/task-workflow/`:
 
-## One step, one chat — the handoff
+| Step | Doc |
+|---|---|
+| Creating tasks | `docs/task-workflow/creating-tasks.md` |
+| Picking the next task | `docs/task-workflow/picking-next-task.md` |
+| Planning a task | `docs/task-workflow/planning-tasks.md` |
+| Implementing a task | `docs/task-workflow/implementing-tasks.md` |
+| Reviewing a task | `docs/task-workflow/reviewing-tasks.md` |
+
+Claude Code additionally wraps each step as a slash-command skill under
+`.claude/skills/` that imports the doc above rather than duplicating it.
+
+## One step, one session — the handoff
 
 Each step is a fresh session: the state lives on the issue and the PR, not in
-the conversation. So **every skill ends by printing the command for the next
-step**, alone in a fenced block, ready to copy-paste into a new chat.
+the conversation. So **every step ends by clearly stating the next step and
+its issue/PR number**, in a form the next session can open with; Claude Code
+additionally prints the literal slash command, alone in a fenced block, ready
+to copy-paste into a new chat.
 
-| Finished | Next command |
+| Finished | Next step |
 |---|---|
-| creating-tasks (one issue) | `/planning-tasks #N` |
-| creating-tasks (backlog/epic) | `/picking-next-task` |
-| picking-next-task | `/planning-tasks #N` |
-| planning-tasks | `/implementing-tasks #N` — only after the user approves the plan |
-| implementing-tasks | `/reviewing-tasks #PR` — the **PR** number |
-| reviewing-tasks (approved + merged) | `/picking-next-task` |
-| reviewing-tasks (changes requested) | `/implementing-tasks #N` — back to the **issue** number |
+| creating tasks (one issue) | plan issue #N — `/planning-tasks #N` in Claude Code |
+| creating tasks (backlog/epic) | pick the next task — `/picking-next-task` in Claude Code |
+| picking the next task | plan issue #N — `/planning-tasks #N` in Claude Code |
+| planning a task | implement issue #N — `/implementing-tasks #N` in Claude Code — only after the user approves the plan |
+| implementing a task | review PR #PR (the **PR** number) — `/reviewing-tasks #PR` in Claude Code |
+| reviewing a task (approved + merged) | pick the next task — `/picking-next-task` in Claude Code |
+| reviewing a task (changes requested) | implement issue #N (back to the **issue** number) — `/implementing-tasks #N` in Claude Code |
 
-Approval does not survive the chat boundary: a plan approved in one session must
-be approved on the issue (or restated in the new chat) before implementation
-starts.
+Approval does not survive the session boundary: a plan approved in one session
+must be approved on the issue (or restated in the new session) before
+implementation starts.
 
 ## Labels
 

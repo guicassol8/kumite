@@ -5,79 +5,23 @@ description: Produces a spec-driven implementation plan for a GitHub Issue, inte
 
 # Planning a task
 
-A plan turns an issue's Acceptance into numbered, verifiable steps. No code is
-written here. Conventions in @docs/workflow.md.
+@docs/task-workflow/planning-tasks.md
 
-**Not for:** creating issues (`creating-tasks`) or writing code
-(`implementing-tasks`).
+## Claude Code specifics
 
-## Step 1 — Absorb
+- Use AskUserQuestion for the Step 2 interrogation — batched, with options
+  and a recommendation.
+- Prefer EnterWorktree over the manual worktree commands in Step 1 when
+  running or trying scratch code.
+- Handoff (MANDATORY): the next step runs in a **fresh chat**, so the very
+  last thing you print is the command to paste there — alone in a fenced
+  block, nothing after it:
 
-- `gh issue view <N> --comments` — body, acceptance, prior discussion.
-- Read `docs/product.md` and `docs/tech-stack.md` for context; the package
-  `AGENTS.md` (back/ or front/) for local rules.
-- Explore the code the issue touches (routes, services, schemas, screens).
-  Reading is fine anywhere, but the moment you need to RUN the app or try
-  scratch code, do it in a worktree (`docs/workflow.md` § Worktrees) — the
-  main checkout must never accumulate changes, planned or exploratory.
-- kata questions (API shapes, middleware, DI, verify rules) → query the
-  `kata-docs` MCP server before guessing.
+  ```
+  /implementing-tasks #12
+  ```
 
-## Step 2 — Interrogate the user (MANDATORY)
-
-Same house rule as creating-tasks: every ambiguity — UX choice, edge case,
-data shape, error behavior, naming, i18n copy — is a question for the user,
-never a silent decision. Batch with AskUserQuestion, always offering options
-and a recommendation. Keep asking until the plan has no guesses left.
-
-## Step 3 — Write the plan
-
-Numbered steps `T1..Tn`, each with:
-
-- **Files**: exact paths to create/change.
-- **Change**: one or two sentences of what happens there.
-- **Verify**: the test written or command run that proves the step
-  (tests-first whenever possible).
-
-The plan must also account for, when applicable:
-- back: `<domain>.schema.ts` changes, `db/schema.ts` + `drizzle-kit generate`
-  migration, `.hurl` update, `kata verify` staying clean;
-- front: i18n keys added to the three catalogs, `data-testid` on new
-  interactive elements, which Playwright evidence review will capture;
-- the typed contract: schema change in back → `pnpm -r typecheck` step for front.
-
-Steps are small (one sitting each) and independently checkable.
-
-## Step 4 — Approval gate
-
-Post the plan as an issue comment under a `## Plan` heading:
-
-```bash
-gh issue comment <N> --body-file -
-```
-
-Show it to the user. `implementing-tasks` may only start after the user
-explicitly approves; revisions edit the same comment (`gh issue comment --edit-last`).
-
-## Step 5 — Kata feedback (attempt every time)
-
-If Step 1 queried the `kata-docs` MCP server, attempt a `kata-feedback/`
-entry before moving on — not gated on finding a bug. Note whether the docs
-actually answered the question or you ended up guessing anyway, and the
-rough cost (queries made, docs read) versus the time it saved. See
-`AGENTS.md` § Kata framework feedback and `kata-feedback/README.md` for the
-format. Skip if this plan never touched kata.
-
-## Step 6 — Handoff (MANDATORY)
-
-The next step runs in a **fresh chat**, so the very last thing you print is the
-command to paste there — alone in a fenced block, nothing after it:
-
-```
-/implementing-tasks #12
-```
-
-Substitute the real number. Say in one line above the block that the plan must
-be approved first (a comment on the issue, or "aprovado" at the top of the new
-chat) — the fresh session cannot see this conversation's approval. Never end
-with a prose suggestion — end with the command itself.
+  Substitute the real number. Say in one line above the block that the plan
+  must be approved first (a comment on the issue, or "aprovado" at the top of
+  the new chat) — the fresh session cannot see this conversation's approval.
+  Never end with a prose suggestion — end with the command itself.

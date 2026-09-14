@@ -116,6 +116,28 @@ pnpm install        # node_modules are per-worktree, not shared
 - In Claude Code, prefer the harness's managed isolation (EnterWorktree /
   subagent `isolation: "worktree"`) — it creates and cleans worktrees itself.
 
+## Gate ladder — before opening or updating a PR
+
+Every task PR must pass the same three commands, in this order, from the
+repo root:
+
+1. `pnpm -r typecheck`
+2. `pnpm verify` (`kata verify --strict-coverage` on `back/`)
+3. `pnpm -r test`
+
+This is a contract, not tooling trivia: a task is **not ready for PR or
+review** while any of the three fails — no exceptions for "it's probably
+fine" or "just docs nearby."
+
+- **Claude Code**: already automated. The Stop hook (`.claude/hooks/stop.sh`)
+  runs this exact ladder and blocks the session from ending while any step
+  fails — but only when the working tree carries uncommitted changes under
+  `back/`, `front/`, `blocks/` or `package.json`. Don't run it by hand too;
+  that's pure duplication of what the hook already gates.
+- **Any other agent (e.g. Codex CLI)**: no hook runs this for you. Run the
+  three commands yourself before considering the implementation done or
+  opening/updating the PR.
+
 ## Branches, commits, PRs
 
 - `develop` is the integration branch — all task work is based on it, and
@@ -127,6 +149,8 @@ pnpm install        # node_modules are per-worktree, not shared
 - Conventional commits on **every** commit: `feat:` `fix:` `chore:` `test:`
   `docs:` `refactor:`.
 - Open the PR against `develop` explicitly: `gh pr create --base develop ...`.
+- Before opening or updating the PR, the gate ladder above must be green
+  (automatic in Claude Code, manual everywhere else).
 - PR body starts with `Fixes #N` and ends with an `## Evidence` section.
 - **Evidence is mandatory** (reviewing-tasks):
   - front → Playwright walkthrough screenshots committed under

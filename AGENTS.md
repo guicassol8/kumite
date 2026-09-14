@@ -21,9 +21,11 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
   built by `logo/export.sh`), image-generation prompts, canvas source files and
   a PNG per screen. Source of truth for the redesign epic (#214): screens follow
   the tokens, never the other way around.
-- `.claude/skills/` — the five task-workflow skills
-  (create → pick → plan → implement → review). Each ends by printing the next
-  step's command for a fresh chat — chain in `docs/workflow.md`.
+- `docs/task-workflow/` — the canonical, agent-agnostic task process (create
+  → pick → plan → implement → review); conventions (labels, worktrees,
+  branches/PRs) in `docs/workflow.md`. Claude Code additionally wraps each
+  step as a slash-command skill under `.claude/skills/` that imports the doc
+  rather than duplicating it.
 - Tasks are GitHub Issues (`gh`); format and labels in `docs/workflow.md`.
 
 ## Verify your work (from the repo root)

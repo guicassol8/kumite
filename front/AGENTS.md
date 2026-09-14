@@ -35,7 +35,7 @@ TanStack Router (file-based) + TanStack Query · i18next · zod ^3.
   `src/components/header.test.tsx`. Need a controlled `fetch`? Use
   `vi.stubGlobal('fetch', …)`; there is no allowlist.
 - Review evidence: Playwright specs in `e2e/`, screenshots committed to
-  `e2e/evidence/<issue>/` (see `.claude/skills/reviewing-tasks`).
+  `e2e/evidence/<issue>/` (see `docs/task-workflow/reviewing-tasks.md`).
 - Telemetry lives ONLY in `<VercelAnalytics />` (`src/components/analytics.tsx`),
   mounted once in `src/routes/__root.tsx`. Nothing else imports
   `@vercel/analytics` or `@vercel/speed-insights`, and it reports the route

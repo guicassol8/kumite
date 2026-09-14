@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { Mark } from '@/components/brand/mark'
+import { usePresentationMode } from '@/hooks/use-presentation-mode'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -55,6 +56,9 @@ function ApiStatusIndicator() {
 
 export function Footer() {
   const { t } = useTranslation()
+  const isPresentation = usePresentationMode()
+
+  if (isPresentation) return null
 
   return (
     <footer

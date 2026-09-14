@@ -10,6 +10,7 @@ vi.mock('@/lib/api', () => ({
 
 import i18n from '@/i18n'
 import { api } from '@/lib/api'
+import { setPresentationActive } from '@/lib/presentation-mode'
 import { Footer } from './footer'
 
 const mockedHealth = vi.mocked(api.health.$get)
@@ -34,6 +35,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   cleanup()
+  setPresentationActive(false)
   await i18n.changeLanguage('pt')
 })
 
@@ -123,5 +125,19 @@ describe('Footer — API status indicator (#217)', () => {
     mockedHealth.mockResolvedValue(jsonResponse(500, {}))
     renderFooter()
     await waitFor(() => expect(screen.getByTestId('api-status-error').textContent).toBe(error))
+  })
+})
+
+describe('Footer — telão (#220)', () => {
+  it('renders nothing while presentation mode is active', () => {
+    setPresentationActive(true)
+    const { container } = render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <Footer />
+      </QueryClientProvider>,
+    )
+    expect(container.firstChild).toBeNull()
   })
 })

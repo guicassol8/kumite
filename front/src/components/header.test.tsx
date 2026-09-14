@@ -25,6 +25,7 @@ import { Header } from '@/components/header'
 import { RoundStreamProvider } from '@/hooks/use-round-stream'
 import i18n from '@/i18n'
 import { api } from '@/lib/api'
+import { setPresentationActive } from '@/lib/presentation-mode'
 import { clearSession, getState, retryHydration, type SessionUser, setSession } from '@/lib/session'
 import type { SseEvent } from '@/lib/sse-schema'
 import { setTheme } from '@/lib/theme'
@@ -132,6 +133,7 @@ afterEach(async () => {
   clearSession('manual')
   localStorage.clear()
   document.documentElement.className = ''
+  setPresentationActive(false)
   // i18n is a module singleton: a test that switches language would otherwise
   // leak English/Spanish into every PT assertion that follows.
   await i18n.changeLanguage('pt')
@@ -600,5 +602,15 @@ describe('Header home link', () => {
     } finally {
       vi.unstubAllGlobals()
     }
+  })
+})
+
+describe('Header — telão (#220)', () => {
+  it('renders nothing while presentation mode is active', async () => {
+    setSession(fakeUser, 'tok-1')
+    setPresentationActive(true)
+    renderHeader('/')
+
+    await waitFor(() => expect(screen.queryByTestId('app-header')).toBeNull())
   })
 })

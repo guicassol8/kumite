@@ -26,6 +26,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
+import { usePresentationMode } from '@/hooks/use-presentation-mode'
 import { useRoundStream } from '@/hooks/use-round-stream'
 import { useSession } from '@/hooks/use-session'
 import { useTheme } from '@/hooks/use-theme'
@@ -109,6 +110,9 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [bugReportOpen, setBugReportOpen] = useState(false)
   const isAuthenticated = status === 'authenticated' && user != null
+  const isPresentation = usePresentationMode()
+
+  if (isPresentation) return null
 
   function logout() {
     clearSession('manual')

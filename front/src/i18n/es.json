@@ -805,6 +805,15 @@
     "presentation": {
       "enter": "Activar modo presentación",
       "exit": "Salir del modo presentación"
+    },
+    "telao": {
+      "exitButton": "Salir del modo pantalla",
+      "liveChip": "Ronda {{name}} · en vivo",
+      "closedChip": "Ronda {{name}} · cerrada",
+      "closedAt": "Cerrada a las {{time}}",
+      "generalBadge": "General",
+      "waitingNextRound": "Esperando la próxima ronda",
+      "pageIndicator": "{{current}} / {{total}} · cambia cada 15 s"
     }
   },
   "roundCountdown": {

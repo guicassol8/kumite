@@ -805,6 +805,15 @@
     "presentation": {
       "enter": "Enter presentation mode",
       "exit": "Exit presentation mode"
+    },
+    "telao": {
+      "exitButton": "Exit big-screen mode",
+      "liveChip": "Round {{name}} · live",
+      "closedChip": "Round {{name}} · closed",
+      "closedAt": "Closed at {{time}}",
+      "generalBadge": "Overall",
+      "waitingNextRound": "Waiting for the next round",
+      "pageIndicator": "{{current}} / {{total}} · switches every 15s"
     }
   },
   "roundCountdown": {

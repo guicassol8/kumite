@@ -1,0 +1,339 @@
+import { cleanup, render, screen } from '@testing-library/react'
+import { act } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import '@/i18n'
+
+import { isPresentationActive, setPresentationActive } from '@/lib/presentation-mode'
+import type { EventRanking, RoundRanking } from '@/lib/sse-schema'
+import { setTheme } from '@/lib/theme'
+
+import { TelaoBoard, type TelaoRoundSummary } from './telao-board'
+
+const roundRanking: RoundRanking = {
+  roundId: 'r1',
+  roundName: 'Rodada 1',
+  problemIds: ['p1'],
+  teams: [
+    {
+      teamId: 't1',
+      teamName: 'Time 1',
+      rank: 1,
+      totalScore: 100,
+      totalAttempts: 1,
+      tiebreakTimeMs: 5000,
+      problems: [{ problemId: 'p1', score: 100, attempts: 1 }],
+    },
+    {
+      teamId: 't2',
+      teamName: 'Time 2',
+      rank: 2,
+      totalScore: 50,
+      totalAttempts: 2,
+      tiebreakTimeMs: 9000,
+      problems: [{ problemId: 'p1', score: 50, attempts: 2 }],
+    },
+  ],
+}
+
+const eventRanking: EventRanking = {
+  teams: [
+    {
+      teamId: 't1',
+      teamName: 'Time 1',
+      rank: 1,
+      totalScore: 100,
+      totalAttempts: 1,
+      tiebreakTimeMs: 5000,
+      rounds: [
+        { roundId: 'r1', roundName: 'Rodada 1', score: 100, attempts: 1, tiebreakTimeMs: 5000 },
+      ],
+    },
+  ],
+}
+
+const teamsById = new Map<string, { members: { university: 'pucrs' | 'merida' }[] }>([
+  ['t1', { members: [{ university: 'pucrs' }] }],
+  ['t2', { members: [{ university: 'merida' }] }],
+])
+
+function baseProps() {
+  return {
+    hasActiveRound: false,
+    activeRoundId: null as string | null,
+    displayedRound: null as RoundRanking | null,
+    eventRanking,
+    lastClosedRound: null as TelaoRoundSummary | null,
+    closesAt: null as Date | null,
+    serverTimeOffsetMs: 0,
+    myTeamId: null as string | null,
+    teamsById,
+    locale: 'pt',
+    onExit: vi.fn(),
+  }
+}
+
+beforeEach(() => {
+  document.documentElement.className = ''
+  setTheme('system')
+})
+
+afterEach(() => {
+  cleanup()
+  setPresentationActive(false)
+  document.documentElement.className = ''
+  localStorage.clear()
+})
+
+describe('TelaoBoard — mount/unmount (#220 T8)', () => {
+  it('activates the presentation signal and forces dark on mount, restoring both on unmount', () => {
+    setTheme('light')
+    const { unmount } = render(<TelaoBoard {...baseProps()} />)
+
+    expect(isPresentationActive()).toBe(true)
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+    unmount()
+
+    expect(isPresentationActive()).toBe(false)
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+  })
+
+  it('moves focus to the exit button on mount', () => {
+    render(<TelaoBoard {...baseProps()} />)
+
+    expect(document.activeElement).toBe(screen.getByTestId('leaderboard-presentation-toggle'))
+  })
+})
+
+describe('TelaoBoard — dual exit (#220 T8)', () => {
+  it('exits on Escape keydown even without a real fullscreen element (API-unsupported fallback)', () => {
+    const onExit = vi.fn()
+    render(<TelaoBoard {...baseProps()} onExit={onExit} />)
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    })
+
+    expect(onExit).toHaveBeenCalledTimes(1)
+  })
+
+  it('exits on fullscreenchange when the browser leaves fullscreen on its own', () => {
+    const onExit = vi.fn()
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: document.createElement('main'),
+    })
+    render(<TelaoBoard {...baseProps()} onExit={onExit} />)
+
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
+    act(() => {
+      document.dispatchEvent(new Event('fullscreenchange'))
+    })
+
+    expect(onExit).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls onExit when the exit button is clicked', () => {
+    const onExit = vi.fn()
+    render(<TelaoBoard {...baseProps()} onExit={onExit} />)
+
+    screen.getByTestId('leaderboard-presentation-toggle').click()
+
+    expect(onExit).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('TelaoBoard — three states (#220 T9)', () => {
+  it('(a) shows the live chip and countdown with an active round', () => {
+    render(
+      <TelaoBoard
+        {...baseProps()}
+        hasActiveRound
+        activeRoundId="r1"
+        displayedRound={roundRanking}
+        closesAt={new Date(Date.now() + 60_000)}
+      />,
+    )
+
+    expect(screen.getByTestId('telao-live-chip').textContent).toContain('Rodada 1')
+    expect(screen.getByTestId('round-countdown')).toBeDefined()
+    expect(screen.queryByTestId('telao-general-badge')).toBeNull()
+  })
+
+  it('(b) shows the Geral badge and waiting eyebrow with no active round and nothing just closed', () => {
+    render(<TelaoBoard {...baseProps()} />)
+
+    expect(screen.getByTestId('telao-general-badge')).toBeDefined()
+    expect(screen.getByTestId('telao-waiting-eyebrow')).toBeDefined()
+    expect(screen.getByTestId('leaderboard-row-t1')).toBeDefined()
+  })
+
+  it('(c) shows the closed chip and time only right after observing the round close live', () => {
+    const lastClosedRound: TelaoRoundSummary = {
+      id: 'r1',
+      name: 'Rodada 1',
+      closedAt: new Date('2026-09-05T13:00:00.000Z'),
+    }
+    const { rerender } = render(
+      <TelaoBoard
+        {...baseProps()}
+        hasActiveRound
+        activeRoundId="r1"
+        displayedRound={roundRanking}
+        closesAt={new Date(Date.now() + 60_000)}
+      />,
+    )
+
+    // The round closes while telão stays mounted: activeRoundId drops to
+    // null and the round's own ranking becomes the "last closed" snapshot —
+    // exactly how leaderboard.tsx's `displayedRound` behaves once
+    // `hasActiveRound` flips.
+    rerender(
+      <TelaoBoard
+        {...baseProps()}
+        hasActiveRound={false}
+        activeRoundId={null}
+        displayedRound={roundRanking}
+        lastClosedRound={lastClosedRound}
+      />,
+    )
+
+    expect(screen.getByTestId('telao-closed-chip').textContent).toContain('Rodada 1')
+    expect(screen.getByTestId('telao-closed-at')).toBeDefined()
+  })
+
+  it('never shows (c) on a fresh mount with no active round, even if a round closed in the past', () => {
+    const lastClosedRound: TelaoRoundSummary = {
+      id: 'r1',
+      name: 'Rodada 1',
+      closedAt: new Date('2026-09-05T13:00:00.000Z'),
+    }
+    render(
+      <TelaoBoard
+        {...baseProps()}
+        displayedRound={roundRanking}
+        lastClosedRound={lastClosedRound}
+      />,
+    )
+
+    expect(screen.queryByTestId('telao-closed-chip')).toBeNull()
+    expect(screen.getByTestId('telao-general-badge')).toBeDefined()
+  })
+})
+
+// Stands in for the jsdom shim when a test needs to drive a resize by hand —
+// same pattern blockly-workspace.test.tsx uses for the same reason (jsdom
+// has no layout engine, so the real ResizeObserver callback never fires).
+class RecordingResizeObserver {
+  static instances: RecordingResizeObserver[] = []
+  readonly disconnect = vi.fn()
+
+  constructor(readonly callback: ResizeObserverCallback) {
+    RecordingResizeObserver.instances.push(this)
+  }
+
+  observe() {}
+  unobserve() {}
+}
+
+function threeTeamRound(): RoundRanking {
+  return {
+    roundId: 'r1',
+    roundName: 'Rodada 1',
+    problemIds: ['p1'],
+    teams: [
+      { ...roundRanking.teams[0]! },
+      { ...roundRanking.teams[1]! },
+      { ...roundRanking.teams[0]!, teamId: 't3', teamName: 'Time 3', rank: 3 },
+    ],
+  }
+}
+
+describe('TelaoBoard — pagination (#220 T10)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    RecordingResizeObserver.instances = []
+    vi.stubGlobal('ResizeObserver', RecordingResizeObserver)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      height: 40,
+    } as DOMRect)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('does not paginate when every row fits the measured height', () => {
+    render(
+      <TelaoBoard
+        {...baseProps()}
+        hasActiveRound
+        activeRoundId="r1"
+        displayedRound={roundRanking}
+      />,
+    )
+
+    const observer = RecordingResizeObserver.instances[0]
+    act(() =>
+      observer?.callback(
+        [{ contentRect: { height: 100 } } as ResizeObserverEntry],
+        observer as unknown as ResizeObserver,
+      ),
+    )
+
+    expect(screen.queryByTestId('telao-page-indicator')).toBeNull()
+  })
+
+  it('paginates and advances every 15s when there are more rows than fit', () => {
+    render(
+      <TelaoBoard
+        {...baseProps()}
+        hasActiveRound
+        activeRoundId="r1"
+        displayedRound={threeTeamRound()}
+      />,
+    )
+
+    const observer = RecordingResizeObserver.instances[0]
+    // 40px per row, 80px available: exactly 2 rows per page, 3 teams -> 2 pages.
+    act(() =>
+      observer?.callback(
+        [{ contentRect: { height: 80 } } as ResizeObserverEntry],
+        observer as unknown as ResizeObserver,
+      ),
+    )
+
+    expect(screen.getByTestId('telao-page-indicator').textContent).toContain('1 / 2')
+
+    act(() => vi.advanceTimersByTime(15_000))
+    expect(screen.getByTestId('telao-page-indicator').textContent).toContain('2 / 2')
+
+    act(() => vi.advanceTimersByTime(15_000))
+    expect(screen.getByTestId('telao-page-indicator').textContent).toContain('1 / 2')
+  })
+})
+
+describe('TelaoBoard — reduced motion (#220 T11)', () => {
+  it('does not pulse the live dot when prefers-reduced-motion is set', async () => {
+    const { setMatchMediaMatches } = await import('@/test/match-media-jsdom')
+    setMatchMediaMatches('(prefers-reduced-motion: reduce)', true)
+
+    render(
+      <TelaoBoard
+        {...baseProps()}
+        hasActiveRound
+        activeRoundId="r1"
+        displayedRound={roundRanking}
+        closesAt={new Date(Date.now() + 60_000)}
+      />,
+    )
+
+    const dot = screen.getByTestId('telao-live-chip').querySelector('[aria-hidden="true"]')
+    expect(dot?.className).not.toContain('animate-pulse')
+
+    setMatchMediaMatches('(prefers-reduced-motion: reduce)', false)
+  })
+})

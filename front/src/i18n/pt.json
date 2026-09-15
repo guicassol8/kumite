@@ -805,6 +805,15 @@
     "presentation": {
       "enter": "Ativar modo telão",
       "exit": "Sair do modo telão"
+    },
+    "telao": {
+      "exitButton": "Sair do telão",
+      "liveChip": "Rodada {{name}} · ao vivo",
+      "closedChip": "Rodada {{name}} · encerrada",
+      "closedAt": "Encerrada às {{time}}",
+      "generalBadge": "Geral",
+      "waitingNextRound": "Aguardando a próxima rodada",
+      "pageIndicator": "{{current}} / {{total}} · troca a cada 15 s"
     }
   },
   "roundCountdown": {

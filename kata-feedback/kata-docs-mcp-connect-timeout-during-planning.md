@@ -155,3 +155,49 @@ A secondary observation: if kata-docs stays unavailable, the practical
 mitigation is already working — the inline ADR-referencing comments in
 `back/src/modules/*/*.route.ts` are doing the job docs would, and are
 worth treating as a deliberate convention rather than incidental.
+
+## Recurrence: planning #142, fifth session, same silent absence
+
+**Found while**: planning-tasks for #142 (Rate limit e paridade de tempo em
+`POST /auth/request-password-reset`)
+
+`ToolSearch` for `kata docs search` and then `+kata docs framework` returned
+"No matching deferred tools found" — same silent-absence mode as #48/#49/#54.
+Five sessions, zero successful contacts.
+
+Unlike #54, this session **did** have a real framework question, and two of
+them: (1) does kata ship a rate-limit middleware, or is anti-abuse entirely
+the consumer's problem? (2) is there a first-class way to read the client IP
+from a route context, or does the consumer reach past `c.raw` into Hono?
+Neither is answerable from kumite's own source, because kumite has never
+needed either before.
+
+The fallback that worked was reading kata's **published type surface** out of
+the pnpm store rather than the `~/Projetos/kata` checkout:
+`node_modules/.pnpm/@katajs-framework+core@0.4.2_*/node_modules/@katajs-framework/core/dist/index.d.ts`
+enumerates every middleware export in one grep (`bodyLimit`, `cors`,
+`secureHeaders`, `fromHonoTransform`, `REQUEST_ID_HEADER`) and
+`dist/context-*.d.ts` confirms `RouteContext.raw` is the Hono `Context`. Two
+questions, two greps, both first-hand and version-exact (0.4.2, the pinned
+version) — arguably better than a docs query, which could have described a
+version other than the one installed.
+
+## Metrics
+
+Zero kata-docs queries (unavailable). Two greps against the installed
+`.d.ts` files answered both framework questions, ~2 turns, negligible
+tokens against a planning session of ~25 tool calls. The gap those two
+greps revealed is logged separately in
+`no-rate-limit-middleware-or-client-ip-helper.md`.
+
+Worth noting as a method, since this is the first session in this file to
+use it: for "does the framework ship X", the installed `dist/*.d.ts` beats
+both kata-docs and the `~/Projetos/kata` checkout — it is exactly the
+version the app depends on, and a single `grep '^export\|declare function'`
+gives the complete public surface with no risk of reading a doc that
+describes a different release.
+
+**Suggested fix (still open, unchanged)**: `npx -y
+@katajs-framework/docs-mcp` in `.mcp.json` has now failed to register in
+five consecutive sessions across two symptom shapes. This reads as a
+package fetch/spawn problem, not a timeout tunable.

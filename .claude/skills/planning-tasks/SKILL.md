@@ -1,6 +1,6 @@
 ---
 name: planning-tasks
-description: Produces a spec-driven implementation plan for a GitHub Issue, interrogating the user about every ambiguity, and posts it on the issue for approval before any code is written. Triggers: "planeja a task", "planejar a #N", "faz o plano", "plano da issue", "plan task", "plan #N", "how should we build".
+description: Produces a spec-driven implementation plan for a GitHub Issue, clarifying material ambiguities, and posts it on the issue for approval before any code is written. Triggers: "planeja a task", "planejar a #N", "faz o plano", "plano da issue", "plan task", "plan #N", "how should we build".
 ---
 
 # Planning a task
@@ -9,7 +9,7 @@ description: Produces a spec-driven implementation plan for a GitHub Issue, inte
 
 ## Claude Code specifics
 
-- Use AskUserQuestion for the Step 2 interrogation — batched, with options
+- Use AskUserQuestion for the Step 2 clarifications when needed — batched, with options
   and a recommendation.
 - Prefer EnterWorktree over the manual worktree commands in Step 1 when
   running or trying scratch code.

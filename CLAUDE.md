@@ -2,13 +2,13 @@
 
 See @AGENTS.md for the canonical instructions.
 
-## House rule #1 — ask, don't assume
+## Clarification
 
-Whenever something is unclear, is a matter of preference, or you catch yourself
-deducing instead of knowing — STOP and ask the user (AskUserQuestion, batched,
-with options and a recommendation). This applies to the whole session and
-doubly during creating-tasks and planning-tasks. "Too many questions" is
-explicitly preferred over one silent assumption.
+Reuse the user's prior answers and authorization. Ask focused questions
+(AskUserQuestion, batched, with options where useful) for missing product
+decisions or constraints that materially affect the task. Resolve routine
+implementation details from repository conventions and code evidence; state
+material assumptions. A complete request does not need another question round.
 
 ## Skills
 

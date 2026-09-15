@@ -1,6 +1,6 @@
 ---
 name: creating-tasks
-description: Turns a feature idea or spec into well-formed GitHub Issues with priority, stack and type labels, EARS acceptance criteria and explicit dependencies, interrogating the user first. Use when the user wants to create tasks, issues, epics or backlog items. Triggers: "cria task", "criar tasks", "nova task", "cria as issues", "monta o backlog", "abre uma issue", "create tasks", "new issue", "spec this out".
+description: Turns a feature idea or spec into well-formed GitHub Issues with priority, stack and type labels, EARS acceptance criteria and explicit dependencies, clarifying missing requirements. Use when the user wants to create tasks, issues, epics or backlog items. Triggers: "cria task", "criar tasks", "nova task", "cria as issues", "monta o backlog", "abre uma issue", "create tasks", "new issue", "spec this out".
 ---
 
 # Creating tasks
@@ -9,7 +9,7 @@ description: Turns a feature idea or spec into well-formed GitHub Issues with pr
 
 ## Claude Code specifics
 
-- Use AskUserQuestion for the Step 1 interrogation — batched, with options
+- Use AskUserQuestion for the Step 1 clarifications when needed — batched, with options
   and a recommendation.
 - Handoff (MANDATORY): the next step runs in a **fresh chat**, so the very
   last thing you print is the command to paste there — alone in a fenced

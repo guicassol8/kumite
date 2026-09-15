@@ -15,8 +15,10 @@ releases); the step-by-step process for each one is agent-agnostic prose in
 | Implementing a task | `docs/task-workflow/implementing-tasks.md` |
 | Reviewing a task | `docs/task-workflow/reviewing-tasks.md` |
 
-Claude Code additionally wraps each step as a slash-command skill under
-`.claude/skills/` that imports the doc above rather than duplicating it.
+Codex discovers each step through `.agents/skills/` (invoke with
+`$creating-tasks`, `$picking-next-task`, `$planning-tasks`,
+`$implementing-tasks` or `$reviewing-tasks`). Claude Code uses slash-command
+wrappers under `.claude/skills/`. Both read the canonical docs above.
 
 ## One step, one session — the handoff
 
@@ -98,7 +100,10 @@ pnpm install        # node_modules are per-worktree, not shared
 ```
 
 - `.worktrees/` is gitignored; never nest a worktree anywhere else.
-- Reviewing a PR? Same rule: `git worktree add .worktrees/review-<PR> <pr-branch>`.
+- Reviewing a PR? Inspect `git worktree list --porcelain` first. Reuse the
+  branch's dedicated worktree if clean and idle; otherwise coordinate ownership.
+  Create `.worktrees/review-<PR>` only when the branch is not checked out
+  elsewhere. See `docs/task-workflow/reviewing-tasks.md` § Stage 0.
 - Running the app in parallel worktrees: the default ports (3000 back,
   5173 front) collide — override with `PORT` / `--port` and `VITE_API_URL`
   in that worktree's `.env` files.
@@ -134,9 +139,11 @@ fine" or "just docs nearby."
   fails — but only when the working tree carries uncommitted changes under
   `back/`, `front/`, `blocks/` or `package.json`. Don't run it by hand too;
   that's pure duplication of what the hook already gates.
-- **Any other agent (e.g. Codex CLI)**: no hook runs this for you. Run the
-  three commands yourself before considering the implementation done or
-  opening/updating the PR.
+- **Any other agent (e.g. Codex)**: do not assume Claude Code's hooks run.
+  Run the three commands before considering the implementation done or
+  opening/updating the PR, unless successful hooks already ran the same
+  checks for the same revision. During implementation use focused checks;
+  repeat the full ladder only after changes or failures justify it.
 
 ## Branches, commits, PRs
 

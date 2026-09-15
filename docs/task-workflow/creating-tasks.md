@@ -7,11 +7,12 @@ live in `docs/workflow.md` — follow them exactly.
 **Not for:** choosing what to do next (picking the next task), designing the
 implementation (planning a task).
 
-## Step 1 — Interrogate the user (MANDATORY)
+## Step 1 — Resolve missing requirements
 
-Never create an issue from assumptions. Ask the user directly — batched, with
-concrete options and a recommendation — and wait for a reply before
-proceeding, until you can answer ALL of:
+Use the request, prior answers and repository evidence to establish the items
+below. Ask focused, batched questions only for missing product decisions or
+constraints that materially affect the issue. Offer options and a recommendation
+where useful; wait for required answers before creating the affected issues:
 
 1. **Goal** — what changes for a participant/organizer when this ships?
 2. **Scope** — what is explicitly OUT of this task?
@@ -27,8 +28,9 @@ proceeding, until you can answer ALL of:
 9. **Size** — bigger than one focused session? Then it is an epic: split into
    sub-issues (each passing questions 1–8 on its own).
 
-Two rounds of questions is normal; zero rounds is a bug. Only skip a question
-when the user's request already answers it explicitly.
+Do not ask again for information or approval already provided. When the request
+is complete, proceed without a question round. Resolve routine technical details
+from repository conventions and state any material assumptions.
 
 ## Step 2 — Write the issues
 

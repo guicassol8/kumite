@@ -10,7 +10,7 @@ description: Implements an approved GitHub Issue plan on a task branch with TDD,
 ## Claude Code specifics
 
 - Prefer EnterWorktree over the manual worktree commands in Preconditions.
-- Use AskUserQuestion for the House rules "doubt mid-flight" rule.
+- Use AskUserQuestion for missing decisions under the House rules.
 - Claude Code's hooks (PostToolUse/Stop, documented in `CLAUDE.md`
   § Claude-specific notes) already run the Gates loop automatically — the
   generic doc's "run these yourself" clause is belt-and-suspenders here, not

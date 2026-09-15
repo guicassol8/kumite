@@ -20,13 +20,14 @@ task).
   guessing; if it's unavailable or the call fails, read kata's own
   docs/source under `~/Projetos/kata` directly instead.
 
-## Step 2 — Interrogate the user (MANDATORY)
+## Step 2 — Resolve material ambiguities
 
-Same house rule as creating tasks: every ambiguity — UX choice, edge case,
-data shape, error behavior, naming, i18n copy — is a question for the user,
-never a silent decision. Ask directly, batched, always offering options and a
-recommendation, and wait for a reply before proceeding. Keep asking until the
-plan has no guesses left.
+Reuse decisions from the request, issue and prior discussion. Resolve routine
+implementation details using repository conventions and code evidence. Ask
+focused, batched questions when a missing product decision, constraint or
+conflicting acceptance criterion materially changes the plan. Offer options and
+a recommendation where useful; continue independent investigation while waiting.
+State material assumptions in the plan, and do not repeat answered questions.
 
 ## Step 3 — Write the plan
 

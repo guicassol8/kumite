@@ -13,16 +13,36 @@ large enough to warrant its own plan.
 
 Reviews never run in the main checkout (other agents may be working there):
 
+First inspect the PR head branch (`gh pr view <PR> --json headRefName`) and
+`git worktree list --porcelain` from the main checkout. Git cannot check out
+one branch in two worktrees.
+
+- If its implementation worktree already has the PR branch checked out, reuse
+  that dedicated worktree when it is clean and idle. Do not remove it at review
+  completion; its lifecycle belongs to the implementation task.
+- If it is dirty or another agent is using it, do not change or detach it.
+  Coordinate ownership before editing the PR branch. A separate detached
+  worktree at the fetched PR head can be used for read-only inspection meanwhile.
+- If the branch is not checked out elsewhere, create the review worktree:
+
 ```bash
 git fetch origin
-git worktree add .worktrees/review-<PR> task/<N>-<slug>
+git worktree add .worktrees/review-<PR> <pr-head-branch>
 cd .worktrees/review-<PR>
 pnpm install
 ```
 
+Before reviewing any existing local PR branch, fetch and fast-forward it to
+the remote PR head in the selected clean, idle worktree. Resolve divergence
+explicitly instead of reviewing stale code.
+
+If the branch exists only on the remote, create its local tracking branch with
+`git worktree add --track -b <pr-head-branch> .worktrees/review-<PR> origin/<pr-head-branch>`.
+
 Everything below — reading, running the app, committing evidence — happens
-inside this worktree. When the review ends (merged or handed back):
-`git worktree remove .worktrees/review-<PR>`.
+inside the selected dedicated worktree. Remove only a worktree created by this
+review, after preserving all changes and following the compose cleanup in
+`docs/workflow.md`. Run removal from the main checkout, not inside the worktree.
 
 ## Stage 1 — Spec compliance
 

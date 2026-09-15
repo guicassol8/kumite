@@ -25,12 +25,16 @@ pnpm install   # node_modules are per-worktree
 
 ## Loop — per plan step
 
-1. **RED**: write or extend the test for the step first, watch it fail.
+1. **RED**: for behavior changes, write or extend a meaningful test first
+   when practical and watch it fail. For documentation or other low-impact
+   changes, use relevant validation instead of tests that mirror the edit.
 2. **GREEN**: implement the minimum that passes.
-3. **Gates** (all from the root, in order): `pnpm format` → `pnpm -r
-   typecheck` → `pnpm verify` → `pnpm -r test`. Run these yourself after
-   every step; nothing runs them for you unless your harness wires up an
-   equivalent to Claude Code's hooks (see `docs/workflow.md`).
+3. **Verify the step** with focused tests or checks appropriate to the change.
+   Before completion or opening/updating the PR, run formatting and the full
+   gate ladder from the root: `pnpm format` → `pnpm -r typecheck` →
+   `pnpm verify` → `pnpm -r test`. Successful hooks can satisfy the same
+   checks for the same revision; do not repeat a passing suite unless later
+   changes or failures justify it. See `docs/workflow.md`.
 4. Extra obligations by surface:
    - back route added/changed → update the module's `.hurl` and run it against
      a live server when feasible (`pnpm dev:back` + `pnpm --filter @kumite/back hurl`);
@@ -44,7 +48,9 @@ pnpm install   # node_modules are per-worktree
 
 ## House rules
 
-- Doubt mid-flight → ask the user directly. Never guess.
+- Ask about missing product decisions or constraints that affect correctness
+  or scope. Use repository evidence for routine implementation choices and
+  preserve the user's earlier answers and authorization.
 - Discovered work → new issue (see creating tasks) with "Discovered from #N";
   never expand the current scope.
 - Hooks block? That's a real failure — fix the cause. Bypassing (`--no-verify`,

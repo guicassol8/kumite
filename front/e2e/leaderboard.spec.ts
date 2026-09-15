@@ -23,6 +23,7 @@ import { createTeamThroughUi } from './support/teams-ui'
 // test fails before step 05.
 const evidence = (name: string) => `e2e/evidence/45/${name}.png`
 const evidence46 = (name: string) => `e2e/evidence/46/${name}.png`
+const evidence220 = (name: string) => `e2e/evidence/220/${name}.png`
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -94,6 +95,30 @@ test.describe('leaderboard (#45)', () => {
     await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
   }
 
+  // Extra teams, created over the API because only their presence in the
+  // accumulated Geral standings matters: the telão's pagination step below
+  // needs more rows than a short screen can hold, and one team can never
+  // overflow anything. They never submit, so the round-scoped tabs (and
+  // #250's participation filter) are untouched.
+  async function apiSignupAndCreateTeam(email: string, teamNameForEmail: string): Promise<void> {
+    await fetch(`${BACK_URL}/auth/signup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'E2E Telão', email, password: PASSWORD, code: 'PUCRS2026' }),
+    })
+    const res = await fetch(`${BACK_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password: PASSWORD }),
+    })
+    const { token } = (await res.json()) as { token: string }
+    await fetch(`${BACK_URL}/teams`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: teamNameForEmail }),
+    })
+  }
+
   async function loginToken(email: string): Promise<string> {
     const res = await fetch(`${BACK_URL}/auth/login`, {
       method: 'POST',
@@ -109,6 +134,13 @@ test.describe('leaderboard (#45)', () => {
     roundSlot,
   }) => {
     const auth = await organizerAuthHeader()
+
+    for (const index of [1, 2, 3]) {
+      await apiSignupAndCreateTeam(
+        `telao-${stamp}-${index}@edu.pucrs.br`,
+        `Telão ${stamp}-${index}`,
+      )
+    }
 
     // 01 — a fresh participant with a team, no active round yet: the overall
     // tab with a dedicated empty state. `leaderboard-empty-no-round` means "no
@@ -165,65 +197,152 @@ test.describe('leaderboard (#45)', () => {
     await expect(myRow).toContainText('100', { timeout: 15_000 })
     await page.screenshot({ path: evidence('03-pontuacao-ao-vivo'), fullPage: true })
 
-    // 46-01 (#46) — toggling presentation mode enters real fullscreen, scales
-    // typography, and shows the round timer next to the score (Acceptance
-    // #1, #2) — the round from step 02 is still open.
+    // 220-01 — the redesigned normal placar: problem columns as letters with
+    // the full title reachable via `title` (no scroll needed to read it), a
+    // legend below the table, and the "ao vivo" chip + countdown showing
+    // outside presentation mode too (#220 acceptance: no longer exclusive to
+    // the telão).
+    await expect(page.getByTestId('leaderboard-live-chip')).toBeVisible()
+    await expect(page.getByRole('main').getByTestId('round-countdown')).toBeVisible()
+    const problemColumn = page.getByTestId(`leaderboard-column-problem-${problemId}`)
+    await expect(problemColumn).toHaveText('A')
+    await expect(problemColumn).toHaveAttribute('title', 'Identidade')
+    await expect(page.getByTestId(`leaderboard-legend-item-${problemId}`)).toContainText(
+      'A — Identidade',
+    )
+    await page.screenshot({ path: evidence220('01-placar-identidade'), fullPage: true })
+
+    // 220-02 — below the cards breakpoint (768px) the table becomes a
+    // stacked card per team, and the page itself never grows a horizontal
+    // scrollbar at any width (Acceptance).
+    await page.setViewportSize({ width: 375, height: 800 })
+    await expect(page.getByTestId('leaderboard-table')).toBeVisible()
+    const hasHorizontalScroll = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    )
+    expect(hasHorizontalScroll).toBe(false)
+    await page.screenshot({ path: evidence220('02-cards-mobile'), fullPage: true })
+    await page.setViewportSize({ width: 1280, height: 800 })
+
+    // 46-01 (#46) / 220-03 — toggling the telão enters real fullscreen,
+    // forces the dark theme, hides the app header/footer, and shows the
+    // round's live chip plus the 96px countdown — state (a) of #220's three
+    // telão states, the round from step 02 is still open.
     await page.getByTestId('leaderboard-presentation-toggle').click()
     await expect(page.getByTestId('leaderboard-presentation-toggle')).toHaveAttribute(
       'aria-pressed',
       'true',
     )
     await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
-    // Scoped to <main>: the header (#217) renders its own round-countdown
-    // chip whenever a round is open.
+    await expect(page.getByTestId('app-header')).toBeHidden()
+    await expect(page.getByTestId('app-footer')).toBeHidden()
+    await expect(page.getByTestId('telao-live-chip')).toBeVisible()
     await expect(page.getByRole('main').getByTestId('round-countdown')).toBeVisible()
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.classList.contains('dark')))
+      .toBe(true)
     await page.screenshot({ path: evidence46('01-modo-apresentacao'), fullPage: true })
+    await page.screenshot({ path: evidence220('03-telao-ao-vivo'), fullPage: true })
 
-    // 46-02 (#46) — Esc exits fullscreen natively in a real browser, which
-    // fires `fullscreenchange`; the route listens for that event, not the
-    // key itself (see leaderboard.tsx), and syncs state back to normal,
-    // dropping the enlarged layout and the timer (Acceptance #3). Headless
-    // Chromium's CDP-dispatched key events don't reach the browser-chrome
-    // Escape-exits-fullscreen shortcut, so this triggers the same
-    // `fullscreenchange` transition a real Esc keypress produces.
-    await page.evaluate(() => document.exitFullscreen())
-    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(false)
-    await expect(page.getByTestId('leaderboard-presentation-toggle')).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    )
-    await expect(page.getByRole('main').getByTestId('round-countdown')).toBeHidden()
-    await page.screenshot({ path: evidence46('02-modo-normal'), fullPage: true })
-
-    // 04 — switching to "Geral" changes the scope without a reload
-    // (Acceptance #3), showing round columns instead of problem columns.
-    await page.getByTestId('leaderboard-tab-event').click()
-    await expect(page.getByTestId(`leaderboard-column-round-${roundId}`)).toBeVisible()
-    await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute('data-state', 'active')
-    // The active-tab pill background is a CSS transition (transition-all);
-    // the data-state flip above is instant but the repaint lags a frame or
-    // two behind it, so a screenshot taken right on the assertion catches
-    // the old tab still looking highlighted even though the content (just
-    // asserted above) has already switched. Let the transition settle.
-    await page.waitForTimeout(200)
-    await page.screenshot({ path: evidence('04-aba-geral'), fullPage: true })
-
-    // 05 — the organizer closes the round while this page stays open — no
-    // reload. The live `round.closed` push must refetch the rounds list on
-    // its own; "Geral" (already selected from step 04) keeps working
-    // uninterrupted through that.
-    //
-    // Held under the close lock through step 06: "última rodada encerrada" is
-    // event-wide, so a round closed by another worker in between would take
-    // the label over and this spec would read a name it never chose (#150).
+    // 220-04 through 06, plus the original 04-06 below, all read event-wide
+    // round state ("última rodada encerrada", the Geral default) derived
+    // from the round this block closes — held under one continuous lock so
+    // another worker's round can never be mistaken for this one (#150).
     await withRoundLock(async () => {
+      // 220-04 — the organizer closes the round while the telão stays open:
+      // state (c), the just-closed round's final ranking with the
+      // "encerrada" chip and the closing time in place of the countdown.
       await closeRound(auth, roundId)
+      await expect(page.getByTestId('telao-closed-chip')).toContainText(roundName, {
+        timeout: 15_000,
+      })
+      await expect(page.getByTestId('telao-closed-at')).toBeVisible()
+      await page.screenshot({ path: evidence220('04-telao-encerrada'), fullPage: true })
+
+      // 220-05 — Esc exits (CDP-dispatched key events don't reach the
+      // browser-chrome fullscreen-exit shortcut, so this exercises the
+      // `keydown` fallback listener directly, not `fullscreenchange` — see
+      // TelaoBoard's own dual-exit comment), restoring the header/footer and
+      // the participant's own theme (never the forced dark).
+      await page.keyboard.press('Escape')
+      await expect(page.getByTestId('leaderboard-presentation-toggle')).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      )
+      await expect(page.getByTestId('app-header')).toBeVisible()
+      await expect(page.getByTestId('app-footer')).toBeVisible()
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.classList.contains('dark')))
+        .toBe(false)
+      await page.screenshot({ path: evidence46('02-modo-normal'), fullPage: true })
+      await page.screenshot({ path: evidence220('05-normal-apos-esc'), fullPage: true })
+
+      // 220-06 — reopening the telão with no active round lands on state
+      // (b), the accumulated Geral standings — never a resurrected state (c)
+      // on a fresh mount, even though a round *did* just close.
+      await page.getByTestId('leaderboard-presentation-toggle').click()
+      await expect(page.getByTestId('telao-general-badge')).toBeVisible()
+      await expect(page.getByTestId('telao-waiting-eyebrow')).toBeVisible()
+      await expect(page.getByTestId('telao-closed-chip')).toBeHidden()
+      await page.screenshot({ path: evidence220('06-telao-geral'), fullPage: true })
+
+      // 220-07 — density stays constant when the teams outgrow the screen:
+      // the telão pages through them instead of shrinking type, and no row
+      // may hang past the bottom edge of its container. This one needs a
+      // real browser — the row and header heights come from layout, and the
+      // original bug (the `<thead>` counted as if it were row space) is
+      // invisible to jsdom's mocked measurements. The viewport has to be
+      // resized outside fullscreen (Chromium refuses to resize a fullscreen
+      // window), so this leaves and re-enters the telão around it.
+      await page.keyboard.press('Escape')
       await expect(page.getByTestId('leaderboard-tabs')).toBeVisible()
+      await page.setViewportSize({ width: 1280, height: 700 })
+      await page.getByTestId('leaderboard-presentation-toggle').click()
+      await expect(page.getByTestId('telao-board')).toBeVisible()
+      await expect(page.getByTestId('telao-page-indicator')).toBeVisible()
+      const fit = await page.evaluate(() => {
+        const table = document.querySelector('[data-testid="telao-board"] table')
+        const container = table?.parentElement
+        if (!container) return null
+        const rows = [...document.querySelectorAll('[data-testid^="leaderboard-row-"]')]
+        return {
+          containerBottom: container.getBoundingClientRect().bottom,
+          lowestRowBottom: Math.max(...rows.map((row) => row.getBoundingClientRect().bottom)),
+          rendered: rows.length,
+        }
+      })
+      expect(fit).not.toBeNull()
+      expect(fit?.rendered).toBeGreaterThan(0)
+      // Sub-pixel slack only: anything more and a row is being clipped.
+      expect(fit!.lowestRowBottom).toBeLessThanOrEqual(fit!.containerBottom + 1)
+      await page.screenshot({ path: evidence220('07-telao-paginacao'), fullPage: true })
+      await page.keyboard.press('Escape')
+      await expect(page.getByTestId('leaderboard-tabs')).toBeVisible()
+      await page.setViewportSize({ width: 1280, height: 800 })
+
+      await expect(page.getByTestId('leaderboard-presentation-toggle')).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      )
+
+      // 04 — switching to "Geral" changes the scope without a reload
+      // (Acceptance #3), showing round columns instead of problem columns —
+      // the round is closed by now, but the Geral tab lists every round
+      // regardless of status.
+      await page.getByTestId('leaderboard-tab-event').click()
+      await expect(page.getByTestId(`leaderboard-column-round-${roundId}`)).toBeVisible()
       await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute(
         'data-state',
         'active',
-        { timeout: 15_000 },
       )
+      // The active-tab pill background is a CSS transition (transition-all);
+      // the data-state flip above is instant but the repaint lags a frame or
+      // two behind it, so a screenshot taken right on the assertion catches
+      // the old tab still looking highlighted even though the content (just
+      // asserted above) has already switched. Let the transition settle.
+      await page.waitForTimeout(200)
+      await page.screenshot({ path: evidence('04-aba-geral'), fullPage: true })
+      await expect(page.getByTestId('leaderboard-tabs')).toBeVisible()
       await page.screenshot({ path: evidence('05-geral-por-padrao'), fullPage: true })
 
       // 06 — switching to "Rodada" (still no reload) falls back to the round
@@ -239,8 +358,8 @@ test.describe('leaderboard (#45)', () => {
         'data-state',
         'active',
       )
+      await page.waitForTimeout(200) // let the tab pill's CSS transition settle, see #04 above
+      await page.screenshot({ path: evidence('06-ultima-rodada-encerrada'), fullPage: true })
     })
-    await page.waitForTimeout(200) // let the tab pill's CSS transition settle, see #04 above
-    await page.screenshot({ path: evidence('06-ultima-rodada-encerrada'), fullPage: true })
   })
 })

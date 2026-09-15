@@ -25,7 +25,7 @@ import '@/i18n'
 import { OFFLINE_AFTER_MS } from '@/hooks/use-leaderboard-stream'
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
-import type { EventRanking, RoundRanking, SseEvent } from '@/lib/sse-schema'
+import type { EventRanking, RoundRanking, RoundRankingTeam, SseEvent } from '@/lib/sse-schema'
 import { routeTree } from '@/routeTree.gen'
 
 import { POLL_WHILE_OFFLINE_MS } from './leaderboard'
@@ -211,6 +211,169 @@ describe('LeaderboardScreen — active round', () => {
 
     await waitFor(() => expect(screen.getByTestId('leaderboard-column-round-r1')).toBeDefined())
     expect(screen.getByTestId('leaderboard-column-round-r1').textContent).toBe('Rodada 1')
+  })
+})
+
+describe('LeaderboardScreen — identity redesign (#220)', () => {
+  it('shows problem columns as letters with the full title in a `title` attribute and in the legend', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    const column = screen.getByTestId('leaderboard-column-problem-p1')
+    expect(column.textContent).toBe('A')
+    await waitFor(() => expect(column.getAttribute('title')).toBe('Soma'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('leaderboard-legend-item-p1').textContent).toBe('A — Soma'),
+    )
+  })
+
+  it('keeps the table wide and the team column sticky instead of scrolling horizontally', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    const table = screen.getByTestId('leaderboard-table')
+    expect(table.tagName).toBe('TABLE')
+    expect(table.className).not.toContain('overflow')
+    const teamColumn = screen.getByTestId('leaderboard-column-team')
+    expect(teamColumn.className).toContain('sticky')
+  })
+
+  it('distinguishes a zero score from no submission on a problem column', async () => {
+    const teamWithZeroScore: RoundRankingTeam = {
+      ...roundRanking.teams[0]!,
+      problems: [{ problemId: 'p1', score: 0, attempts: 1 }],
+    }
+    const teamWithNoSubmission: RoundRankingTeam = { ...roundRanking.teams[1]!, problems: [] }
+    const roundWithDistinctScores: RoundRanking = {
+      ...roundRanking,
+      teams: [teamWithZeroScore, teamWithNoSubmission],
+    }
+    mockedRoundRanking.mockResolvedValue(jsonResponse(200, roundWithDistinctScores))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundWithDistinctScores,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('0')
+    expect(screen.getByTestId('leaderboard-row-t2').textContent).toContain('—')
+  })
+
+  it('colors the rank numeral by position and fills the "Seu time" badge solid', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(200, teamsEnvelope({ myTeamId: 't1' })))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    const row1 = screen.getByTestId('leaderboard-row-t1')
+    const rankSpan = row1.querySelector('.font-display.tabular-nums')
+    expect(rankSpan?.className).toContain('text-brand-text')
+
+    const badge = screen.getByTestId('leaderboard-your-team-badge')
+    expect(badge.getAttribute('data-variant')).toBe('brand')
+    expect(row1.className).toContain('bg-brand-soft')
+  })
+
+  it('names the score cells on screen in the card layout, leaving rank and team to read for themselves', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    const cells = [...screen.getByTestId('leaderboard-row-t1').querySelectorAll('td')]
+    const labelOf = (index: number) => cells[index]?.querySelector('span')
+    // rank, team, problem A, total — in that column order.
+    expect(labelOf(0)?.className).toContain('sr-only')
+    expect(labelOf(1)?.className).toContain('sr-only')
+    expect(labelOf(2)?.className).not.toContain('sr-only')
+    expect(labelOf(3)?.className).not.toContain('sr-only')
+    expect(labelOf(3)?.textContent?.trim()).toBe('Total:')
+  })
+
+  it('shows the live chip and brand-text countdown whenever a round is active', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-live-chip')).toBeDefined())
+    expect(screen.getByTestId('round-countdown').className).toContain('text-brand-text')
+  })
+})
+
+describe('LeaderboardScreen — alert-styled states (#220)', () => {
+  it('shows the error state as a destructive Alert with a retry action', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(500, {}))
+    mockedRounds.mockResolvedValue(jsonResponse(500, {}))
+    mockedRoundRanking.mockResolvedValue(jsonResponse(500, {}))
+    mockedEventRanking.mockResolvedValue(jsonResponse(500, {}))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-error')).toBeDefined())
+    const alert = screen.getByTestId('leaderboard-error')
+    expect(alert.getAttribute('role')).toBe('alert')
+    expect(alert.querySelector('svg')).not.toBeNull()
+  })
+
+  it('shows the connection banner as a warning Alert with an icon while reconnecting', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+
+    emitStatus('open')
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-connection-banner')).toBeNull())
+
+    emitStatus('reconnecting')
+    await waitFor(() => {
+      const banner = screen.getByTestId('leaderboard-connection-banner')
+      expect(banner.className).toContain('border-warning')
+      expect(banner.querySelector('svg')).not.toBeNull()
+    })
   })
 })
 
@@ -823,6 +986,11 @@ describe('LeaderboardScreen — presentation mode', () => {
     await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
   }
 
+  // The toggle's testid is the same enter/exit control throughout, but once
+  // presentation mode is active the element carrying it is TelaoBoard's own
+  // exit button, not the small icon that opened it (#220 T12) — so each
+  // assertion after a state change re-queries by testid instead of holding
+  // on to the (by-then-unmounted) original node.
   it('enters presentation mode on toggle click and requests fullscreen', async () => {
     await renderWithActiveRound()
 
@@ -832,46 +1000,84 @@ describe('LeaderboardScreen — presentation mode', () => {
     fireEvent.click(toggle)
 
     expect(HTMLElement.prototype.requestFullscreen).toHaveBeenCalledTimes(1)
-    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'true',
+    )
   })
 
   it('exits presentation mode when the browser reports fullscreen exit (Esc path)', async () => {
     await renderWithActiveRound()
 
-    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'true',
+    )
 
     Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
     act(() => document.dispatchEvent(new Event('fullscreenchange')))
 
-    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'false',
+    )
   })
 
   it('exits presentation mode via the toggle itself, calling exitFullscreen', async () => {
     await renderWithActiveRound()
 
-    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
-    fireEvent.click(toggle)
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
     Object.defineProperty(document, 'fullscreenElement', {
       configurable: true,
       value: document.querySelector('main'),
     })
 
-    fireEvent.click(toggle)
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
 
     expect(document.exitFullscreen).toHaveBeenCalledTimes(1)
-    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'false',
+    )
   })
 
   it('degrades gracefully when requestFullscreen rejects', async () => {
     HTMLElement.prototype.requestFullscreen = vi.fn().mockRejectedValue(new Error('denied'))
     await renderWithActiveRound()
 
-    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
-    fireEvent.click(toggle)
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
 
-    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+  })
+
+  it('returns focus to the toggle that opened it once presentation mode exits', async () => {
+    await renderWithActiveRound()
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('leaderboard-presentation-toggle')),
+    )
+  })
+
+  it('stays escapable when the telão is opened before any ranking has loaded', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+    // Gating TelaoBoard on having data used to leave the projector on a
+    // blank fullscreen with both exit listeners unmounted (#220 review).
+    expect(screen.getByTestId('telao-board')).toBeDefined()
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    })
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed'),
+      ).toBe('false'),
+    )
   })
 
   it('paints an opaque background on the fullscreened main so the browser backdrop never shows through', async () => {
@@ -882,10 +1088,11 @@ describe('LeaderboardScreen — presentation mode', () => {
     expect(document.querySelector('main')?.className).toContain('bg-background')
   })
 
-  it('hides the round countdown in normal mode even with an active round', async () => {
+  it('shows the round countdown and live chip in normal mode with an active round (#220)', async () => {
     await renderWithActiveRound()
 
-    expect(screen.queryByTestId('round-countdown')).toBeNull()
+    expect(screen.getByTestId('round-countdown')).toBeDefined()
+    expect(screen.getByTestId('leaderboard-live-chip')).toBeDefined()
   })
 
   it('shows the round countdown once presentation mode is toggled on', async () => {

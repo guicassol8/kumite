@@ -775,11 +775,16 @@
     },
     "lastClosedRoundLabel": "{{name}} — última ronda cerrada",
     "notLiveBadge": "no en vivo",
+    "liveChip": "En vivo",
+    "noSubmission": "—",
     "columns": {
       "rank": "#",
       "team": "Equipo",
-      "total": "Total",
-      "problemFallback": "P{{position}}"
+      "total": "Total"
+    },
+    "legend": {
+      "entry": "{{letter}} — {{title}}",
+      "loading": "cargando…"
     },
     "connection": {
       "connecting": "Conectando al marcador en vivo...",
@@ -788,6 +793,7 @@
     },
     "loading": "Cargando marcador...",
     "error": {
+      "alertTitle": "No fue posible cargar",
       "message": "No fue posible cargar el marcador.",
       "retry": "Intentar de nuevo"
     },
@@ -799,6 +805,16 @@
     "presentation": {
       "enter": "Activar modo presentación",
       "exit": "Salir del modo presentación"
+    },
+    "telao": {
+      "exitButton": "Salir del modo pantalla",
+      "exitHint": "Esc · salir del modo pantalla",
+      "liveChip": "{{name}} · en vivo",
+      "closedChip": "{{name}} · cerrada",
+      "closedAt": "Cerrada a las {{time}}",
+      "generalBadge": "General",
+      "waitingNextRound": "Esperando la próxima ronda",
+      "pageIndicator": "{{current}} / {{total}} · cambia cada 15 s"
     }
   },
   "roundCountdown": {

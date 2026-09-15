@@ -301,19 +301,23 @@ export function TelaoBoard({
         <table className="w-full table-fixed text-[28px]">
           <thead>
             <tr className="border-b">
-              <th className="px-2 py-2 text-left">{t('leaderboard.columns.rank')}</th>
-              <th className="px-2 py-2 text-left">{t('leaderboard.columns.team')}</th>
+              <th className="w-20 px-2 py-2 text-left align-top">
+                {t('leaderboard.columns.rank')}
+              </th>
+              <th className="px-2 py-2 text-left align-top">{t('leaderboard.columns.team')}</th>
               {columns.map((column) => (
                 <th
                   key={column.id}
                   data-testid={column.testId}
                   title={column.headerTitle}
-                  className="px-2 py-2 text-left"
+                  className="w-28 overflow-hidden px-2 py-2 text-left align-top break-words"
                 >
                   {column.header}
                 </th>
               ))}
-              <th className="px-2 py-2 text-left">{t('leaderboard.columns.total')}</th>
+              <th className="w-28 px-2 py-2 text-left align-top">
+                {t('leaderboard.columns.total')}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -338,15 +342,22 @@ export function TelaoBoard({
                   )}
                 >
                   <td
-                    className={cn('px-2 py-2 font-display tabular-nums', rankColorClass(row.rank))}
+                    className={cn(
+                      'px-2 py-2 align-top font-display tabular-nums',
+                      rankColorClass(row.rank),
+                    )}
                   >
                     {row.rank}
                   </td>
-                  <td className="px-2 py-2">
-                    <div className="flex items-center gap-2">
-                      <span>{row.teamName}</span>
+                  <td className="px-2 py-2 align-top">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="min-w-0 truncate">{row.teamName}</span>
                       {isMyTeam && (
-                        <Badge variant="brand" data-testid="leaderboard-your-team-badge">
+                        <Badge
+                          variant="brand"
+                          data-testid="leaderboard-your-team-badge"
+                          className="shrink-0"
+                        >
                           {t('teams.yourTeamBadge')}
                         </Badge>
                       )}
@@ -360,11 +371,11 @@ export function TelaoBoard({
                     </div>
                   </td>
                   {columns.map((column) => (
-                    <td key={column.id} className="px-2 py-2">
+                    <td key={column.id} className="px-2 py-2 align-top">
                       {column.cell(row)}
                     </td>
                   ))}
-                  <td className="px-2 py-2 font-bold tabular-nums">{row.totalScore}</td>
+                  <td className="px-2 py-2 align-top font-bold tabular-nums">{row.totalScore}</td>
                 </motion.tr>
               )
             })}

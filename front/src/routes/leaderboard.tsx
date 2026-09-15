@@ -70,6 +70,11 @@ type RankingColumn<T> = {
   header: React.ReactNode
   headerTitle?: string
   mobileLabel: string
+  // Below `md` the row is a card with no `<thead>` to name its cells. A
+  // score column there would be a bare number with nothing saying which
+  // problem it belongs to, so those carry the label on screen; rank and
+  // team read for themselves and keep it screen-reader-only.
+  mobileLabelVisible?: boolean
   cell: (row: T) => React.ReactNode
 }
 
@@ -132,7 +137,14 @@ function RankingTable<
                       ),
                   )}
                 >
-                  <span className="sr-only md:hidden">{column.mobileLabel}: </span>
+                  <span
+                    className={cn(
+                      'md:hidden',
+                      column.mobileLabelVisible ? 'text-muted-foreground' : 'sr-only',
+                    )}
+                  >
+                    {column.mobileLabel}:{' '}
+                  </span>
                   {column.cell(row)}
                 </td>
               ))}
@@ -321,6 +333,7 @@ function LeaderboardScreen() {
       testId: 'leaderboard-column-total',
       header: t('leaderboard.columns.total'),
       mobileLabel: t('leaderboard.columns.total'),
+      mobileLabelVisible: true,
       cell: (row) => <span className="font-bold tabular-nums">{row.totalScore}</span>,
     }
   }
@@ -335,6 +348,7 @@ function LeaderboardScreen() {
         header: positionLabel(index),
         headerTitle: problemTitleById.get(problemId),
         mobileLabel: problemTitleById.get(problemId) ?? positionLabel(index),
+        mobileLabelVisible: true,
         cell: (row) => {
           const entry = row.problems.find((problem) => problem.problemId === problemId)
           return entry ? entry.score : t('leaderboard.noSubmission')
@@ -353,6 +367,7 @@ function LeaderboardScreen() {
         testId: `leaderboard-column-round-${round.roundId}`,
         header: round.roundName,
         mobileLabel: round.roundName,
+        mobileLabelVisible: true,
         cell: (row) => {
           const entry = row.rounds.find((r) => r.roundId === round.roundId)
           return entry ? entry.score : t('leaderboard.noSubmission')
@@ -405,23 +420,28 @@ function LeaderboardScreen() {
   }
 
   if (isPresentation) {
+    // Rendered unconditionally, loading and error included: TelaoBoard owns
+    // both exit listeners, so gating it on having data left the projector
+    // stuck on a blank fullscreen with no way back — Escape would drop the
+    // real fullscreen but `isPresentation` stayed true, against #220's
+    // "Esc restores the normal screen". With no ranking yet it simply shows
+    // the chrome (title, exit button, state chip) over an empty table.
     return (
       <main ref={mainRef} className="flex flex-1 flex-col bg-background">
-        {!isLoading && !isError && (
-          <TelaoBoard
-            hasActiveRound={hasActiveRound}
-            activeRoundId={activeRoundId}
-            displayedRound={displayedRound}
-            eventRanking={eventRanking}
-            lastClosedRound={lastClosedRound}
-            closesAt={countdownClosesAt}
-            serverTimeOffsetMs={serverTimeOffsetMs}
-            myTeamId={myTeamId}
-            teamsById={teamsById}
-            locale={locale}
-            onExit={exitPresentation}
-          />
-        )}
+        <TelaoBoard
+          hasActiveRound={hasActiveRound}
+          activeRoundId={activeRoundId}
+          displayedRound={displayedRound}
+          eventRanking={eventRanking}
+          lastClosedRound={lastClosedRound}
+          closesAt={countdownClosesAt}
+          serverTimeOffsetMs={serverTimeOffsetMs}
+          myTeamId={myTeamId}
+          teamsById={teamsById}
+          problemTitles={problemTitleById}
+          locale={locale}
+          onExit={exitPresentation}
+        />
       </main>
     )
   }

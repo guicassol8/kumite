@@ -95,6 +95,30 @@ test.describe('leaderboard (#45)', () => {
     await expect(page.getByTestId('header-user-email')).toHaveText(E2E_PARTICIPANT_NAME)
   }
 
+  // Extra teams, created over the API because only their presence in the
+  // accumulated Geral standings matters: the telão's pagination step below
+  // needs more rows than a short screen can hold, and one team can never
+  // overflow anything. They never submit, so the round-scoped tabs (and
+  // #250's participation filter) are untouched.
+  async function apiSignupAndCreateTeam(email: string, teamNameForEmail: string): Promise<void> {
+    await fetch(`${BACK_URL}/auth/signup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'E2E Telão', email, password: PASSWORD, code: 'PUCRS2026' }),
+    })
+    const res = await fetch(`${BACK_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password: PASSWORD }),
+    })
+    const { token } = (await res.json()) as { token: string }
+    await fetch(`${BACK_URL}/teams`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name: teamNameForEmail }),
+    })
+  }
+
   async function loginToken(email: string): Promise<string> {
     const res = await fetch(`${BACK_URL}/auth/login`, {
       method: 'POST',
@@ -110,6 +134,13 @@ test.describe('leaderboard (#45)', () => {
     roundSlot,
   }) => {
     const auth = await organizerAuthHeader()
+
+    for (const index of [1, 2, 3]) {
+      await apiSignupAndCreateTeam(
+        `telao-${stamp}-${index}@edu.pucrs.br`,
+        `Telão ${stamp}-${index}`,
+      )
+    }
 
     // 01 — a fresh participant with a team, no active round yet: the overall
     // tab with a dedicated empty state. `leaderboard-empty-no-round` means "no
@@ -254,7 +285,41 @@ test.describe('leaderboard (#45)', () => {
       await expect(page.getByTestId('telao-waiting-eyebrow')).toBeVisible()
       await expect(page.getByTestId('telao-closed-chip')).toBeHidden()
       await page.screenshot({ path: evidence220('06-telao-geral'), fullPage: true })
+
+      // 220-07 — density stays constant when the teams outgrow the screen:
+      // the telão pages through them instead of shrinking type, and no row
+      // may hang past the bottom edge of its container. This one needs a
+      // real browser — the row and header heights come from layout, and the
+      // original bug (the `<thead>` counted as if it were row space) is
+      // invisible to jsdom's mocked measurements. The viewport has to be
+      // resized outside fullscreen (Chromium refuses to resize a fullscreen
+      // window), so this leaves and re-enters the telão around it.
       await page.keyboard.press('Escape')
+      await expect(page.getByTestId('leaderboard-tabs')).toBeVisible()
+      await page.setViewportSize({ width: 1280, height: 700 })
+      await page.getByTestId('leaderboard-presentation-toggle').click()
+      await expect(page.getByTestId('telao-board')).toBeVisible()
+      await expect(page.getByTestId('telao-page-indicator')).toBeVisible()
+      const fit = await page.evaluate(() => {
+        const table = document.querySelector('[data-testid="telao-board"] table')
+        const container = table?.parentElement
+        if (!container) return null
+        const rows = [...document.querySelectorAll('[data-testid^="leaderboard-row-"]')]
+        return {
+          containerBottom: container.getBoundingClientRect().bottom,
+          lowestRowBottom: Math.max(...rows.map((row) => row.getBoundingClientRect().bottom)),
+          rendered: rows.length,
+        }
+      })
+      expect(fit).not.toBeNull()
+      expect(fit?.rendered).toBeGreaterThan(0)
+      // Sub-pixel slack only: anything more and a row is being clipped.
+      expect(fit!.lowestRowBottom).toBeLessThanOrEqual(fit!.containerBottom + 1)
+      await page.screenshot({ path: evidence220('07-telao-paginacao'), fullPage: true })
+      await page.keyboard.press('Escape')
+      await expect(page.getByTestId('leaderboard-tabs')).toBeVisible()
+      await page.setViewportSize({ width: 1280, height: 800 })
+
       await expect(page.getByTestId('leaderboard-presentation-toggle')).toHaveAttribute(
         'aria-pressed',
         'false',

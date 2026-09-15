@@ -23,11 +23,17 @@ export function RoundCountdown({
   serverTimeOffsetMs,
   className,
   roundName,
+  bare = false,
 }: {
   closesAt: Date
   serverTimeOffsetMs: number
   className?: string
   roundName?: string
+  // Drops the "Termina em" prefix from the visible timer, for the telao,
+  // where the countdown is a 96px numeral and the prefix would eat the
+  // width the digits need (design canvas `Telao.dc.html`). The screen
+  // reader summary below keeps the full sentence either way.
+  bare?: boolean
 }) {
   const { t } = useTranslation()
   const [now, setNow] = useState(() => Date.now())
@@ -43,7 +49,9 @@ export function RoundCountdown({
   return (
     <>
       <span data-testid="round-countdown" aria-live="off" className={cn(className)}>
-        {t('home.round.timeRemaining', { time: formatRemaining(remainingMs) })}
+        {bare
+          ? formatRemaining(remainingMs)
+          : t('home.round.timeRemaining', { time: formatRemaining(remainingMs) })}
       </span>
       <span data-testid="round-countdown-summary" className="sr-only">
         {roundName

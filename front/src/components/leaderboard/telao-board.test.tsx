@@ -68,6 +68,7 @@ function baseProps() {
     serverTimeOffsetMs: 0,
     myTeamId: null as string | null,
     teamsById,
+    problemTitles: new Map<string, string | undefined>([['p1', 'Soma dos pares']]),
     locale: 'pt',
     onExit: vi.fn(),
   }
@@ -277,9 +278,11 @@ describe('TelaoBoard — pagination (#220 T10)', () => {
     )
 
     const observer = RecordingResizeObserver.instances[0]
+    // Every element measures 40px here, the <thead> included, so 120px of
+    // container leaves 80px of body: exactly the 2 rows this round has.
     act(() =>
       observer?.callback(
-        [{ contentRect: { height: 100 } } as ResizeObserverEntry],
+        [{ contentRect: { height: 120 } } as ResizeObserverEntry],
         observer as unknown as ResizeObserver,
       ),
     )
@@ -298,10 +301,11 @@ describe('TelaoBoard — pagination (#220 T10)', () => {
     )
 
     const observer = RecordingResizeObserver.instances[0]
-    // 40px per row, 80px available: exactly 2 rows per page, 3 teams -> 2 pages.
+    // 120px of container minus the 40px header leaves 80px of body: 2 rows
+    // per page at 40px each, 3 teams -> 2 pages.
     act(() =>
       observer?.callback(
-        [{ contentRect: { height: 80 } } as ResizeObserverEntry],
+        [{ contentRect: { height: 120 } } as ResizeObserverEntry],
         observer as unknown as ResizeObserver,
       ),
     )
@@ -313,6 +317,100 @@ describe('TelaoBoard — pagination (#220 T10)', () => {
 
     act(() => vi.advanceTimersByTime(15_000))
     expect(screen.getByTestId('telao-page-indicator').textContent).toContain('1 / 2')
+  })
+
+  it('counts only the rows that fit below the header, not the whole container', () => {
+    render(
+      <TelaoBoard
+        {...baseProps()}
+        hasActiveRound
+        activeRoundId="r1"
+        displayedRound={threeTeamRound()}
+      />,
+    )
+
+    const observer = RecordingResizeObserver.instances[0]
+    // 160px of container looks like room for 4 rows of 40px, but the 40px
+    // <thead> lives inside it too — only 3 fit, so the third team must not
+    // be pushed past the bottom edge (#220: "nenhuma linha cortada").
+    act(() =>
+      observer?.callback(
+        [{ contentRect: { height: 160 } } as ResizeObserverEntry],
+        observer as unknown as ResizeObserver,
+      ),
+    )
+
+    expect(screen.queryByTestId('telao-page-indicator')).toBeNull()
+    expect(screen.getByTestId('leaderboard-row-t3')).toBeDefined()
+  })
+
+  it('keeps the board itself shrinkable so the measured height is the screen, not the content', () => {
+    render(<TelaoBoard {...baseProps()} />)
+
+    // Without `min-h-0` the board refuses to shrink below its own content
+    // (flex items default to `min-height: auto`), reports that overgrown
+    // height to the ResizeObserver, and pagination can never fire — jsdom
+    // cannot see the layout, so the class itself is the guard.
+    const board = screen.getByTestId('telao-board')
+    expect(board.className).toContain('min-h-0')
+    expect(board.className).toContain('overflow-hidden')
+  })
+
+  it('starts paginating once teams arrive on a telão that mounted with an empty board', () => {
+    const emptyRound: RoundRanking = { ...roundRanking, teams: [] }
+    const { rerender } = render(
+      <TelaoBoard {...baseProps()} hasActiveRound activeRoundId="r1" displayedRound={emptyRound} />,
+    )
+
+    const observer = RecordingResizeObserver.instances[0]
+    act(() =>
+      observer?.callback(
+        [{ contentRect: { height: 120 } } as ResizeObserverEntry],
+        observer as unknown as ResizeObserver,
+      ),
+    )
+    // Nothing to measure a row against yet — and nothing to paginate either.
+    expect(screen.queryByTestId('telao-page-indicator')).toBeNull()
+
+    rerender(
+      <TelaoBoard
+        {...baseProps()}
+        hasActiveRound
+        activeRoundId="r1"
+        displayedRound={threeTeamRound()}
+      />,
+    )
+
+    expect(screen.getByTestId('telao-page-indicator').textContent).toContain('1 / 2')
+  })
+})
+
+describe('TelaoBoard — footer legend (#220 spec 4)', () => {
+  it('spells out each problem letter with its title, not the bare letter', () => {
+    render(
+      <TelaoBoard
+        {...baseProps()}
+        hasActiveRound
+        activeRoundId="r1"
+        displayedRound={roundRanking}
+      />,
+    )
+
+    expect(screen.getByTestId('telao-legend-item-p1').textContent).toBe('A — Soma dos pares')
+  })
+
+  it('falls back to the loading placeholder while a title is still in flight', () => {
+    render(
+      <TelaoBoard
+        {...baseProps()}
+        problemTitles={new Map<string, string | undefined>()}
+        hasActiveRound
+        activeRoundId="r1"
+        displayedRound={roundRanking}
+      />,
+    )
+
+    expect(screen.getByTestId('telao-legend-item-p1').textContent).toBe('A — carregando…')
   })
 })
 

@@ -808,8 +808,9 @@
     },
     "telao": {
       "exitButton": "Sair do telão",
-      "liveChip": "Rodada {{name}} · ao vivo",
-      "closedChip": "Rodada {{name}} · encerrada",
+      "exitHint": "Esc · sair do modo telão",
+      "liveChip": "{{name}} · ao vivo",
+      "closedChip": "{{name}} · encerrada",
       "closedAt": "Encerrada às {{time}}",
       "generalBadge": "Geral",
       "waitingNextRound": "Aguardando a próxima rodada",

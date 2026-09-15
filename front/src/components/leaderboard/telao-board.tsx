@@ -57,6 +57,7 @@ export function TelaoBoard({
   serverTimeOffsetMs,
   myTeamId,
   teamsById,
+  problemTitles,
   locale,
   onExit,
 }: {
@@ -69,6 +70,7 @@ export function TelaoBoard({
   serverTimeOffsetMs: number
   myTeamId: string | null
   teamsById: Map<string, { members: { university: University }[] }>
+  problemTitles: Map<string, string | undefined>
   locale: string
   onExit: () => void
 }) {
@@ -173,9 +175,11 @@ export function TelaoBoard({
   // getBoundingClientRect), so this path is exercised by the Playwright
   // evidence, not the unit tests, same convention as blockly-workspace.tsx.
   const containerRef = useRef<HTMLDivElement>(null)
+  const headRef = useRef<HTMLTableSectionElement>(null)
   const firstRowRef = useRef<HTMLTableRowElement>(null)
   const [availableHeight, setAvailableHeight] = useState(0)
   const [rowHeight, setRowHeight] = useState(0)
+  const [headHeight, setHeadHeight] = useState(0)
   const [currentPage, setCurrentPage] = useState(0)
 
   useEffect(() => {
@@ -188,15 +192,31 @@ export function TelaoBoard({
     return () => observer.disconnect()
   }, [])
 
+  // Re-measured whenever either height can have changed, never once on
+  // mount: the telao is up for the whole event, so it routinely mounts with
+  // an empty ranking (a round that just opened, an event with no scores yet)
+  // and only grows rows later — a measure-once effect left `rowHeight` at 0
+  // forever in that case. The `<thead>` sits inside the measured container
+  // and is tall enough to matter (its labels wrap), so the rows only get
+  // what is left below it. Over-counting either way does not scroll, it
+  // silently clips the last row against the container's `overflow-hidden` —
+  // exactly what #220 forbids ("nenhuma linha cortada na borda inferior").
   useEffect(() => {
-    const measured = firstRowRef.current?.getBoundingClientRect().height ?? 0
-    if (measured > 0) setRowHeight(measured)
-  }, [])
+    const measuredRow = firstRowRef.current?.getBoundingClientRect().height ?? 0
+    const measuredHead = headRef.current?.getBoundingClientRect().height ?? 0
+    setRowHeight((current) => (measuredRow > 0 ? measuredRow : current))
+    setHeadHeight((current) => (measuredHead > 0 ? measuredHead : current))
+  }, [rows.length, columns.length, availableHeight])
 
-  const rowsPerPage =
-    rowHeight > 0 && availableHeight > 0
-      ? Math.max(1, Math.floor(availableHeight / rowHeight))
-      : rows.length || 1
+  // Only "nothing measured yet" falls back to rendering every row. Once the
+  // heights are known the count is always clamped to at least one row per
+  // page, header included — a header so tall it leaves no body (a projector
+  // squeezed to a laptop window, say) must still page through the ranking
+  // rather than drop every row into a container that cannot hold them.
+  const hasMeasurements = rowHeight > 0 && availableHeight > 0
+  const rowsPerPage = hasMeasurements
+    ? Math.max(1, Math.floor((availableHeight - headHeight) / rowHeight))
+    : rows.length || 1
   const totalPages = Math.max(1, Math.ceil(rows.length / rowsPerPage))
   const paginated = rows.length > rowsPerPage
   const safePage = Math.min(currentPage, totalPages - 1)
@@ -214,9 +234,15 @@ export function TelaoBoard({
     : rows
 
   return (
+    // `min-h-0` is what makes any of the height math below mean anything: a
+    // flex item defaults to `min-height: auto`, so without it this board
+    // refuses to shrink under its own content, grows past the screen and
+    // reports that overgrown height to the ResizeObserver — `rowsPerPage`
+    // then always came out equal to the row count, pagination never fired in
+    // any state, and the surplus rows were simply cut off by the viewport.
     <div
       data-testid="telao-board"
-      className="flex flex-1 flex-col gap-6 bg-background p-8 text-foreground"
+      className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden bg-background p-8 text-foreground"
     >
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-display font-bold text-[84px] leading-none">
@@ -255,6 +281,7 @@ export function TelaoBoard({
                 closesAt={closesAt}
                 serverTimeOffsetMs={serverTimeOffsetMs}
                 roundName={displayedRound.roundName}
+                bare
                 className="font-display text-[96px] text-brand-text leading-none tabular-nums"
               />
             )}
@@ -299,7 +326,7 @@ export function TelaoBoard({
 
       <div ref={containerRef} className="flex-1 overflow-hidden">
         <table className="w-full table-fixed text-[28px]">
-          <thead>
+          <thead ref={headRef}>
             <tr className="border-b">
               <th className="w-20 px-2 py-2 text-left align-top">
                 {t('leaderboard.columns.rank')}
@@ -334,11 +361,15 @@ export function TelaoBoard({
                   className={cn(
                     'border-b',
                     isMyTeam && 'bg-brand-soft',
-                    isHighlighted &&
-                      cn(
-                        'bg-brand-soft',
-                        !prefersReducedMotion && 'transition-colors duration-3000',
-                      ),
+                    // The transition rides the *un*highlighted state on
+                    // purpose: a row lights up the instant its rank moves and
+                    // the colour bleeds back out over ~3s ("realcada por ~3s,
+                    // esvaindo"). Declaring it alongside `bg-brand-soft`
+                    // instead would animate the after-change style and invert
+                    // the whole thing — a 3s fade *in*, then a hard cut.
+                    isHighlighted
+                      ? 'bg-brand-soft'
+                      : !prefersReducedMotion && 'transition-colors duration-3000',
                   )}
                 >
                   <td
@@ -383,11 +414,16 @@ export function TelaoBoard({
         </table>
       </div>
 
-      <div className="flex items-center justify-between gap-4 text-muted-foreground text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 text-lg text-muted-foreground">
         {isRoundScoped && displayedRound && displayedRound.problemIds.length > 0 && (
-          <ul data-testid="telao-legend" className="flex flex-wrap gap-4">
+          <ul data-testid="telao-legend" className="flex min-w-0 flex-wrap gap-x-8 gap-y-1">
             {displayedRound.problemIds.map((problemId, index) => (
-              <li key={problemId}>{positionLabel(index)}</li>
+              <li key={problemId} data-testid={`telao-legend-item-${problemId}`}>
+                {t('leaderboard.legend.entry', {
+                  letter: positionLabel(index),
+                  title: problemTitles.get(problemId) ?? t('leaderboard.legend.loading'),
+                })}
+              </li>
             ))}
           </ul>
         )}
@@ -396,6 +432,9 @@ export function TelaoBoard({
             {t('leaderboard.telao.pageIndicator', { current: safePage + 1, total: totalPages })}
           </span>
         )}
+        <span data-testid="telao-exit-hint" className="shrink-0">
+          {t('leaderboard.telao.exitHint')}
+        </span>
       </div>
     </div>
   )

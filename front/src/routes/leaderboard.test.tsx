@@ -299,6 +299,27 @@ describe('LeaderboardScreen — identity redesign (#220)', () => {
     expect(row1.className).toContain('bg-brand-soft')
   })
 
+  it('names the score cells on screen in the card layout, leaving rank and team to read for themselves', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    const cells = [...screen.getByTestId('leaderboard-row-t1').querySelectorAll('td')]
+    const labelOf = (index: number) => cells[index]?.querySelector('span')
+    // rank, team, problem A, total — in that column order.
+    expect(labelOf(0)?.className).toContain('sr-only')
+    expect(labelOf(1)?.className).toContain('sr-only')
+    expect(labelOf(2)?.className).not.toContain('sr-only')
+    expect(labelOf(3)?.className).not.toContain('sr-only')
+    expect(labelOf(3)?.textContent?.trim()).toBe('Total:')
+  })
+
   it('shows the live chip and brand-text countdown whenever a round is active', async () => {
     renderLeaderboard()
     await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
@@ -1036,6 +1057,26 @@ describe('LeaderboardScreen — presentation mode', () => {
 
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByTestId('leaderboard-presentation-toggle')),
+    )
+  })
+
+  it('stays escapable when the telão is opened before any ranking has loaded', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+    // Gating TelaoBoard on having data used to leave the projector on a
+    // blank fullscreen with both exit listeners unmounted (#220 review).
+    expect(screen.getByTestId('telao-board')).toBeDefined()
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    })
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed'),
+      ).toBe('false'),
     )
   })
 

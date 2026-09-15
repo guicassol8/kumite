@@ -808,8 +808,9 @@
     },
     "telao": {
       "exitButton": "Exit big-screen mode",
-      "liveChip": "Round {{name}} · live",
-      "closedChip": "Round {{name}} · closed",
+      "exitHint": "Esc · exit big-screen mode",
+      "liveChip": "{{name}} · live",
+      "closedChip": "{{name}} · closed",
       "closedAt": "Closed at {{time}}",
       "generalBadge": "Overall",
       "waitingNextRound": "Waiting for the next round",

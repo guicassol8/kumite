@@ -808,8 +808,9 @@
     },
     "telao": {
       "exitButton": "Salir del modo pantalla",
-      "liveChip": "Ronda {{name}} · en vivo",
-      "closedChip": "Ronda {{name}} · cerrada",
+      "exitHint": "Esc · salir del modo pantalla",
+      "liveChip": "{{name}} · en vivo",
+      "closedChip": "{{name}} · cerrada",
       "closedAt": "Cerrada a las {{time}}",
       "generalBadge": "General",
       "waitingNextRound": "Esperando la próxima ronda",

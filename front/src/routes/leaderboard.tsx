@@ -1,27 +1,20 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Maximize2, Minimize2 } from 'lucide-react'
+import { Maximize2, Minimize2, TriangleAlert, WifiOff } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { RoundCountdown } from '@/components/round-countdown'
 import { type University, UniversityBadge } from '@/components/teams/university-badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLeaderboardStream } from '@/hooks/use-leaderboard-stream'
 import { api } from '@/lib/api'
 import { fetchEventRanking, fetchRoundRanking } from '@/lib/ranking-query'
+import { positionLabel } from '@/lib/round-position'
 import { fetchRounds, ROUNDS_QUERY_KEY } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
 import type { EventRankingTeam, RoundRanking, RoundRankingTeam } from '@/lib/sse-schema'
@@ -47,8 +40,19 @@ export const POLL_WHILE_OFFLINE_MS = 15_000
 
 // Table row classes mirror ui/table.tsx's TableRow — needed here because the
 // position-change animation (#45 plan) requires `motion.tr`, not the plain
-// `<tr>` that component renders.
-const ROW_CLASSNAME = 'border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted'
+// `<tr>` that component renders. Stacks into a card below `md`
+// (`size.breakpoint-cards`, 768px) and becomes a real table row from there —
+// same single-DOM-tree trick as `rounds.$id.tsx`'s problem list, with
+// explicit ARIA roles kept alongside the table tags since the CSS display
+// override below `md` breaks their implicit ones.
+const ROW_CLASSNAME =
+  'flex flex-col gap-2 rounded-xl border p-4 transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted md:table-row md:rounded-none md:border-x-0 md:border-t-0 md:border-b md:p-0'
+
+function rankColorClass(rank: number): string {
+  if (rank === 1) return 'text-brand-text'
+  if (rank <= 3) return 'text-foreground'
+  return 'text-muted-foreground'
+}
 
 function universitiesForTeam(
   teamId: string,
@@ -57,6 +61,86 @@ function universitiesForTeam(
   const team = teamsById.get(teamId)
   if (!team) return []
   return [...new Set(team.members.map((member) => member.university))]
+}
+
+type RankingColumn<T> = {
+  id: string
+  testId: string
+  header: React.ReactNode
+  headerTitle?: string
+  mobileLabel: string
+  cell: (row: T) => React.ReactNode
+}
+
+// One generic table for both the Rodada and Geral tabs (#220): the only
+// difference between them is which extra columns sit between "team" and
+// "total" — round problems as letters here, round names on the Geral tab.
+function RankingTable<
+  T extends { teamId: string; teamName: string; rank: number; totalScore: number },
+>({
+  columns,
+  rows,
+  myTeamId,
+}: {
+  columns: RankingColumn<T>[]
+  rows: T[]
+  myTeamId: string | null
+}) {
+  return (
+    <table data-testid="leaderboard-table" role="table" className="w-full table-fixed text-sm">
+      <thead className="hidden md:table-header-group">
+        <tr role="row" className="border-b">
+          {columns.map((column) => (
+            <th
+              key={column.id}
+              role="columnheader"
+              data-testid={column.testId}
+              title={column.headerTitle}
+              className={cn(
+                'h-10 px-2 text-left align-middle font-medium text-foreground',
+                column.id === 'team' && 'md:sticky md:left-0 md:z-10 md:bg-background',
+              )}
+            >
+              {column.header}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => {
+          const isMyTeam = row.teamId === myTeamId
+          return (
+            <motion.tr
+              key={row.teamId}
+              layout
+              transition={ROW_TRANSITION}
+              role="row"
+              data-testid={`leaderboard-row-${row.teamId}`}
+              className={cn(ROW_CLASSNAME, isMyTeam && 'bg-brand-soft md:bg-brand-soft')}
+            >
+              {columns.map((column) => (
+                <td
+                  key={column.id}
+                  role="cell"
+                  className={cn(
+                    'flex items-center justify-between gap-2 md:table-cell md:p-2 md:align-middle',
+                    column.id === 'team' &&
+                      cn(
+                        'md:sticky md:left-0 md:z-10',
+                        isMyTeam ? 'md:bg-brand-soft' : 'md:bg-background',
+                      ),
+                  )}
+                >
+                  <span className="sr-only md:hidden">{column.mobileLabel}: </span>
+                  {column.cell(row)}
+                </td>
+              ))}
+            </motion.tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
 }
 
 function LeaderboardScreen() {
@@ -177,16 +261,99 @@ function LeaderboardScreen() {
       },
     })),
   })
+  // No fallback here on purpose: the header shows the letter regardless
+  // (positionLabel), and the legend below has its own loading placeholder —
+  // unlike the old `problemFallback` copy, nothing here depends on the
+  // title having loaded yet.
   const problemTitleById = new Map(
-    problemIds.map((problemId, index) => [
-      problemId,
-      problemQueries[index]?.data?.title ??
-        t('leaderboard.columns.problemFallback', { position: index + 1 }),
-    ]),
+    problemIds.map((problemId, index) => [problemId, problemQueries[index]?.data?.title]),
   )
 
   const teamsById = new Map((teams.data?.teams ?? []).map((team) => [team.id, team]))
   const myTeamId = teams.data?.myTeamId ?? null
+
+  function teamColumn<T extends { teamId: string; teamName: string }>(): RankingColumn<T> {
+    return {
+      id: 'team',
+      testId: 'leaderboard-column-team',
+      header: t('leaderboard.columns.team'),
+      mobileLabel: t('leaderboard.columns.team'),
+      cell: (row) => (
+        <div className="flex items-center gap-2">
+          <span>{row.teamName}</span>
+          {row.teamId === myTeamId && (
+            <Badge variant="brand" data-testid="leaderboard-your-team-badge">
+              {t('teams.yourTeamBadge')}
+            </Badge>
+          )}
+          {universitiesForTeam(row.teamId, teamsById).map((university) => (
+            <UniversityBadge key={university} university={university} />
+          ))}
+        </div>
+      ),
+    }
+  }
+
+  function rankColumn<T extends { rank: number }>(): RankingColumn<T> {
+    return {
+      id: 'rank',
+      testId: 'leaderboard-column-rank',
+      header: t('leaderboard.columns.rank'),
+      mobileLabel: t('leaderboard.columns.rank'),
+      cell: (row) => (
+        <span className={cn('font-display tabular-nums', rankColorClass(row.rank))}>
+          {row.rank}
+        </span>
+      ),
+    }
+  }
+
+  function totalColumn<T extends { totalScore: number }>(): RankingColumn<T> {
+    return {
+      id: 'total',
+      testId: 'leaderboard-column-total',
+      header: t('leaderboard.columns.total'),
+      mobileLabel: t('leaderboard.columns.total'),
+      cell: (row) => <span className="font-bold tabular-nums">{row.totalScore}</span>,
+    }
+  }
+
+  const roundColumns: RankingColumn<RoundRankingTeam>[] = [
+    rankColumn(),
+    teamColumn(),
+    ...problemIds.map(
+      (problemId, index): RankingColumn<RoundRankingTeam> => ({
+        id: `problem-${problemId}`,
+        testId: `leaderboard-column-problem-${problemId}`,
+        header: positionLabel(index),
+        headerTitle: problemTitleById.get(problemId),
+        mobileLabel: problemTitleById.get(problemId) ?? positionLabel(index),
+        cell: (row) => {
+          const entry = row.problems.find((problem) => problem.problemId === problemId)
+          return entry ? entry.score : t('leaderboard.noSubmission')
+        },
+      }),
+    ),
+    totalColumn(),
+  ]
+
+  const eventColumns: RankingColumn<EventRankingTeam>[] = [
+    rankColumn(),
+    teamColumn(),
+    ...(eventRanking?.teams[0]?.rounds ?? []).map(
+      (round): RankingColumn<EventRankingTeam> => ({
+        id: `round-${round.roundId}`,
+        testId: `leaderboard-column-round-${round.roundId}`,
+        header: round.roundName,
+        mobileLabel: round.roundName,
+        cell: (row) => {
+          const entry = row.rounds.find((r) => r.roundId === round.roundId)
+          return entry ? entry.score : t('leaderboard.noSubmission')
+        },
+      }),
+    ),
+    totalColumn(),
+  ]
 
   // `stream.event === null` used to sit in this list, which is exactly the
   // condition that enables the REST fallback below — so the fallback fetched
@@ -235,8 +402,8 @@ function LeaderboardScreen() {
       ref={mainRef}
       className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 bg-background p-8"
     >
-      <div className="flex items-center gap-4">
-        <h1 className={cn('font-bold text-2xl', isPresentation && 'text-5xl')}>
+      <div className="flex flex-wrap items-center gap-4">
+        <h1 className={cn('font-display font-bold text-2xl', isPresentation && 'text-5xl')}>
           {t('leaderboard.heading')}
         </h1>
         <Button
@@ -261,13 +428,32 @@ function LeaderboardScreen() {
             {t('leaderboard.notLiveBadge')}
           </Badge>
         )}
-        {isPresentation && hasActiveRound && countdownClosesAt !== null && (
-          <RoundCountdown closesAt={countdownClosesAt} serverTimeOffsetMs={serverTimeOffsetMs} />
+        {hasActiveRound && (
+          <div className="flex items-center gap-2" data-testid="leaderboard-live-chip">
+            <span
+              aria-hidden="true"
+              className="size-2 shrink-0 animate-pulse rounded-full bg-brand"
+            />
+            <span className="font-display text-[13px] font-semibold text-brand-text uppercase tracking-[0.12em]">
+              {t('leaderboard.liveChip')}
+            </span>
+          </div>
+        )}
+        {hasActiveRound && countdownClosesAt !== null && (
+          <RoundCountdown
+            closesAt={countdownClosesAt}
+            serverTimeOffsetMs={serverTimeOffsetMs}
+            className={cn('font-display text-brand-text tabular-nums', isPresentation && 'text-xl')}
+          />
         )}
       </div>
 
       {!stream.isLive && (
-        <Alert data-testid="leaderboard-connection-banner">
+        <Alert
+          variant={stream.connectionStatus === 'reconnecting' ? 'warning' : 'default'}
+          data-testid="leaderboard-connection-banner"
+        >
+          {stream.connectionStatus === 'reconnecting' && <WifiOff />}
           <AlertDescription>
             {stream.isOffline
               ? t('leaderboard.connection.offline')
@@ -278,20 +464,30 @@ function LeaderboardScreen() {
         </Alert>
       )}
 
-      {isLoading && <p data-testid="leaderboard-loading">{t('leaderboard.loading')}</p>}
+      {isLoading && (
+        <div data-testid="leaderboard-loading" className="flex flex-col gap-3">
+          <div className="h-9 w-1/3 animate-pulse rounded-md bg-background-2" />
+          <div className="h-16 w-full animate-pulse rounded-md bg-background-2" />
+          <div className="h-16 w-full animate-pulse rounded-md bg-background-2" />
+        </div>
+      )}
 
       {!isLoading && isError && (
-        <div data-testid="leaderboard-error" className="flex flex-col items-start gap-2">
-          <p>{t('leaderboard.error.message')}</p>
-          <Button
-            type="button"
-            variant="outline"
-            data-testid="leaderboard-error-retry"
-            onClick={retry}
-          >
-            {t('leaderboard.error.retry')}
-          </Button>
-        </div>
+        <Alert variant="destructive" data-testid="leaderboard-error">
+          <TriangleAlert />
+          <AlertTitle>{t('leaderboard.error.alertTitle')}</AlertTitle>
+          <AlertDescription>
+            <p>{t('leaderboard.error.message')}</p>
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="leaderboard-error-retry"
+              onClick={retry}
+            >
+              {t('leaderboard.error.retry')}
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
 
       {!isLoading && !isError && (
@@ -344,65 +540,27 @@ function LeaderboardScreen() {
                     </p>
                   </div>
                 ) : (
-                  <Table
-                    data-testid="leaderboard-table"
-                    className={cn(isPresentation && '[&_td]:text-3xl [&_th]:text-2xl')}
-                  >
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead data-testid="leaderboard-column-rank">
-                          {t('leaderboard.columns.rank')}
-                        </TableHead>
-                        <TableHead data-testid="leaderboard-column-team">
-                          {t('leaderboard.columns.team')}
-                        </TableHead>
-                        {problemIds.map((problemId) => (
-                          <TableHead
-                            key={problemId}
-                            data-testid={`leaderboard-column-problem-${problemId}`}
-                          >
-                            {problemTitleById.get(problemId)}
-                          </TableHead>
-                        ))}
-                        <TableHead data-testid="leaderboard-column-total">
-                          {t('leaderboard.columns.total')}
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {displayedRound.teams.map((team: RoundRankingTeam) => (
-                        <motion.tr
-                          key={team.teamId}
-                          layout
-                          transition={ROW_TRANSITION}
-                          data-testid={`leaderboard-row-${team.teamId}`}
-                          className={ROW_CLASSNAME}
-                        >
-                          <TableCell>{team.rank}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span>{team.teamName}</span>
-                              {team.teamId === myTeamId && (
-                                <Badge data-testid="leaderboard-your-team-badge">
-                                  {t('teams.yourTeamBadge')}
-                                </Badge>
-                              )}
-                              {universitiesForTeam(team.teamId, teamsById).map((university) => (
-                                <UniversityBadge key={university} university={university} />
-                              ))}
-                            </div>
-                          </TableCell>
-                          {problemIds.map((problemId) => (
-                            <TableCell key={problemId}>
-                              {team.problems.find((problem) => problem.problemId === problemId)
-                                ?.score ?? 0}
-                            </TableCell>
-                          ))}
-                          <TableCell className="font-medium">{team.totalScore}</TableCell>
-                        </motion.tr>
+                  <>
+                    <RankingTable
+                      columns={roundColumns}
+                      rows={displayedRound.teams}
+                      myTeamId={myTeamId}
+                    />
+                    <ul
+                      data-testid="leaderboard-legend"
+                      className="flex flex-col gap-1 text-muted-foreground text-sm"
+                    >
+                      {problemIds.map((problemId, index) => (
+                        <li key={problemId} data-testid={`leaderboard-legend-item-${problemId}`}>
+                          {t('leaderboard.legend.entry', {
+                            letter: positionLabel(index),
+                            title:
+                              problemTitleById.get(problemId) ?? t('leaderboard.legend.loading'),
+                          })}
+                        </li>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </ul>
+                  </>
                 )}
               </div>
             )}
@@ -417,62 +575,7 @@ function LeaderboardScreen() {
                 <p className="text-muted-foreground">{t('leaderboard.empty.title')}</p>
               </div>
             ) : (
-              <Table
-                data-testid="leaderboard-table"
-                className={cn(isPresentation && '[&_td]:text-3xl [&_th]:text-2xl')}
-              >
-                <TableHeader>
-                  <TableRow>
-                    <TableHead data-testid="leaderboard-column-rank">
-                      {t('leaderboard.columns.rank')}
-                    </TableHead>
-                    <TableHead data-testid="leaderboard-column-team">
-                      {t('leaderboard.columns.team')}
-                    </TableHead>
-                    {(eventRanking.teams[0]?.rounds ?? []).map((round) => (
-                      <TableHead
-                        key={round.roundId}
-                        data-testid={`leaderboard-column-round-${round.roundId}`}
-                      >
-                        {round.roundName}
-                      </TableHead>
-                    ))}
-                    <TableHead data-testid="leaderboard-column-total">
-                      {t('leaderboard.columns.total')}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {eventRanking.teams.map((team: EventRankingTeam) => (
-                    <motion.tr
-                      key={team.teamId}
-                      layout
-                      transition={ROW_TRANSITION}
-                      data-testid={`leaderboard-row-${team.teamId}`}
-                      className={ROW_CLASSNAME}
-                    >
-                      <TableCell>{team.rank}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span>{team.teamName}</span>
-                          {team.teamId === myTeamId && (
-                            <Badge data-testid="leaderboard-your-team-badge">
-                              {t('teams.yourTeamBadge')}
-                            </Badge>
-                          )}
-                          {universitiesForTeam(team.teamId, teamsById).map((university) => (
-                            <UniversityBadge key={university} university={university} />
-                          ))}
-                        </div>
-                      </TableCell>
-                      {team.rounds.map((round) => (
-                        <TableCell key={round.roundId}>{round.score}</TableCell>
-                      ))}
-                      <TableCell className="font-medium">{team.totalScore}</TableCell>
-                    </motion.tr>
-                  ))}
-                </TableBody>
-              </Table>
+              <RankingTable columns={eventColumns} rows={eventRanking.teams} myTeamId={myTeamId} />
             )}
           </TabsContent>
         </Tabs>

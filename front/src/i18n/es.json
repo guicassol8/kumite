@@ -775,11 +775,16 @@
     },
     "lastClosedRoundLabel": "{{name}} — última ronda cerrada",
     "notLiveBadge": "no en vivo",
+    "liveChip": "En vivo",
+    "noSubmission": "—",
     "columns": {
       "rank": "#",
       "team": "Equipo",
-      "total": "Total",
-      "problemFallback": "P{{position}}"
+      "total": "Total"
+    },
+    "legend": {
+      "entry": "{{letter}} — {{title}}",
+      "loading": "cargando…"
     },
     "connection": {
       "connecting": "Conectando al marcador en vivo...",
@@ -788,6 +793,7 @@
     },
     "loading": "Cargando marcador...",
     "error": {
+      "alertTitle": "No fue posible cargar",
       "message": "No fue posible cargar el marcador.",
       "retry": "Intentar de nuevo"
     },

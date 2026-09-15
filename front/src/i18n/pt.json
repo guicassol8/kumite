@@ -775,11 +775,16 @@
     },
     "lastClosedRoundLabel": "{{name}} — última rodada encerrada",
     "notLiveBadge": "não ao vivo",
+    "liveChip": "Ao vivo",
+    "noSubmission": "—",
     "columns": {
       "rank": "#",
       "team": "Time",
-      "total": "Total",
-      "problemFallback": "P{{position}}"
+      "total": "Total"
+    },
+    "legend": {
+      "entry": "{{letter}} — {{title}}",
+      "loading": "carregando…"
     },
     "connection": {
       "connecting": "Conectando ao placar ao vivo...",
@@ -788,6 +793,7 @@
     },
     "loading": "Carregando placar...",
     "error": {
+      "alertTitle": "Não foi possível carregar",
       "message": "Não foi possível carregar o placar.",
       "retry": "Tentar novamente"
     },
@@ -797,8 +803,8 @@
       "noSubmissionsYet": "Ninguém submeteu nesta rodada ainda."
     },
     "presentation": {
-      "enter": "Ativar modo apresentação",
-      "exit": "Sair do modo apresentação"
+      "enter": "Ativar modo telão",
+      "exit": "Sair do modo telão"
     }
   },
   "roundCountdown": {

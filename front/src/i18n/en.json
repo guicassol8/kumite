@@ -775,11 +775,16 @@
     },
     "lastClosedRoundLabel": "{{name}} — last closed round",
     "notLiveBadge": "not live",
+    "liveChip": "Live",
+    "noSubmission": "—",
     "columns": {
       "rank": "#",
       "team": "Team",
-      "total": "Total",
-      "problemFallback": "P{{position}}"
+      "total": "Total"
+    },
+    "legend": {
+      "entry": "{{letter}} — {{title}}",
+      "loading": "loading…"
     },
     "connection": {
       "connecting": "Connecting to the live leaderboard...",
@@ -788,6 +793,7 @@
     },
     "loading": "Loading leaderboard...",
     "error": {
+      "alertTitle": "Could not load",
       "message": "Could not load the leaderboard.",
       "retry": "Retry"
     },

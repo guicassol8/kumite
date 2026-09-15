@@ -25,7 +25,7 @@ import '@/i18n'
 import { OFFLINE_AFTER_MS } from '@/hooks/use-leaderboard-stream'
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
-import type { EventRanking, RoundRanking, SseEvent } from '@/lib/sse-schema'
+import type { EventRanking, RoundRanking, RoundRankingTeam, SseEvent } from '@/lib/sse-schema'
 import { routeTree } from '@/routeTree.gen'
 
 import { POLL_WHILE_OFFLINE_MS } from './leaderboard'
@@ -211,6 +211,148 @@ describe('LeaderboardScreen — active round', () => {
 
     await waitFor(() => expect(screen.getByTestId('leaderboard-column-round-r1')).toBeDefined())
     expect(screen.getByTestId('leaderboard-column-round-r1').textContent).toBe('Rodada 1')
+  })
+})
+
+describe('LeaderboardScreen — identity redesign (#220)', () => {
+  it('shows problem columns as letters with the full title in a `title` attribute and in the legend', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    const column = screen.getByTestId('leaderboard-column-problem-p1')
+    expect(column.textContent).toBe('A')
+    await waitFor(() => expect(column.getAttribute('title')).toBe('Soma'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('leaderboard-legend-item-p1').textContent).toBe('A — Soma'),
+    )
+  })
+
+  it('keeps the table wide and the team column sticky instead of scrolling horizontally', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    const table = screen.getByTestId('leaderboard-table')
+    expect(table.tagName).toBe('TABLE')
+    expect(table.className).not.toContain('overflow')
+    const teamColumn = screen.getByTestId('leaderboard-column-team')
+    expect(teamColumn.className).toContain('sticky')
+  })
+
+  it('distinguishes a zero score from no submission on a problem column', async () => {
+    const teamWithZeroScore: RoundRankingTeam = {
+      ...roundRanking.teams[0]!,
+      problems: [{ problemId: 'p1', score: 0, attempts: 1 }],
+    }
+    const teamWithNoSubmission: RoundRankingTeam = { ...roundRanking.teams[1]!, problems: [] }
+    const roundWithDistinctScores: RoundRanking = {
+      ...roundRanking,
+      teams: [teamWithZeroScore, teamWithNoSubmission],
+    }
+    mockedRoundRanking.mockResolvedValue(jsonResponse(200, roundWithDistinctScores))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundWithDistinctScores,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('0')
+    expect(screen.getByTestId('leaderboard-row-t2').textContent).toContain('—')
+  })
+
+  it('colors the rank numeral by position and fills the "Seu time" badge solid', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(200, teamsEnvelope({ myTeamId: 't1' })))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+    const row1 = screen.getByTestId('leaderboard-row-t1')
+    const rankSpan = row1.querySelector('.font-display.tabular-nums')
+    expect(rankSpan?.className).toContain('text-brand-text')
+
+    const badge = screen.getByTestId('leaderboard-your-team-badge')
+    expect(badge.getAttribute('data-variant')).toBe('brand')
+    expect(row1.className).toContain('bg-brand-soft')
+  })
+
+  it('shows the live chip and brand-text countdown whenever a round is active', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emit({
+      type: 'round.opened',
+      serverTime: new Date(),
+      roundId: 'r1',
+      closesAt: new Date('2026-09-05T13:00:00.000Z'),
+    })
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-live-chip')).toBeDefined())
+    expect(screen.getByTestId('round-countdown').className).toContain('text-brand-text')
+  })
+})
+
+describe('LeaderboardScreen — alert-styled states (#220)', () => {
+  it('shows the error state as a destructive Alert with a retry action', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(500, {}))
+    mockedRounds.mockResolvedValue(jsonResponse(500, {}))
+    mockedRoundRanking.mockResolvedValue(jsonResponse(500, {}))
+    mockedEventRanking.mockResolvedValue(jsonResponse(500, {}))
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-error')).toBeDefined())
+    const alert = screen.getByTestId('leaderboard-error')
+    expect(alert.getAttribute('role')).toBe('alert')
+    expect(alert.querySelector('svg')).not.toBeNull()
+  })
+
+  it('shows the connection banner as a warning Alert with an icon while reconnecting', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+
+    emitStatus('open')
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-connection-banner')).toBeNull())
+
+    emitStatus('reconnecting')
+    await waitFor(() => {
+      const banner = screen.getByTestId('leaderboard-connection-banner')
+      expect(banner.className).toContain('border-warning')
+      expect(banner.querySelector('svg')).not.toBeNull()
+    })
   })
 })
 
@@ -882,10 +1024,11 @@ describe('LeaderboardScreen — presentation mode', () => {
     expect(document.querySelector('main')?.className).toContain('bg-background')
   })
 
-  it('hides the round countdown in normal mode even with an active round', async () => {
+  it('shows the round countdown and live chip in normal mode with an active round (#220)', async () => {
     await renderWithActiveRound()
 
-    expect(screen.queryByTestId('round-countdown')).toBeNull()
+    expect(screen.getByTestId('round-countdown')).toBeDefined()
+    expect(screen.getByTestId('leaderboard-live-chip')).toBeDefined()
   })
 
   it('shows the round countdown once presentation mode is toggled on', async () => {

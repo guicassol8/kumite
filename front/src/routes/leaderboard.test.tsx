@@ -965,6 +965,11 @@ describe('LeaderboardScreen — presentation mode', () => {
     await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
   }
 
+  // The toggle's testid is the same enter/exit control throughout, but once
+  // presentation mode is active the element carrying it is TelaoBoard's own
+  // exit button, not the small icon that opened it (#220 T12) — so each
+  // assertion after a state change re-queries by testid instead of holding
+  // on to the (by-then-unmounted) original node.
   it('enters presentation mode on toggle click and requests fullscreen', async () => {
     await renderWithActiveRound()
 
@@ -974,46 +979,64 @@ describe('LeaderboardScreen — presentation mode', () => {
     fireEvent.click(toggle)
 
     expect(HTMLElement.prototype.requestFullscreen).toHaveBeenCalledTimes(1)
-    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'true',
+    )
   })
 
   it('exits presentation mode when the browser reports fullscreen exit (Esc path)', async () => {
     await renderWithActiveRound()
 
-    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'true',
+    )
 
     Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
     act(() => document.dispatchEvent(new Event('fullscreenchange')))
 
-    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'false',
+    )
   })
 
   it('exits presentation mode via the toggle itself, calling exitFullscreen', async () => {
     await renderWithActiveRound()
 
-    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
-    fireEvent.click(toggle)
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
     Object.defineProperty(document, 'fullscreenElement', {
       configurable: true,
       value: document.querySelector('main'),
     })
 
-    fireEvent.click(toggle)
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
 
     expect(document.exitFullscreen).toHaveBeenCalledTimes(1)
-    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'false',
+    )
   })
 
   it('degrades gracefully when requestFullscreen rejects', async () => {
     HTMLElement.prototype.requestFullscreen = vi.fn().mockRejectedValue(new Error('denied'))
     await renderWithActiveRound()
 
-    const toggle = screen.getByTestId('leaderboard-presentation-toggle')
-    fireEvent.click(toggle)
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
 
-    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('leaderboard-presentation-toggle').getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+  })
+
+  it('returns focus to the toggle that opened it once presentation mode exits', async () => {
+    await renderWithActiveRound()
+
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+    fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
+
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByTestId('leaderboard-presentation-toggle')),
+    )
   })
 
   it('paints an opaque background on the fullscreened main so the browser backdrop never shows through', async () => {

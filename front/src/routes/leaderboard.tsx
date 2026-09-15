@@ -1,10 +1,11 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Maximize2, Minimize2, TriangleAlert, WifiOff } from 'lucide-react'
+import { Maximize2, TriangleAlert, WifiOff } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { TelaoBoard } from '@/components/leaderboard/telao-board'
 import { RoundCountdown } from '@/components/round-countdown'
 import { type University, UniversityBadge } from '@/components/teams/university-badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -150,29 +151,35 @@ function LeaderboardScreen() {
   const mainRef = useRef<HTMLElement>(null)
   const [isPresentation, setIsPresentation] = useState(false)
 
+  // Exiting is TelaoBoard's job from here (it owns the fullscreenchange and
+  // Escape-keydown listeners while mounted) — this effect only hands focus
+  // back to the toggle that opened it, and only on a genuine close, never on
+  // first mount (`wasPresentingRef` starts false).
+  const wasPresentingRef = useRef(false)
   useEffect(() => {
-    function handleFullscreenChange() {
-      setIsPresentation(document.fullscreenElement === mainRef.current)
+    if (wasPresentingRef.current && !isPresentation) {
+      document
+        .querySelector<HTMLButtonElement>('[data-testid="leaderboard-presentation-toggle"]')
+        ?.focus()
     }
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }, [])
+    wasPresentingRef.current = isPresentation
+  }, [isPresentation])
 
-  const togglePresentation = useCallback(() => {
-    if (isPresentation) {
-      setIsPresentation(false)
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {})
-      }
-      return
-    }
+  const enterPresentation = useCallback(() => {
     // Set optimistically: if the Fullscreen API is unsupported or the
     // request is denied, the enlarged layout still applies (degrade
-    // gracefully) — a real transition later confirms the same state via
-    // the fullscreenchange listener above.
+    // gracefully) — TelaoBoard's own fullscreenchange listener confirms the
+    // same state later if a real transition does happen.
     setIsPresentation(true)
     mainRef.current?.requestFullscreen().catch(() => {})
-  }, [isPresentation])
+  }, [])
+
+  const exitPresentation = useCallback(() => {
+    setIsPresentation(false)
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    }
+  }, [])
   // round.opened/round.closed refetch the list so a round that just closed
   // (or opened) resolves in `closedRounds`/`lastClosedRound` right away,
   // instead of staying stuck on the stale snapshot until something else
@@ -397,34 +404,48 @@ function LeaderboardScreen() {
     eventRankingRest.refetch()
   }
 
+  if (isPresentation) {
+    return (
+      <main ref={mainRef} className="flex flex-1 flex-col bg-background">
+        {!isLoading && !isError && (
+          <TelaoBoard
+            hasActiveRound={hasActiveRound}
+            activeRoundId={activeRoundId}
+            displayedRound={displayedRound}
+            eventRanking={eventRanking}
+            lastClosedRound={lastClosedRound}
+            closesAt={countdownClosesAt}
+            serverTimeOffsetMs={serverTimeOffsetMs}
+            myTeamId={myTeamId}
+            teamsById={teamsById}
+            locale={locale}
+            onExit={exitPresentation}
+          />
+        )}
+      </main>
+    )
+  }
+
   return (
     <main
       ref={mainRef}
       className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-6 bg-background p-8"
     >
       <div className="flex flex-wrap items-center gap-4">
-        <h1 className={cn('font-display font-bold text-2xl', isPresentation && 'text-5xl')}>
-          {t('leaderboard.heading')}
-        </h1>
+        <h1 className="font-display font-bold text-2xl">{t('leaderboard.heading')}</h1>
         <Button
           type="button"
           variant="ghost"
           size="icon"
           data-testid="leaderboard-presentation-toggle"
-          aria-pressed={isPresentation}
-          aria-label={t(
-            isPresentation ? 'leaderboard.presentation.exit' : 'leaderboard.presentation.enter',
-          )}
-          onClick={togglePresentation}
+          aria-pressed={false}
+          aria-label={t('leaderboard.presentation.enter')}
+          onClick={enterPresentation}
         >
-          {isPresentation ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+          <Maximize2 className="size-4" />
         </Button>
         {stream.isOffline && (
-          <Badge
-            variant="outline"
-            data-testid="leaderboard-not-live-badge"
-            className={cn(isPresentation && 'text-xl')}
-          >
+          <Badge variant="outline" data-testid="leaderboard-not-live-badge">
             {t('leaderboard.notLiveBadge')}
           </Badge>
         )}
@@ -443,7 +464,7 @@ function LeaderboardScreen() {
           <RoundCountdown
             closesAt={countdownClosesAt}
             serverTimeOffsetMs={serverTimeOffsetMs}
-            className={cn('font-display text-brand-text tabular-nums', isPresentation && 'text-xl')}
+            className="font-display text-brand-text tabular-nums"
           />
         )}
       </div>
@@ -496,18 +517,10 @@ function LeaderboardScreen() {
           onValueChange={(value) => setManualTab(value as 'round' | 'event')}
         >
           <TabsList data-testid="leaderboard-tabs">
-            <TabsTrigger
-              value="round"
-              data-testid="leaderboard-tab-round"
-              className={cn(isPresentation && 'text-xl')}
-            >
+            <TabsTrigger value="round" data-testid="leaderboard-tab-round">
               {t('leaderboard.tabs.round')}
             </TabsTrigger>
-            <TabsTrigger
-              value="event"
-              data-testid="leaderboard-tab-event"
-              className={cn(isPresentation && 'text-xl')}
-            >
+            <TabsTrigger value="event" data-testid="leaderboard-tab-event">
               {t('leaderboard.tabs.event')}
             </TabsTrigger>
           </TabsList>

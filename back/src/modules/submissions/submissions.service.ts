@@ -35,7 +35,7 @@ export async function getBestSubmission(
   const [best] = await db
     .select({
       score: submissionsTable.score,
-      achievedAt: submissionsTable.createdAt,
+      achievedAt: submissionsTable.acceptedAt,
       // Postgres evaluates window functions before LIMIT, so `count(*) over ()`
       // is the full attempt count for this (team, problem, round) — one round
       // trip for both the best row and the total.
@@ -50,7 +50,7 @@ export async function getBestSubmission(
       ),
     )
     // Ties go to the earliest submission: reaching the score first wins.
-    .orderBy(desc(submissionsTable.score), asc(submissionsTable.createdAt))
+    .orderBy(desc(submissionsTable.score), asc(submissionsTable.acceptedAt))
     .limit(1)
 
   return best ?? null
@@ -281,6 +281,9 @@ export async function submitSolution(
     // must not have its closure announced (#176).
     judgingRoundId = body.roundId
     enterJudging(judgingRoundId)
+    // Stamped now, not at INSERT time, so the tiebreak below never inflates a
+    // team's time by however long the judge sandbox happened to take (#238).
+    const acceptedAt = new Date()
 
     const generated = generateJudgeSource(body.workspace, body.locale ?? DEFAULT_LOCALE)
     if (!generated.ok) {
@@ -321,6 +324,7 @@ export async function submitSolution(
           caseResults: toPersistedCaseResults(results),
           score,
           attemptNumber,
+          acceptedAt,
         })
         .returning()
       if (!row) throw new Error('expected the submission insert to return a row')

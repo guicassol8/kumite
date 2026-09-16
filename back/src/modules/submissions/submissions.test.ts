@@ -168,6 +168,7 @@ describe('submissions table', () => {
         ],
         score: 25,
         attemptNumber: 1,
+        acceptedAt: new Date(),
       })
       .returning()
 
@@ -203,6 +204,7 @@ describe('submissions table', () => {
       caseResults: [],
       score: 0,
       attemptNumber: 1,
+      acceptedAt: new Date(),
     })
 
     await expect(
@@ -216,6 +218,7 @@ describe('submissions table', () => {
         caseResults: [],
         score: 10,
         attemptNumber: 1,
+        acceptedAt: new Date(),
       }),
     ).rejects.toThrow()
   })
@@ -233,6 +236,7 @@ describe('submissions table', () => {
       caseResults: [],
       score: 0,
       attemptNumber: 1,
+      acceptedAt: new Date(),
     })
 
     await expect(db.delete(problemsTable).where(eq(problemsTable.id, problem.id))).rejects.toThrow()
@@ -251,6 +255,7 @@ describe('submissions table', () => {
       caseResults: [],
       score: 30,
       attemptNumber: 1,
+      acceptedAt: new Date(),
     })
 
     await expect(db.delete(teamsTable).where(eq(teamsTable.id, team.id))).rejects.toThrow()
@@ -269,6 +274,7 @@ describe('submissions table', () => {
       caseResults: [],
       score: 30,
       attemptNumber: 1,
+      acceptedAt: new Date(),
     })
 
     await expect(db.delete(usersTable).where(eq(usersTable.id, user.id))).rejects.toThrow()
@@ -298,7 +304,10 @@ describe('getBestSubmission', () => {
         caseResults: [],
         score: 20,
         attemptNumber: 1,
-        createdAt: new Date('2026-08-31T11:00:00.000Z'),
+        acceptedAt: new Date('2026-08-31T11:00:00.000Z'),
+        // Reversed vs. acceptedAt: the assertion below only holds if the code
+        // reads acceptedAt, not this INSERT timestamp (#238).
+        createdAt: new Date('2026-08-31T13:30:00.000Z'),
       },
       {
         problemId: problem.id,
@@ -310,7 +319,8 @@ describe('getBestSubmission', () => {
         caseResults: [],
         score: 80,
         attemptNumber: 2,
-        createdAt: best,
+        acceptedAt: best,
+        createdAt: new Date('2026-08-31T11:30:00.000Z'),
       },
       {
         problemId: problem.id,
@@ -322,7 +332,8 @@ describe('getBestSubmission', () => {
         caseResults: [],
         score: 50,
         attemptNumber: 3,
-        createdAt: new Date('2026-08-31T13:00:00.000Z'),
+        acceptedAt: new Date('2026-08-31T13:00:00.000Z'),
+        createdAt: new Date('2026-08-31T12:30:00.000Z'),
       },
     ])
 
@@ -348,7 +359,10 @@ describe('getBestSubmission', () => {
         caseResults: [],
         score: 80,
         attemptNumber: 1,
-        createdAt: earliest,
+        acceptedAt: earliest,
+        // Reversed vs. acceptedAt: a createdAt-based tiebreak would pick the
+        // other row here, so this only passes if the code reads acceptedAt.
+        createdAt: new Date('2026-08-31T13:00:00.000Z'),
       },
       {
         problemId: problem.id,
@@ -360,7 +374,8 @@ describe('getBestSubmission', () => {
         caseResults: [],
         score: 80,
         attemptNumber: 2,
-        createdAt: new Date('2026-08-31T12:00:00.000Z'),
+        acceptedAt: new Date('2026-08-31T12:00:00.000Z'),
+        createdAt: new Date('2026-08-31T10:00:00.000Z'),
       },
     ])
 
@@ -391,7 +406,10 @@ describe('getBestSubmission', () => {
         caseResults: [],
         score: 40,
         attemptNumber: 1,
-        createdAt: own,
+        acceptedAt: own,
+        // Deliberately different from acceptedAt: proves achievedAt below
+        // reads acceptedAt, not this INSERT timestamp (#238).
+        createdAt: new Date('2026-08-31T12:00:00.000Z'),
       },
       {
         problemId: problem.id,
@@ -403,6 +421,7 @@ describe('getBestSubmission', () => {
         caseResults: [],
         score: 90,
         attemptNumber: 1,
+        acceptedAt: new Date(),
       },
       {
         problemId: otherProblem.id,
@@ -414,6 +433,7 @@ describe('getBestSubmission', () => {
         caseResults: [],
         score: 95,
         attemptNumber: 1,
+        acceptedAt: new Date(),
       },
     ])
 
@@ -1142,4 +1162,62 @@ describe('submitSolution when the round closes mid-judging', () => {
     expect(outcome).toEqual({ ok: false, error: 'problem_not_found' })
     expect(hasJudgingInFlight(roundId)).toBe(false)
   })
+})
+
+// #238: acceptedAt must survive a slow judge, or the tiebreak it feeds
+// inflates by however long the sandbox took.
+describe('submitSolution tiebreak survives a slow judge', () => {
+  beforeEach(() => {
+    resetSubmissionThrottle()
+  })
+
+  it(
+    "keeps team A's acceptedAt earlier than team B's even though B's row is INSERTed first",
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user: userA, team: teamA } = await insertTeamMember('Time A', 'time-a@edu.pucrs.br')
+      const { user: userB, team: teamB } = await insertTeamMember('Time B', 'time-b@edu.pucrs.br')
+
+      // Team A accepts first, but its own judge run (via the mocked runJudge
+      // above) hangs until team B's *entire* submitSolution — accept, judge,
+      // INSERT — has completed. Team A's row therefore lands in the table
+      // after team B's, despite A having been accepted first.
+      judgeRace.onJudged = async () => {
+        // Cleared before awaiting B, or B's own runJudge call would re-enter
+        // this same hook and await a submission that never starts.
+        judgeRace.onJudged = null
+        expectSubmitted(
+          await submitSolution(
+            db,
+            { userId: userB.id, teamId: teamB.id },
+            { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+          ),
+        )
+      }
+
+      expectSubmitted(
+        await submitSolution(
+          db,
+          { userId: userA.id, teamId: teamA.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        ),
+      )
+
+      const [rowA] = await db
+        .select()
+        .from(submissionsTable)
+        .where(eq(submissionsTable.teamId, teamA.id))
+      const [rowB] = await db
+        .select()
+        .from(submissionsTable)
+        .where(eq(submissionsTable.teamId, teamB.id))
+      if (!rowA || !rowB) throw new Error('expected both submissions to be recorded')
+
+      // The bug this issue fixes: A's row is written after B's...
+      expect(rowA.createdAt.getTime()).toBeGreaterThan(rowB.createdAt.getTime())
+      // ...but A was accepted first, and the tiebreak must reflect that.
+      expect(rowA.acceptedAt.getTime()).toBeLessThan(rowB.acceptedAt.getTime())
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
 })

@@ -102,7 +102,7 @@ function LoginScreen() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
               {search.notice === 'expired' && (
                 <Alert data-testid="login-expired-notice">
                   {/* Without the icon the bordered box reads as one more empty
@@ -120,6 +120,7 @@ function LoginScreen() {
                     <FormControl>
                       <Input type="email" data-testid="login-email-input" {...field} />
                     </FormControl>
+                    <FormMessage data-testid="login-email-error" />
                   </FormItem>
                 )}
               />
@@ -132,6 +133,7 @@ function LoginScreen() {
                     <FormControl>
                       <PasswordInput data-testid="login-password-input" {...field} />
                     </FormControl>
+                    <FormMessage data-testid="login-password-error" />
                   </FormItem>
                 )}
               />

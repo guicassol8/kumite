@@ -35,3 +35,15 @@ describe('PasswordInput', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 })
+
+it('forwards invalid state and the error association to the input', () => {
+  render(
+    <>
+      <PasswordInput data-testid="pw" aria-invalid="true" aria-describedby="pw-error" />
+      <p id="pw-error">Invalid password</p>
+    </>,
+  )
+  expect(screen.getByTestId('pw').getAttribute('aria-invalid')).toBe('true')
+  expect(screen.getByTestId('pw').getAttribute('aria-describedby')).toBe('pw-error')
+  expect(screen.getByTestId('pw-toggle').getAttribute('aria-label')).toBeTruthy()
+})

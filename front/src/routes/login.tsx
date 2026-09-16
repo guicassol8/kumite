@@ -1,14 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Info } from 'lucide-react'
+import { CircleAlert, Info } from 'lucide-react'
 import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
-
+import { AuthLayout } from '@/components/auth-layout'
+import { Mark } from '@/components/brand'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Form,
   FormControl,
@@ -95,71 +95,109 @@ function LoginScreen() {
   const rootError = form.formState.errors.root?.message
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center p-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('auth.login.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
-              {search.notice === 'expired' && (
-                <Alert data-testid="login-expired-notice">
-                  {/* Without the icon the bordered box reads as one more empty
+    <AuthLayout
+      title={t('auth.login.title')}
+      description={t('auth.login.description')}
+      poster={
+        <aside
+          data-testid="login-poster"
+          className="flex w-full flex-col justify-between gap-12 p-14"
+        >
+          <Mark className="size-28" data-testid="login-poster-mark" />
+          <div>
+            <p className="font-display font-bold text-6xl uppercase leading-none">
+              {t('auth.login.poster.pucrs')} <span className="text-brand-on-chrome">×</span>{' '}
+              {t('auth.login.poster.merida')}
+              <br />
+              {t('auth.login.poster.title')}
+            </p>
+            <p className="mt-5 max-w-sm text-chrome-muted text-sm leading-relaxed">
+              {t('auth.login.poster.support')}
+            </p>
+          </div>
+          <p className="font-display font-semibold text-chrome-muted text-xs uppercase tracking-widest">
+            {t('auth.login.poster.event')}
+          </p>
+        </aside>
+      }
+      navigation={
+        <>
+          <Link
+            to="/reset-password"
+            data-testid="login-forgot-password-link"
+            className="text-muted-foreground underline underline-offset-4 focus-visible:outline-ring"
+          >
+            {t('auth.login.forgotPasswordLink')}
+          </Link>
+          <span className="text-muted-foreground">
+            {t('auth.login.noAccount')}{' '}
+            <Link
+              to="/signup"
+              search={{ redirect: search.redirect }}
+              data-testid="login-signup-link"
+              className="text-foreground underline-offset-4 hover:underline focus-visible:outline-ring"
+            >
+              {t('auth.login.signupLink')}
+            </Link>
+          </span>
+        </>
+      }
+    >
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+          {search.notice === 'expired' && (
+            <Alert data-testid="login-expired-notice">
+              {/* Without the icon the bordered box reads as one more empty
                       input sitting above the email field. */}
-                  <Info />
-                  <AlertDescription>{t('auth.login.notices.expired')}</AlertDescription>
-                </Alert>
-              )}
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('auth.login.emailLabel')}</FormLabel>
-                    <FormControl>
-                      <Input type="email" data-testid="login-email-input" {...field} />
-                    </FormControl>
-                    <FormMessage data-testid="login-email-error" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('auth.login.passwordLabel')}</FormLabel>
-                    <FormControl>
-                      <PasswordInput data-testid="login-password-input" {...field} />
-                    </FormControl>
-                    <FormMessage data-testid="login-password-error" />
-                  </FormItem>
-                )}
-              />
-              {rootError && (
-                <Alert variant="destructive" data-testid="login-form-error">
-                  <AlertDescription>{rootError}</AlertDescription>
-                </Alert>
-              )}
-              <Button
-                type="submit"
-                data-testid="login-submit-button"
-                disabled={form.formState.isSubmitting}
-              >
-                {t('auth.login.submitButton')}
-              </Button>
-              <Link
-                to="/reset-password"
-                data-testid="login-forgot-password-link"
-                className="text-center text-muted-foreground text-sm underline-offset-4 hover:underline"
-              >
-                {t('auth.login.forgotPasswordLink')}
-              </Link>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </main>
+              <Info />
+              <AlertDescription>{t('auth.login.notices.expired')}</AlertDescription>
+            </Alert>
+          )}
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('auth.login.emailLabel')}</FormLabel>
+                <FormControl>
+                  <Input type="email" data-testid="login-email-input" {...field} />
+                </FormControl>
+                <FormMessage data-testid="login-email-error" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('auth.login.passwordLabel')}</FormLabel>
+                <FormControl>
+                  <PasswordInput data-testid="login-password-input" {...field} />
+                </FormControl>
+                <FormMessage data-testid="login-password-error" />
+              </FormItem>
+            )}
+          />
+          {rootError && (
+            <Alert
+              variant="destructive"
+              className="border-destructive"
+              data-testid="login-form-error"
+            >
+              <CircleAlert aria-hidden="true" />
+              <AlertDescription>{rootError}</AlertDescription>
+            </Alert>
+          )}
+          <Button
+            type="submit"
+            data-testid="login-submit-button"
+            disabled={form.formState.isSubmitting}
+          >
+            {t('auth.login.submitButton')}
+          </Button>
+        </form>
+      </Form>
+    </AuthLayout>
   )
 }

@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { CircleAlert } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
-
+import { AuthLayout } from '@/components/auth-layout'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Form,
   FormControl,
@@ -135,153 +135,149 @@ function ResetPasswordScreen() {
   const rootError = form.formState.errors.root?.message
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center p-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('auth.resetPassword.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {succeeded ? (
-            <div className="flex flex-col gap-4" data-testid="reset-password-success">
-              <p>{t('auth.resetPassword.successMessage')}</p>
-              <Button asChild>
-                <Link to="/login" data-testid="reset-password-login-link">
-                  {t('auth.resetPassword.successLoginLink')}
-                </Link>
-              </Button>
-            </div>
-          ) : sentTo === null ? (
-            <Form {...requestForm}>
-              <form
-                onSubmit={requestForm.handleSubmit(onRequestSubmit)}
-                className="flex flex-col gap-4"
+    <AuthLayout title={t('auth.resetPassword.title')}>
+      {succeeded ? (
+        <div className="flex flex-col gap-4" data-testid="reset-password-success">
+          <p>{t('auth.resetPassword.successMessage')}</p>
+          <Button asChild>
+            <Link to="/login" data-testid="reset-password-login-link">
+              {t('auth.resetPassword.successLoginLink')}
+            </Link>
+          </Button>
+        </div>
+      ) : sentTo === null ? (
+        <Form {...requestForm}>
+          <form
+            onSubmit={requestForm.handleSubmit(onRequestSubmit)}
+            className="flex flex-col gap-4"
+          >
+            <p className="text-muted-foreground text-sm">
+              {t('auth.resetPassword.request.description')}
+            </p>
+            <FormField
+              control={requestForm.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('auth.resetPassword.request.emailLabel')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      data-testid="reset-password-request-email-input"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage data-testid="reset-password-request-email-error" />
+                </FormItem>
+              )}
+            />
+            {requestError && (
+              <Alert
+                variant="destructive"
+                className="border-destructive"
+                data-testid="reset-password-request-error"
               >
-                <p className="text-muted-foreground text-sm">
-                  {t('auth.resetPassword.request.description')}
-                </p>
-                <FormField
-                  control={requestForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('auth.resetPassword.request.emailLabel')}</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          data-testid="reset-password-request-email-input"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage data-testid="reset-password-request-email-error" />
-                    </FormItem>
-                  )}
-                />
-                {requestError && (
-                  <Alert variant="destructive" data-testid="reset-password-request-error">
-                    <AlertDescription>{requestError}</AlertDescription>
-                  </Alert>
-                )}
-                <Button
-                  type="submit"
-                  data-testid="reset-password-request-submit"
-                  disabled={requestForm.formState.isSubmitting}
-                >
-                  {t('auth.resetPassword.request.submitButton')}
-                </Button>
-              </form>
-            </Form>
-          ) : (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-                <Alert data-testid="reset-password-request-sent">
-                  <AlertDescription>
-                    {t('auth.resetPassword.request.sentMessage', { email: sentTo })}
-                  </AlertDescription>
-                </Alert>
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('auth.resetPassword.emailLabel')}</FormLabel>
-                      <FormControl>
-                        <Input type="email" data-testid="reset-password-email-input" {...field} />
-                      </FormControl>
-                      <FormMessage data-testid="reset-password-email-error" />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="otp"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('auth.resetPassword.otpLabel')}</FormLabel>
-                      <FormControl>
-                        <Input
-                          inputMode="numeric"
-                          data-testid="reset-password-otp-input"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage data-testid="reset-password-otp-error" />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="newPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('auth.resetPassword.newPasswordLabel')}</FormLabel>
-                      <FormControl>
-                        <PasswordInput data-testid="reset-password-new-password-input" {...field} />
-                      </FormControl>
-                      <FormMessage data-testid="reset-password-new-password-error" />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('auth.resetPassword.confirmPasswordLabel')}</FormLabel>
-                      <FormControl>
-                        <PasswordInput
-                          data-testid="reset-password-confirm-password-input"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage data-testid="reset-password-confirm-password-error" />
-                    </FormItem>
-                  )}
-                />
-                {rootError && (
-                  <Alert variant="destructive" data-testid="reset-password-form-error">
-                    <AlertDescription>{rootError}</AlertDescription>
-                  </Alert>
-                )}
-                <Button
-                  type="submit"
-                  data-testid="reset-password-submit-button"
-                  disabled={form.formState.isSubmitting}
-                >
-                  {t('auth.resetPassword.submitButton')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  data-testid="reset-password-request-back"
-                  onClick={() => setSentTo(null)}
-                >
-                  {t('auth.resetPassword.request.backButton')}
-                </Button>
-              </form>
-            </Form>
-          )}
-        </CardContent>
-      </Card>
-    </main>
+                <CircleAlert aria-hidden="true" />
+                <AlertDescription>{requestError}</AlertDescription>
+              </Alert>
+            )}
+            <Button
+              type="submit"
+              data-testid="reset-password-request-submit"
+              disabled={requestForm.formState.isSubmitting}
+            >
+              {t('auth.resetPassword.request.submitButton')}
+            </Button>
+          </form>
+        </Form>
+      ) : (
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+            <Alert data-testid="reset-password-request-sent">
+              <AlertDescription>
+                {t('auth.resetPassword.request.sentMessage', { email: sentTo })}
+              </AlertDescription>
+            </Alert>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('auth.resetPassword.emailLabel')}</FormLabel>
+                  <FormControl>
+                    <Input type="email" data-testid="reset-password-email-input" {...field} />
+                  </FormControl>
+                  <FormMessage data-testid="reset-password-email-error" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="otp"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('auth.resetPassword.otpLabel')}</FormLabel>
+                  <FormControl>
+                    <Input inputMode="numeric" data-testid="reset-password-otp-input" {...field} />
+                  </FormControl>
+                  <FormMessage data-testid="reset-password-otp-error" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="newPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('auth.resetPassword.newPasswordLabel')}</FormLabel>
+                  <FormControl>
+                    <PasswordInput data-testid="reset-password-new-password-input" {...field} />
+                  </FormControl>
+                  <FormMessage data-testid="reset-password-new-password-error" />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('auth.resetPassword.confirmPasswordLabel')}</FormLabel>
+                  <FormControl>
+                    <PasswordInput data-testid="reset-password-confirm-password-input" {...field} />
+                  </FormControl>
+                  <FormMessage data-testid="reset-password-confirm-password-error" />
+                </FormItem>
+              )}
+            />
+            {rootError && (
+              <Alert
+                variant="destructive"
+                className="border-destructive"
+                data-testid="reset-password-form-error"
+              >
+                <CircleAlert aria-hidden="true" />
+                <AlertDescription>{rootError}</AlertDescription>
+              </Alert>
+            )}
+            <Button
+              type="submit"
+              data-testid="reset-password-submit-button"
+              disabled={form.formState.isSubmitting}
+            >
+              {t('auth.resetPassword.submitButton')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              data-testid="reset-password-request-back"
+              onClick={() => setSentTo(null)}
+            >
+              {t('auth.resetPassword.request.backButton')}
+            </Button>
+          </form>
+        </Form>
+      )}
+    </AuthLayout>
   )
 }

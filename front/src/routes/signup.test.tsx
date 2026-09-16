@@ -48,10 +48,10 @@ const fakeUser = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
 
-function renderSignup() {
+function renderSignup(initialEntry = '/signup') {
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ['/signup'] }),
+    history: createMemoryHistory({ initialEntries: [initialEntry] }),
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -189,4 +189,18 @@ describe('SignupScreen', () => {
       expect(getState()).toMatchObject({ status: 'authenticated', token: 'tok-1' })
     })
   })
+})
+
+it('preserves the destination in the login link', async () => {
+  renderSignup('/signup?redirect=%2Fteams')
+  const link = await screen.findByTestId('signup-login-link')
+  expect(link.getAttribute('href')).toBe('/login?redirect=%2Fteams')
+})
+
+it('shows a confirmation error even when both passwords are empty (#200)', async () => {
+  renderSignup()
+  await screen.findByTestId('signup-submit-button')
+  fireEvent.click(screen.getByTestId('signup-submit-button'))
+  expect(await screen.findByTestId('signup-confirm-password-error')).toBeDefined()
+  expect(mockedSignup).not.toHaveBeenCalled()
 })

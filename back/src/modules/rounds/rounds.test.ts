@@ -861,6 +861,7 @@ describe('rounds.service', () => {
         generatedCode: '// generated',
         score,
         attemptNumber,
+        acceptedAt: new Date(),
       })
     }
 

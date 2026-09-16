@@ -7,6 +7,9 @@ import { E2E_PARTICIPANT_NAME, ORGANIZER_NAME } from './support/rounds'
 // the seeded-organizer test below reads the same two vars to log in as that
 // account, and skips itself when they aren't set.
 const evidence = (name: string) => `e2e/evidence/28/${name}.png`
+// Visual walkthrough for #191 (login inline field errors) — kept in this
+// file since it extends the same login flow covered above.
+const evidence191 = (name: string) => `e2e/evidence/191/${name}.png`
 
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
 const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
@@ -43,6 +46,29 @@ test('signup with a mismatched email suffix shows an inline field error', async 
 
   await expect(page.getByTestId('signup-email-error')).toBeVisible()
   await page.screenshot({ path: evidence('03-signup-domain-mismatch'), fullPage: true })
+})
+
+test('login with an invalid email shows an inline field error under the email field', async ({
+  page,
+}) => {
+  await page.goto('/login')
+  await page.getByTestId('login-email-input').fill('not-an-email')
+  await page.getByTestId('login-password-input').fill('supersecret')
+  await page.getByTestId('login-submit-button').click()
+
+  await expect(page.getByTestId('login-email-error')).toBeVisible()
+  await page.screenshot({ path: evidence191('01-login-invalid-email'), fullPage: true })
+})
+
+test('login with an empty password shows an inline field error under the password field', async ({
+  page,
+}) => {
+  await page.goto('/login')
+  await page.getByTestId('login-email-input').fill('ada@edu.pucrs.br')
+  await page.getByTestId('login-submit-button').click()
+
+  await expect(page.getByTestId('login-password-error')).toBeVisible()
+  await page.screenshot({ path: evidence191('02-login-empty-password'), fullPage: true })
 })
 
 test('login with the wrong password shows a single generic error', async ({ page }) => {

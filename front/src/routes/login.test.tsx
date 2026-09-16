@@ -89,6 +89,37 @@ describe('LoginScreen', () => {
     fireEvent.click(screen.getByTestId('login-submit-button'))
 
     expect(await screen.findByTestId('login-form-error')).toBeDefined()
+    expect(screen.queryByTestId('login-email-error')).toBeNull()
+    expect(screen.queryByTestId('login-password-error')).toBeNull()
+  })
+
+  it('shows the inline error under the email field for an invalid email', async () => {
+    renderLogin()
+    await waitFor(() => screen.getByTestId('login-email-input'))
+
+    fireEvent.change(screen.getByTestId('login-email-input'), {
+      target: { value: 'not-an-email' },
+    })
+    fireEvent.change(screen.getByTestId('login-password-input'), {
+      target: { value: 'supersecret' },
+    })
+    fireEvent.click(screen.getByTestId('login-submit-button'))
+
+    expect(await screen.findByTestId('login-email-error')).toBeDefined()
+    expect(mockedLogin).not.toHaveBeenCalled()
+  })
+
+  it('shows the inline error under the password field for an empty password', async () => {
+    renderLogin()
+    await waitFor(() => screen.getByTestId('login-email-input'))
+
+    fireEvent.change(screen.getByTestId('login-email-input'), {
+      target: { value: 'ada@edu.pucrs.br' },
+    })
+    fireEvent.click(screen.getByTestId('login-submit-button'))
+
+    expect(await screen.findByTestId('login-password-error')).toBeDefined()
+    expect(mockedLogin).not.toHaveBeenCalled()
   })
 
   it('offers a way out to the self-service password reset', async () => {

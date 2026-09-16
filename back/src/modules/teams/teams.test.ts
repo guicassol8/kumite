@@ -92,6 +92,7 @@ async function insertSubmission(teamId: string, userId: string) {
       caseResults: [],
       score: 100,
       attemptNumber: 1,
+      acceptedAt: new Date(),
     })
     .returning()
   if (!submission) throw new Error('expected a submission fixture')

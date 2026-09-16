@@ -480,6 +480,7 @@ describe('sse.service', () => {
           caseResults: [],
           score: 100,
           attemptNumber: 1,
+          acceptedAt: new Date(),
         })
 
         const event = await buildRankingUpdatedEvent(db)

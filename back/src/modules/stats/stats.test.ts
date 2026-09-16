@@ -106,6 +106,7 @@ async function submit(teamId: string, problemId: string, roundId: string, create
     caseResults: [],
     score: 100,
     attemptNumber: attemptCounter,
+    acceptedAt: new Date(),
     ...(createdAt ? { createdAt } : {}),
   })
 }

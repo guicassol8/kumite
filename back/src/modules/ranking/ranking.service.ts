@@ -15,13 +15,13 @@ import type { EventRanking, RoundRanking } from './ranking.schema'
 
 /** One submission, reduced to what scoring needs: who, for what key
  * (a problemId in a round, or a roundId in the event), how much, and when. */
-export type ScoringRow = { teamId: string; key: string; score: number; createdAt: Date }
+export type ScoringRow = { teamId: string; key: string; score: number; acceptedAt: Date }
 
 export type BestEntry = { score: number; attempts: number; achievedAt: Date | null }
 
 /**
  * For every (team, key) pair in `teamIds` x `keys`, the best-scoring row
- * (ties go to the earliest `createdAt`) plus how many rows it had — 0/null
+ * (ties go to the earliest `acceptedAt`) plus how many rows it had — 0/null
  * when the pair has no rows at all. Both lists are the source of truth for
  * which pairs exist, not the rows themselves: a team or key with zero
  * submissions still gets an entry.
@@ -58,12 +58,12 @@ export function reduceBestPerProblem(
       for (const row of group) {
         if (
           row.score > best.score ||
-          (row.score === best.score && row.createdAt < best.createdAt)
+          (row.score === best.score && row.acceptedAt < best.acceptedAt)
         ) {
           best = row
         }
       }
-      perKey.set(key, { score: best.score, attempts: group.length, achievedAt: best.createdAt })
+      perKey.set(key, { score: best.score, attempts: group.length, achievedAt: best.acceptedAt })
     }
     result.set(teamId, perKey)
   }
@@ -141,6 +141,10 @@ export function rankTeams(teams: RankInput[]): RankedTeam[] {
 // derivation by time window silently dropped any submission whose judging
 // outlived the round it was accepted in — the row's createdAt landed past
 // closedAt and fell out of every ranking.
+//
+// The tiebreak itself reads accepted_at, not created_at (#238): the latter
+// is stamped at INSERT time and would otherwise fold a slow judge's duration
+// into a team's tiebreak time.
 
 async function fetchTeams(db: Db): Promise<{ id: string; name: string }[]> {
   return db
@@ -170,7 +174,7 @@ async function fetchSubmissionRows(
       teamId: submissionsTable.teamId,
       problemId: submissionsTable.problemId,
       score: submissionsTable.score,
-      createdAt: submissionsTable.createdAt,
+      acceptedAt: submissionsTable.acceptedAt,
     })
     .from(submissionsTable)
     .where(
@@ -181,7 +185,7 @@ async function fetchSubmissionRows(
     teamId: row.teamId,
     key: row.problemId,
     score: row.score,
-    createdAt: row.createdAt,
+    acceptedAt: row.acceptedAt,
   }))
 }
 

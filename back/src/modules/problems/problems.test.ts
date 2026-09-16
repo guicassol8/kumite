@@ -571,7 +571,10 @@ describe('problems.service', () => {
         caseResults: [],
         score: 80,
         attemptNumber: 1,
-        createdAt: achievedAt,
+        acceptedAt: achievedAt,
+        // Deliberately different from acceptedAt: proves bestSubmission reads
+        // acceptedAt, not the INSERT timestamp (#238).
+        createdAt: new Date('2026-08-31T13:00:00.000Z'),
       })
 
       const problem = await getPublishedProblem(db, id, 'pt', user.id)

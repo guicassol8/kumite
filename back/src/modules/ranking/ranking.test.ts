@@ -35,9 +35,9 @@ describe('reduceBestPerProblem', () => {
 
   it('picks the highest score and counts every attempt', () => {
     const rows: ScoringRow[] = [
-      { teamId: 'team-a', key: 'p1', score: 20, createdAt: new Date('2026-09-01T10:00:00Z') },
-      { teamId: 'team-a', key: 'p1', score: 80, createdAt: new Date('2026-09-01T10:05:00Z') },
-      { teamId: 'team-a', key: 'p1', score: 50, createdAt: new Date('2026-09-01T10:10:00Z') },
+      { teamId: 'team-a', key: 'p1', score: 20, acceptedAt: new Date('2026-09-01T10:00:00Z') },
+      { teamId: 'team-a', key: 'p1', score: 80, acceptedAt: new Date('2026-09-01T10:05:00Z') },
+      { teamId: 'team-a', key: 'p1', score: 50, acceptedAt: new Date('2026-09-01T10:10:00Z') },
     ]
 
     expect(reduceBestPerProblem(rows, ['team-a'], ['p1']).get('team-a')?.get('p1')).toEqual({
@@ -50,8 +50,8 @@ describe('reduceBestPerProblem', () => {
   it('resolves a tied best score to the earliest submission', () => {
     const earliest = new Date('2026-09-01T10:00:00Z')
     const rows: ScoringRow[] = [
-      { teamId: 'team-a', key: 'p1', score: 80, createdAt: earliest },
-      { teamId: 'team-a', key: 'p1', score: 80, createdAt: new Date('2026-09-01T10:05:00Z') },
+      { teamId: 'team-a', key: 'p1', score: 80, acceptedAt: earliest },
+      { teamId: 'team-a', key: 'p1', score: 80, acceptedAt: new Date('2026-09-01T10:05:00Z') },
     ]
 
     expect(reduceBestPerProblem(rows, ['team-a'], ['p1']).get('team-a')?.get('p1')).toEqual({
@@ -63,8 +63,8 @@ describe('reduceBestPerProblem', () => {
 
   it('keeps teams and keys independent', () => {
     const rows: ScoringRow[] = [
-      { teamId: 'team-a', key: 'p1', score: 90, createdAt: new Date('2026-09-01T10:00:00Z') },
-      { teamId: 'team-b', key: 'p2', score: 40, createdAt: new Date('2026-09-01T10:00:00Z') },
+      { teamId: 'team-a', key: 'p1', score: 90, acceptedAt: new Date('2026-09-01T10:00:00Z') },
+      { teamId: 'team-b', key: 'p2', score: 40, acceptedAt: new Date('2026-09-01T10:00:00Z') },
     ]
 
     const result = reduceBestPerProblem(rows, ['team-a', 'team-b'], ['p1', 'p2'])
@@ -253,6 +253,7 @@ async function submit(
     caseResults: [],
     score,
     attemptNumber: options.attemptNumber ?? 1,
+    acceptedAt: new Date(),
   })
 }
 

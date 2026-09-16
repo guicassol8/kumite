@@ -4,7 +4,7 @@ import { defineRoute } from '../../context'
 import { requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
 import type { SseEvent } from './sse.schema'
-import { buildRankingUpdatedEvent, buildStateSyncEvent } from './sse.service'
+import { buildRankingUpdatedEvent, buildStateSyncEvent, isUserStillActive } from './sse.service'
 
 // 401 (requireUser) short-circuits before output validation runs (kata
 // ADR-0011), same as every other guarded route — not declared here.
@@ -25,6 +25,7 @@ export const sseRoute = defineRoute({
   input: {},
   output: {},
   handler: async (c) => {
+    const currentUser = c.get('currentUser')
     return streamSSE(c.raw, async (stream) => {
       const write = (event: SseEvent) =>
         stream.writeSSE({ event: event.type, data: JSON.stringify(event) })
@@ -38,12 +39,27 @@ export const sseRoute = defineRoute({
       // (front/src/hooks/use-event-stream.ts).
       let buffering = true
       const pending: SseEvent[] = []
+      // Set once the stream reaches its final `await new Promise` below;
+      // calling it ends the handler the same way `stream.onAbort` already
+      // does, just triggered by a deactivation instead of a client hangup.
+      let closeStream: (() => void) | undefined
       const unsubscribe = c.get('sseBus').subscribe((event) => {
         if (buffering) {
           pending.push(event)
           return
         }
         void write(event)
+
+        // #232: the only recurring point on an otherwise connect-once stream
+        // — piggyback the deactivation recheck on it so a banned account's
+        // stream closes without waiting for a client-side reconnect.
+        if (event.type === 'heartbeat') {
+          void isUserStillActive(c.get('db'), currentUser.id).then((stillActive) => {
+            if (stillActive) return
+            unsubscribe()
+            closeStream?.()
+          })
+        }
       })
 
       try {
@@ -71,6 +87,7 @@ export const sseRoute = defineRoute({
       }
 
       await new Promise<void>((resolve) => {
+        closeStream = resolve
         stream.onAbort(() => {
           unsubscribe()
           resolve()

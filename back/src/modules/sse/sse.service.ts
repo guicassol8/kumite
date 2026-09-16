@@ -8,6 +8,7 @@ import {
   reapExpiredRound,
 } from '../rounds/rounds.service'
 import { hasJudgingInFlight } from '../submissions/submissions.service'
+import { findUserById } from '../users/users.service'
 
 import type { RankingUpdatedEvent, SseEvent, StateSyncEvent } from './sse.schema'
 
@@ -108,6 +109,23 @@ export async function runExpiryTick(db: Db, bus: SseBus): Promise<void> {
     console.error('sse expiry tick failed', error)
   }
   bus.publish({ type: 'heartbeat', serverTime: new Date() })
+}
+
+// #232: a connection's own auth only runs once, at connect — nothing
+// reauthenticates it while the stream lives. Reuses the heartbeat tick
+// (already the stream's only recurring hook) to catch a deactivation that
+// happens mid-stream, the same way every other route does per request since
+// #174. Fails open on a DB error, same rule as runExpiryTick/runRankingTick
+// below: a transient blip must not drop a live connection, and a sustained
+// outage already takes every other route down with it.
+export async function isUserStillActive(db: Db, userId: string): Promise<boolean> {
+  try {
+    const user = await findUserById(db, userId)
+    return user !== null && user.active
+  } catch (error) {
+    console.error('sse user revalidation failed', error)
+    return true
+  }
 }
 
 // --- Ranking debounce (#44) ---

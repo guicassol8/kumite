@@ -1,5 +1,5 @@
 import { signJwt } from '@katajs-framework/core/jwt'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { app } from '../../app'
@@ -41,6 +41,7 @@ import {
   buildRankingUpdatedEvent,
   buildStateSyncEvent,
   createSseBus,
+  isUserStillActive,
   markRankingDirty,
   publishRoundClosed,
   publishRoundExtended,
@@ -535,6 +536,54 @@ describe('sse.service', () => {
         await expect(runRankingTick(failingDb, bus)).resolves.toBeUndefined()
       })
     })
+
+    describe('isUserStillActive', () => {
+      it('is true for an active user', async () => {
+        const [user] = await db
+          .insert(usersTable)
+          .values({
+            email: `sse-active-${crypto.randomUUID()}@example.com`,
+            passwordHash: 'hash',
+            role: 'participant',
+            university: 'pucrs',
+          })
+          .returning()
+        if (!user) throw new Error('expected fixture')
+
+        await expect(isUserStillActive(db, user.id)).resolves.toBe(true)
+      })
+
+      it('is false for a deactivated user', async () => {
+        const [user] = await db
+          .insert(usersTable)
+          .values({
+            email: `sse-inactive-${crypto.randomUUID()}@example.com`,
+            passwordHash: 'hash',
+            role: 'participant',
+            university: 'pucrs',
+            active: false,
+          })
+          .returning()
+        if (!user) throw new Error('expected fixture')
+
+        await expect(isUserStillActive(db, user.id)).resolves.toBe(false)
+      })
+
+      it('is false for a missing user', async () => {
+        await expect(isUserStillActive(db, crypto.randomUUID())).resolves.toBe(false)
+      })
+
+      it('does not throw when the db rejects, resolving true instead', async () => {
+        const failingDb = {
+          ...db,
+          select: () => {
+            throw new Error('db is down')
+          },
+        } as unknown as typeof db
+
+        await expect(isUserStillActive(failingDb, crypto.randomUUID())).resolves.toBe(true)
+      })
+    })
   })
 })
 
@@ -684,5 +733,40 @@ describe('GET /sse', () => {
     })
 
     await frames.cancel()
+  })
+
+  it('closes the stream after a deactivation, but only once the next heartbeat runs the check', async () => {
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email: `sse-${crypto.randomUUID()}@example.com`,
+        passwordHash: 'hash',
+        role: 'participant',
+        university: 'pucrs',
+      })
+      .returning()
+    if (!user) throw new Error('expected fixture')
+    const token = await tokenFor(user)
+
+    const res = await app.request('/sse', { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.body) throw new Error('expected a streamed body')
+    const frames = createFrameReader(res.body)
+
+    expect(await frames.next()).toContain('event: state.sync')
+    expect(await frames.next()).toContain('event: ranking.updated')
+
+    await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, user.id))
+
+    // Same tick given to the happy-path test above: the handler's bus
+    // subscription runs after `writeSSE`'s promise resolves.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    k.resolve('sseBus').publish({ type: 'heartbeat', serverTime: new Date() })
+
+    // The heartbeat that triggers the recheck is still the last thing a
+    // deactivated user sees — the stream closes only once the recheck
+    // resolves, one tick after this frame is delivered.
+    expect(await frames.next()).toContain('event: heartbeat')
+
+    await expect(frames.next()).rejects.toThrow('stream closed before a full SSE frame arrived')
   })
 })

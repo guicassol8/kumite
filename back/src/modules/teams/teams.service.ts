@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import postgres from 'postgres'
 
 import type { Db } from '../../db/client'
@@ -80,7 +80,11 @@ export async function listTeams(db: Db, viewerId: string): Promise<TeamsList> {
   }
 
   for (const team of teams.values()) {
-    team.slotsAvailable = config.maxTeamSize - team.members.length
+    // Clamped (achado #38): a team can end up over `maxTeamSize` after the
+    // organizer lowers it post-formation, and stats.service.ts's countTeams
+    // already floors the same subtraction at 0 — this keeps both endpoints
+    // agreeing instead of one going negative.
+    team.slotsAvailable = Math.max(0, config.maxTeamSize - team.members.length)
     team.joinBlockedReason = resolveJoinBlockedReason(
       team.members,
       { university: viewer.university, hasTeam: myTeamId !== null },
@@ -145,7 +149,8 @@ export async function listOrganizerTeams(db: Db): Promise<OrganizerTeamsList> {
   }
 
   for (const team of teams.values()) {
-    team.slotsAvailable = config.maxTeamSize - team.members.length
+    // Clamped (achado #38) — see the same comment in listTeams above.
+    team.slotsAvailable = Math.max(0, config.maxTeamSize - team.members.length)
   }
 
   return { maxTeamSize: config.maxTeamSize, teams: [...teams.values()] }
@@ -166,12 +171,17 @@ export async function createTeam(db: Db, userId: string, name: string): Promise<
   // No target: the only unique constraint on `teams` is the lower(name)
   // index this insert itself would hit — same onConflictDoNothing shape as
   // createUser (users.service.ts).
-  const [team] = await db.insert(teamsTable).values({ name }).onConflictDoNothing().returning()
-  if (!team) return { ok: false, error: 'name_taken' }
+  // Transactional (achado #31): a failed member insert used to leave a
+  // memberless team row committed, permanently hoarding its name under
+  // teams_lower_name_idx. Wrapping both inserts rolls the team back too.
+  return db.transaction(async (tx) => {
+    const [team] = await tx.insert(teamsTable).values({ name }).onConflictDoNothing().returning()
+    if (!team) return { ok: false, error: 'name_taken' }
 
-  await db.insert(teamMembersTable).values({ userId, teamId: team.id })
+    await tx.insert(teamMembersTable).values({ userId, teamId: team.id })
 
-  return { ok: true, team }
+    return { ok: true, team }
+  })
 }
 
 export type JoinTeamResult =
@@ -191,25 +201,36 @@ export async function joinTeam(db: Db, userId: string, teamId: string): Promise<
   const [team] = await db.select().from(teamsTable).where(eq(teamsTable.id, teamId))
   if (!team) return { ok: false, error: 'not_found' }
 
-  const [members, { mixingLocked, maxTeamSize }, [joiningUser]] = await Promise.all([
-    db
-      .select({ university: usersTable.university })
-      .from(teamMembersTable)
-      .innerJoin(usersTable, eq(usersTable.id, teamMembersTable.userId))
-      .where(eq(teamMembersTable.teamId, teamId)),
+  const [{ mixingLocked, maxTeamSize }, [joiningUser]] = await Promise.all([
     getEventConfig(db),
     db.select().from(usersTable).where(eq(usersTable.id, userId)),
   ])
   if (!joiningUser) throw new Error('expected joining user to exist')
 
-  if (members.length >= maxTeamSize) return { ok: false, error: 'team_full' }
-  if (mixingLocked && members.some((member) => member.university !== joiningUser.university)) {
-    return { ok: false, error: 'mixed_lock_violation' }
-  }
+  // Transactional + advisory-locked (achado #22): the capacity check and the
+  // insert used to run as separate read-then-write statements, so two joiners
+  // could both pass the check before either had inserted. The lock is scoped
+  // to this team's id, so it only ever serializes joiners racing each other,
+  // never unrelated teams — same idiom as password-reset.service.ts.
+  return db.transaction(async (tx) => {
+    const lockKey = `team-join:${teamId}`
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}::text))`)
 
-  await db.insert(teamMembersTable).values({ userId, teamId })
+    const members = await tx
+      .select({ university: usersTable.university })
+      .from(teamMembersTable)
+      .innerJoin(usersTable, eq(usersTable.id, teamMembersTable.userId))
+      .where(eq(teamMembersTable.teamId, teamId))
 
-  return { ok: true, team }
+    if (members.length >= maxTeamSize) return { ok: false, error: 'team_full' }
+    if (mixingLocked && members.some((member) => member.university !== joiningUser.university)) {
+      return { ok: false, error: 'mixed_lock_violation' }
+    }
+
+    await tx.insert(teamMembersTable).values({ userId, teamId })
+
+    return { ok: true, team }
+  })
 }
 
 export type LeaveTeamResult =

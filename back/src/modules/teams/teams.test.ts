@@ -12,6 +12,7 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
+import { updateEventConfig } from '../event-config/event-config.service'
 import type { University } from '../users/users.schema'
 
 import {
@@ -178,6 +179,25 @@ describe('createTeam', () => {
 
     expect(result).toEqual({ ok: false, error: 'name_taken' })
   })
+
+  // Achado #31: createTeam did the team insert and the member insert as two
+  // separate statements, so a real failure of the second one (here, the
+  // membership FK rejecting a nonexistent user) still left the team row
+  // committed — memberless and permanently hoarding the name.
+  it('rolls back the team insert when the membership insert fails', async () => {
+    const bogusUserId = '00000000-0000-0000-0000-000000000000'
+
+    await expect(createTeam(db, bogusUserId, 'Blockly Busters')).rejects.toThrow()
+
+    const [orphan] = await db
+      .select()
+      .from(teamsTable)
+      .where(eq(teamsTable.name, 'Blockly Busters'))
+    expect(orphan).toBeUndefined()
+    const realCreator = await insertUser()
+    const result = await createTeam(db, realCreator.id, 'Blockly Busters')
+    expect(result).toMatchObject({ ok: true, team: { name: 'Blockly Busters' } })
+  })
 })
 
 describe('joinTeam', () => {
@@ -264,6 +284,32 @@ describe('joinTeam', () => {
     const result = await joinTeam(db, joiner.id, created.team.id)
 
     expect(result.ok).toBe(true)
+  })
+
+  // Achado #22: read-then-insert with no transaction or lock let two joiners
+  // both read `members.length < maxTeamSize` before either had inserted,
+  // overbooking the team past its cap. Mirrors the `Promise.all` burst pattern
+  // in password-reset.test.ts for the same class of TOCTOU bug.
+  it('admits exactly one joiner in a race for the last slot', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 2 })
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    const joinerA = await insertUser()
+    const joinerB = await insertUser()
+
+    const results = await Promise.all([
+      joinTeam(db, joinerA.id, created.team.id),
+      joinTeam(db, joinerB.id, created.team.id),
+    ])
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toEqual([{ ok: false, error: 'team_full' }])
+    const members = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.teamId, created.team.id))
+    expect(members).toHaveLength(2)
   })
 })
 
@@ -786,6 +832,23 @@ describe('listTeams', () => {
 
     expect(result.teams[0]?.joinBlockedReason).toBeNull()
   })
+
+  // Achado #38: lowering maxTeamSize after a team already formed (reachable
+  // via PATCH /organizer/event-config) left slotsAvailable negative instead
+  // of clamped, disagreeing with stats.service.ts's countTeams.
+  it('clamps slotsAvailable at zero for a team over the new max size', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 3 })
+    const creator = await insertUser()
+    const joiner = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await joinTeam(db, joiner.id, created.team.id)
+    await updateEventConfig(db, { maxTeamSize: 1 })
+
+    const result = await listTeams(db, creator.id)
+
+    expect(result.teams[0]?.slotsAvailable).toBe(0)
+  })
 })
 
 describe('listOrganizerTeams', () => {
@@ -879,5 +942,20 @@ describe('listOrganizerTeams', () => {
     const result = await listOrganizerTeams(db)
 
     expect(result.teams[0]?.frozen).toBe(true)
+  })
+
+  // Achado #38 — see the same test in the listTeams describe block above.
+  it('clamps slotsAvailable at zero for a team over the new max size', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 3 })
+    const creator = await insertUser()
+    const joiner = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    await joinTeam(db, joiner.id, created.team.id)
+    await updateEventConfig(db, { maxTeamSize: 1 })
+
+    const result = await listOrganizerTeams(db)
+
+    expect(result.teams[0]?.slotsAvailable).toBe(0)
   })
 })

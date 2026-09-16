@@ -171,6 +171,17 @@ for (const theme of ['light', 'dark']) {
     const toggle = page.getByTestId('login-password-input-toggle')
     await expect(toggle).toBeFocused()
     expect(await toggle.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none')
+    const focus = await toggle.evaluate((element) => {
+      const style = getComputedStyle(element)
+      const probe = document.createElement('span')
+      probe.style.color = 'var(--ring)'
+      document.body.append(probe)
+      const ring = getComputedStyle(probe).color
+      probe.remove()
+      return { borderWidth: style.borderTopWidth, borderColor: style.borderTopColor, ring }
+    })
+    expect(focus.borderWidth).toBe('1px')
+    expect(focus.borderColor).toBe(focus.ring)
     await page.screenshot({ path: evidence(`${theme}-password-focus`), fullPage: true })
     await page.getByTestId('login-email-input').fill(`unknown-${Date.now()}@edu.pucrs.br`)
     await page.getByTestId('login-password-input').fill('wrong-password')

@@ -127,6 +127,27 @@
       "when": 1789095418286,
       "tag": "0017_silly_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789517016963,
+      "tag": "0018_quick_rawhide_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789517028754,
+      "tag": "0019_backfill_submissions_accepted_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789517097963,
+      "tag": "0020_unusual_alice",
+      "breakpoints": true
     }
   ]
 }

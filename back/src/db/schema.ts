@@ -267,6 +267,10 @@ export const submissionsTable = pgTable(
     caseResults: jsonb('case_results').notNull().default([]).$type<SubmissionCaseResult[]>(),
     score: integer('score').notNull(),
     attemptNumber: integer('attempt_number').notNull(),
+    // When the submission passed the accept gate (isProblemInOpenRound),
+    // stamped before codegen/judging — unlike createdAt, which is the INSERT
+    // time and therefore includes however long the judge took (#238).
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -283,7 +287,7 @@ export const submissionsTable = pgTable(
       table.teamId,
       table.problemId,
       desc(table.score),
-      asc(table.createdAt),
+      asc(table.acceptedAt),
     ),
     // Serves the round-scoped reads (#176): the ranking's per-round fetch and
     // the per-round best-score lookups behind the problem page.

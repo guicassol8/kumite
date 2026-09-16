@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { CircleAlert } from 'lucide-react'
 import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
-
+import { AuthLayout } from '@/components/auth-layout'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Form,
   FormControl,
@@ -50,7 +50,7 @@ function useSignupSchema() {
             .max(80, t('auth.signup.errors.nameTooLong')),
           email: z.string().email(t('auth.signup.errors.emailInvalid')),
           password: z.string().min(8, t('auth.signup.errors.passwordTooShort')),
-          confirmPassword: z.string(),
+          confirmPassword: z.string().min(1, t('auth.signup.errors.confirmPasswordRequired')),
           code: z.string().min(1, t('auth.signup.errors.codeRequired')),
         })
         .refine((data) => data.password === data.confirmPassword, {
@@ -144,95 +144,112 @@ function SignupScreen() {
   const rootError = form.formState.errors.root?.message
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center p-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('auth.signup.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('auth.signup.nameLabel')}</FormLabel>
-                    <FormControl>
-                      <Input data-testid="signup-name-input" {...field} />
-                    </FormControl>
-                    <FormMessage data-testid="signup-name-error" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('auth.signup.emailLabel')}</FormLabel>
-                    <FormControl>
-                      <Input type="email" data-testid="signup-email-input" {...field} />
-                    </FormControl>
-                    <FormMessage data-testid="signup-email-error" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('auth.signup.passwordLabel')}</FormLabel>
-                    <FormControl>
-                      <PasswordInput data-testid="signup-password-input" {...field} />
-                    </FormControl>
-                    <FormMessage data-testid="signup-password-error" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('auth.signup.confirmPasswordLabel')}</FormLabel>
-                    <FormControl>
-                      <PasswordInput data-testid="signup-confirm-password-input" {...field} />
-                    </FormControl>
-                    <FormMessage data-testid="signup-confirm-password-error" />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="code"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t('auth.signup.codeLabel')}</FormLabel>
-                    <FormControl>
-                      <Input data-testid="signup-code-input" {...field} />
-                    </FormControl>
-                    <FormMessage data-testid="signup-code-error" />
-                  </FormItem>
-                )}
-              />
-              {rootError && (
-                <Alert variant="destructive" data-testid="signup-form-error">
-                  <AlertDescription>{rootError}</AlertDescription>
-                </Alert>
-              )}
-              <Button
-                type="submit"
-                data-testid="signup-submit-button"
-                disabled={form.formState.isSubmitting}
-              >
-                {t('auth.signup.submitButton')}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </main>
+    <AuthLayout
+      title={t('auth.signup.title')}
+      navigation={
+        <span className="text-muted-foreground">
+          {t('auth.signup.hasAccount')}{' '}
+          <Link
+            to="/login"
+            search={{ redirect: search.redirect }}
+            data-testid="signup-login-link"
+            className="text-foreground underline-offset-4 hover:underline focus-visible:outline-ring"
+          >
+            {t('auth.signup.loginLink')}
+          </Link>
+        </span>
+      }
+    >
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('auth.signup.nameLabel')}</FormLabel>
+                <FormControl>
+                  <Input data-testid="signup-name-input" {...field} />
+                </FormControl>
+                <FormMessage data-testid="signup-name-error" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('auth.signup.emailLabel')}</FormLabel>
+                <FormControl>
+                  <Input type="email" data-testid="signup-email-input" {...field} />
+                </FormControl>
+                <FormMessage data-testid="signup-email-error" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('auth.signup.passwordLabel')}</FormLabel>
+                <FormControl>
+                  <PasswordInput data-testid="signup-password-input" {...field} />
+                </FormControl>
+                <FormMessage data-testid="signup-password-error" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('auth.signup.confirmPasswordLabel')}</FormLabel>
+                <FormControl>
+                  <PasswordInput data-testid="signup-confirm-password-input" {...field} />
+                </FormControl>
+                <FormMessage data-testid="signup-confirm-password-error" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="code"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('auth.signup.codeLabel')}</FormLabel>
+                <FormControl>
+                  <Input
+                    className="font-mono tracking-widest"
+                    data-testid="signup-code-input"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage data-testid="signup-code-error" />
+              </FormItem>
+            )}
+          />
+          {rootError && (
+            <Alert
+              variant="destructive"
+              className="border-destructive"
+              data-testid="signup-form-error"
+            >
+              <CircleAlert aria-hidden="true" />
+              <AlertDescription>{rootError}</AlertDescription>
+            </Alert>
+          )}
+          <Button
+            type="submit"
+            data-testid="signup-submit-button"
+            disabled={form.formState.isSubmitting}
+          >
+            {t('auth.signup.submitButton')}
+          </Button>
+        </form>
+      </Form>
+    </AuthLayout>
   )
 }

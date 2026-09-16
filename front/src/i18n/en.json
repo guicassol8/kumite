@@ -641,11 +641,14 @@
         "invalidDomain": "This email doesn't belong to the code's university",
         "emailInUse": "This email is already registered",
         "invalidField": "Invalid value",
-        "unexpected": "Couldn't complete signup. Please try again."
-      }
+        "unexpected": "Couldn't complete signup. Please try again.",
+        "confirmPasswordRequired": "Confirm your password."
+      },
+      "hasAccount": "Already have an account?",
+      "loginLink": "Sign in"
     },
     "login": {
-      "title": "Log in",
+      "title": "Sign in",
       "emailLabel": "Email",
       "passwordLabel": "Password",
       "submitButton": "Log in",
@@ -657,6 +660,16 @@
       },
       "notices": {
         "expired": "Your session expired. Please sign in again."
+      },
+      "description": "Use the email registered with the event code.",
+      "noAccount": "No account?",
+      "signupLink": "Sign up",
+      "poster": {
+        "pucrs": "PUCRS",
+        "merida": "Mérida",
+        "title": "Block programming",
+        "support": "Build your solution with blocks, submit it and follow the live leaderboard.",
+        "event": "Online event · 2026"
       }
     },
     "resetPassword": {

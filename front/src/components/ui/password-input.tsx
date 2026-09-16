@@ -26,7 +26,7 @@ export function PasswordInput({ className, 'data-testid': testId, ...props }: Pa
         type="button"
         data-testid={`${testId}-toggle`}
         aria-label={t(visible ? 'auth.passwordToggle.hide' : 'auth.passwordToggle.show')}
-        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+        className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground rounded-md outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         onClick={() => setVisible((current) => !current)}
       >
         {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}

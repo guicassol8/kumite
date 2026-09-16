@@ -199,3 +199,25 @@ describe('LoginScreen expired-session notice (#179)', () => {
     })
   })
 })
+
+describe('Login identity navigation', () => {
+  it('preserves the destination in the signup link', async () => {
+    renderLogin('/login?redirect=%2Fteams')
+    const link = await screen.findByTestId('login-signup-link')
+    expect(link.getAttribute('href')).toBe('/signup?redirect=%2Fteams')
+  })
+
+  it('routes temporary passwords to the required change screen', async () => {
+    mockedLogin.mockResolvedValue(jsonResponse(200, { token: 'tok-1' }))
+    mockedMe.mockResolvedValue(jsonResponse(200, { ...fakeUser, mustChangePassword: true }))
+    const router = renderLogin('/login?redirect=%2Fteams')
+    fireEvent.change(await screen.findByTestId('login-email-input'), {
+      target: { value: 'ada@edu.pucrs.br' },
+    })
+    fireEvent.change(screen.getByTestId('login-password-input'), {
+      target: { value: 'temporary-password' },
+    })
+    fireEvent.click(screen.getByTestId('login-submit-button'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/change-password'))
+  })
+})

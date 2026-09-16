@@ -641,11 +641,14 @@
         "invalidDomain": "Ese correo no pertenece a la universidad del código ingresado",
         "emailInUse": "Ese correo ya está registrado",
         "invalidField": "Valor inválido",
-        "unexpected": "No se pudo completar el registro. Intenta de nuevo."
-      }
+        "unexpected": "No se pudo completar el registro. Intenta de nuevo.",
+        "confirmPasswordRequired": "Confirma tu contraseña."
+      },
+      "hasAccount": "¿Ya tienes cuenta?",
+      "loginLink": "Entrar"
     },
     "login": {
-      "title": "Iniciar sesión",
+      "title": "Entrar",
       "emailLabel": "Correo electrónico",
       "passwordLabel": "Contraseña",
       "submitButton": "Entrar",
@@ -657,6 +660,16 @@
       },
       "notices": {
         "expired": "Tu sesión expiró. Inicia sesión de nuevo."
+      },
+      "description": "Usa el correo registrado con el código del evento.",
+      "noAccount": "¿Sin cuenta?",
+      "signupLink": "Registrarse",
+      "poster": {
+        "pucrs": "PUCRS",
+        "merida": "Mérida",
+        "title": "Programación en bloques",
+        "support": "Construye la solución con bloques, envíala y sigue la clasificación en vivo.",
+        "event": "Evento en línea · 2026"
       }
     },
     "resetPassword": {

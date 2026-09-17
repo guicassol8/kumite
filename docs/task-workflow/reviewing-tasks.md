@@ -111,7 +111,11 @@ explicitly, don't fix it partially.
 
 **Back-touching PRs:**
 1. `pnpm -r test` — paste trimmed output.
-2. Server up (`pnpm dev:back`) → `pnpm --filter @kumite/back hurl` — paste
+2. `pnpm --filter @kumite/back db:reset` — the hurl suite is not re-runnable
+   on a dirty database (it asserts on seed state, and vitest leaves rounds,
+   teams and `event_config` behind). The script refuses any non-local
+   `DATABASE_URL`, so it is safe to run without checking first.
+3. Server up (`pnpm dev:back`) → `pnpm --filter @kumite/back hurl` — paste
    trimmed output.
 
 No evidence = the review is NOT done. Say exactly that rather than approving.

@@ -93,17 +93,19 @@ describe('seed', () => {
     }
   })
 
-  it('resets a mutated event_config row back to the defaults', async () => {
-    // Exactly the state the vitest suite leaves behind: the singleton row
-    // exists and holds whatever the last test wrote to it.
+  it('preserves an event_config row the organizer already changed (#287)', async () => {
+    // What production looks like after the organizer locked mixing and
+    // resized teams: deploy.yml runs this seed on every release, and until
+    // #287 it reset the row to the defaults. The suites' "known state" comes
+    // from db/reset.ts now, never from here.
     await db.insert(eventConfigTable).values({ id: 1, mixingLocked: true, maxTeamSize: 6 })
 
     await seed(db)
 
     const eventConfig = await db.select().from(eventConfigTable)
     expect(eventConfig).toHaveLength(1)
-    expect(eventConfig[0]?.mixingLocked).toBe(false)
-    expect(eventConfig[0]?.maxTeamSize).toBe(3)
+    expect(eventConfig[0]?.mixingLocked).toBe(true)
+    expect(eventConfig[0]?.maxTeamSize).toBe(6)
   })
 
   it('stays idempotent when run twice', async () => {

@@ -211,19 +211,14 @@ export async function seed(db: Db): Promise<void> {
     ])
     .onConflictDoNothing()
 
-  // Reset, not additive: the singleton event_config row is event-wide mutable
-  // state that the vitest suite and the hurl files leave dirty, so seeding is
-  // the point where it comes back to a known state. `onConflictDoNothing()`
-  // would preserve whatever ran last, which is what #161 fixed.
-  // Keep these values in sync with the `.default()`s on `eventConfigTable`.
-  const eventConfigDefaults = { mixingLocked: false, maxTeamSize: 3 }
-  await db
-    .insert(eventConfigTable)
-    .values({ id: 1, ...eventConfigDefaults })
-    .onConflictDoUpdate({
-      target: eventConfigTable.id,
-      set: { ...eventConfigDefaults, updatedAt: new Date() },
-    })
+  // Insert-if-missing, like everything else in this seed (#287). deploy.yml
+  // runs db:seed on every production deploy, so the seed must never overwrite
+  // the organizer's configuration: #161 made this an upsert-with-reset to give
+  // the test suites a known state, and that reset silently undid mixingLocked
+  // / maxTeamSize on every release. The reset now lives in db/reset.ts
+  // (`pnpm db:reset`), which truncates first and then calls this seed — the
+  // suites get their clean state from there, production keeps its row.
+  await db.insert(eventConfigTable).values({ id: 1 }).onConflictDoNothing()
 
   await seedProblems(db)
 }

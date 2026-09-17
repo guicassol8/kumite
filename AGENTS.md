@@ -62,22 +62,27 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
 
 ## Kata framework feedback
 
-Whenever a kumite task touches the **kata framework** itself (not kumite
-code) — the `kata-docs` MCP server, `kata verify`, hurl, the DI/JWT/error
-surfaces, anything under `~/Projetos/kata` — attempt a report in
-`kata-feedback/` at the repo root (format in `kata-feedback/README.md`).
-This is not gated on finding something wrong: a plain observation, a
-"this was smooth," or a metrics-only entry all count as useful signal — a
-suggested fix is optional, never required. Do this instead of silently
-moving on, and instead of expanding the current task's scope to fix kata
-itself.
+When a kumite task **genuinely touches the kata framework** (not kumite
+code) — a `defineRoute`/`defineMiddleware`/DI surface, the JWT or error
+envelopes, a `kata verify` rule, the hurl conventions, `hc<AppType>` typing,
+anything under `~/Projetos/kata` — and you learned something or hit
+friction, write a report in `kata-feedback/` at the repo root (format and
+the full rule in `kata-feedback/README.md`). A suggested fix is optional.
+Never expand the current task's scope to fix kata itself.
 
-Where you have the numbers, include them: tokens/context spent on
-kata-docs round-trips (searches + doc reads) versus the task's total, and
-whether that lookup actually paid for itself versus guessing; turn-count or
-latency friction (a slow `kata verify`, a doc dead end, a lint rule that
-false-positived); and whether the kata-docs MCP or harness genuinely helped
-this task or just added overhead.
+When kata was **out of frame** (front-only, docs-only, a task where `kata
+verify` merely ran and passed), do **not** write a report: append one line
+to `kata-feedback/LEDGER.csv` instead. The old "attempt a report every
+time" rule produced a hundred near-identical files (`kata-feedback/v2/`).
+
+The `kata-docs` MCP server (`.mcp.json`) is optional: use it when it is
+enabled in your session, otherwise read `~/Projetos/kata/docs` and the
+bundled `.d.ts` directly. Its absence is not a finding and needs no
+explanation.
+
+Where you have the numbers, include them in the report or the ledger:
+docs lookups made and whether they paid for themselves, `kata verify` runs
+and real findings, turns lost to kata friction.
 
 This is separate from "Discovered work" (`docs/workflow.md`): that flow
 opens a kumite GitHub issue for kumite-scoped work; kata feedback is not

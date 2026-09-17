@@ -63,9 +63,8 @@ Review the diff only (not the whole repo) for:
 - correctness and error paths;
 - kata idioms in back (schemas in `.schema.ts`, `c.error(...)` for errors,
   services pure — `kata verify` catches most, look for what it can't).
-  Consult the kata-docs MCP server first for any of these idioms you're
-  unsure about, falling back to reading `~/Projetos/kata` directly if it's
-  unavailable or fails;
+  For an idiom you're unsure about, read `~/Projetos/kata/docs` (or the
+  kata-docs MCP server when it is enabled in this session);
 - AI-regression smells: unrelated deletions, ghost imports, weakened
   assertions, swallowed errors, `any`;
 - test quality (asserting behavior, not implementation) and i18n catalog parity.
@@ -105,7 +104,11 @@ explicitly, don't fix it partially.
 2. Drive every changed flow via a Playwright spec in `front/e2e/`
    (extend or add one), asserting through `data-testid`.
 3. Screenshot each meaningful final state to
-   `front/e2e/evidence/<issue>/<nn>-<state>.png` and commit them on the PR branch.
+   `front/e2e/evidence/<issue>/<nn>-<state>.png`. Specs of *other* issues
+   rewrite their own folders on every run, so before committing run
+   `pnpm evidence:restore <issue>` (restores everything outside this
+   issue's folder) and stage only `git add front/e2e/evidence/<issue>` —
+   never `git add -A` here.
 4. Write the walkthrough in the PR's `## Evidence`: step → expected → screenshot
    path, in order.
 
@@ -123,18 +126,22 @@ No evidence = the review is NOT done. Say exactly that rather than approving.
   user's explicit go-ahead: `gh pr merge --squash --delete-branch`. The PR
   targets `develop`, not the repo's default branch, so `Fixes #N` does
   **not** auto-close the issue — close it explicitly:
-  `gh issue close <N> --reason completed`.
+  `gh issue close <N> --reason completed`. Then, from the main checkout,
+  `pnpm worktree:prune` removes the merged branch's worktree and its
+  Postgres (and any other merged, clean one left behind).
 - **Request changes**: only for a finding left unfixed per § Fixing
   findings (needs a fresh plan, or the user chose not to fix it now) —
   precise, file-level items on the PR.
 
-## Kata feedback (attempt every time)
+## Kata feedback (only when kata was in frame)
 
-Stage 2 reads the diff for kata idioms — attempt a `kata-feedback/` entry
-before the handoff, not gated on finding a violation. A PR that used kata
-cleanly, or a lint rule that caught (or missed) something real, is still
-signal. See `AGENTS.md` § Kata framework feedback and
-`kata-feedback/README.md` for the format.
+Stage 2 reads the diff for kata idioms. If a kata surface was part of the
+review — a lint rule that caught or missed something real, an idiom you had
+to look up, a hurl or `hc` constraint that shaped a fix — write a
+`kata-feedback/` entry before the handoff. A front-only or docs-only PR
+where verify merely ran green gets one line in `kata-feedback/LEDGER.csv`
+instead. Rule and format: `AGENTS.md` § Kata framework feedback,
+`kata-feedback/README.md`.
 
 ## Handoff (MANDATORY)
 

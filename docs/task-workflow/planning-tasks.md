@@ -8,6 +8,13 @@ task).
 
 ## Step 1 — Absorb
 
+- **First, refresh the integration branch**: `git fetch origin` and compare
+  `git log --oneline -1 origin/develop` with the checkout you are reading.
+  Plan against `origin/develop`, never against a stale local `develop` —
+  two plans (#229, #203) had to be rewritten in public because the code they
+  described had already changed. If the main checkout is behind, read the
+  files from the ref (`git show origin/develop:<path>`) or from a fresh
+  worktree.
 - `gh issue view <N> --comments` — body, acceptance, prior discussion.
 - Read `docs/product.md` and `docs/tech-stack.md` for context; the package
   `AGENTS.md` (back/ or front/) for local rules.
@@ -15,10 +22,10 @@ task).
   Reading is fine anywhere, but the moment you need to RUN the app or try
   scratch code, do it in a worktree (`docs/workflow.md` § Worktrees) — the
   main checkout must never accumulate changes, planned or exploratory.
-- kata questions (API shapes, middleware, DI, verify rules) → consult the
-  kata-docs MCP server (this repo configures one in `.mcp.json`) before
-  guessing; if it's unavailable or the call fails, read kata's own
-  docs/source under `~/Projetos/kata` directly instead.
+- kata questions (API shapes, middleware, DI, verify rules) → read kata's
+  docs and the bundled `.d.ts` (`~/Projetos/kata/docs`, or the kata-docs
+  MCP server when it is enabled in this session — it is optional and often
+  is not). Never guess a kata API shape; never report the MCP's absence.
 
 ## Step 2 — Resolve material ambiguities
 
@@ -58,14 +65,14 @@ gh issue comment <N> --body-file -
 Show it to the user. Implementing a task may only start after the user
 explicitly approves; revisions edit the same comment (`gh issue comment --edit-last`).
 
-## Step 5 — Kata feedback (attempt every time)
+## Step 5 — Kata feedback (only when kata was in frame)
 
-If Step 1 queried the kata-docs MCP server, attempt a `kata-feedback/`
-entry before moving on — not gated on finding a bug. Note whether the docs
-actually answered the question or you ended up guessing anyway, and the
-rough cost (queries made, docs read) versus the time it saved. See
-`AGENTS.md` § Kata framework feedback and `kata-feedback/README.md` for the
-format. Skip if this plan never touched kata.
+If the plan hinged on a kata surface (an API shape you had to look up, a
+verify rule that shapes the design, a hurl or `hc` constraint) and you
+learned something or hit friction, write a `kata-feedback/` entry. If kata
+was out of frame, append one line to `kata-feedback/LEDGER.csv` and move
+on. Rule and format: `AGENTS.md` § Kata framework feedback,
+`kata-feedback/README.md`.
 
 ## Step 6 — Handoff (MANDATORY)
 

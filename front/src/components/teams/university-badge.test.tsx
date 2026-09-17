@@ -10,24 +10,24 @@ afterEach(async () => {
 })
 
 describe('UniversityBadge', () => {
-  it('renders the PUCRS flag and label', () => {
+  it('renders the PUCRS textual seal', () => {
     render(<UniversityBadge university="pucrs" />)
 
     const badge = screen.getByTestId('university-badge-pucrs')
-    expect(badge.textContent).toContain('🇧🇷')
+    expect(badge.textContent).not.toContain('🇧🇷')
     expect(badge.textContent).toContain('PUCRS')
   })
 
-  it('renders the Mérida flag and label', () => {
+  it('renders the Mérida textual seal', () => {
     render(<UniversityBadge university="merida" />)
 
     const badge = screen.getByTestId('university-badge-merida')
-    expect(badge.textContent).toContain('🇲🇽')
+    expect(badge.textContent).not.toContain('🇲🇽')
     expect(badge.textContent).toContain('Mérida')
   })
 
-  it('translates the label with the active language', async () => {
-    await i18n.changeLanguage('en')
+  it.each(['pt', 'es', 'en'])('keeps the seal label in %s', async (language) => {
+    await i18n.changeLanguage(language)
     render(<UniversityBadge university="merida" />)
 
     expect(screen.getByTestId('university-badge-merida').textContent).toContain('Mérida')

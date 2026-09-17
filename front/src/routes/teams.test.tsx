@@ -179,7 +179,7 @@ describe('TeamsScreen — listing', () => {
     await waitFor(() => expect(screen.getByTestId('teams-join-t1')).toBeDefined())
     expect(screen.getByTestId<HTMLButtonElement>('teams-join-t1').disabled).toBe(true)
     expect(screen.getByTestId('teams-row-t1').textContent).toContain('Time cheio')
-    expect(screen.getByTestId('teams-row-t1').textContent).toContain('Cheio')
+    expect(screen.getByTestId('teams-join-t1').textContent).toBe('Cheio')
   })
 
   it('disables Join when the mixing lock would refuse it, and banners the lock', async () => {
@@ -415,4 +415,17 @@ describe('TeamsScreen — joining a team', () => {
     const alert = await screen.findByTestId('teams-action-error')
     expect(alert.textContent).toContain('Esse time não existe mais.')
   })
+})
+
+describe('TeamsScreen — event rules', () => {
+  it.each([false, true])(
+    'shows the configured maximum and mixing rule (locked: %s)',
+    async (mixingLocked) => {
+      mockedList.mockResolvedValue(jsonResponse(200, envelope({ maxTeamSize: 5, mixingLocked })))
+      renderTeams()
+      const rules = await screen.findByTestId('teams-rules')
+      expect(rules.textContent).toContain('5')
+      expect(rules.textContent).toContain(mixingLocked ? 'travada' : 'liberada')
+    },
+  )
 })

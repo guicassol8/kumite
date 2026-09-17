@@ -89,12 +89,16 @@
       "title": "Your team",
       "none": "You are not on a team yet.",
       "memberCount": "{{members}} of {{max}} members",
-      "cta": "View teams"
+      "cta": "View teams",
+      "lastResult": "#{{rank}} in {{name}}"
     },
     "round": {
       "waiting": "Waiting for the next round.",
       "timeRemaining": "Ends in {{time}}",
-      "cta": "View round"
+      "cta": "View round",
+      "live": "Live round",
+      "problemCount_one": "{{count}} problem",
+      "problemCount_other": "{{count}} problems"
     },
     "closedRounds": {
       "title": "Closed rounds",
@@ -615,7 +619,10 @@
       "alreadyInTeam": "You are already on a team.",
       "notFound": "That team no longer exists.",
       "unexpected": "Could not join the team. Please try again."
-    }
+    },
+    "rules": "Teams of up to {{max}} people. University mixing is {{rule}}.",
+    "mixingAllowed": "allowed",
+    "mixingLocked": "locked"
   },
   "auth": {
     "passwordToggle": {

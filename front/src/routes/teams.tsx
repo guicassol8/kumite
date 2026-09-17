@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -37,14 +37,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useSession } from '@/hooks/use-session'
 import { api } from '@/lib/api'
 import { requireAuth } from '@/lib/route-guards'
@@ -167,48 +160,86 @@ function TeamsScreen() {
   }
 
   const createRootError = createForm.formState.errors.root?.message
+  const eyebrow = 'font-display text-[13px] font-semibold uppercase tracking-[0.12em]'
+  const cellClass =
+    'flex min-w-0 items-start justify-between gap-3 whitespace-normal px-4 py-2 md:table-cell md:px-3 md:py-4'
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="font-bold text-2xl">{t('teams.heading')}</h1>
+    <main
+      data-testid="teams-screen"
+      className="mx-auto flex w-full min-w-0 max-w-6xl flex-1 flex-col gap-6 px-4 py-8 md:px-8"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1
+            data-testid="teams-heading"
+            className="font-display font-bold text-4xl leading-none uppercase tracking-[0.01em]"
+          >
+            {t('teams.heading')}
+          </h1>
+          {data && (
+            <p data-testid="teams-rules" className="mt-2 text-muted-foreground text-sm">
+              {t('teams.rules', {
+                max: data.maxTeamSize,
+                rule: t(data.mixingLocked ? 'teams.mixingLocked' : 'teams.mixingAllowed'),
+              })}
+            </p>
+          )}
+        </div>
         {canCreate && (
-          <Button type="button" data-testid="teams-create-open" onClick={openCreateDialog}>
+          <Button
+            type="button"
+            data-testid="teams-create-open"
+            onClick={openCreateDialog}
+            className="h-11 shadow-none md:h-9"
+          >
             {t('teams.createAction')}
           </Button>
         )}
       </div>
 
       {myTeam && (
-        <Card data-testid="my-team-panel">
-          <CardHeader>
-            <CardTitle data-testid="my-team-name">
-              {t('teams.myTeam.title')} — {myTeam.name}
-            </CardTitle>
+        <Card data-testid="my-team-panel" className="gap-4 shadow-none">
+          <CardHeader className="flex-row flex-wrap items-center gap-3">
+            <h2 className={`${eyebrow} text-muted-foreground`}>{t('teams.myTeam.title')}</h2>
+            <Badge
+              data-testid="my-team-name"
+              className="max-w-full whitespace-normal wrap-anywhere"
+            >
+              {myTeam.name}
+            </Badge>
+            <span data-testid="my-team-count" className="text-muted-foreground text-sm">
+              {t('home.team.memberCount', {
+                members: myTeam.members.length,
+                max: data?.maxTeamSize,
+              })}
+            </span>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col">
               {myTeam.members.map((member, index) => (
                 <li
-                  // Same reasoning as the listing: the roster has no stable
-                  // per-member id, only its position.
                   key={`${myTeam.id}-${index}`}
                   data-testid={`my-team-member-${index}`}
-                  className="flex items-center gap-2 text-sm"
+                  className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-t py-3 text-sm"
                 >
+                  <span
+                    aria-hidden="true"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted font-display font-semibold text-muted-foreground"
+                  >
+                    {(member.name || member.email || '').slice(0, 1).toLocaleUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1 basis-36 wrap-anywhere">
+                    {member.name ? (
+                      <>
+                        <span className="block">{member.name}</span>
+                        <span className="block text-muted-foreground text-xs">{member.email}</span>
+                      </>
+                    ) : (
+                      <span>{member.email}</span>
+                    )}
+                  </div>
                   <UniversityBadge university={member.university} />
-                  {/* Name in front, email secondary; a member without a name
-                      (account predating #122) shows the email alone instead of
-                      a dangling dash. The "you" marker still compares emails —
-                      that is the unique identifier, a name is not. */}
-                  {member.name ? (
-                    <>
-                      <span>{member.name}</span>
-                      <span className="text-muted-foreground">{member.email}</span>
-                    </>
-                  ) : (
-                    <span>{member.email}</span>
-                  )}
                   {member.email === user?.email && (
                     <span className="text-muted-foreground">{t('teams.myTeam.you')}</span>
                   )}
@@ -223,11 +254,12 @@ function TeamsScreen() {
             <div>
               <Button
                 type="button"
-                variant="outline"
+                variant="destructive"
                 size="sm"
                 data-testid="my-team-leave"
                 disabled={myTeam.frozen || leave.isPending}
                 onClick={() => setLeaveDialogOpen(true)}
+                className="h-11 shadow-none md:h-8"
               >
                 {t('teams.myTeam.leaveAction')}
               </Button>
@@ -276,70 +308,106 @@ function TeamsScreen() {
       )}
 
       {data && data.teams.length > 0 && (
-        <Table data-testid="teams-table">
-          <TableHeader>
+        <table
+          data-testid="teams-table"
+          role="table"
+          className="w-full table-fixed text-sm md:rounded-lg md:border md:bg-card"
+        >
+          <TableHeader className="hidden md:table-header-group">
             <TableRow>
-              <TableHead>{t('teams.columns.name')}</TableHead>
-              <TableHead>{t('teams.columns.members')}</TableHead>
-              <TableHead>{t('teams.columns.slots')}</TableHead>
-              <TableHead>{t('teams.columns.actions')}</TableHead>
+              <TableHead
+                data-testid="teams-column-name"
+                className={`${eyebrow} w-[25%] text-muted-foreground`}
+              >
+                {t('teams.columns.name')}
+              </TableHead>
+              <TableHead
+                data-testid="teams-column-members"
+                className={`${eyebrow} w-[30%] text-muted-foreground`}
+              >
+                {t('teams.columns.members')}
+              </TableHead>
+              <TableHead
+                data-testid="teams-column-slots"
+                className={`${eyebrow} w-[12%] text-muted-foreground`}
+              >
+                {t('teams.columns.slots')}
+              </TableHead>
+              <TableHead
+                data-testid="teams-column-actions"
+                className={`${eyebrow} text-muted-foreground`}
+              >
+                {t('teams.columns.actions')}
+              </TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="flex flex-col gap-4 md:table-row-group [&_tr:last-child]:border md:[&_tr:last-child]:border-0">
             {data.teams.map((team) => {
               const isMine = team.id === data.myTeamId
               return (
-                <TableRow key={team.id} data-testid={`teams-row-${team.id}`}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span>{team.name}</span>
-                      {isMine && (
-                        <Badge data-testid="teams-your-team-badge">
-                          {t('teams.yourTeamBadge')}
-                        </Badge>
-                      )}
-                    </div>
+                <TableRow
+                  key={team.id}
+                  data-testid={`teams-row-${team.id}`}
+                  role="row"
+                  className="flex flex-col rounded-lg border bg-card py-2 md:table-row md:rounded-none md:py-0"
+                >
+                  <TableCell role="cell" className={cellClass}>
+                    <span className={`${eyebrow} text-muted-foreground md:hidden`}>
+                      {t('teams.columns.name')}
+                    </span>
+                    <span className="min-w-0 wrap-anywhere font-medium">{team.name}</span>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-1">
+                  <TableCell role="cell" className={cellClass}>
+                    <span className={`${eyebrow} text-muted-foreground md:hidden`}>
+                      {t('teams.columns.members')}
+                    </span>
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <span
+                        data-testid={`teams-member-count-${team.id}`}
+                        className="mr-1 font-display font-semibold tabular-nums"
+                      >
+                        {team.members.length}
+                      </span>
                       {team.members.map((member, index) => (
                         <UniversityBadge
-                          // Members are anonymous in the public listing, so
-                          // there is no stable id to key on — position is the
-                          // only identity a row has.
                           key={`${team.id}-${index}`}
                           university={member.university}
                         />
                       ))}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span>
-                        {t('teams.slots', {
-                          available: team.slotsAvailable,
-                          max: data.maxTeamSize,
-                        })}
-                      </span>
-                      {team.slotsAvailable === 0 && (
-                        <Badge variant="secondary">{t('teams.full')}</Badge>
-                      )}
-                    </div>
+                  <TableCell role="cell" className={cellClass}>
+                    <span className={`${eyebrow} text-muted-foreground md:hidden`}>
+                      {t('teams.columns.slots')}
+                    </span>
+                    <span className="font-display font-semibold tabular-nums">
+                      {t('teams.slots', { available: team.slotsAvailable, max: data.maxTeamSize })}
+                    </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell role="cell" className={cellClass}>
+                    <span className={`${eyebrow} text-muted-foreground md:hidden`}>
+                      {t('teams.columns.actions')}
+                    </span>
+                    {isMine && (
+                      <Badge variant="brand" data-testid="teams-your-team-badge">
+                        {t('teams.yourTeamBadge')}
+                      </Badge>
+                    )}
                     {!isOrganizer && !isMine && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <Button
                           type="button"
                           size="sm"
+                          variant={team.slotsAvailable === 0 ? 'ghost' : 'outline'}
+                          className={`h-11 shadow-none md:h-8 ${team.slotsAvailable === 0 ? 'text-muted-foreground disabled:opacity-100' : ''}`}
                           data-testid={`teams-join-${team.id}`}
                           disabled={team.joinBlockedReason !== null || join.isPending}
                           onClick={() => join.mutate(team.id)}
                         >
-                          {t('teams.joinAction')}
+                          {t(team.slotsAvailable === 0 ? 'teams.full' : 'teams.joinAction')}
                         </Button>
                         {team.joinBlockedReason && (
-                          <span className="text-muted-foreground text-sm">
+                          <span className="min-w-0 wrap-anywhere text-muted-foreground text-xs">
                             {t(JOIN_BLOCKED_KEYS[team.joinBlockedReason])}
                           </span>
                         )}
@@ -350,13 +418,15 @@ function TeamsScreen() {
               )
             })}
           </TableBody>
-        </Table>
+        </table>
       )}
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent data-testid="teams-create-dialog">
           <DialogHeader>
-            <DialogTitle>{t('teams.create.title')}</DialogTitle>
+            <DialogTitle className="font-display font-semibold text-2xl">
+              {t('teams.create.title')}
+            </DialogTitle>
           </DialogHeader>
           <Form {...createForm}>
             <form
@@ -370,7 +440,7 @@ function TeamsScreen() {
                   <FormItem>
                     <FormLabel>{t('teams.create.nameLabel')}</FormLabel>
                     <FormControl>
-                      <Input data-testid="teams-create-name-input" {...field} />
+                      <Input data-testid="teams-create-name-input" className="h-11" {...field} />
                     </FormControl>
                     <FormMessage data-testid="teams-create-name-error" />
                   </FormItem>
@@ -406,7 +476,9 @@ function TeamsScreen() {
       <AlertDialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
         <AlertDialogContent data-testid="teams-leave-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('teams.leaveDialog.title')}</AlertDialogTitle>
+            <AlertDialogTitle className="font-display font-semibold text-2xl">
+              {t('teams.leaveDialog.title')}
+            </AlertDialogTitle>
             <AlertDialogDescription>{t('teams.leaveDialog.description')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -415,6 +487,7 @@ function TeamsScreen() {
             </AlertDialogCancel>
             <AlertDialogAction
               data-testid="teams-leave-confirm"
+              className="border border-destructive bg-transparent text-destructive hover:bg-destructive/10"
               onClick={() => {
                 leave.mutate()
                 setLeaveDialogOpen(false)

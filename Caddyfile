@@ -3,5 +3,11 @@
 }
 
 {$KUMITE_DOMAIN} {
+	# Outer ceiling on request bodies (#287); the back enforces its own,
+	# smaller APP_MAX_BODY_BYTES behind it. Anything past this is refused here,
+	# before it costs the API process any memory.
+	request_body {
+		max_size 1MB
+	}
 	reverse_proxy back:3000
 }

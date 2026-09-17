@@ -89,12 +89,16 @@
       "title": "Seu time",
       "none": "Você ainda não está em um time.",
       "memberCount": "{{members}} de {{max}} integrantes",
-      "cta": "Ver times"
+      "cta": "Ver times",
+      "lastResult": "#{{rank}} na {{name}}"
     },
     "round": {
       "waiting": "Aguardando a próxima rodada.",
       "timeRemaining": "Termina em {{time}}",
-      "cta": "Ver rodada"
+      "cta": "Ver rodada",
+      "live": "Rodada ao vivo",
+      "problemCount_one": "{{count}} problema",
+      "problemCount_other": "{{count}} problemas"
     },
     "closedRounds": {
       "title": "Rodadas encerradas",
@@ -615,7 +619,10 @@
       "alreadyInTeam": "Você já está em um time.",
       "notFound": "Esse time não existe mais.",
       "unexpected": "Não foi possível entrar no time. Tente novamente."
-    }
+    },
+    "rules": "Times de até {{max}} pessoas. Mistura entre universidades {{rule}}.",
+    "mixingAllowed": "liberada",
+    "mixingLocked": "travada"
   },
   "auth": {
     "passwordToggle": {

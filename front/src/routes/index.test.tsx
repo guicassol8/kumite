@@ -111,8 +111,18 @@ describe('Home', () => {
   it('does not show the notice banner by default', async () => {
     renderHome()
 
-    await waitFor(() => expect(screen.getByTestId('api-status')).toBeDefined())
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'kumite', level: 1 })).toBeDefined(),
+    )
     expect(screen.queryByTestId('home-notice-banner')).toBeNull()
+  })
+
+  it('keeps API status only in the footer', async () => {
+    renderHome()
+    await waitFor(() => expect(screen.getByRole('main')).toBeDefined())
+    expect(within(screen.getByRole('main')).queryByTestId('api-status')).toBeNull()
+    expect(within(screen.getByRole('main')).queryByTestId('api-status-ok')).toBeNull()
+    await waitFor(() => expect(screen.getByTestId('api-status-ok')).toBeDefined())
   })
 
   it('shows the forbidden-organizer notice and dismisses it, clearing the search param', async () => {
@@ -131,7 +141,9 @@ describe('Home — team card', () => {
   it('stays hidden while anonymous, and asks for no team data', async () => {
     renderHome()
 
-    await waitFor(() => expect(screen.getByTestId('api-status')).toBeDefined())
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'kumite', level: 1 })).toBeDefined(),
+    )
     expect(screen.queryByTestId('home-team-card')).toBeNull()
     expect(mockedTeams).not.toHaveBeenCalled()
   })
@@ -415,7 +427,9 @@ describe('Home — organizer shortcuts card (#40)', () => {
     setSession(fakeUser, 'tok-1')
     renderHome()
 
-    await waitFor(() => expect(screen.getByTestId('api-status')).toBeDefined())
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'kumite', level: 1 })).toBeDefined(),
+    )
     expect(screen.queryByTestId('home-organizer-shortcuts')).toBeNull()
   })
 
@@ -431,4 +445,84 @@ describe('Home — organizer shortcuts card (#40)', () => {
       '/organizer/rounds',
     )
   })
+})
+
+describe('Home — latest closed round', () => {
+  beforeEach(() => {
+    setSession(fakeUser, 'tok-1')
+    mockedTeams.mockResolvedValue(
+      jsonResponse(200, {
+        maxTeamSize: 4,
+        mixingLocked: false,
+        myTeamId: 't1',
+        teams: [
+          {
+            id: 't1',
+            name: 'Byte Fighters',
+            members: [],
+            slotsAvailable: 4,
+            frozen: false,
+            joinBlockedReason: 'already_in_team',
+          },
+        ],
+      }),
+    )
+    mockedRounds.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({
+          id: 'old',
+          name: 'Anterior',
+          status: 'closed',
+          closedAt: '2026-09-01T18:00:00Z',
+        }),
+        roundSummary({
+          id: 'latest',
+          name: 'Mais recente',
+          status: 'closed',
+          closedAt: '2026-09-02T18:00:00Z',
+        }),
+      ]),
+    )
+  })
+
+  function ranking(rank: number) {
+    return { teams: [{ teamId: 't1', rank, totalScore: 100 }], problemIds: [] }
+  }
+
+  it('uses the most recently closed round regardless of API order and shares ranking requests', async () => {
+    mockedRoundRanking.mockImplementation(async ({ param }) =>
+      jsonResponse(200, ranking(param.id === 'latest' ? 2 : 7)),
+    )
+    renderHome()
+    await waitFor(() =>
+      expect(screen.getByTestId('home-team-last-result').textContent).toContain(
+        '#2 na Mais recente',
+      ),
+    )
+    const links = within(screen.getByTestId('home-closed-rounds')).getAllByRole('link')
+    expect(links.map((link) => link.textContent)).toEqual(['Mais recente', 'Anterior'])
+    expect(mockedRoundRanking).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not fall back to an older result when absent from the latest ranking', async () => {
+    mockedRoundRanking.mockImplementation(async ({ param }) =>
+      jsonResponse(200, param.id === 'latest' ? { teams: [], problemIds: [] } : ranking(7)),
+    )
+    renderHome()
+    await waitFor(() => expect(screen.getByTestId('home-closed-round-result-old')).toBeDefined())
+    expect(screen.queryByTestId('home-team-last-result')).toBeNull()
+  })
+
+  it.each(['pending', 'error'])(
+    'does not invent a result while the latest ranking is %s',
+    async (state) => {
+      mockedRoundRanking.mockImplementation(({ param }) => {
+        if (param.id === 'old') return Promise.resolve(jsonResponse(200, ranking(7)))
+        return state === 'pending' ? new Promise(() => {}) : Promise.resolve(jsonResponse(500, {}))
+      })
+      renderHome()
+      await waitFor(() => expect(screen.getByTestId('home-closed-round-result-old')).toBeDefined())
+      expect(screen.queryByTestId('home-team-last-result')).toBeNull()
+    },
+  )
 })

@@ -1,1 +1,2 @@
 date,task,phase,kata_in_frame,docs_lookups,verify_runs,verify_findings,friction_turns,note
+2026-09-17,#288,reviewing,no,0,2,0,0,"PR de docs/scripts: kata fora de frame no diff; verify verde como gate. hurl 15/15 (321 req) de primeira apos db:reset (#289) — o tema no1 do v2/TRIAGE (17 relatos de hurl nao re-executavel) nao reapareceu"

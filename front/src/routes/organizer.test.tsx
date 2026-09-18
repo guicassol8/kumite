@@ -12,8 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/api', () => ({ api: {} }))
 vi.mock('@/lib/sse-client', () => ({ connectEventStream: vi.fn(() => () => {}) }))
 
+import { OrganizerShell } from '@/components/organizer/panel-shell'
 import i18n from '@/i18n'
-import { OrganizerScreen } from '@/routes/organizer'
 
 const TAB_TESTIDS = [
   'organizer-nav-overview',
@@ -29,7 +29,7 @@ const TAB_TESTIDS = [
 // screen — and the authenticated queries each one fires — into a test that
 // only asserts the chrome. Every `<Link to>` destination still needs a route
 // here, because TanStack resolves the href against the tree.
-const rootRoute = createRootRoute({ component: OrganizerScreen })
+const rootRoute = createRootRoute({ component: OrganizerShell })
 const routeTree = rootRoute.addChildren(
   [
     '/organizer',

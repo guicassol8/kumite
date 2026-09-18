@@ -176,8 +176,12 @@ describe('OrganizerUsersScreen', () => {
     // check that matters is that the email is still the only identity shown.
     const legacyRow = screen.getByTestId('organizer-users-row-u2')
     expect(legacyRow.textContent).toContain('grace@merida.edu.mx')
-    expect(legacyRow.querySelectorAll('td')[0]?.textContent).toBe('—')
-    expect(screen.getByText('Nome')).toBeDefined()
+    // Below 768px every cell repeats its column header as a card label, so the
+    // cell reads "Nome—"; the value itself is the last span in the cell.
+    const nameCell = legacyRow.querySelectorAll('td')[0]
+    expect(nameCell?.lastElementChild?.textContent).toBe('—')
+    // "Nome" is now both the `th` and the label inside each row.
+    expect(screen.getAllByText('Nome').length).toBeGreaterThan(0)
   })
 
   it('marks a deactivated user with a badge', async () => {
@@ -458,5 +462,74 @@ describe('organizer users — password reset (#143)', () => {
     // The self case keeps the tooltip the other two buttons already share, so
     // the organizer-only one must not also appear on this row.
     expect(screen.queryByTestId('organizer-users-reset-password-tooltip-org-1')).toBeNull()
+  })
+})
+
+// #223: the panel's widest table — seven columns, and the one that decides
+// whether "no horizontal page scroll from 768px up" holds. The measurements
+// themselves live in e2e/organizer-identity.spec.ts, because jsdom does no
+// layout; what can be asserted here is the structure that makes it possible.
+describe('organizer users — identity (#223)', () => {
+  it('renders the listing as the panel table, never inside a scrolling wrapper', async () => {
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-users-table')).toBeDefined())
+    const table = screen.getByTestId('organizer-users-table')
+    expect(table.className).toContain('table-fixed')
+
+    let node: HTMLElement | null = table
+    while (node) {
+      expect(node.className).not.toContain('overflow-x')
+      node = node.parentElement
+    }
+  })
+
+  it('gives every column a width so `table-fixed` can compress them', async () => {
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-users-table')).toBeDefined())
+    const headers = [...screen.getByTestId('organizer-users-table').querySelectorAll('th')]
+    expect(headers).toHaveLength(7)
+    for (const header of headers) {
+      expect(header.className).toMatch(/w-\[\d+%\]/)
+      expect(header.className).toContain('font-display')
+      expect(header.className).toContain('uppercase')
+    }
+  })
+
+  it('repeats every column header as the card label inside a row', async () => {
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-users-row-u1')).toBeDefined())
+    const row = screen.getByTestId('organizer-users-row-u1')
+    for (const label of ['Nome', 'E-mail', 'Universidade', 'Papel', 'Time', 'Status']) {
+      expect(row.textContent).toContain(label)
+    }
+  })
+
+  it('badges role and status, keeping the existing status testid', async () => {
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-users-row-u1')).toBeDefined())
+    // Role is an outlined badge in both directions.
+    expect(screen.getByTestId('organizer-users-role-u1').dataset.variant).toBe('outline')
+    expect(screen.getByTestId('organizer-users-role-u2').dataset.variant).toBe('outline')
+    // Active outlined, deactivated grey — the testid predates #223 and is
+    // untouched.
+    expect(screen.getByTestId('organizer-users-status-u1').dataset.variant).toBe('outline')
+    expect(screen.getByTestId('organizer-users-status-u2').dataset.variant).toBe('secondary')
+  })
+
+  it('keeps the filter controls and the pagination range in the identity', async () => {
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-users-range')).toBeDefined())
+    // Tabular numerals so the range does not jitter as pages change.
+    expect(screen.getByTestId('organizer-users-range').className).toContain('tabular-nums')
+    // 36px controls (§ 5), full width on a phone and fixed from `sm` up.
+    expect(screen.getByTestId('organizer-users-search-input').className).toContain('h-9')
+    expect(screen.getByTestId('organizer-users-search-input').className).toContain('w-full')
+    expect(screen.getByTestId('organizer-users-filter-university').className).toContain('h-9')
+    expect(screen.getByTestId('organizer-users-filter-university').className).toContain('w-full')
   })
 })

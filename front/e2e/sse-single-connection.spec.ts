@@ -185,6 +185,11 @@ test.describe('one SSE connection per tab (#274)', () => {
     await page.goto('/leaderboard')
     await expect(page.getByTestId('leaderboard-live-chip')).toBeVisible({ timeout: 15_000 })
     await expectExactlyOneLiveConnection('/leaderboard')
+    // Wait for the grid to settle before the shot: the live chip is up as soon
+    // as the stream opens, while the ranking is still a skeleton, and evidence
+    // should show the screen as the participant ends up seeing it.
+    await expect(page.getByTestId('leaderboard-tabs')).toBeVisible()
+    await expect(page.getByTestId('leaderboard-loading')).toHaveCount(0)
     await page.screenshot({ path: evidence('04-leaderboard-uma-conexao'), fullPage: true })
 
     // --- 2. Moving between those screens through the UI opens nothing ---

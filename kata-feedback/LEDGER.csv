@@ -2,3 +2,4 @@ date,task,phase,kata_in_frame,docs_lookups,verify_runs,verify_findings,friction_
 2026-09-17,#288,reviewing,no,0,2,0,0,"PR de docs/scripts: kata fora de frame no diff; verify verde como gate. hurl 15/15 (321 req) de primeira apos db:reset (#289) — o tema no1 do v2/TRIAGE (17 relatos de hurl nao re-executavel) nao reapareceu"
 2026-09-17,#274,planning,no,0,0,0,0,
 2026-09-17,#274,implementing,yes,0,5,0,0,"defineRoute + DI (c.get(sseBus)) na rota de desativacao e no /sse; verify verde em todas as rodadas, nenhum achado, nenhuma friccao — sem relatorio"
+2026-09-18,#274,reviewing,yes,0,1,0,0,"Review do PR #293: kata em frame no diff de back (defineRoute + DI c.get(sseBus) na rota de desativacao e no /sse). verify verde (66 arquivos), nenhum achado. hurl 15/15 (321 req) de primeira apos db:reset com servidor novo — sem friccao, sem relatorio"

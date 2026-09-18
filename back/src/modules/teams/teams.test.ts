@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq, isNotNull, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
@@ -104,6 +104,42 @@ async function insertSubmission(teamId: string, userId: string) {
     .returning()
   if (!submission) throw new Error('expected a submission fixture')
   return submission
+}
+
+// Holds `team-join:<teamId>` — the key joinTeam, moveMember and removeTeam all
+// share — on its own connection until `release` is called. Racing tests that
+// rely on a lucky `Promise.all` interleaving only catch a regression some of
+// the time; parking the contender on the lock freezes it at a chosen point and
+// makes the same proof deterministic.
+async function holdTeamJoinLock(teamId: string) {
+  const holder = createDb()
+  let acquired!: () => void
+  const lockAcquired = new Promise<void>((resolve) => {
+    acquired = resolve
+  })
+  let releaseRequested!: () => void
+  const releaseWanted = new Promise<void>((resolve) => {
+    releaseRequested = resolve
+  })
+
+  const holding = holder.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`team-join:${teamId}`}::text))`)
+    acquired()
+    await releaseWanted
+  })
+  await lockAcquired
+
+  let released = false
+  return {
+    // Idempotent: tests release in a `finally` and again on the happy path.
+    async release() {
+      if (released) return
+      released = true
+      releaseRequested()
+      await holding
+      await holder.$client.end()
+    },
+  }
 }
 
 afterAll(async () => {
@@ -607,6 +643,88 @@ describe('moveMember', () => {
       .from(teamMembersTable)
       .where(eq(teamMembersTable.teamId, teamA.team.id))
     expect(members).toHaveLength(2)
+  })
+
+  // Beyond the issue's literal spec, same achado M1: moveMember validated the
+  // destination outside its transaction and removeTeam took no lock at all, so
+  // one organizer could remove a team inside the window between the other's
+  // check and write. The moved member ended up pinned to a removed team — in
+  // no visible team and unable to join another, exactly the damage #276
+  // describes. Whoever wins, the invariant is the same: no membership may
+  // point at a removed team.
+  it('never leaves a member pinned to a team removed in the same instant', async () => {
+    const creatorA = await insertUser()
+    const mover = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, mover.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    await Promise.all([moveMember(db, mover.id, teamA.team.id), removeTeam(db, teamA.team.id)])
+
+    const pinned = await db
+      .select({ userId: teamMembersTable.userId })
+      .from(teamMembersTable)
+      .innerJoin(teamsTable, eq(teamsTable.id, teamMembersTable.teamId))
+      .where(isNotNull(teamsTable.removedAt))
+    expect(pinned).toEqual([])
+  })
+
+  // The deterministic half of the test above: the move is parked on the shared
+  // lock, past every check it used to make outside its transaction, and the
+  // destination is removed while it waits. Validating the destination before
+  // the lock makes this move happily pin the member to a removed team.
+  it('rejects a move whose destination is removed while it waits for the lock', async () => {
+    const creatorA = await insertUser()
+    const mover = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, mover.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+    const lock = await holdTeamJoinLock(teamA.team.id)
+
+    let result: Awaited<ReturnType<typeof moveMember>>
+    try {
+      const move = moveMember(db, mover.id, teamA.team.id)
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      await db
+        .update(teamsTable)
+        .set({ removedAt: new Date() })
+        .where(eq(teamsTable.id, teamA.team.id))
+      await lock.release()
+      result = await move
+    } finally {
+      await lock.release()
+    }
+
+    expect(result).toEqual({ ok: false, error: 'team_not_found' })
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, mover.id))
+    expect(membership?.teamId).toBe(teamB.team.id)
+  })
+
+  // The other half: removeTeam must contend for the same key, or its delete of
+  // the destination's memberships can slip between a move's capacity check and
+  // its write — leaving the moved member behind on a removed team.
+  it('makes removeTeam wait for whoever holds the destination team lock', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    const lock = await holdTeamJoinLock(created.team.id)
+
+    const removal = removeTeam(db, created.team.id)
+    let settled = false
+    void removal.then(() => {
+      settled = true
+    })
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      expect(settled).toBe(false)
+    } finally {
+      await lock.release()
+    }
+
+    expect(await removal).toEqual({ ok: true })
   })
 })
 

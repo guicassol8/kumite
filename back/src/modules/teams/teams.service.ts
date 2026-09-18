@@ -306,12 +306,6 @@ export async function moveMember(
     .where(eq(teamMembersTable.userId, userId))
   if (!membership) return { ok: false, error: 'member_not_found' }
 
-  const [destination] = await db
-    .select()
-    .from(teamsTable)
-    .where(and(eq(teamsTable.id, destinationTeamId), isNull(teamsTable.removedAt)))
-  if (!destination) return { ok: false, error: 'team_not_found' }
-
   const { maxTeamSize } = await getEventConfig(db)
 
   // Achado M1 (#276): the capacity check and the update ran as two unlocked
@@ -322,6 +316,16 @@ export async function moveMember(
   return db.transaction(async (tx) => {
     const lockKey = `team-join:${destinationTeamId}`
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}::text))`)
+
+    // Read under the lock, not before it: validated outside the transaction,
+    // the destination could be removed while this move waited its turn, and
+    // the member would land on a team nobody can see. `member_not_found` still
+    // wins over `team_not_found` — the membership check above comes first.
+    const [destination] = await tx
+      .select()
+      .from(teamsTable)
+      .where(and(eq(teamsTable.id, destinationTeamId), isNull(teamsTable.removedAt)))
+    if (!destination) return { ok: false, error: 'team_not_found' }
 
     const members = await tx
       .select()
@@ -362,7 +366,14 @@ export async function removeTeam(db: Db, teamId: string): Promise<RemoveTeamResu
   // the team vanished from every listing while its members stayed pinned to
   // it, in no visible team and unable to join another. Both halves now live in
   // one transaction, so the team is removed with its members or not at all.
+  //
+  // Same key as joinTeam/moveMember: without it this delete of the team's
+  // memberships can slip between a move's capacity check and its write, and
+  // the moved member is left pinned to a team that no longer exists.
   return db.transaction(async (tx) => {
+    const lockKey = `team-join:${teamId}`
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}::text))`)
+
     const [team] = await tx
       .update(teamsTable)
       .set({ removedAt: new Date(), updatedAt: new Date() })

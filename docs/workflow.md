@@ -20,6 +20,10 @@ Codex discovers each step through `.agents/skills/` (invoke with
 `$implementing-tasks` or `$reviewing-tasks`). Claude Code uses slash-command
 wrappers under `.claude/skills/`. Both read the canonical docs above.
 
+Running several issues in one sitting is **batch mode**
+(`docs/task-workflow/orchestrating-batch.md`): one thin session that only
+decides and relays, delegating every step to a subagent — see below.
+
 ## One step, one session — the handoff
 
 Each step is a fresh session: the state lives on the issue and the PR, not in
@@ -41,6 +45,16 @@ to copy-paste into a new chat.
 Approval does not survive the session boundary: a plan approved in one session
 must be approved on the issue (or restated in the new session) before
 implementation starts.
+
+**The one exception — batch mode.** What this rule protects is *context
+isolation*: no step may inherit the working context of the step before it.
+`docs/task-workflow/orchestrating-batch.md` takes 2–3 issues through all five
+steps in a single session by moving that boundary from the session to the
+subagent — each step runs in an agent spawned fresh for it and discarded
+after, while the orchestrating session holds only the batch state, the user's
+decisions and the relay. It never plans, codes or reviews itself. Anything
+that runs the steps in one shared context is a violation of this rule, not an
+instance of the exception.
 
 ## Labels
 

@@ -23,9 +23,15 @@ running inside Claude Code; the docs are the source of truth.
 | planning-tasks | designing the implementation of an issue |
 | implementing-tasks | coding an approved plan |
 | reviewing-tasks | reviewing a PR + producing mandatory evidence |
+| orchestrating-batch | running 2–3 issues end to end via subagents |
 
 Each step is its own chat: every skill ends by printing the next step's command,
 ready to paste into a new session. The full chain is in `docs/workflow.md`
+§ One step, one session.
+
+`orchestrating-batch` is the deliberate exception: it runs the whole chain in
+one chat, delegating each step to a fresh-context subagent instead of to a new
+chat. Same isolation, different boundary — `docs/workflow.md`
 § One step, one session.
 
 ## Claude-specific notes

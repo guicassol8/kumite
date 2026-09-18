@@ -168,6 +168,11 @@ Every later deploy is automated by `deploy.yml`; the very first one is manual
 because the VM starts with no image pulled yet and no schema migrated:
 ```bash
 cd ~/kumite
+# Create the backup directory BEFORE the first `up -d`. It is a bind mount, so
+# if it does not exist Docker creates it owned by root, and the by-hand dump in
+# §13 then cannot write into it. Created here, it belongs to you and the
+# container (root) still writes into it fine.
+mkdir -p backups
 docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec -T back pnpm --filter @kumite/back db:migrate
 docker compose -f docker-compose.prod.yml exec -T back pnpm --filter @kumite/back db:seed
@@ -207,14 +212,134 @@ Must still be streaming past the 600s mark — not dropped by Caddy or the VM.
 
 ## 13. Between activation and the event
 
+- **Dump at the end of each day of the event, and copy it off the VM — before
+  stopping anything.** Stopping the VM is the point of no return here, not
+  deleting it: once it is stopped there is nothing running to dump from, and a
+  stopped VM that never comes back (trial expired, project deleted) takes the
+  submissions, the ranking and the participant list with it — exactly what the
+  organisation needs for the certificates and the report with Mérida. On the
+  VM:
+  ```bash
+  cd ~/kumite
+  mkdir -p backups
+  # On a VM deployed before the backup service existed, Docker created
+  # ./backups itself and it belongs to root — the redirect below would then
+  # fail with "Permission denied". This makes it yours; it is a no-op once done.
+  [ -w backups ] || sudo chown "$USER" backups
+  docker compose -f docker-compose.prod.yml exec -T db \
+    pg_dump -U kumite kumite | gzip > backups/kumite-$(date +%F).sql.gz
+  ```
+  then, **from your own machine** (that is where `gcloud` is authenticated):
+  ```bash
+  gcloud compute scp <vm>:~/kumite/backups/kumite-<date>.sql.gz . \
+    --zone southamerica-east1-b
+  ```
+  The dashes in that name (`kumite-2026-10-03.sql.gz`) are deliberate:
+  automatic rotation only ever deletes `kumite-YYYYMMDD-HHMMSS.sql.gz`, so a
+  dump you took by hand is never rotated away.
+
+- The `backup` service dumps the database every 15 minutes on its own and
+  keeps the newest 48 — a 12-hour window — in `~/kumite/backups`
+  (`BACKUP_INTERVAL_SECONDS` and `BACKUP_KEEP` in `.env.example` widen it
+  without a code deploy). Those copies are on the VM's disk only: they cover a
+  wrong `docker compose down -v`, a bad migration or a full disk, **not**
+  losing the VM. That is what the daily `scp` above is for. Check on them with:
+  ```bash
+  docker compose -f docker-compose.prod.yml logs --tail 20 backup
+  ls -lh ~/kumite/backups
+  ```
+  Every cycle logs the file it wrote and the free space left. A cycle that
+  fails logs `[backup] ERRO …`, deletes nothing and leaves the `back`
+  container alone — it never drops a good dump to make room for a bad one, so
+  a run of failures shows up as dumps that stop getting newer, never as an
+  empty directory.
+
 - Stop the VM after the initial smoke test to conserve trial credit; resume
   it a few days before the event (`docker compose up -d` picks back up
   where it left off — the named volumes persist data and certs).
 
 ## 14. Post-event teardown
 
+**0. Dump first. Everything below this line is irreversible.** The automatic
+dumps live in `~/kumite/backups` *on the VM*, so deleting the VM deletes them
+too. Take a final dump and copy the whole rotated set out before touching
+anything else:
+```bash
+# on the VM
+cd ~/kumite
+mkdir -p backups
+# Docker may have created ./backups as root (see §13) — the redirect below
+# fails with "Permission denied" until this runs. No-op if already yours.
+[ -w backups ] || sudo chown "$USER" backups
+docker compose -f docker-compose.prod.yml exec -T db \
+  pg_dump -U kumite kumite | gzip > backups/kumite-final-$(date +%F).sql.gz
+```
+```bash
+# from your own machine — the whole directory, not just the last file
+gcloud compute scp --recurse <vm>:~/kumite/backups . \
+  --zone southamerica-east1-b
+```
+Check the copy actually landed locally, and that the final dump is not
+suspiciously small, before going on. Restoring one of these is §15.
+
 - Stop and delete the VM.
 - Remove the DNS A record.
 - Revoke the GHCR PAT (step 7) and the GitHub Deploy Key (step 3).
 - Revert the Vercel `VITE_API_URL` if the event environment shouldn't
   outlive the event.
+
+## 15. Restore a dump onto a fresh VM
+
+Verified end to end for #275 against two throwaway Postgres 17 containers
+(evidence on that PR). The order is the whole procedure:
+
+0. Prerequisites, if the VM really is new: §1–§12 first, up to and including
+   the clone into `~/kumite` and its `.env` — this section restores data onto a
+   working deploy, it does not create one. Then put the dump on the VM (it is
+   on your machine, from the §13/§14 `scp`):
+   ```bash
+   # from your own machine
+   gcloud compute scp kumite-<date>.sql.gz <vm>:~/kumite/ \
+     --zone southamerica-east1-b
+   ```
+1. Bring up **only** the database:
+   ```bash
+   cd ~/kumite
+   mkdir -p backups
+   docker compose -f docker-compose.prod.yml up -d db
+   ```
+2. **Do not run `db:migrate` first.** These are plain SQL dumps of the entire
+   database: they carry the schema *and* drizzle's own ledger
+   (`drizzle.__drizzle_migrations`). Restoring one over an already-migrated
+   database collides with `relation already exists`. The target is the empty
+   database a fresh `db` container comes up with.
+3. Restore:
+   ```bash
+   gunzip -c kumite-<date>.sql.gz | docker compose -f docker-compose.prod.yml \
+     exec -T db psql -U kumite -d kumite -v ON_ERROR_STOP=1
+   ```
+4. Check it before trusting it — row counts per table, and a migration ledger
+   holding as many rows as `back/drizzle/meta/_journal.json` has entries (21
+   as of this writing):
+   ```bash
+   docker compose -f docker-compose.prod.yml exec -T db psql -U kumite -d kumite -c "
+     select table_name,
+            (xpath('/row/c/text()', query_to_xml(
+               format('select count(*) as c from %I.%I', table_schema, table_name),
+               false, true, '')))[1]::text::int as rows
+     from information_schema.tables
+     where table_schema = 'public' and table_type = 'BASE TABLE' order by 1;"
+   docker compose -f docker-compose.prod.yml exec -T db psql -U kumite -d kumite \
+     -c 'select count(*) from drizzle.__drizzle_migrations;'
+   ```
+5. Only then bring the rest of the stack up:
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+   `db:migrate` afterwards is a no-op, and that is what proves the ledger came
+   across. It prints two `NOTICE` blocks — `schema "drizzle" already exists`
+   and `relation "__drizzle_migrations" already exists` — and applies nothing;
+   that is drizzle-kit's own `CREATE … IF NOT EXISTS`, not a failure.
+6. `db:reset` is **not** part of this. It refuses any non-local database
+   (#287/#289) and is the local wipe-everything helper; the path here is an
+   empty database plus `psql`.

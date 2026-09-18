@@ -14,6 +14,41 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # pg_dump every BACKUP_INTERVAL_SECONDS, keeping the newest BACKUP_KEEP
+  # dumps (#275). No `profiles:` on purpose: deploy.yml runs a bare
+  # `docker compose -f docker-compose.prod.yml up -d`, so a profiled service
+  # would only start if someone remembered the flag — and "everyone believes
+  # there are backups and there are none" is precisely the disaster this
+  # service exists to prevent.
+  backup:
+    image: postgres:17-alpine
+    # Bypasses the postgres image's own docker-entrypoint.sh, which would read
+    # this as "initialise a cluster". Same major as db, so pg_dump 17 talks to
+    # a server 17 with no version mismatch.
+    entrypoint: ['/bin/sh', '/usr/local/bin/backup-loop.sh']
+    environment:
+      PGHOST: db
+      PGUSER: kumite
+      PGDATABASE: kumite
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-900}
+      BACKUP_KEEP: ${BACKUP_KEEP:-48}
+    volumes:
+      # The VM's ~/kumite is a git checkout that deploy.yml pulls before every
+      # `up -d`, so the script arrives with the repo — same pattern as the
+      # Caddyfile above.
+      - ./scripts/backup-loop.sh:/usr/local/bin/backup-loop.sh:ro
+      # A bind mount, deliberately not a named volume: `docker compose down -v`
+      # deletes named volumes and does not touch this, and "a wrong down -v" is
+      # one of the loss scenarios #275 exists for. It also puts the dumps at
+      # ~/kumite/backups on the VM, where the teardown's `gcloud compute scp`
+      # can read them without a `docker compose cp` first.
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   back:
     build:
       context: .

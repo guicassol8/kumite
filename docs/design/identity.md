@@ -246,6 +246,32 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   visíveis na barra** no desktop — não migram para dentro do menu do usuário,
   que existe para o que não cabe nela.
 
+  **Barra comprimida (768–1279 px)**, averbada pela #297. O inventário acima é
+  o mesmo em toda largura de desktop — nada migra para dentro de menu nenhum —
+  mas abaixo de 1280 px a barra o comprime: espaçamentos menores (gap 8 px no
+  lugar de 16), padding horizontal menor nos controles, seletor de idioma como
+  **um grupo segmentado de verdade** (sem folga entre PT · ES · EN) e o nome do
+  usuário truncado em 80 px em vez de 200. Duas regras decorrem disso:
+
+  - **O nome da rodada sai entre 768 e 1023 px e volta em 1024 px.** É o único
+    item da barra sem largura previsível — texto livre que o organizador
+    digita, com teto só na coluna de 120 caracteres —, então dimensionar a
+    barra por ele seria dimensionar por uma string desconhecida. De 1024 px
+    para cima ele reaparece com teto de 240 px e reticências. O **ponto e o
+    timer ficam em toda largura**: o chip nunca some, e nada mais do
+    inventário desaparece para a barra caber.
+  - **O timer do header é o numeral**, não a frase. "Termina em 41:23" é a
+    redação do cartão da home; no chip, onde a §5 descreve "ponto + nome +
+    timer", o que se lê é `41:23`. A frase inteira continua sendo anunciada
+    por leitor de tela (`round-countdown-summary`, `sr-only`), então a
+    economia é só de pixels.
+
+  A medida que decide tudo isto é `document.scrollWidth ≤ window.innerWidth`
+  em **768 px e em 1024 px**, nos três catálogos, para participante e
+  organizador, com e sem rodada aberta — `front/e2e/header-width.spec.ts`. O
+  caso que dimensiona é o **inglês com rodada aberta**, não o português: veja
+  Expansão de texto, abaixo.
+
   **Header, celular (< 768 px)**: lockup + controle de idioma + botão de menu.
   O botão abre um **painel de menu** com navegação, bloco do usuário (nome e
   e-mail), chip da rodada, tema, reportar bug e Sair. É esse painel que fecha o

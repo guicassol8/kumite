@@ -714,9 +714,17 @@ describe('moveMember', () => {
 
     const removal = removeTeam(db, created.team.id)
     let settled = false
-    void removal.then(() => {
-      settled = true
-    })
+    // Settle-or-reject, both observed: a bare `.then` would leave the rejected
+    // branch unhandled, and the unhandled rejection would surface before the
+    // `await removal` below that actually explains the failure.
+    void removal.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
     try {
       await new Promise((resolve) => setTimeout(resolve, 250))
       expect(settled).toBe(false)

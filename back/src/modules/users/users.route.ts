@@ -4,6 +4,7 @@ import { defineRoute } from '../../context'
 import { clientIp } from '../../lib/client-ip'
 import { requireOrganizer, requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 import { resetPasswordByOrganizer } from '../password-reset/password-reset.service'
+import { publishUserDeactivated } from '../sse/sse.service'
 
 import {
   ListUsersQuerySchema,
@@ -84,7 +85,16 @@ export const deactivateUserRoute = defineRoute({
   output: { 200: UserSummarySchema, 403: ErrorBodySchema, 404: ErrorBodySchema },
   handler: async (c) => {
     const result = await deactivateUser(c.get('db'), c.get('currentUser').id, c.input.params.id)
-    if (result.ok) return c.json(result.user, 200)
+    if (result.ok) {
+      // #274: closes this account's live `/sse` stream, if it has one, without
+      // every connection polling `findUserById` once a second to notice.
+      // Published here rather than from the service because services stay pure
+      // (AGENTS.md) and the bus is the route's to reach for — same as
+      // rounds.route.ts. Only on the happy path: a refused deactivation
+      // changed no row and must close nothing.
+      publishUserDeactivated(c.get('sseBus'), result.user.id)
+      return c.json(result.user, 200)
+    }
 
     switch (result.error) {
       case 'not_found':

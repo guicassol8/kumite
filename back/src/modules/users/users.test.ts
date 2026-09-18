@@ -1,6 +1,10 @@
+import { signJwt } from '@katajs-framework/core/jwt'
 import { sql } from 'drizzle-orm'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { app } from '../../app'
+import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
+import { k } from '../../context'
 import { createDb } from '../../db/client'
 import { teamMembersTable, teamsTable, usersTable } from '../../db/schema'
 import type { NewUser } from './users.schema'
@@ -345,5 +349,68 @@ describe('users.service deactivateUser / reactivateUser', () => {
   it('reactivate 404s on an unknown id', async () => {
     const result = await reactivateUser(db, '00000000-0000-0000-0000-000000000000')
     expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+})
+
+// #274: the route, not the service, publishes on the bus — services here stay
+// pure (AGENTS.md) and injecting the bus into `deactivateUser` would close the
+// import cycle users.service -> sse.service -> users.service. Same shape as
+// rounds.route.ts publishing round.opened/extended/closed.
+describe('POST /organizer/users/:id/deactivate — sse side effect', () => {
+  async function organizerSession() {
+    const organizer = await createUser(db, {
+      ...baseUser,
+      email: `organizer-${crypto.randomUUID()}@example.com`,
+      role: 'organizer',
+    })
+    if (!organizer) throw new Error('expected fixture')
+    return {
+      organizer,
+      token: await signJwt(
+        { role: organizer.role, university: organizer.university },
+        { secret: JWT_SECRET, subject: organizer.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+      ),
+    }
+  }
+
+  it('publishes exactly one user.deactivated carrying the target id', async () => {
+    const { token } = await organizerSession()
+    const target = await createUser(db, {
+      ...baseUser,
+      email: `target-${crypto.randomUUID()}@example.com`,
+    })
+    if (!target) throw new Error('expected fixture')
+    const fn = vi.fn()
+    const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+    const res = await app.request(`/organizer/users/${target.id}/deactivate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(200)
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(fn).toHaveBeenCalledWith({ type: 'user.deactivated', userId: target.id })
+
+    unsubscribe()
+  })
+
+  // Nothing was deactivated, so nothing may be closed: publishing on the
+  // refused self-deactivation would drop the organizer's own live stream on a
+  // request that changed no row.
+  it('publishes nothing when the self-guard refuses the deactivation', async () => {
+    const { organizer, token } = await organizerSession()
+    const fn = vi.fn()
+    const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+    const res = await app.request(`/organizer/users/${organizer.id}/deactivate`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    expect(res.status).toBe(403)
+    expect(fn).not.toHaveBeenCalled()
+
+    unsubscribe()
   })
 })

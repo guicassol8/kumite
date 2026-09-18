@@ -26,7 +26,7 @@ vi.mock('../submissions/submissions.service', async (importOriginal) => {
   return { ...actual, hasJudgingInFlight: (roundId: string) => judging.rounds.has(roundId) }
 })
 
-import type { SseEvent } from './sse.schema'
+import type { SseBusEvent, SseEvent } from './sse.schema'
 import {
   HeartbeatEventSchema,
   RankingUpdatedEventSchema,
@@ -41,11 +41,11 @@ import {
   buildRankingUpdatedEvent,
   buildStateSyncEvent,
   createSseBus,
-  isUserStillActive,
   markRankingDirty,
   publishRoundClosed,
   publishRoundExtended,
   publishRoundOpened,
+  publishUserDeactivated,
   ROUND_CLOSE_ANNOUNCE_MAX_WAIT_MS,
   runExpiryTick,
   runRankingTick,
@@ -104,6 +104,15 @@ describe('sse.schema', () => {
 
   it('rejects an unknown event type', () => {
     const event = { type: 'unknown', serverTime: new Date() }
+    expect(SseEventSchema.safeParse(event).success).toBe(false)
+  })
+
+  // #274: `user.deactivated` rides the same in-process bus but must never
+  // reach the wire — it carries one user's id, and every open connection
+  // would receive it. Keeping it out of the union is what makes that a type
+  // error in the route rather than a leak nobody notices.
+  it('rejects the internal user.deactivated control event', () => {
+    const event = { type: 'user.deactivated', userId: crypto.randomUUID() }
     expect(SseEventSchema.safeParse(event).success).toBe(false)
   })
 
@@ -190,6 +199,20 @@ describe('sse.service', () => {
 
       expect(fn).not.toHaveBeenCalled()
     })
+
+    it('fans out an internal control event to every subscriber', () => {
+      const bus = createSseBus()
+      const a = vi.fn()
+      const b = vi.fn()
+      bus.subscribe(a)
+      bus.subscribe(b)
+
+      const event: SseBusEvent = { type: 'user.deactivated', userId: 'u1' }
+      bus.publish(event)
+
+      expect(a).toHaveBeenCalledWith(event)
+      expect(b).toHaveBeenCalledWith(event)
+    })
   })
 
   describe('publish helpers', () => {
@@ -215,6 +238,16 @@ describe('sse.service', () => {
         3,
         expect.objectContaining({ type: 'round.closed', roundId: 'r1' }),
       )
+    })
+
+    it('shapes the internal user.deactivated event', () => {
+      const bus = createSseBus()
+      const fn = vi.fn()
+      bus.subscribe(fn)
+
+      publishUserDeactivated(bus, 'u1')
+
+      expect(fn).toHaveBeenCalledWith({ type: 'user.deactivated', userId: 'u1' })
     })
   })
 
@@ -537,54 +570,6 @@ describe('sse.service', () => {
         await expect(runRankingTick(failingDb, bus)).resolves.toBeUndefined()
       })
     })
-
-    describe('isUserStillActive', () => {
-      it('is true for an active user', async () => {
-        const [user] = await db
-          .insert(usersTable)
-          .values({
-            email: `sse-active-${crypto.randomUUID()}@example.com`,
-            passwordHash: 'hash',
-            role: 'participant',
-            university: 'pucrs',
-          })
-          .returning()
-        if (!user) throw new Error('expected fixture')
-
-        await expect(isUserStillActive(db, user.id)).resolves.toBe(true)
-      })
-
-      it('is false for a deactivated user', async () => {
-        const [user] = await db
-          .insert(usersTable)
-          .values({
-            email: `sse-inactive-${crypto.randomUUID()}@example.com`,
-            passwordHash: 'hash',
-            role: 'participant',
-            university: 'pucrs',
-            active: false,
-          })
-          .returning()
-        if (!user) throw new Error('expected fixture')
-
-        await expect(isUserStillActive(db, user.id)).resolves.toBe(false)
-      })
-
-      it('is false for a missing user', async () => {
-        await expect(isUserStillActive(db, crypto.randomUUID())).resolves.toBe(false)
-      })
-
-      it('does not throw when the db rejects, resolving true instead', async () => {
-        const failingDb = {
-          ...db,
-          select: () => {
-            throw new Error('db is down')
-          },
-        } as unknown as typeof db
-
-        await expect(isUserStillActive(failingDb, crypto.randomUUID())).resolves.toBe(true)
-      })
-    })
   })
 })
 
@@ -736,7 +721,12 @@ describe('GET /sse', () => {
     await frames.cancel()
   })
 
-  it('closes the stream after a deactivation, but only once the next heartbeat runs the check', async () => {
+  // #274 replaces #232's per-heartbeat `findUserById`: nothing on the stream
+  // reads the users table any more, so the row going false is invisible to a
+  // live connection until the bus says so. This is the behavioural form of the
+  // acceptance criterion "zero session-revalidation queries per second" — if
+  // any revalidation came back, one of these heartbeats would kill the stream.
+  it('keeps the stream open across heartbeats after the row was flipped, with no revalidation query', async () => {
     const [user] = await db
       .insert(usersTable)
       .values({
@@ -761,13 +751,108 @@ describe('GET /sse', () => {
     // Same tick given to the happy-path test above: the handler's bus
     // subscription runs after `writeSSE`'s promise resolves.
     await new Promise((resolve) => setTimeout(resolve, 0))
+
+    for (let i = 0; i < 3; i++) {
+      k.resolve('sseBus').publish({ type: 'heartbeat', serverTime: new Date() })
+      expect(await frames.next()).toContain('event: heartbeat')
+    }
+
+    await frames.cancel()
+  })
+
+  it('closes the stream on user.deactivated, without waiting for a heartbeat', async () => {
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email: `sse-${crypto.randomUUID()}@example.com`,
+        passwordHash: 'hash',
+        role: 'participant',
+        university: 'pucrs',
+      })
+      .returning()
+    if (!user) throw new Error('expected fixture')
+    const token = await tokenFor(user)
+
+    const res = await app.request('/sse', { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.body) throw new Error('expected a streamed body')
+    const frames = createFrameReader(res.body)
+
+    expect(await frames.next()).toContain('event: state.sync')
+    expect(await frames.next()).toContain('event: ranking.updated')
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    k.resolve('sseBus').publish({ type: 'user.deactivated', userId: user.id })
+
+    // No heartbeat in between, and no frame carrying the control event: it is
+    // consumed by the handler, never written to the wire.
+    await expect(frames.next()).rejects.toThrow('stream closed before a full SSE frame arrived')
+  })
+
+  it('ignores a user.deactivated aimed at a different user', async () => {
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email: `sse-${crypto.randomUUID()}@example.com`,
+        passwordHash: 'hash',
+        role: 'participant',
+        university: 'pucrs',
+      })
+      .returning()
+    if (!user) throw new Error('expected fixture')
+    const token = await tokenFor(user)
+
+    const res = await app.request('/sse', { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.body) throw new Error('expected a streamed body')
+    const frames = createFrameReader(res.body)
+
+    expect(await frames.next()).toContain('event: state.sync')
+    expect(await frames.next()).toContain('event: ranking.updated')
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    k.resolve('sseBus').publish({ type: 'user.deactivated', userId: crypto.randomUUID() })
     k.resolve('sseBus').publish({ type: 'heartbeat', serverTime: new Date() })
 
-    // The heartbeat that triggers the recheck is still the last thing a
-    // deactivated user sees — the stream closes only once the recheck
-    // resolves, one tick after this frame is delivered.
-    expect(await frames.next()).toContain('event: heartbeat')
+    // Somebody else's ban is not this connection's problem — and the control
+    // event itself must not surface as a frame, or it would hand that user's
+    // id to every other client.
+    const next = await frames.next()
+    expect(next).toContain('event: heartbeat')
+    expect(next).not.toContain('user.deactivated')
 
+    await frames.cancel()
+  })
+
+  // The race the `closed` latch exists for: at this point the handler is still
+  // inside `buildStateSyncEvent`, so `closeStream` is `undefined` and there is
+  // nothing for the subscriber to call. Without the latch the handler would go
+  // on to `await new Promise` and hang there forever, leaving a deactivated
+  // account holding an open stream for the rest of the event.
+  it('closes a stream deactivated while the initial snapshot is still being built', async () => {
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email: `sse-${crypto.randomUUID()}@example.com`,
+        passwordHash: 'hash',
+        role: 'participant',
+        university: 'pucrs',
+      })
+      .returning()
+    if (!user) throw new Error('expected fixture')
+    const token = await tokenFor(user)
+
+    const res = await app.request('/sse', { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.body) throw new Error('expected a streamed body')
+    const frames = createFrameReader(res.body)
+
+    // No tick in between, unlike the tests above: published while the snapshot
+    // is still two queries away from being written.
+    k.resolve('sseBus').publish({ type: 'user.deactivated', userId: user.id })
+
+    // The snapshot already in flight still goes out...
+    expect(await frames.next()).toContain('event: state.sync')
+    expect(await frames.next()).toContain('event: ranking.updated')
+
+    // ...and then the stream ends, instead of staying open forever.
     await expect(frames.next()).rejects.toThrow('stream closed before a full SSE frame arrived')
   })
 })

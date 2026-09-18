@@ -8,13 +8,16 @@ import {
   reapExpiredRound,
 } from '../rounds/rounds.service'
 import { hasJudgingInFlight } from '../submissions/submissions.service'
-import { findUserById } from '../users/users.service'
 
-import type { RankingUpdatedEvent, SseEvent, StateSyncEvent } from './sse.schema'
+import type { RankingUpdatedEvent, SseBusEvent, StateSyncEvent } from './sse.schema'
 
+// Carries `SseBusEvent`, not `SseEvent`: besides the wire contract the bus
+// also moves internal control events that must never be written to a stream
+// (#274, see sse.schema.ts). Subscribers are handed the wider type on purpose
+// — the route has to narrow before it can write.
 export type SseBus = {
-  subscribe: (fn: (event: SseEvent) => void) => () => void
-  publish: (event: SseEvent) => void
+  subscribe: (fn: (event: SseBusEvent) => void) => () => void
+  publish: (event: SseBusEvent) => void
 }
 
 // Pure in-memory pub/sub — no timers, no I/O. The 1s expiry tick is wired
@@ -22,7 +25,7 @@ export type SseBus = {
 // a background process (see the plan's architecture note: tests that import
 // app.ts/context.ts must not inherit a live DB-polling timer).
 export function createSseBus(): SseBus {
-  const subscribers = new Set<(event: SseEvent) => void>()
+  const subscribers = new Set<(event: SseBusEvent) => void>()
   return {
     subscribe(fn) {
       subscribers.add(fn)
@@ -63,6 +66,20 @@ export function publishRoundExtended(bus: SseBus, round: { id: string; closesAt:
 
 export function publishRoundClosed(bus: SseBus, round: { id: string }) {
   bus.publish({ type: 'round.closed', serverTime: new Date(), roundId: round.id })
+}
+
+/**
+ * Tells every live `/sse` handler that this account was deactivated, so the
+ * one belonging to it can close (#274).
+ *
+ * Internal, never written to a stream — see `SseControlEvent` in
+ * sse.schema.ts for why it is not part of the wire union. Published by
+ * `deactivateUserRoute`, not by `deactivateUser`: services here stay pure
+ * (back/AGENTS.md) and the bus is already the route's to reach for, exactly
+ * as rounds.route.ts does for round.opened/extended/closed.
+ */
+export function publishUserDeactivated(bus: SseBus, userId: string) {
+  bus.publish({ type: 'user.deactivated', userId })
 }
 
 // How long a closed round's announcement waits for judging to drain (#176).
@@ -109,23 +126,6 @@ export async function runExpiryTick(db: Db, bus: SseBus): Promise<void> {
     console.error('sse expiry tick failed', error)
   }
   bus.publish({ type: 'heartbeat', serverTime: new Date() })
-}
-
-// #232: a connection's own auth only runs once, at connect — nothing
-// reauthenticates it while the stream lives. Reuses the heartbeat tick
-// (already the stream's only recurring hook) to catch a deactivation that
-// happens mid-stream, the same way every other route does per request since
-// #174. Fails open on a DB error, same rule as runExpiryTick/runRankingTick
-// below: a transient blip must not drop a live connection, and a sustained
-// outage already takes every other route down with it.
-export async function isUserStillActive(db: Db, userId: string): Promise<boolean> {
-  try {
-    const user = await findUserById(db, userId)
-    return user !== null && user.active
-  } catch (error) {
-    console.error('sse user revalidation failed', error)
-    return true
-  }
 }
 
 // --- Ranking debounce (#44) ---

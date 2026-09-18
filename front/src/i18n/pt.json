@@ -118,6 +118,7 @@
   "organizer": {
     "heading": "Área do organizador",
     "nav": {
+      "ariaLabel": "Seções do painel",
       "overview": "Visão geral",
       "problems": "Problemas",
       "rounds": "Rodadas",

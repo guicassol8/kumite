@@ -545,6 +545,62 @@ describe('moveMember', () => {
 
     expect(result).toEqual({ ok: true })
   })
+
+  // Achado M1 (#276): moveMember read the destination's member count and
+  // wrote the new teamId as two unlocked statements, so two organizers
+  // moving different members into the same team both passed the capacity
+  // check before either had written. Same Promise.all burst as the joinTeam
+  // race test above, which #192 fixed with this very idiom.
+  it('admits exactly one move in a race for the last slot', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 2 })
+    const creatorA = await insertUser()
+    const moverB = await insertUser()
+    const moverC = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, moverB.id, 'Team B')
+    const teamC = await createTeam(db, moverC.id, 'Team C')
+    if (!teamA.ok || !teamB.ok || !teamC.ok) throw new Error('expected success')
+
+    const results = await Promise.all([
+      moveMember(db, moverB.id, teamA.team.id),
+      moveMember(db, moverC.id, teamA.team.id),
+    ])
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toEqual([{ ok: false, error: 'team_full' }])
+    const members = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.teamId, teamA.team.id))
+    expect(members).toHaveLength(2)
+  })
+
+  // The advisory key is shared with joinTeam (`team-join:<teamId>`) on
+  // purpose, so the two paths into a team serialize against each other and
+  // not just against themselves. Give the move its own key and this goes red
+  // again while the test above stays green.
+  it('serializes a join and a move disputing the same slot', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 2 })
+    const creatorA = await insertUser()
+    const joiner = await insertUser()
+    const mover = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, mover.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    const results = await Promise.all([
+      joinTeam(db, joiner.id, teamA.team.id),
+      moveMember(db, mover.id, teamA.team.id),
+    ])
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toEqual([{ ok: false, error: 'team_full' }])
+    const members = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.teamId, teamA.team.id))
+    expect(members).toHaveLength(2)
+  })
 })
 
 describe('removeMember', () => {

@@ -312,18 +312,30 @@ export async function moveMember(
     .where(and(eq(teamsTable.id, destinationTeamId), isNull(teamsTable.removedAt)))
   if (!destination) return { ok: false, error: 'team_not_found' }
 
-  const [members, { maxTeamSize }] = await Promise.all([
-    db.select().from(teamMembersTable).where(eq(teamMembersTable.teamId, destinationTeamId)),
-    getEventConfig(db),
-  ])
-  if (members.length >= maxTeamSize) return { ok: false, error: 'team_full' }
+  const { maxTeamSize } = await getEventConfig(db)
 
-  await db
-    .update(teamMembersTable)
-    .set({ teamId: destinationTeamId })
-    .where(eq(teamMembersTable.userId, userId))
+  // Achado M1 (#276): the capacity check and the update ran as two unlocked
+  // statements, so two organizers moving different members into the same team
+  // both read a free slot before either had written — the very TOCTOU joinTeam
+  // fixed in #22. The lock key is deliberately the one joinTeam uses, so a
+  // join and a move racing for the same slot serialize against each other too.
+  return db.transaction(async (tx) => {
+    const lockKey = `team-join:${destinationTeamId}`
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}::text))`)
 
-  return { ok: true }
+    const members = await tx
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.teamId, destinationTeamId))
+    if (members.length >= maxTeamSize) return { ok: false, error: 'team_full' }
+
+    await tx
+      .update(teamMembersTable)
+      .set({ teamId: destinationTeamId })
+      .where(eq(teamMembersTable.userId, userId))
+
+    return { ok: true }
+  })
 }
 
 export type RemoveMemberResult = { ok: true } | { ok: false; error: 'not_found' }

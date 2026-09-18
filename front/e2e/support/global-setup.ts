@@ -1,3 +1,6 @@
+import { execFileSync } from 'node:child_process'
+import path from 'node:path'
+
 import {
   BACK_URL,
   clearRoundLock,
@@ -35,6 +38,18 @@ async function waitForBack(): Promise<boolean> {
 }
 
 export default async function globalSetup(): Promise<void> {
+  // Opt-in (#287): wipe and re-seed the database this worktree's back/.env
+  // points at before any worker starts, so a suite never inherits the
+  // event_config, teams or rounds a vitest or hurl run left behind. Off by
+  // default because `reuseExistingServer` may be talking to another
+  // worktree's back, whose database is not the one db:reset would wipe.
+  if (process.env.E2E_RESET_DB === '1') {
+    execFileSync('pnpm', ['--filter', '@kumite/back', 'db:reset'], {
+      cwd: path.resolve(import.meta.dirname, '../../..'),
+      stdio: 'inherit',
+    })
+  }
+
   // A run killed while a worker held the round-close lock leaves the file
   // behind; the next run would then wait `LOCK_STALE_MS` on its first close.
   await clearRoundLock()

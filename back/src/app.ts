@@ -1,5 +1,6 @@
-import { cors } from '@katajs-framework/core'
+import { bodyLimit, cors } from '@katajs-framework/core'
 
+import { APP_MAX_BODY_BYTES } from './config'
 import { createApp } from './context'
 import { requestLogger } from './middlewares/request-logger'
 import * as auth from './modules/auth/auth.route'
@@ -46,9 +47,13 @@ export const modules = [
   bugReports,
 ] as const
 
+// bodyLimit runs app-wide (#287): the public routes had no ceiling at all, so
+// the first thing every request meets is a size check. A route may still be
+// stricter — submissions keeps its own SUBMISSION_MAX_BODY_BYTES in `use:`,
+// and the smaller of the two is what applies there.
 export const app = createApp({
   modules,
-  middlewares: [cors(), requestLogger],
+  middlewares: [cors(), bodyLimit({ maxSize: APP_MAX_BODY_BYTES }), requestLogger],
 })
 
 // The single artifact the front imports (type-only) to build its typed RPC

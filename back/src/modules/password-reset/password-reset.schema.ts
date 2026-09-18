@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { LocaleSchema } from '../../lib/locale'
+import { PASSWORD_MAX_LENGTH } from '../auth/auth.schema'
 
 export const RequestPasswordResetBodySchema = z.object({
   email: z.string().email(),
@@ -14,7 +15,7 @@ export const RequestPasswordResetBodySchema = z.object({
 export const CompletePasswordResetBodySchema = z.object({
   email: z.string().email(),
   otp: z.string().length(6),
-  newPassword: z.string().min(8),
+  newPassword: z.string().min(8).max(PASSWORD_MAX_LENGTH),
 })
 
 export const NoContentSchema = z.void()

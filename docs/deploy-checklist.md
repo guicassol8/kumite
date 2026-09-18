@@ -173,6 +173,12 @@ docker compose -f docker-compose.prod.yml exec -T back pnpm --filter @kumite/bac
 docker compose -f docker-compose.prod.yml exec -T back pnpm --filter @kumite/back db:seed
 ```
 
+`db:seed` is insert-if-missing everywhere (#287): `deploy.yml` re-runs it on
+every release, and it never overwrites the organizer account, the event codes
+or the event configuration the organizer changed in the panel. `db:reset`
+(the local, wipe-everything variant) refuses any non-local database, so it
+cannot be pointed at this one by accident.
+
 ## 10. Point the front at the live back
 
 In the Vercel project settings, update `VITE_API_URL` to

@@ -293,6 +293,15 @@ suspiciously small, before going on. Restoring one of these is §15.
 Verified end to end for #275 against two throwaway Postgres 17 containers
 (evidence on that PR). The order is the whole procedure:
 
+0. Prerequisites, if the VM really is new: §1–§12 first, up to and including
+   the clone into `~/kumite` and its `.env` — this section restores data onto a
+   working deploy, it does not create one. Then put the dump on the VM (it is
+   on your machine, from the §13/§14 `scp`):
+   ```bash
+   # from your own machine
+   gcloud compute scp kumite-<date>.sql.gz <vm>:~/kumite/ \
+     --zone southamerica-east1-b
+   ```
 1. Bring up **only** the database:
    ```bash
    cd ~/kumite

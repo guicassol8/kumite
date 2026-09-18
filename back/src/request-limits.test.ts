@@ -41,8 +41,10 @@ describe('app-wide body limit', () => {
       body: JSON.stringify({ email: 'x@example.com', password: 'p'.repeat(1000) }),
     })
     // Not 413: the request reached zod (password has no min(8) on login, so this
-    // one goes on to the handler and is refused as bad credentials).
-    expect(res.status).not.toBe(413)
+    // one goes on to the handler and is refused as bad credentials). Asserting
+    // the 401 itself, not merely "something other than 413" — a 500 would
+    // otherwise pass this as happily as the behaviour it is meant to pin.
+    expect(res.status).toBe(401)
   })
 
   it('keeps the stricter route-level ceiling on POST /submissions', async () => {
@@ -78,6 +80,21 @@ describe('password length ceilings', () => {
         newPassword: 'p'.repeat(PASSWORD_MAX_LENGTH + 1),
       }).success,
     ).toBe(false)
+  })
+
+  // The acceptance line for #287 is about the status the *system* answers, not
+  // about what the schema accepts: pin it end-to-end so a change in kata's
+  // validation envelope (or a route that stops using this schema) is caught
+  // here and not in production.
+  it('answers 422 to a signup whose password is over PASSWORD_MAX_LENGTH', async () => {
+    const res = await app.request('/auth/signup', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({ ...base, password: 'p'.repeat(PASSWORD_MAX_LENGTH + 1) }),
+    })
+    expect(res.status).toBe(422)
+    const body = (await res.json()) as { issues?: { body?: { path?: string }[] } }
+    expect(body.issues?.body?.some((issue) => issue.path === 'password')).toBe(true)
   })
 
   it('gives a password only being verified the looser ceiling', () => {

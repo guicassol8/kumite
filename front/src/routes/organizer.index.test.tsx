@@ -291,3 +291,130 @@ describe('organizer overview', () => {
     expect(screen.getByTestId('overview-retry')).toBeDefined()
   })
 })
+
+// #223: the overview in the identity — four numeric cards on one row, the
+// podium on a card of its own, the shortcuts as a list. Colours and layout
+// are measured in the browser (e2e/organizer-identity.spec.ts); what is
+// asserted here is the structure and the wiring.
+describe('organizer overview — identity (#223)', () => {
+  it('sets every headline number in the display face, tabular', async () => {
+    mockedStatsGet.mockResolvedValue(jsonResponse(200, stats()))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('overview-signups-total')).toBeDefined())
+    for (const testId of [
+      'overview-signups-total',
+      'overview-teams-total',
+      'overview-submissions-total',
+    ]) {
+      const stat = screen.getByTestId(testId)
+      expect(stat.className).toContain('font-display')
+      expect(stat.className).toContain('tabular-nums')
+    }
+  })
+
+  it('marks the round card with the brand border and the open chip while a round runs', async () => {
+    mockedStatsGet.mockResolvedValue(
+      jsonResponse(200, stats({ round: { active: roundRef(), lastClosed: null } })),
+    )
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('overview-round-card')).toBeDefined())
+    // The only card the identity lets carry the brand border, and only while
+    // something is actually happening.
+    expect(screen.getByTestId('overview-round-card').className).toContain('border-brand')
+    expect(screen.getByTestId('overview-round-open-state').className).toContain('text-brand-text')
+    expect(
+      within(screen.getByTestId('overview-round-card')).getByTestId('round-countdown').className,
+    ).toContain('text-brand-text')
+    // No closed round yet, so no podium card at all.
+    expect(screen.queryByTestId('overview-podium-card')).toBeNull()
+  })
+
+  it('leaves the round card unbranded when no round is open', async () => {
+    mockedStatsGet.mockResolvedValue(jsonResponse(200, stats()))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('overview-round-card')).toBeDefined())
+    expect(screen.getByTestId('overview-round-card').className).not.toContain('border-brand')
+    expect(screen.queryByTestId('overview-round-open-state')).toBeNull()
+    // Neither round at all: the existing empty state, unchanged.
+    expect(screen.getByTestId('overview-round-none')).toBeDefined()
+    expect(screen.queryByTestId('overview-round-cta')).toBeNull()
+  })
+
+  it('gives the two round CTAs names of their own', async () => {
+    mockedStatsGet.mockResolvedValue(
+      jsonResponse(200, stats({ round: { active: roundRef(), lastClosed: null } })),
+    )
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('overview-round-cta')).toBeDefined())
+    // Until #223 both shared `overview-round-cta`, because only one of them
+    // was ever on screen at a time.
+    expect(screen.getByTestId('overview-round-cta').getAttribute('href')).toBe('/organizer/rounds')
+    expect(screen.getByTestId('overview-round-leaderboard-cta').getAttribute('href')).toBe(
+      '/leaderboard',
+    )
+  })
+
+  it('puts the closed round podium on a card of its own, the winner in brand', async () => {
+    mockedStatsGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        stats({
+          round: {
+            active: null,
+            lastClosed: roundRef({
+              id: 'r-closed',
+              name: 'Rodada 2',
+              status: 'closed',
+              closedAt: '2026-09-02T13:00:00.000Z',
+            }),
+          },
+        }),
+      ),
+    )
+    mockedRankingGet.mockResolvedValue(
+      jsonResponse(200, {
+        roundId: 'r-closed',
+        roundName: 'Rodada 2',
+        problemIds: [],
+        teams: [
+          rankingTeam(),
+          rankingTeam({ teamId: 't2', teamName: 'Loop Masters', rank: 2, totalScore: 200 }),
+        ],
+      }),
+    )
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('overview-podium-card')).toBeDefined())
+    // The closing time moved into the podium card's header along with it.
+    expect(
+      within(screen.getByTestId('overview-podium-card')).getByTestId('overview-round-closed-at'),
+    ).toBeDefined()
+
+    // The ranking is a second query, so the entries land after the card.
+    await waitFor(() => expect(screen.getByTestId('overview-round-podium-t1')).toBeDefined())
+    const first = screen.getByTestId('overview-round-podium-t1')
+    expect(first.textContent).toContain('Blockly Busters')
+    expect(first.textContent).toContain('300')
+    // The numeral is now a column, not a "#1 name · pts" sentence — and only
+    // the winner's takes the brand colour.
+    expect(first.firstElementChild?.className).toContain('text-brand-text')
+    expect(
+      screen.getByTestId('overview-round-podium-t2').firstElementChild?.className,
+    ).not.toContain('text-brand-text')
+  })
+
+  it('renders the five shortcuts as a list of links, not a row of buttons', async () => {
+    mockedStatsGet.mockResolvedValue(jsonResponse(200, stats()))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('overview-shortcuts-card')).toBeDefined())
+    // Five, not the mock's four: the count is the acceptance criterion's, and
+    // `overview-shortcuts-teams` is already covered by an existing test.
+    const list = within(screen.getByTestId('overview-shortcuts-card')).getByRole('list')
+    expect(within(list).getAllByRole('link')).toHaveLength(5)
+  })
+})

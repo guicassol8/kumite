@@ -533,11 +533,13 @@
       "round": {
         "title": "Round",
         "streamOffline": "Live connection lost",
+        "openState": "Round open",
         "manageCta": "Manage rounds",
         "lastClosed": "Last round: {{name}}",
         "closedAt": "Closed on {{date}}",
+        "podiumTitle": "Last closed round · {{name}}",
         "podiumEmpty": "No team scored in this round.",
-        "podiumEntry": "#{{rank}} {{name}} · {{score}} pts",
+        "podiumPoints": "{{score}} pts",
         "leaderboardCta": "View leaderboard",
         "none": "No round has been created yet."
       },

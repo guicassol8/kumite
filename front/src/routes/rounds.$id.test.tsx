@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
@@ -27,10 +27,9 @@ import { routeTree } from '@/routeTree.gen'
 const mockedGet = vi.mocked(api.rounds[':id'].$get)
 const sseUnsubscribe = vi.fn()
 
-// The screen owns a dedicated connection alongside the app-wide one opened by
-// `RoundStreamProvider` in `__root` (#217) — mounted as a descendant of the
-// provider, its effect commits first, so its call is always the first of the
-// two `connectEventStream` calls, never the last.
+// Since #274 this screen reads the app-wide connection opened by
+// `RoundStreamProvider` in `__root` instead of opening a second one of its
+// own, so there is exactly one `connectEventStream` call to drive.
 function emitSse(event: SseEvent) {
   const onEvent = connectEventStream.mock.calls[0]?.[0] as (e: SseEvent) => void
   act(() => onEvent(event))
@@ -154,7 +153,11 @@ describe('RoundDetailScreen', () => {
       round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
     })
 
-    expect(await screen.findByTestId('round-countdown')).toBeDefined()
+    // Scoped to <main>: the header renders its own chip off the same shared
+    // connection since #274 (see emitSse above).
+    await waitFor(() =>
+      expect(within(screen.getByRole('main')).getByTestId('round-countdown')).toBeDefined(),
+    )
   })
 
   it('shows the real best score, or the placeholder for a never-submitted problem, once closed', async () => {
@@ -272,7 +275,11 @@ describe('RoundDetailScreen', () => {
       round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
     })
 
-    expect(await screen.findByTestId('round-countdown')).toBeDefined()
+    // Scoped to the screen's own <main>: since #274 the header shares this one
+    // connection, so it renders its own `round-countdown` chip for the open
+    // round too — exactly as it always did in the browser.
+    await screen.findByTestId('round-detail-status-badge')
+    expect(within(screen.getByRole('main')).getByTestId('round-countdown')).toBeDefined()
     expect(screen.queryByTestId('round-detail-closed-at')).toBeNull()
     expect(screen.getByTestId('round-detail-status-badge').textContent).toBe('Aberta')
   })

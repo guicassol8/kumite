@@ -17,8 +17,8 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useBlocklyLocale } from '@/hooks/use-blockly-locale'
-import { useEventStream } from '@/hooks/use-event-stream'
 import { type ExampleRunState, useExampleRun } from '@/hooks/use-example-run'
+import { useRoundStream } from '@/hooks/use-round-stream'
 import { useWorkspaceAutoSave } from '@/hooks/use-workspace-autosave'
 import { formatDate } from '@/i18n/format'
 import { api } from '@/lib/api'
@@ -62,7 +62,18 @@ function ProblemScreen() {
   const { toolbox, onReady: onWorkspaceReady } = useBlocklyLocale(workspaceRef)
   const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(id)
 
-  useEventStream(() => queryClient.invalidateQueries({ queryKey: problemQueryKey(id) }))
+  // Reads the app's single `/sse` connection instead of opening a second one
+  // of its own (#274). `roundChangedAt` moves on every round.opened/
+  // round.closed — the same signal the callback used to carry. The ref starts
+  // at the value already on the provider, so mounting mid-round does not
+  // invalidate on the first render.
+  const eventStream = useRoundStream()
+  const lastRoundChangeRef = useRef(eventStream.roundChangedAt)
+  useEffect(() => {
+    if (eventStream.roundChangedAt === lastRoundChangeRef.current) return
+    lastRoundChangeRef.current = eventStream.roundChangedAt
+    queryClient.invalidateQueries({ queryKey: problemQueryKey(id) })
+  }, [eventStream.roundChangedAt, queryClient, id])
 
   const problem = useQuery({
     queryKey: [...problemQueryKey(id), locale],
@@ -148,9 +159,9 @@ function ProblemScreen() {
   const data = problem.data
 
   // Only a failure with nothing to show takes the screen: an SSE-triggered
-  // refetch that fails (`useEventStream` invalidates this query on every
-  // event) must not throw away a workspace the participant is in the middle
-  // of (#178).
+  // refetch that fails (the effect above invalidates this query on every
+  // round change) must not throw away a workspace the participant is in the
+  // middle of (#178).
   if (problem.isError && !data) {
     return (
       <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">

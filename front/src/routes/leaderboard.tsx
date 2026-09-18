@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLeaderboardStream } from '@/hooks/use-leaderboard-stream'
+import { useRoundStream } from '@/hooks/use-round-stream'
 import { api } from '@/lib/api'
 import { fetchEventRanking, fetchRoundRanking } from '@/lib/ranking-query'
 import { positionLabel } from '@/lib/round-position'
@@ -196,10 +197,20 @@ function LeaderboardScreen() {
   // (or opened) resolves in `closedRounds`/`lastClosedRound` right away,
   // instead of staying stuck on the stale snapshot until something else
   // happens to refetch it — same pattern as index.tsx's invalidateRounds.
-  const invalidateRounds = useCallback(() => {
+  // Both read the app's single `/sse` connection (#274): `stream` is the
+  // ranking slice, `roundStream.roundChangedAt` the round-change signal that
+  // used to arrive as this hook's `onRoundChange` callback. The ref starts at
+  // the provider's current value so mounting does not invalidate on the first
+  // render. Side effect worth having: the "reconnect" button now reopens the
+  // connection the whole app is on, not just this screen's own socket.
+  const stream = useLeaderboardStream()
+  const roundStream = useRoundStream()
+  const lastRoundChangeRef = useRef(roundStream.roundChangedAt)
+  useEffect(() => {
+    if (roundStream.roundChangedAt === lastRoundChangeRef.current) return
+    lastRoundChangeRef.current = roundStream.roundChangedAt
     queryClient.invalidateQueries({ queryKey: ROUNDS_QUERY_KEY })
-  }, [queryClient])
-  const stream = useLeaderboardStream(invalidateRounds)
+  }, [roundStream.roundChangedAt, queryClient])
 
   const refetchInterval = stream.isLive ? false : POLL_WHILE_OFFLINE_MS
 

@@ -8,7 +8,7 @@ import { RoundCountdown } from '@/components/round-countdown'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useEventStream } from '@/hooks/use-event-stream'
+import { useRoundStream } from '@/hooks/use-round-stream'
 import { formatTime } from '@/i18n/format'
 import { positionLabel } from '@/lib/round-position'
 import { fetchRound, RoundNotFoundError, roundQueryKey } from '@/lib/rounds-query'
@@ -43,10 +43,16 @@ function RoundDetailScreen() {
 
   // A blunt refetch on any round.opened/round.closed, same pattern index.tsx
   // uses — the live countdown below already updates from the pushed event
-  // without this.
-  const eventStream = useEventStream(() =>
-    queryClient.invalidateQueries({ queryKey: roundQueryKey(id) }),
-  )
+  // without this. Reads the app's single `/sse` connection rather than opening
+  // a second one for this screen (#274); the ref starts at the provider's
+  // current value so mounting mid-round does not invalidate on first render.
+  const eventStream = useRoundStream()
+  const lastRoundChangeRef = useRef(eventStream.roundChangedAt)
+  useEffect(() => {
+    if (eventStream.roundChangedAt === lastRoundChangeRef.current) return
+    lastRoundChangeRef.current = eventStream.roundChangedAt
+    queryClient.invalidateQueries({ queryKey: roundQueryKey(id) })
+  }, [eventStream.roundChangedAt, queryClient, id])
 
   const round = useQuery({
     queryKey: [...roundQueryKey(id), locale],

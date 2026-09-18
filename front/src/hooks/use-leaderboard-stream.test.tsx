@@ -1,4 +1,5 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const connectEventStream = vi.fn()
@@ -10,6 +11,14 @@ import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import type { EventRanking, RoundRanking, SseEvent } from '@/lib/sse-schema'
 
 import { OFFLINE_AFTER_MS, useLeaderboardStream } from './use-leaderboard-stream'
+import { RoundStreamProvider, useRoundStream } from './use-round-stream'
+
+// #274: the hook is a selector over the app's single `/sse` connection now,
+// so every case mounts it under the provider that owns that connection —
+// which is also how it is mounted for real, from `__root`.
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <RoundStreamProvider>{children}</RoundStreamProvider>
+)
 
 const fakeUser: SessionUser = {
   id: 'u1',
@@ -82,13 +91,13 @@ afterEach(() => {
 describe('useLeaderboardStream', () => {
   it('does not connect while anonymous', () => {
     clearSession('manual')
-    renderHook(() => useLeaderboardStream())
+    renderHook(() => useLeaderboardStream(), { wrapper })
     expect(connectEventStream).not.toHaveBeenCalled()
   })
 
   it('applies ranking.updated with a populated round', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     const serverTime = new Date('2026-09-05T12:00:00.000Z')
     emit({ type: 'ranking.updated', serverTime, round: roundRanking, event: eventRanking })
@@ -100,7 +109,7 @@ describe('useLeaderboardStream', () => {
 
   it('applies ranking.updated with a null round (no active round)', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'ranking.updated',
@@ -115,7 +124,7 @@ describe('useLeaderboardStream', () => {
 
   it('applies heartbeat, updating only serverTime', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'ranking.updated',
@@ -132,7 +141,7 @@ describe('useLeaderboardStream', () => {
 
   it('reflects connectionStatus changes', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     expect(result.current.connectionStatus).toBe('connecting')
     emitStatus('open')
@@ -143,7 +152,7 @@ describe('useLeaderboardStream', () => {
 
   it('disconnects on logout / unmount', () => {
     setSession(fakeUser, 'tok-1')
-    const { unmount } = renderHook(() => useLeaderboardStream())
+    const { unmount } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     unmount()
 
@@ -152,7 +161,7 @@ describe('useLeaderboardStream', () => {
 
   it('sets activeRoundId from state.sync', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'state.sync',
@@ -167,7 +176,7 @@ describe('useLeaderboardStream', () => {
 
   it('sets activeRoundId on round.opened, before any ranking.updated arrives', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'round.opened',
@@ -182,7 +191,7 @@ describe('useLeaderboardStream', () => {
 
   it('clears activeRoundId on round.closed', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'round.opened',
@@ -195,26 +204,37 @@ describe('useLeaderboardStream', () => {
     expect(result.current.activeRoundId).toBeNull()
   })
 
-  it('calls onRoundChange on round.opened and round.closed', () => {
+  // Was an `onRoundChange` callback on this hook; since #274 the round-change
+  // signal is `roundChangedAt` on the shared provider, which the route reads
+  // instead. Same two events, same two notifications — one connection.
+  it('advances roundChangedAt on round.opened and round.closed, on the same connection', () => {
     setSession(fakeUser, 'tok-1')
-    const onRoundChange = vi.fn()
-    renderHook(() => useLeaderboardStream(onRoundChange))
+    const { result } = renderHook(
+      () => ({ leaderboard: useLeaderboardStream(), round: useRoundStream() }),
+      { wrapper },
+    )
 
+    const openedAt = new Date('2026-09-05T12:00:00.000Z')
     emit({
       type: 'round.opened',
-      serverTime: new Date(),
+      serverTime: openedAt,
       roundId: 'r1',
       closesAt: new Date('2026-09-05T13:00:00.000Z'),
     })
-    expect(onRoundChange).toHaveBeenCalledTimes(1)
+    expect(result.current.round.roundChangedAt).toEqual(openedAt)
+    expect(result.current.leaderboard.activeRoundId).toBe('r1')
 
-    emit({ type: 'round.closed', serverTime: new Date(), roundId: 'r1' })
-    expect(onRoundChange).toHaveBeenCalledTimes(2)
+    const closedAt = new Date('2026-09-05T12:30:00.000Z')
+    emit({ type: 'round.closed', serverTime: closedAt, roundId: 'r1' })
+    expect(result.current.round.roundChangedAt).toEqual(closedAt)
+    expect(result.current.leaderboard.activeRoundId).toBeNull()
+
+    expect(connectEventStream).toHaveBeenCalledTimes(1)
   })
 
   it('keeps activeRoundId in sync with ranking.updated', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'ranking.updated',
@@ -230,7 +250,7 @@ describe('useLeaderboardStream', () => {
 
   it('hydrates closesAt from state.sync', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'state.sync',
@@ -245,7 +265,7 @@ describe('useLeaderboardStream', () => {
 
   it('sets closesAt on round.opened and clears it on round.closed', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'round.opened',
@@ -261,7 +281,7 @@ describe('useLeaderboardStream', () => {
 
   it('updates closesAt on round.extended for the active round only', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'round.opened',
@@ -299,7 +319,7 @@ describe('useLeaderboardStream — offline detection', () => {
 
   it('flags the stream as offline after OFFLINE_AFTER_MS without an open connection', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     expect(result.current.isLive).toBe(false)
     expect(result.current.isOffline).toBe(false)
@@ -317,7 +337,7 @@ describe('useLeaderboardStream — offline detection', () => {
   // that never comes back would never be reported as offline.
   it('still goes offline while the client keeps re-announcing "reconnecting"', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     for (let elapsed = 0; elapsed < OFFLINE_AFTER_MS; elapsed += 2000) {
       emitStatus('reconnecting')
@@ -329,7 +349,7 @@ describe('useLeaderboardStream — offline detection', () => {
 
   it('does not flag a blip that reconnects before the threshold', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emitStatus('open')
     emitStatus('reconnecting')
@@ -343,7 +363,7 @@ describe('useLeaderboardStream — offline detection', () => {
 
   it('clears the offline flag once the connection opens again', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     act(() => vi.advanceTimersByTime(OFFLINE_AFTER_MS))
     expect(result.current.isOffline).toBe(true)
@@ -357,7 +377,7 @@ describe('useLeaderboardStream — offline detection', () => {
 describe('useLeaderboardStream — reconnect()', () => {
   it('drops the current connection and opens a new one', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
     expect(connectEventStream).toHaveBeenCalledTimes(1)
 
     act(() => result.current.reconnect())
@@ -370,7 +390,7 @@ describe('useLeaderboardStream — reconnect()', () => {
   // already on screen — only a logout resets the state.
   it('keeps the last ranking while reconnecting', () => {
     setSession(fakeUser, 'tok-1')
-    const { result } = renderHook(() => useLeaderboardStream())
+    const { result } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     emit({
       type: 'ranking.updated',
@@ -387,7 +407,7 @@ describe('useLeaderboardStream — reconnect()', () => {
 
   it('keeps a stable identity across renders', () => {
     setSession(fakeUser, 'tok-1')
-    const { result, rerender } = renderHook(() => useLeaderboardStream())
+    const { result, rerender } = renderHook(() => useLeaderboardStream(), { wrapper })
 
     const first = result.current.reconnect
     rerender()

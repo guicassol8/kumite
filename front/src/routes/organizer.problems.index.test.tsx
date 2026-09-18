@@ -68,6 +68,15 @@ const publishedProblem = {
   ],
 }
 
+const archivedProblem = {
+  id: 'p4',
+  points: 15,
+  difficulty: 'medium',
+  status: 'archived',
+  testCaseCount: 3,
+  translations: [{ locale: 'pt', title: 'Fila' }],
+}
+
 const untitledProblem = {
   id: 'p3',
   points: 5,
@@ -161,5 +170,84 @@ describe('OrganizerProblemsList', () => {
 
     await waitFor(() => expect(mockedArchive).toHaveBeenCalledWith({ param: { id: 'p1' } }))
     await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(2))
+  })
+
+  // Identity § 5, verifiable through `data-variant` rather than through a
+  // colour a jsdom test cannot see. The paint itself is asserted in the
+  // browser (e2e/organizer-identity.spec.ts).
+  it('paints the difficulty trio with the outlined identity badges', async () => {
+    mockedList.mockResolvedValue(
+      jsonResponse(200, [draftProblem, untitledProblem, publishedProblem]),
+    )
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-problems-table')).toBeDefined())
+    expect(screen.getByTestId('organizer-problems-difficulty-p1').dataset.variant).toBe('success')
+    expect(screen.getByTestId('organizer-problems-difficulty-p3').dataset.variant).toBe('warning')
+    expect(screen.getByTestId('organizer-problems-difficulty-p2').dataset.variant).toBe(
+      'destructive',
+    )
+  })
+
+  it('paints the state badges and strikes the archived one through', async () => {
+    mockedList.mockResolvedValue(
+      jsonResponse(200, [draftProblem, publishedProblem, archivedProblem]),
+    )
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-problems-table')).toBeDefined())
+    expect(screen.getByTestId('organizer-problems-status-p2').dataset.variant).toBe('default')
+    expect(screen.getByTestId('organizer-problems-status-p1').dataset.variant).toBe('secondary')
+
+    const archived = screen.getByTestId('organizer-problems-status-p4')
+    expect(archived.dataset.variant).toBe('secondary')
+    // Struck through, so "arquivado" does not rest on colour alone (§ 3).
+    expect(archived.className).toContain('line-through')
+  })
+
+  it('keeps every row action and its testid, archived rows included', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [draftProblem, archivedProblem]))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-problems-table')).toBeDefined())
+    expect(screen.getByTestId('organizer-problems-edit-p1')).toBeDefined()
+    expect(screen.getByTestId('organizer-problems-archive-p1')).toBeDefined()
+    // An archived problem can still be edited but not archived again.
+    expect(screen.getByTestId('organizer-problems-edit-p4')).toBeDefined()
+    expect(screen.queryByTestId('organizer-problems-archive-p4')).toBeNull()
+  })
+
+  it('repeats every column header inside the row as its card label', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [draftProblem]))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-problems-table')).toBeDefined())
+
+    // Below 768px the row is a card and each cell carries its own label; the
+    // labels come from the column headers, so no new catalog key is needed.
+    const row = screen.getByTestId('organizer-problems-row-p1')
+    for (const label of ['Título', 'Dificuldade', 'Pontos', 'Estado', 'Casos', 'Ações']) {
+      expect(row.textContent).toContain(label)
+    }
+
+    const table = screen.getByTestId('organizer-problems-table')
+    const header = table.querySelector('th')
+    expect(header?.className).toContain('font-display')
+    expect(header?.className).toContain('uppercase')
+  })
+
+  it('never puts the table inside a horizontally scrolling wrapper', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [draftProblem]))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-problems-table')).toBeDefined())
+
+    // `ui/table.tsx` would have wrapped it in `overflow-x-auto`, which § 5
+    // forbids as the answer to overflow.
+    let node: HTMLElement | null = screen.getByTestId('organizer-problems-table')
+    while (node) {
+      expect(node.className).not.toContain('overflow-x')
+      node = node.parentElement
+    }
   })
 })

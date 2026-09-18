@@ -152,6 +152,7 @@ function TeamCard({
               id: 'email',
               header: t('organizer.teamModeration.columns.email'),
               width: 'w-[26%]',
+              wrapAnywhere: true,
               cell: (member) => member.email,
             },
             {
@@ -165,7 +166,7 @@ function TeamCard({
               header: t('organizer.teamModeration.columns.role'),
               width: 'w-[14%]',
               cell: (member) => (
-                <Badge variant="outline" className="whitespace-normal">
+                <Badge variant="outline" className="whitespace-normal wrap-normal">
                   {t(ROLE_KEYS[member.role])}
                 </Badge>
               ),

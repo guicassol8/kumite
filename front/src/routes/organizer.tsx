@@ -13,8 +13,15 @@ export const Route = createFileRoute('/organizer')({
 // and a border on the container would draw one line under the whole bar
 // instead of under the active tab. On the item it follows the tab to whichever
 // row it wrapped onto.
-const TAB_CLASS = 'border-transparent border-b-2 pb-2 font-medium text-muted-foreground text-sm'
+// The active/inactive split has to go through `activeProps`/`inactiveProps`,
+// not through one base class plus an override: TanStack *appends*
+// `activeProps.className`, it does not run it through tailwind-merge, so a
+// `border-transparent` in the base and a `border-brand` in `activeProps` both
+// survive into the attribute and the winner is whichever Tailwind emitted
+// last in the stylesheet — `border-transparent`, as the browser test caught.
+const TAB_CLASS = 'border-b-2 pb-2 font-medium text-sm'
 const TAB_ACTIVE_CLASS = 'border-brand text-foreground'
+const TAB_INACTIVE_CLASS = 'border-transparent text-muted-foreground'
 
 // Exported for `organizer.test.tsx`, which mounts the shell on a minimal route
 // tree (the `header.test.tsx` recipe) instead of `routeTree.gen` — the real
@@ -42,6 +49,7 @@ export function OrganizerScreen() {
           // route, since they all sit under /organizer.
           activeOptions={{ exact: true }}
           activeProps={{ className: TAB_ACTIVE_CLASS }}
+          inactiveProps={{ className: TAB_INACTIVE_CLASS }}
           className={TAB_CLASS}
         >
           {t('organizer.nav.overview')}
@@ -50,6 +58,7 @@ export function OrganizerScreen() {
           to="/organizer/problems"
           data-testid="organizer-nav-problems"
           activeProps={{ className: TAB_ACTIVE_CLASS }}
+          inactiveProps={{ className: TAB_INACTIVE_CLASS }}
           className={TAB_CLASS}
         >
           {t('organizer.nav.problems')}
@@ -58,6 +67,7 @@ export function OrganizerScreen() {
           to="/organizer/rounds"
           data-testid="organizer-nav-rounds"
           activeProps={{ className: TAB_ACTIVE_CLASS }}
+          inactiveProps={{ className: TAB_INACTIVE_CLASS }}
           className={TAB_CLASS}
         >
           {t('organizer.nav.rounds')}
@@ -66,6 +76,7 @@ export function OrganizerScreen() {
           to="/organizer/event-config"
           data-testid="organizer-nav-event-config"
           activeProps={{ className: TAB_ACTIVE_CLASS }}
+          inactiveProps={{ className: TAB_INACTIVE_CLASS }}
           className={TAB_CLASS}
         >
           {t('organizer.nav.eventConfig')}
@@ -74,6 +85,7 @@ export function OrganizerScreen() {
           to="/organizer/teams"
           data-testid="organizer-nav-teams"
           activeProps={{ className: TAB_ACTIVE_CLASS }}
+          inactiveProps={{ className: TAB_INACTIVE_CLASS }}
           className={TAB_CLASS}
         >
           {t('organizer.nav.teams')}
@@ -82,6 +94,7 @@ export function OrganizerScreen() {
           to="/organizer/users"
           data-testid="organizer-nav-users"
           activeProps={{ className: TAB_ACTIVE_CLASS }}
+          inactiveProps={{ className: TAB_INACTIVE_CLASS }}
           className={TAB_CLASS}
         >
           {t('organizer.nav.users')}

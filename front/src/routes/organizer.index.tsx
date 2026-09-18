@@ -305,7 +305,12 @@ function OrganizerOverviewScreen() {
               </Card>
             )}
 
-            <Card data-testid="overview-shortcuts-card">
+            {/* With a round open there is no podium, so the shortcuts take
+                the whole row instead of leaving half of it blank. */}
+            <Card
+              data-testid="overview-shortcuts-card"
+              className={cn(!(!activeRound && lastClosedRound) && 'lg:col-span-2')}
+            >
               <CardHeader>
                 <CardTitle className={CARD_TITLE}>
                   {t('organizer.overview.shortcuts.title')}

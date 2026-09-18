@@ -226,7 +226,7 @@ function OrganizerUsersScreen() {
               {
                 id: 'name',
                 header: t('organizer.users.columns.name'),
-                width: 'w-[15%]',
+                width: 'w-[14%]',
                 // Accounts predating #122 have no name — an em dash, not a
                 // blank cell, so the column still reads as filled in.
                 cell: (item) => (
@@ -236,26 +236,28 @@ function OrganizerUsersScreen() {
               {
                 id: 'email',
                 header: t('organizer.users.columns.email'),
-                width: 'w-[19%]',
-                // The widest string in the panel, and the one with no spaces
-                // to break at — `wrap-anywhere` (from PanelTable's cell) is
-                // what keeps it from pushing the page into horizontal scroll.
+                width: 'w-[13%]',
+                // The widest string in the panel, and the only one with no
+                // spaces to break at — the one column that earns
+                // `wrapAnywhere`, and what keeps it from pushing the page
+                // into horizontal scroll.
+                wrapAnywhere: true,
                 cell: (item) => item.email,
               },
               {
                 id: 'university',
                 header: t('organizer.users.columns.university'),
-                width: 'w-[11%]',
+                width: 'w-[13%]',
                 cell: (item) => <UniversityBadge university={item.university} />,
               },
               {
                 id: 'role',
                 header: t('organizer.users.columns.role'),
-                width: 'w-[13%]',
+                width: 'w-[16%]',
                 cell: (item) => (
                   <Badge
                     variant="outline"
-                    className="whitespace-normal"
+                    className="whitespace-normal wrap-normal"
                     data-testid={`organizer-users-role-${item.id}`}
                   >
                     {t(ROLE_KEYS[item.role])}
@@ -265,17 +267,17 @@ function OrganizerUsersScreen() {
               {
                 id: 'team',
                 header: t('organizer.users.columns.team'),
-                width: 'w-[13%]',
+                width: 'w-[11%]',
                 cell: (item) => item.team?.name ?? t('organizer.users.noTeam'),
               },
               {
                 id: 'status',
                 header: t('organizer.users.columns.status'),
-                width: 'w-[12%]',
+                width: 'w-[15%]',
                 cell: (item) => (
                   <Badge
                     variant={item.active ? 'outline' : 'secondary'}
-                    className="whitespace-normal"
+                    className="whitespace-normal wrap-normal"
                     data-testid={`organizer-users-status-${item.id}`}
                   >
                     {item.active
@@ -287,7 +289,7 @@ function OrganizerUsersScreen() {
               {
                 id: 'actions',
                 header: t('organizer.users.columns.actions'),
-                width: 'w-[17%]',
+                width: 'w-[18%]',
                 mobileLabelVisible: false,
                 cell: (item) => (
                   <UserRowActions user={item} isSelf={session.user?.id === item.id} />

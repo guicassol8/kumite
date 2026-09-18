@@ -392,6 +392,8 @@ function EventCodesSection({ eventCodes }: { eventCodes: EventCode[] }) {
             id: 'suffixes',
             header: t('organizer.eventConfig.codes.columns.suffixes'),
             width: 'w-[34%]',
+            // Domain suffixes are unbreakable tokens, same as an e-mail.
+            wrapAnywhere: true,
             cell: (eventCode) => eventCode.allowedEmailSuffixes.join(', '),
           },
           {
@@ -401,7 +403,7 @@ function EventCodesSection({ eventCodes }: { eventCodes: EventCode[] }) {
             cell: (eventCode) => (
               <Badge
                 variant={eventCode.active ? 'default' : 'secondary'}
-                className="whitespace-normal"
+                className="whitespace-normal wrap-normal"
                 data-testid={`event-config-codes-active-${eventCode.university}`}
               >
                 {t(

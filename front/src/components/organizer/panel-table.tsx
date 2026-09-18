@@ -14,6 +14,13 @@ export type PanelTableColumn<T> = {
   width?: string
   /** `false` keeps the mobile label in the accessibility tree but hides it visually. */
   mobileLabelVisible?: boolean
+  /**
+   * Breaks the value mid-word when it has nowhere else to break. Only for a
+   * column whose content is one unbreakable token — an e-mail address. Every
+   * other column wraps between words, so a name never comes out as
+   * "Ada Lovelac / e".
+   */
+  wrapAnywhere?: boolean
   headerTestId?: string
   headerClassName?: string
   cellClassName?: string
@@ -73,7 +80,11 @@ export function PanelTable<T>({
               data-testid={column.headerTestId}
               className={cn(
                 EYEBROW,
-                'px-3 py-3 text-left align-middle text-muted-foreground',
+                // `wrap-break-word`, not `wrap-anywhere`: a header only breaks
+                // when the whole word cannot fit, instead of bleeding into the
+                // next column — "UNIVERSIDAD" over "ROL" is what that looked
+                // like at 768px in Spanish.
+                'wrap-break-word px-3 py-3 text-left align-middle text-muted-foreground',
                 column.width,
                 column.headerClassName,
               )}
@@ -113,7 +124,12 @@ export function PanelTable<T>({
                 >
                   {column.header}
                 </span>
-                <span className="flex min-w-0 flex-wrap items-center justify-end gap-2 text-right wrap-anywhere md:justify-start md:text-left">
+                <span
+                  className={cn(
+                    'flex min-w-0 flex-wrap items-center justify-end gap-2 text-right md:justify-start md:text-left',
+                    column.wrapAnywhere ? 'wrap-anywhere' : 'wrap-break-word',
+                  )}
+                >
                   {column.cell(row)}
                 </span>
               </td>

@@ -171,10 +171,12 @@ describe('OrganizerTeamsScreen', () => {
     renderScreen()
 
     await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+    // Below 768px each cell repeats its column header as a card label, so the
+    // cell reads "NomeAda Lovelace"; the value is the last span in the cell.
     const named = screen.getByTestId('team-moderation-member-row-u1')
-    expect(named.querySelectorAll('td')[0]?.textContent).toBe('Ada Lovelace')
+    expect(named.querySelectorAll('td')[0]?.lastElementChild?.textContent).toBe('Ada Lovelace')
     const legacy = screen.getByTestId('team-moderation-member-row-u2')
-    expect(legacy.querySelectorAll('td')[0]?.textContent).toBe('—')
+    expect(legacy.querySelectorAll('td')[0]?.lastElementChild?.textContent).toBe('—')
     expect(legacy.textContent).toContain('cross@merida.edu.mx')
   })
 
@@ -331,5 +333,50 @@ describe('OrganizerTeamsScreen', () => {
       expect(screen.getByTestId('team-moderation-remove-team-error-team-2')).toBeDefined(),
     )
     expect(mockedTeamsGet).toHaveBeenCalledTimes(1)
+  })
+})
+
+// #223: the moderation cards are a reading surface, so they move to the panel
+// table like every other listing. The overlays they open (remove team, remove
+// member) belong to #233 and are untouched here.
+describe('organizer teams — identity (#223)', () => {
+  it('renders each member list as the panel table, never inside a scrolling wrapper', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-members-team-1')).toBeDefined())
+    const table = screen.getByTestId('team-moderation-members-team-1')
+    expect(table.className).toContain('table-fixed')
+    expect(table.querySelector('th')?.className).toContain('font-display')
+
+    // The member list inside a card was the worst overflow on a phone.
+    let node: HTMLElement | null = table
+    while (node) {
+      expect(node.className).not.toContain('overflow-x')
+      node = node.parentElement
+    }
+  })
+
+  it('shows the member count in the card header in tabular display numerals', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+    const count = screen.getByTestId('team-moderation-member-count-team-1')
+    expect(count.className).toContain('font-display')
+    expect(count.className).toContain('tabular-nums')
+    expect(count.getAttribute('aria-label')).toBe('Integrantes')
+  })
+
+  it('keeps the destructive team action as an outline, and every row testid', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+    // This issue only *consumes* the crimson outline #216 gave the button.
+    expect(screen.getByTestId('team-moderation-remove-team-action-team-1')).toBeDefined()
+    expect(screen.getByTestId('team-moderation-move-select-u1')).toBeDefined()
+    expect(screen.getByTestId('team-moderation-move-action-u1')).toBeDefined()
+    expect(screen.getByTestId('team-moderation-remove-member-action-u1')).toBeDefined()
   })
 })

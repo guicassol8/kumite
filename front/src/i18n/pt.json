@@ -366,6 +366,7 @@
         "retry": "Tentar novamente"
       },
       "frozenBadge": "Congelado",
+      "memberCountLabel": "Integrantes",
       "role": {
         "participant": "Participante",
         "organizer": "Organizador"

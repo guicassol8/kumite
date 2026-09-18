@@ -41,9 +41,9 @@ pnpm install   # node_modules are per-worktree
    - front UI → `data-testid` on new interactive elements + keys in the three
      i18n catalogs;
    - db change → `db/schema.ts` + `pnpm --filter @kumite/back db:generate`,
-     commit the migration; consult the kata-docs MCP server first for any
-     kata-side question the migration raises (DI, verify rules), falling
-     back to `~/Projetos/kata` directly if it's unavailable or fails.
+     commit the migration; for any kata-side question it raises (DI, verify
+     rules) read `~/Projetos/kata/docs` or the kata-docs MCP server when it
+     is enabled — never guess.
 5. One conventional commit per coherent step (`feat: …`, `test: …`).
 
 ## House rules
@@ -67,23 +67,24 @@ PR body: `Fixes #N`, a short what/how summary, the test plan, and an empty
 `## Evidence` section — reviewing the task fills it. The task is **NOT** done
 at PR creation.
 
-After the PR merges, clean up:
+After the PR merges, clean up from the main checkout — this removes every
+worktree whose branch already landed on `origin/develop` and is clean, with
+its throwaway Postgres:
 
 ```bash
-git worktree remove .worktrees/task-<N>-<slug>
-git branch -d task/<N>-<slug>
+pnpm worktree:prune          # --dry-run to list first
 ```
 
-## Kata feedback (attempt every time)
+## Kata feedback (only when kata was in frame)
 
-This loop is the heaviest kata surface of the whole workflow — `kata verify`,
-hurl, the DI/JWT/error idioms, maybe kata-docs lookups mid-flight. Before
-the handoff, attempt a `kata-feedback/` entry: not gated on hitting a bug —
-a clean run with nothing to report is still worth a line. Where you have
-them, include metrics: turns or tokens spent chasing a kata-docs answer vs.
-the task's total, any `kata verify`/hook friction, whether the harness
-caught something real or just added ceremony. See `AGENTS.md` § Kata
-framework feedback and `kata-feedback/README.md` for the format.
+This loop is where kata shows up most — `kata verify`, hurl, the
+DI/JWT/error idioms. Before the handoff: if kata was genuinely in frame and
+you learned something or hit friction (a false positive, a rule that
+blocked the plan, a hurl trap, a type that lied), write a `kata-feedback/`
+entry with the metrics you have. If it was out of frame — a front-only or
+docs-only task where verify merely ran green — append one line to
+`kata-feedback/LEDGER.csv` and nothing else. Rule and format: `AGENTS.md`
+§ Kata framework feedback, `kata-feedback/README.md`.
 
 ## Handoff (MANDATORY)
 

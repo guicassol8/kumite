@@ -30,16 +30,18 @@ ready to paste into a new session. The full chain is in `docs/workflow.md`
 
 ## Claude-specific notes
 
-- The `kata-docs` MCP server (`.mcp.json`) answers questions about the kata
-  framework — query it before guessing any kata API.
-- Any task touching kata (kata-docs MCP, `kata verify`, hurl, DI/JWT/error
-  surfaces)? Attempt a report in `kata-feedback/` at the repo root — bugs,
-  gaps, improvement ideas, plain observations, and metrics (tokens/turns
-  spent on kata-docs lookups, whether they paid off) all count, no fix
-  required. See `AGENTS.md` § Kata framework feedback. Never fix kata itself
-  as a side effect of a kumite task.
+- The `kata-docs` MCP server (`.mcp.json`) is optional — it may be disabled
+  in `settings.local.json`. When it is available, prefer it for kata API
+  questions; when it is not, read `~/Projetos/kata/docs` and the bundled
+  `.d.ts` directly, and do not report its absence.
+- Kata feedback: a report in `kata-feedback/` only when kata was genuinely
+  in frame or caused friction; otherwise one line in `kata-feedback/LEDGER.csv`.
+  See `AGENTS.md` § Kata framework feedback. Never fix kata itself as a side
+  effect of a kumite task.
 - Hooks: PostToolUse auto-formats and runs `kata verify` on back edits; Stop
-  runs the full gate ladder (typecheck → verify → tests) and blocks until green.
+  runs the full gate ladder (typecheck → verify → tests) and blocks until
+  green. The pre-commit (lefthook) runs format, typecheck and verify only —
+  the test suites run once, in the Stop hook and in CI (#288).
 - Worktrees: prefer the harness's own isolation — `EnterWorktree` for this
   session's task work, `isolation: "worktree"` when spawning subagents that
   edit files. Manual fallback:

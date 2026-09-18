@@ -9,7 +9,12 @@ description: Implements an approved GitHub Issue plan on a task branch with TDD,
 
 ## Claude Code specifics
 
-- Prefer EnterWorktree over the manual worktree commands in Preconditions.
+- Prefer EnterWorktree over the manual worktree commands in Preconditions —
+  but EnterWorktree branches from `origin/main`, and this repo integrates on
+  `develop`. Right after entering, with a clean tree:
+  `git fetch origin && git reset --hard origin/develop`, then rename the
+  branch to `task/<N>-<slug>` (`git branch -m`). Skipping this bases the
+  task on the last release instead of on develop.
 - Use AskUserQuestion for missing decisions under the House rules.
 - Claude Code's hooks (PostToolUse/Stop, documented in `CLAUDE.md`
   § Claude-specific notes) already run the Gates loop automatically — the

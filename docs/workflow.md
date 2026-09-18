@@ -115,9 +115,14 @@ pnpm install        # node_modules are per-worktree, not shared
   point that worktree's `back/.env` `DATABASE_URL` at the same port
   (`postgres://kumite:kumite@localhost:5439/kumite`) and run
   `pnpm --filter @kumite/back db:migrate` (+ `db:seed` if needed).
-- After the PR merges: `docker compose down -v` (if this worktree ran its own
-  Postgres) before `git worktree remove .worktrees/task-<N>-<slug>` and
-  delete the branch.
+- After the PR merges: `pnpm worktree:prune` from the main checkout. It
+  removes every worktree whose branch is already in `origin/develop` and
+  whose tree is clean, together with that worktree's compose project and
+  `docker run` Postgres (`--dry-run` lists first). Dirty trees and unmerged
+  branches are always kept — they may be another agent's.
+- Reviewing with Playwright rewrites `front/e2e/evidence/<n>/` for every
+  spec it runs, not only the current issue's: `pnpm evidence:restore <issue>`
+  before committing evidence.
 - In Claude Code, prefer the harness's managed isolation (EnterWorktree /
   subagent `isolation: "worktree"`) — it creates and cleans worktrees itself.
 
@@ -134,11 +139,18 @@ This is a contract, not tooling trivia: a task is **not ready for PR or
 review** while any of the three fails — no exceptions for "it's probably
 fine" or "just docs nearby."
 
-- **Claude Code**: already automated. The Stop hook (`.claude/hooks/stop.sh`)
-  runs this exact ladder and blocks the session from ending while any step
-  fails — but only when the working tree carries uncommitted changes under
-  `back/`, `front/`, `blocks/` or `package.json`. Don't run it by hand too;
-  that's pure duplication of what the hook already gates.
+- **Where each step runs.** The pre-commit (`lefthook.yml`) runs format,
+  typecheck and `kata verify` on every commit — fast, and none of them
+  needs a database. The test suites run **once**: in Claude Code's Stop
+  hook, by hand before the PR for any other agent, and always in CI. They
+  used to run in the pre-commit too, and two suites truncating the same
+  local Postgres in parallel is where the OOM-killed commits and the
+  phantom test failures came from (#288).
+- **Claude Code**: the Stop hook (`.claude/hooks/stop.sh`) runs the full
+  ladder and blocks the session from ending while any step fails — but only
+  when the working tree carries uncommitted changes under `back/`, `front/`,
+  `blocks/` or `package.json`. Don't run the tests by hand too; that's pure
+  duplication of what the hook already gates.
 - **Any other agent (e.g. Codex)**: do not assume Claude Code's hooks run.
   Run the three commands before considering the implementation done or
   opening/updating the PR, unless successful hooks already ran the same

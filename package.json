@@ -16,6 +16,8 @@
     "format": "biome check --write .",
     "format:check": "biome check .",
     "check": "pnpm format:check && pnpm typecheck && pnpm verify && pnpm test",
+    "worktree:prune": "bash scripts/worktree-prune.sh",
+    "evidence:restore": "bash scripts/evidence-restore.sh",
     "prepare": "lefthook install"
   },
   "devDependencies": {

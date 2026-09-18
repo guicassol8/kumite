@@ -4,7 +4,7 @@ import { defineRoute } from '../../context'
 import { requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
 import type { SseEvent } from './sse.schema'
-import { buildRankingUpdatedEvent, buildStateSyncEvent, isUserStillActive } from './sse.service'
+import { buildRankingUpdatedEvent, buildStateSyncEvent } from './sse.service'
 
 // 401 (requireUser) short-circuits before output validation runs (kata
 // ADR-0011), same as every other guarded route — not declared here.
@@ -43,23 +43,33 @@ export const sseRoute = defineRoute({
       // calling it ends the handler the same way `stream.onAbort` already
       // does, just triggered by a deactivation instead of a client hangup.
       let closeStream: (() => void) | undefined
+      // Latched instead of relying on `closeStream` alone: a deactivation can
+      // land while the snapshot below is still being built, when `closeStream`
+      // is still `undefined` and there is nothing to call. The final
+      // `await new Promise` reads this before it ever waits, so that race ends
+      // the stream instead of leaving it open forever.
+      let closed = false
+      const endStream = () => {
+        closed = true
+        unsubscribe()
+        closeStream?.()
+      }
       const unsubscribe = c.get('sseBus').subscribe((event) => {
+        // #274: the bus also carries internal control events that never go to
+        // the wire (see SseControlEvent in sse.schema.ts). Narrowing them out
+        // first is what keeps `write` below reachable only by wire events —
+        // and it replaces #232's per-heartbeat `findUserById`, which cost one
+        // query per connection per second just to notice a deactivation.
+        if (event.type === 'user.deactivated') {
+          if (event.userId === currentUser.id) endStream()
+          return
+        }
+
         if (buffering) {
           pending.push(event)
           return
         }
         void write(event)
-
-        // #232: the only recurring point on an otherwise connect-once stream
-        // — piggyback the deactivation recheck on it so a banned account's
-        // stream closes without waiting for a client-side reconnect.
-        if (event.type === 'heartbeat') {
-          void isUserStillActive(c.get('db'), currentUser.id).then((stillActive) => {
-            if (stillActive) return
-            unsubscribe()
-            closeStream?.()
-          })
-        }
       })
 
       try {
@@ -87,6 +97,11 @@ export const sseRoute = defineRoute({
       }
 
       await new Promise<void>((resolve) => {
+        // Already ended while the snapshot was being built — never wait.
+        if (closed) {
+          resolve()
+          return
+        }
         closeStream = resolve
         stream.onAbort(() => {
           unsubscribe()

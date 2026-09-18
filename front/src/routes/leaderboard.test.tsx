@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const connectEventStream = vi.fn()
@@ -53,25 +53,17 @@ function jsonResponse(status: number, body: unknown): any {
   return { ok: status >= 200 && status < 300, status, json: async () => body }
 }
 
-// The screen owns a dedicated connection alongside the app-wide one opened by
-// `RoundStreamProvider` in `__root` (#217). That provider is a fixed ancestor
-// with no round.opened/round.closed/ranking.updated consumer of its own to
-// disambiguate by shape, but its connect effect commits right after the
-// screen's initial one and it never reconnects — so it is always exactly the
-// second call ever made, constant across the whole file. Excluding it leaves
-// only the leaderboard's own connection, including any later one opened by
-// `reconnect()`.
-function leaderboardConnectionCalls() {
-  return connectEventStream.mock.calls.filter((_, index) => index !== 1)
-}
-
+// Since #274 there is exactly ONE connection on this screen — the app-wide one
+// opened by `RoundStreamProvider` in `__root`, which the leaderboard now reads
+// from instead of opening a second one of its own. So the latest call is
+// always the live connection, including the one `reconnect()` opens.
 function emit(event: SseEvent) {
-  const onEvent = leaderboardConnectionCalls().at(-1)?.[0] as (e: SseEvent) => void
+  const onEvent = connectEventStream.mock.calls.at(-1)?.[0] as (e: SseEvent) => void
   act(() => onEvent(event))
 }
 
 function emitStatus(status: 'connecting' | 'open' | 'reconnecting') {
-  const onStatusChange = leaderboardConnectionCalls().at(-1)?.[1] as (s: string) => void
+  const onStatusChange = connectEventStream.mock.calls.at(-1)?.[1] as (s: string) => void
   act(() => onStatusChange(status))
 }
 
@@ -337,7 +329,12 @@ describe('LeaderboardScreen — identity redesign (#220)', () => {
     })
 
     await waitFor(() => expect(screen.getByTestId('leaderboard-live-chip')).toBeDefined())
-    expect(screen.getByTestId('round-countdown').className).toContain('text-brand-text')
+    // Scoped to the screen's own <main>: since #274 the header shares this one
+    // connection, so it renders its own `round-countdown` chip as soon as the
+    // round opens — exactly as it always did in the browser.
+    expect(within(screen.getByRole('main')).getByTestId('round-countdown').className).toContain(
+      'text-brand-text',
+    )
   })
 })
 
@@ -863,11 +860,13 @@ describe('LeaderboardScreen — retry', () => {
     renderLeaderboard()
 
     await waitFor(() => expect(screen.getByTestId('leaderboard-error')).toBeDefined())
-    expect(leaderboardConnectionCalls()).toHaveLength(1)
+    // One connection for the whole screen (#274) — the retry reopens that one,
+    // rather than a second socket only this route could see.
+    expect(connectEventStream.mock.calls).toHaveLength(1)
 
     fireEvent.click(screen.getByTestId('leaderboard-error-retry'))
 
-    await waitFor(() => expect(leaderboardConnectionCalls()).toHaveLength(2))
+    await waitFor(() => expect(connectEventStream.mock.calls).toHaveLength(2))
   })
 })
 
@@ -1091,7 +1090,9 @@ describe('LeaderboardScreen — presentation mode', () => {
   it('shows the round countdown and live chip in normal mode with an active round (#220)', async () => {
     await renderWithActiveRound()
 
-    expect(screen.getByTestId('round-countdown')).toBeDefined()
+    // Scoped to <main> for the same reason as above: the header's own chip is
+    // a second `round-countdown` once the shared stream reports a live round.
+    expect(within(screen.getByRole('main')).getByTestId('round-countdown')).toBeDefined()
     expect(screen.getByTestId('leaderboard-live-chip')).toBeDefined()
   })
 

@@ -61,7 +61,11 @@ describe('useEventStream', () => {
       round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
     })
 
-    expect(result.current).toEqual({
+    // Since #274 the same connection also feeds the leaderboard's reducer,
+    // exposed under `leaderboard` — split off here so the round slice can
+    // still be asserted exactly.
+    const { leaderboard, ...round } = result.current
+    expect(round).toEqual({
       currentRoundId: 'r1',
       closesAt: new Date('2026-09-02T12:30:00.000Z'),
       serverTime,
@@ -69,6 +73,7 @@ describe('useEventStream', () => {
       roundChangedAt: null,
       rankingUpdatedAt: null,
     })
+    expect(leaderboard.activeRoundId).toBe('r1')
   })
 
   it('round.opened sets the current round and calls onRoundChange', () => {
@@ -118,6 +123,38 @@ describe('useEventStream', () => {
     emit({ type: 'round.closed', serverTime: new Date(), roundId: 'other-round' })
 
     expect(result.current.currentRoundId).toBe('r4')
+  })
+
+  // #274: `roundChangedAt` is the provider's equivalent of the `onRoundChange`
+  // callback, and screens now derive their invalidation from it. The callback
+  // has always fired on every round.closed, so the timestamp has to move on
+  // every round.closed too — the two disagreeing is a silent regression in the
+  // window where `announceClosedRounds` holds a close back (up to
+  // JUDGE_TIMEOUT_MS + 10s, #176): a client that connects inside it gets
+  // `state.sync` with `round: null` and then a `round.closed` whose id matches
+  // nothing it is tracking.
+  it('round.closed for a different round still advances roundChangedAt', () => {
+    setSession(fakeUser, 'tok-1')
+    const onRoundChange = vi.fn()
+    const { result } = renderHook(() => useEventStream(onRoundChange))
+
+    const openedAt = new Date('2026-09-02T12:00:00.000Z')
+    emit({
+      type: 'round.opened',
+      serverTime: openedAt,
+      roundId: 'r4',
+      closesAt: new Date('2026-09-02T12:45:00.000Z'),
+    })
+    onRoundChange.mockClear()
+
+    const closedAt = new Date('2026-09-02T12:10:00.000Z')
+    emit({ type: 'round.closed', serverTime: closedAt, roundId: 'other-round' })
+
+    expect(result.current.roundChangedAt).toEqual(closedAt)
+    expect(onRoundChange).toHaveBeenCalledTimes(1)
+    // The rest of the round state stays keyed on the id, as before.
+    expect(result.current.currentRoundId).toBe('r4')
+    expect(result.current.closesAt).toEqual(new Date('2026-09-02T12:45:00.000Z'))
   })
 
   it('round.extended updates closesAt on the tracked round without invalidating', () => {

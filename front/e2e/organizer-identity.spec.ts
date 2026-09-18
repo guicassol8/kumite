@@ -276,21 +276,16 @@ async function noOverflow(page: Page) {
 }
 
 /**
- * The same criterion, scoped to the panel.
+ * The same criterion, plus the panel's own half: `<main>` does not scroll
+ * horizontally and no descendant of it crosses the viewport edge.
  *
- * At exactly 768px the whole-document check cannot pass yet, and not because
- * of anything on this screen: at that width the header flips to its desktop
- * layout and its right-hand cluster does not fit, pushing
- * `document.scrollWidth` to 791 (pt) / 827 (es). A probe run during #223
- * measured the identical numbers on `/teams` (#222) and `/leaderboard` (#220),
- * screens this issue does not touch, and found no overflowing element inside
- * `<main>` on any of them. That is the header's bug, filed as #297.
- *
- * So the panel proves its own half: `<main>` does not scroll horizontally and
- * no descendant of it crosses the viewport edge. Below 768px the header uses
- * its phone layout, so `noOverflow` above holds for the whole document and is
- * what the 390x844 acceptance criterion is asserted with. Once #297 lands,
- * this can widen back to the whole document at 768 too.
+ * This used to be a *replacement* for `noOverflow` at exactly 768px, because
+ * the whole-document check could not pass there — and not because of anything
+ * on this screen: at that width the header flipped to its desktop layout and
+ * its right-hand cluster did not fit, pushing `document.scrollWidth` to 791
+ * (pt) / 827 (es). #297 fixed the header, so both checks now run at 768 too
+ * (see the callers), and this one has gone back to being what it always
+ * should have been: the extra, panel-scoped detail.
  */
 async function noPanelOverflow(page: Page) {
   const report = await page.evaluate(() => {
@@ -537,8 +532,10 @@ test.describe('organizer panel identity (#223)', () => {
       await switchLanguage(page, language)
       // The whole point of the issue: at the breakpoint it is a table with the
       // columns compressed, and the page still does not scroll sideways —
-      // "Correo electrónico" and "Universidad" included.
+      // "Correo electrónico" and "Universidad" included. Whole document since
+      // #297 fixed the header, which is what used to force the panel scope.
       await expect(page.getByTestId('organizer-users-row-u-1')).toHaveCSS('display', 'table-row')
+      await noOverflow(page)
       await noPanelOverflow(page)
       if (language === 'es') await capture(page, '07-usuarios-desktop')
     }
@@ -636,10 +633,10 @@ test.describe('organizer panel identity (#223)', () => {
         await expect(page.getByTestId('organizer-heading')).toBeVisible()
         for (const language of LANGUAGES) {
           await switchLanguage(page, language)
-          // 390x844 is the written acceptance criterion and takes the whole
-          // document; 768 takes the panel, for the reason on `noPanelOverflow`.
-          if (size === PHONE) await noOverflow(page)
-          else await noPanelOverflow(page)
+          // Both widths take the whole document since #297; 768 also keeps the
+          // panel-scoped detail, which names the offending element.
+          await noOverflow(page)
+          if (size === BREAKPOINT) await noPanelOverflow(page)
         }
         await switchLanguage(page, 'pt')
       }

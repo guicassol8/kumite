@@ -30,9 +30,9 @@ ready to paste into a new session. The full chain is in `docs/workflow.md`
 § One step, one session.
 
 `orchestrating-batch` is the deliberate exception: it runs the whole chain in
-one chat, delegating each step to a fresh-context subagent instead of to a new
-chat. Same isolation, different boundary — `docs/workflow.md`
-§ One step, one session.
+one chat, delegating planning, implementation and review to a fresh-context
+subagent each instead of to a new chat. Same isolation, different boundary —
+`docs/workflow.md` § One step, one session.
 
 ## Claude-specific notes
 

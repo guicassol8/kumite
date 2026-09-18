@@ -48,13 +48,16 @@ implementation starts.
 
 **The one exception — batch mode.** What this rule protects is *context
 isolation*: no step may inherit the working context of the step before it.
-`docs/task-workflow/orchestrating-batch.md` takes 2–3 issues through all five
-steps in a single session by moving that boundary from the session to the
-subagent — each step runs in an agent spawned fresh for it and discarded
-after, while the orchestrating session holds only the batch state, the user's
-decisions and the relay. It never plans, codes or reviews itself. Anything
-that runs the steps in one shared context is a violation of this rule, not an
-instance of the exception.
+`docs/task-workflow/orchestrating-batch.md` takes 2–3 issues from picking to
+merge in a single session by moving that boundary from the session to the
+subagent — planning, implementation and review each run in an agent spawned
+fresh for them and discarded after, while the orchestrating session holds
+only the batch state, the user's decisions and the relay. It never plans,
+codes or reviews itself. Picking is the one step it keeps: selecting the
+batch *is* the state it carries, and it writes nothing before the user
+confirms. Anything that runs a planning, coding or review step in the shared
+orchestrating context is a violation of this rule, not an instance of the
+exception.
 
 ## Labels
 

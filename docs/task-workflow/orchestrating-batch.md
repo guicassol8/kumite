@@ -1,9 +1,9 @@
 # Orchestrating a batch
 
-Run **2–3 issues end to end in one session** by delegating every step to a
-subagent with a fresh context. Conventions in `docs/workflow.md`; what each
-step actually does stays in its own doc — this one only says who runs it, in
-what order, and where the user is asked.
+Run **2–3 issues end to end in one session** by delegating every step that
+plans, writes code or reviews to a subagent with a fresh context. Conventions
+in `docs/workflow.md`; what each step actually does stays in its own doc —
+this one only says who runs it, in what order, and where the user is asked.
 
 **Not for:** a single task (run the five steps, one session each), and never
 for doing a step yourself. The orchestrator does not plan, does not write
@@ -14,9 +14,12 @@ code and does not review.
 That rule protects **context isolation**: a step must not inherit the working
 context of the step before it. Batch mode keeps that intact — the isolation
 boundary moves from the session to the subagent. The orchestrator's own
-context holds only the batch state, the user's decisions and the relay; each
-step runs in an agent spawned for it and discarded after it. A step's agent is
-never reused for another step, and never for another issue.
+context holds only the batch state, the user's decisions and the relay;
+planning, implementation and review each run in an agent spawned for them and
+discarded after. A step's agent is never reused for another step, and never
+for another issue. Picking (Step 1) is the exception the orchestrator keeps:
+its output *is* the batch state, and it writes nothing before the user
+confirms.
 
 Approval still does not cross a boundary: a subagent cannot see the user's
 approval, so the orchestrator states it explicitly in the prompt it writes.
@@ -60,8 +63,10 @@ and leave it out rather than carrying it.
 
 **With no arguments**: compute READY and rank exactly as
 `picking-next-task.md` Steps 1–2 describe — run those queries here, in the
-orchestrator's own context; it is two `gh` calls and the result is needed for
-every later decision.
+orchestrator's own context, since the result is needed for every later
+decision. Two `gh list` calls plus one `gh issue view <n> --json state` per
+"Blocked by" reference: that last check is what keeps a blocked issue out of
+the batch, so do not skip it.
 
 Then apply the **coherence test**, which is what makes a batch a batch: no
 two issues may touch the same files, modules, screens or migrations — or they
@@ -84,8 +89,8 @@ gh issue edit <N> --add-assignee @me   # each issue in the batch
 One planning agent per issue, all spawned at once: planning is reading, and
 reading parallelizes safely. Implementation does not (Step 4).
 
-Spawn each with `subagent_type: claude`, the default model (see § Model),
-running in the background, and this prompt:
+Spawn each as a general-purpose subagent on the default model (see § Model),
+running in the background, with this prompt:
 
 ```text
 Your first action: invoke the planning-tasks skill and follow
@@ -112,13 +117,13 @@ End with the canonical handoff line from the doc.
 
 **Questions.** Wait for every planner to report, then put all their questions
 into a **single** batched round for the user, options and recommendation
-included. Send the answers back with `SendMessage` to the **same agent** — its
-investigation is the reason the question exists; a new agent would re-derive
-it from nothing.
+included. Send the answers back to the **same agent**, as a follow-up message
+that keeps its context — its investigation is the reason the question exists,
+and an agent spawned anew would re-derive it from nothing.
 
 **Approval.** With the plans posted, show the user each plan **in full**, and
 take approval issue by issue: approve / adjust / drop from the batch.
-"Adjust" goes back to the same planner by `SendMessage`, which edits the same
+"Adjust" goes back to the same planner the same way, and it edits the same
 comment (`gh issue comment --edit-last`) — never a second `## Plan`.
 
 No issue advances to Step 4 without the user's explicit approval. Record each
@@ -133,7 +138,7 @@ implemented, reviewed, merged — before the next one starts.
 
 ### 4a — Implementation
 
-A new agent, `isolation: "worktree"`:
+A new agent, in its own worktree — the harness's isolation when it has one:
 
 ```text
 Your first action: invoke the implementing-tasks skill and follow
@@ -142,13 +147,14 @@ docs/task-workflow/implementing-tasks.md for issue #<N>.
 The approved plan is the `## Plan` comment on the issue. I confirm the user
 approved it in this session — treat the approval precondition as satisfied.
 
-Worktree: EnterWorktree branches from origin/main and this repo integrates on
-develop. Right after entering, with a clean tree, `git fetch origin && git
-reset --hard origin/develop`, then rename the branch to `task/<N>-<slug>`.
-Run `pnpm install` inside it — node_modules are per-worktree. If you need to
-run the app or Postgres, override the ports (`PORT`, `--port`, `VITE_API_URL`,
-`DB_PORT` in that worktree's `.env`); the defaults collide with other
-worktrees.
+Worktree: this repo integrates on `develop`, so the branch must come from
+`origin/develop` (`docs/workflow.md` § Worktrees). If your harness creates the
+worktree for you and branches from the default branch instead, fix it right
+after entering, with a clean tree: `git fetch origin && git reset --hard
+origin/develop`, then rename the branch to `task/<N>-<slug>`. Run `pnpm
+install` inside it — node_modules are per-worktree. If you need to run the app
+or Postgres, override the ports (`PORT`, `--port`, `VITE_API_URL`, `DB_PORT`
+in that worktree's `.env`); the defaults collide with other worktrees.
 
 Conventional commits, never in the background: the Stop hook runs the suite in
 parallel with the pre-commit and both truncate the same database. A commit
@@ -167,7 +173,8 @@ Relay the PR and the summary to the user as soon as it returns.
 
 ### 4b — Review
 
-A new agent, **no** `isolation` — it manages its own worktree:
+A new agent, with no harness-managed isolation — Stage 0 of the review has it
+choose and manage its own worktree:
 
 ```text
 Your first action: invoke the reviewing-tasks skill and follow

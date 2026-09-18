@@ -24,7 +24,8 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
 - `docs/task-workflow/` — the canonical, agent-agnostic task process (create
   → pick → plan → implement → review); conventions (labels, worktrees,
   branches/PRs) in `docs/workflow.md`. `orchestrating-batch.md` runs 2–3
-  issues through all five steps in one session, one subagent per step. Codex
+  issues from picking to merge in one session, delegating planning,
+  implementation and review to a fresh subagent each. Codex
   discovers the thin wrappers in `.agents/skills/`; Claude Code uses
   `.claude/skills/`. Both read the same canonical docs rather than
   duplicating the process.

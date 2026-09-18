@@ -17,6 +17,10 @@ description: Runs a batch of 2–3 GitHub Issues end to end in one session — p
   `isolation: "worktree"`; review with no isolation. Answers to a planner's
   `## PERGUNTAS` go back with `SendMessage` to the same agent — a new `Agent`
   call starts cold and loses the investigation.
+- **Worktree base**: `EnterWorktree` and `isolation: "worktree"` branch from
+  `origin/main`, and this repo integrates on `develop` — the implementation
+  prompt must tell the agent to `git fetch origin && git reset --hard
+  origin/develop` right after entering, before any edit.
 - **Never** spawn two implementation agents at once, and never reuse one
   step's agent for the next step.
 - Use `AskUserQuestion` for the three blocking gates — batch confirmation,

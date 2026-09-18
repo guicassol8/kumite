@@ -16,8 +16,22 @@
 # Usage: pnpm worktree:prune [--dry-run]
 set -uo pipefail
 
+# `--dry-run` is accepted in any position, and a bare `--` is ignored: the
+# npm-style `pnpm worktree:prune -- --dry-run` puts `--` in $1, which a
+# positional check reads as "not a dry run" and then deletes worktrees for
+# real. Any other argument aborts — a typo must never become a real run.
 dry_run=0
-[ "${1:-}" = "--dry-run" ] && dry_run=1
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry_run=1 ;;
+    --) ;;
+    *)
+      echo "worktree-prune: unknown argument '$arg'" >&2
+      echo "usage: pnpm worktree:prune [--dry-run]" >&2
+      exit 2
+      ;;
+  esac
+done
 
 main="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 if [ -z "$main" ]; then

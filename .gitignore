@@ -12,6 +12,11 @@ front/test-results/
 front/playwright-report/
 front/blob-report/
 
+# Database dumps written by the compose `backup` service (#275). On the VM
+# this is ~/kumite/backups, inside the git checkout deploy.yml pulls into —
+# ignoring it keeps that pull clean.
+backups/
+
 # Python bytecode from docs/design/canvas/generate
 __pycache__/
 

@@ -136,6 +136,16 @@ test.describe('leaderboard without SSE (#180)', () => {
     // reaches 'open'.
     await page.route('**/sse', (route) => route.abort())
 
+    // Reload so the block actually applies to the connection this screen uses.
+    // Since #274 the leaderboard reads the app-wide connection opened by
+    // `RoundStreamProvider` instead of opening its own on mount — and that one
+    // was established back at signup, before the route above existed, so
+    // without this the screen would arrive already live and fully populated.
+    // The reload tears it down and reopens it through the block, which is the
+    // state this spec is about.
+    await page.reload()
+    await expect(page.getByTestId('header-leaderboard-link')).toBeVisible()
+
     // 01 — the loading state, held open on purpose by delaying the first
     // GET /ranking. Before the fix the screen stayed here forever, because
     // `isLoading` included the very condition that enabled the REST fallback.

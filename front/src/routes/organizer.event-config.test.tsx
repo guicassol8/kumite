@@ -296,3 +296,48 @@ describe('OrganizerEventConfigScreen', () => {
     )
   })
 })
+
+// #223 owns the codes TABLE (a reading surface). The edit dialog, the team
+// rules form and the mixing switch are #233's and are untouched here.
+describe('organizer event config — identity (#223)', () => {
+  beforeEach(() => {
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
+    mockedCodesGet.mockResolvedValue(
+      jsonResponse(200, [
+        eventCode(),
+        eventCode({
+          university: 'merida',
+          code: 'MERIDA2026',
+          allowedEmailSuffixes: ['merida.edu.mx'],
+          active: false,
+        }),
+      ]),
+    )
+  })
+
+  it('renders the codes listing as the panel table, never inside a scrolling wrapper', async () => {
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('event-config-codes-table')).toBeDefined())
+    const table = screen.getByTestId('event-config-codes-table')
+    expect(table.className).toContain('table-fixed')
+    expect(table.querySelector('th')?.className).toContain('font-display')
+    expect(table.querySelector('th')?.className).toContain('uppercase')
+
+    let node: HTMLElement | null = table
+    while (node) {
+      expect(node.className).not.toContain('overflow-x')
+      node = node.parentElement
+    }
+  })
+
+  it('badges an active code solid and an inactive one grey, keeping the edit trigger', async () => {
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('event-config-codes-table')).toBeDefined())
+    expect(screen.getByTestId('event-config-codes-active-pucrs').dataset.variant).toBe('default')
+    expect(screen.getByTestId('event-config-codes-active-merida').dataset.variant).toBe('secondary')
+    // The row trigger stays in #223; what it opens belongs to #233.
+    expect(screen.getByTestId('event-config-codes-edit-pucrs')).toBeDefined()
+  })
+})

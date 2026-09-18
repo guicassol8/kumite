@@ -271,4 +271,48 @@ describe('OrganizerRoundsList', () => {
       ).toBeDefined(),
     )
   })
+  // Identity § 5: "Aberta" is an outlined badge with a red dot, "Encerrada"
+  // and "Rascunho" are grey. Asserted through `data-variant`, since jsdom
+  // paints nothing — the colours themselves are checked in the browser
+  // (e2e/organizer-identity.spec.ts).
+  it('marks the open round with the dotted outline badge and the others grey', async () => {
+    mockedList.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({ id: 'r1', status: 'draft' }),
+        roundSummary({ id: 'r2', status: 'open', openedAt: '2026-01-01T10:00:00.000Z' }),
+        roundSummary({ id: 'r3', status: 'closed', closedAt: '2026-01-01T11:00:00.000Z' }),
+      ]),
+    )
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-table')).toBeDefined())
+    expect(screen.getByTestId('organizer-rounds-status-r2').dataset.variant).toBe('outline')
+    expect(screen.getByTestId('organizer-rounds-status-dot-r2')).toBeDefined()
+    expect(screen.getByTestId('organizer-rounds-status-r1').dataset.variant).toBe('secondary')
+    expect(screen.getByTestId('organizer-rounds-status-r3').dataset.variant).toBe('secondary')
+    // The dot is decoration; only the open round has one and the word always
+    // carries the meaning (§ 3 forbids colour as the only cue).
+    expect(screen.queryByTestId('organizer-rounds-status-dot-r1')).toBeNull()
+    expect(screen.queryByTestId('organizer-rounds-status-dot-r3')).toBeNull()
+  })
+
+  it('repeats every column header inside the row and keeps the table unscrolled', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [roundSummary()]))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-table')).toBeDefined())
+
+    const row = screen.getByTestId('organizer-rounds-row-r1')
+    for (const label of ['Nome', 'Estado', 'Duração', 'Problemas', 'Ações']) {
+      expect(row.textContent).toContain(label)
+    }
+
+    const table = screen.getByTestId('organizer-rounds-table')
+    expect(table.querySelector('th')?.className).toContain('font-display')
+    let node: HTMLElement | null = table
+    while (node) {
+      expect(node.className).not.toContain('overflow-x')
+      node = node.parentElement
+    }
+  })
 })

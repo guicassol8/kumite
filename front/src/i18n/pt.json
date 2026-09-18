@@ -118,6 +118,7 @@
   "organizer": {
     "heading": "Área do organizador",
     "nav": {
+      "ariaLabel": "Seções do painel",
       "overview": "Visão geral",
       "problems": "Problemas",
       "rounds": "Rodadas",
@@ -365,6 +366,7 @@
         "retry": "Tentar novamente"
       },
       "frozenBadge": "Congelado",
+      "memberCountLabel": "Integrantes",
       "role": {
         "participant": "Participante",
         "organizer": "Organizador"
@@ -531,11 +533,13 @@
       "round": {
         "title": "Rodada",
         "streamOffline": "Sem conexão ao vivo",
+        "openState": "Rodada aberta",
         "manageCta": "Gerenciar rodadas",
         "lastClosed": "Última rodada: {{name}}",
         "closedAt": "Encerrada em {{date}}",
+        "podiumTitle": "Última rodada encerrada · {{name}}",
         "podiumEmpty": "Nenhum time pontuou nesta rodada.",
-        "podiumEntry": "#{{rank}} {{name}} · {{score}} pts",
+        "podiumPoints": "{{score}} pts",
         "leaderboardCta": "Ver classificação",
         "none": "Nenhuma rodada criada ainda."
       },

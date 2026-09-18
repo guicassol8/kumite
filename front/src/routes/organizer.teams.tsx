@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ArrowRightLeft, Check, Pencil, UserMinus, X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
+import { PanelTable } from '@/components/organizer/panel-table'
 import { UniversityBadge } from '@/components/teams/university-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -27,14 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { api } from '@/lib/api'
 
 export const Route = createFileRoute('/organizer/teams')({
@@ -72,7 +64,10 @@ function OrganizerTeamsScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="font-semibold text-xl" data-testid="team-moderation-heading">
+      <h2
+        className="font-display font-semibold text-2xl uppercase tracking-[0.01em]"
+        data-testid="team-moderation-heading"
+      >
         {t('organizer.teamModeration.heading')}
       </h2>
 
@@ -124,48 +119,76 @@ function TeamCard({
   return (
     <Card data-testid={`team-moderation-card-${team.id}`}>
       <CardHeader className="flex-row items-center justify-between gap-2">
-        <TeamNameHeader team={team} onRenamed={onChanged} />
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <TeamNameHeader team={team} onRenamed={onChanged} />
+          <span
+            data-testid={`team-moderation-member-count-${team.id}`}
+            aria-label={t('organizer.teamModeration.memberCountLabel')}
+            className="font-display font-semibold text-lg tabular-nums"
+          >
+            {team.members.length}
+          </span>
+        </div>
         <RemoveTeamAction teamId={team.id} onRemoved={onChanged} />
       </CardHeader>
       <CardContent>
-        <Table data-testid={`team-moderation-members-${team.id}`}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('organizer.teamModeration.columns.name')}</TableHead>
-              <TableHead>{t('organizer.teamModeration.columns.email')}</TableHead>
-              <TableHead>{t('organizer.teamModeration.columns.university')}</TableHead>
-              <TableHead>{t('organizer.teamModeration.columns.role')}</TableHead>
-              <TableHead>{t('organizer.teamModeration.columns.actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {team.members.map((member) => (
-              <TableRow
-                key={member.userId}
-                data-testid={`team-moderation-member-row-${member.userId}`}
-              >
-                <TableCell>{member.name ?? t('organizer.teamModeration.noName')}</TableCell>
-                <TableCell>{member.email}</TableCell>
-                <TableCell>
-                  <UniversityBadge university={member.university} />
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{t(ROLE_KEYS[member.role])}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <MoveMemberAction
-                      userId={member.userId}
-                      destinations={allTeams.filter((candidate) => candidate.id !== team.id)}
-                      onMoved={onChanged}
-                    />
-                    <RemoveMemberAction userId={member.userId} onRemoved={onChanged} />
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <PanelTable
+          testId={`team-moderation-members-${team.id}`}
+          rows={team.members}
+          rowKey={(member) => member.userId}
+          rowTestId={(member) => `team-moderation-member-row-${member.userId}`}
+          columns={[
+            {
+              id: 'name',
+              header: t('organizer.teamModeration.columns.name'),
+              width: 'w-[22%]',
+              cell: (member) => (
+                <span className="font-medium">
+                  {member.name ?? t('organizer.teamModeration.noName')}
+                </span>
+              ),
+            },
+            {
+              id: 'email',
+              header: t('organizer.teamModeration.columns.email'),
+              width: 'w-[26%]',
+              wrapAnywhere: true,
+              cell: (member) => member.email,
+            },
+            {
+              id: 'university',
+              header: t('organizer.teamModeration.columns.university'),
+              width: 'w-[12%]',
+              cell: (member) => <UniversityBadge university={member.university} />,
+            },
+            {
+              id: 'role',
+              header: t('organizer.teamModeration.columns.role'),
+              width: 'w-[14%]',
+              cell: (member) => (
+                <Badge variant="outline" className="whitespace-normal wrap-normal">
+                  {t(ROLE_KEYS[member.role])}
+                </Badge>
+              ),
+            },
+            {
+              id: 'actions',
+              header: t('organizer.teamModeration.columns.actions'),
+              width: 'w-[26%]',
+              mobileLabelVisible: false,
+              cell: (member) => (
+                <>
+                  <MoveMemberAction
+                    userId={member.userId}
+                    destinations={allTeams.filter((candidate) => candidate.id !== team.id)}
+                    onMoved={onChanged}
+                  />
+                  <RemoveMemberAction userId={member.userId} onRemoved={onChanged} />
+                </>
+              ),
+            },
+          ]}
+        />
       </CardContent>
     </Card>
   )
@@ -215,7 +238,7 @@ function MoveMemberAction({
       <div className="flex items-center gap-1">
         <Select value={destinationTeamId} onValueChange={setDestinationTeamId}>
           <SelectTrigger
-            className="h-8 w-28 text-xs"
+            className="h-9 w-32 text-xs"
             data-testid={`team-moderation-move-select-${userId}`}
           >
             <SelectValue placeholder={t('organizer.teamModeration.move.selectPlaceholder')} />
@@ -236,7 +259,7 @@ function MoveMemberAction({
           type="button"
           variant="outline"
           size="icon"
-          className="size-8"
+          className="size-9"
           data-testid={`team-moderation-move-action-${userId}`}
           disabled={!destinationTeamId || move.isPending}
           onClick={onMove}

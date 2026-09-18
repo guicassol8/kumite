@@ -1,75 +1,12 @@
-import { createFileRoute, Link, Outlet } from '@tanstack/react-router'
-import { useTranslation } from 'react-i18next'
+import { createFileRoute } from '@tanstack/react-router'
 
+import { OrganizerShell } from '@/components/organizer/panel-shell'
 import { requireRole } from '@/lib/route-guards'
 
+// The shell itself lives in `components/organizer/panel-shell.tsx`: a route
+// file that exports anything besides `Route` opts out of the router plugin's
+// `autoCodeSplitting`, which would ship the panel chrome to every visitor.
 export const Route = createFileRoute('/organizer')({
   beforeLoad: requireRole('organizer'),
-  component: OrganizerScreen,
+  component: OrganizerShell,
 })
-
-function OrganizerScreen() {
-  const { t } = useTranslation()
-
-  return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-8">
-      <h1 className="font-bold text-2xl" data-testid="organizer-heading">
-        {t('organizer.heading')}
-      </h1>
-      <nav className="flex items-center gap-4 border-b pb-2">
-        <Link
-          to="/organizer"
-          data-testid="organizer-nav-overview"
-          // Without `exact`, the index link stays active on every child
-          // route, since they all sit under /organizer.
-          activeOptions={{ exact: true }}
-          activeProps={{ className: 'font-semibold text-foreground' }}
-          className="text-muted-foreground text-sm"
-        >
-          {t('organizer.nav.overview')}
-        </Link>
-        <Link
-          to="/organizer/problems"
-          data-testid="organizer-nav-problems"
-          activeProps={{ className: 'font-semibold text-foreground' }}
-          className="text-muted-foreground text-sm"
-        >
-          {t('organizer.nav.problems')}
-        </Link>
-        <Link
-          to="/organizer/rounds"
-          data-testid="organizer-nav-rounds"
-          activeProps={{ className: 'font-semibold text-foreground' }}
-          className="text-muted-foreground text-sm"
-        >
-          {t('organizer.nav.rounds')}
-        </Link>
-        <Link
-          to="/organizer/event-config"
-          data-testid="organizer-nav-event-config"
-          activeProps={{ className: 'font-semibold text-foreground' }}
-          className="text-muted-foreground text-sm"
-        >
-          {t('organizer.nav.eventConfig')}
-        </Link>
-        <Link
-          to="/organizer/teams"
-          data-testid="organizer-nav-teams"
-          activeProps={{ className: 'font-semibold text-foreground' }}
-          className="text-muted-foreground text-sm"
-        >
-          {t('organizer.nav.teams')}
-        </Link>
-        <Link
-          to="/organizer/users"
-          data-testid="organizer-nav-users"
-          activeProps={{ className: 'font-semibold text-foreground' }}
-          className="text-muted-foreground text-sm"
-        >
-          {t('organizer.nav.users')}
-        </Link>
-      </nav>
-      <Outlet />
-    </main>
-  )
-}

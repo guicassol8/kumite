@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PanelTable } from '@/components/organizer/panel-table'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,14 +16,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { api } from '@/lib/api'
 import { resolveProblemTitle, type UiLocale } from '@/lib/resolve-problem-title'
 
@@ -31,6 +24,23 @@ export const Route = createFileRoute('/organizer/problems/')({
 })
 
 const PROBLEMS_QUERY_KEY = ['organizer-problems']
+
+// Identity § 5: difficulty is the outlined trio — Fácil green, Médio in
+// --warning-text (--warning itself is 2,0:1 and may never carry text),
+// Difícil crimson.
+const DIFFICULTY_VARIANT = {
+  easy: 'success',
+  medium: 'warning',
+  hard: 'destructive',
+} as const
+
+// Publicado is the only solid one (ink); Rascunho and Arquivado are grey, and
+// Arquivado is struck through so the state does not rest on colour alone.
+const STATUS_VARIANT = {
+  published: 'default',
+  draft: 'secondary',
+  archived: 'secondary',
+} as const
 
 async function fetchProblems() {
   const res = await api.organizer.problems.$get()
@@ -66,8 +76,10 @@ function OrganizerProblemsList() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-xl">{t('organizer.problems.heading')}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display font-semibold text-2xl uppercase tracking-[0.01em]">
+          {t('organizer.problems.heading')}
+        </h2>
         <Button asChild data-testid="organizer-problems-create">
           <Link to="/organizer/problems/new">{t('organizer.problems.createAction')}</Link>
         </Button>
@@ -104,61 +116,99 @@ function OrganizerProblemsList() {
       )}
 
       {problems.data && problems.data.length > 0 && (
-        <Table data-testid="organizer-problems-table">
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('organizer.problems.columns.title')}</TableHead>
-              <TableHead>{t('organizer.problems.columns.difficulty')}</TableHead>
-              <TableHead>{t('organizer.problems.columns.points')}</TableHead>
-              <TableHead>{t('organizer.problems.columns.status')}</TableHead>
-              <TableHead>{t('organizer.problems.columns.testCases')}</TableHead>
-              <TableHead>{t('organizer.problems.columns.actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {problems.data.map((problem) => {
-              const title = resolveProblemTitle(problem.translations, uiLocale)
-              return (
-                <TableRow key={problem.id} data-testid={`organizer-problems-row-${problem.id}`}>
-                  <TableCell>{title ?? t('organizer.problems.missingTitle')}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {t(`organizer.problems.difficulty.${problem.difficulty}`)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{problem.points}</TableCell>
-                  <TableCell>
-                    <Badge>{t(`organizer.problems.status.${problem.status}`)}</Badge>
-                  </TableCell>
-                  <TableCell>{problem.testCaseCount}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Link
-                        to="/organizer/problems/$id/edit"
-                        params={{ id: problem.id }}
-                        data-testid={`organizer-problems-edit-${problem.id}`}
-                        className="text-primary text-sm underline"
-                      >
-                        {t('organizer.problems.editAction')}
-                      </Link>
-                      {problem.status !== 'archived' && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          data-testid={`organizer-problems-archive-${problem.id}`}
-                          onClick={() => setArchiveTargetId(problem.id)}
-                        >
-                          {t('organizer.problems.archiveAction')}
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
+        <PanelTable
+          testId="organizer-problems-table"
+          rows={problems.data}
+          rowKey={(problem) => problem.id}
+          rowTestId={(problem) => `organizer-problems-row-${problem.id}`}
+          columns={[
+            {
+              id: 'title',
+              header: t('organizer.problems.columns.title'),
+              width: 'w-[28%]',
+              cell: (problem) => (
+                <span className="font-medium">
+                  {resolveProblemTitle(problem.translations, uiLocale) ??
+                    t('organizer.problems.missingTitle')}
+                </span>
+              ),
+            },
+            {
+              id: 'difficulty',
+              header: t('organizer.problems.columns.difficulty'),
+              width: 'w-[14%]',
+              cell: (problem) => (
+                <Badge
+                  variant={DIFFICULTY_VARIANT[problem.difficulty]}
+                  data-testid={`organizer-problems-difficulty-${problem.id}`}
+                >
+                  {t(`organizer.problems.difficulty.${problem.difficulty}`)}
+                </Badge>
+              ),
+            },
+            {
+              id: 'points',
+              header: t('organizer.problems.columns.points'),
+              width: 'w-[10%]',
+              cell: (problem) => (
+                <span className="font-display font-semibold tabular-nums">{problem.points}</span>
+              ),
+            },
+            {
+              id: 'status',
+              header: t('organizer.problems.columns.status'),
+              width: 'w-[14%]',
+              cell: (problem) => (
+                <Badge
+                  variant={STATUS_VARIANT[problem.status]}
+                  data-testid={`organizer-problems-status-${problem.id}`}
+                  className={problem.status === 'archived' ? 'line-through' : undefined}
+                >
+                  {t(`organizer.problems.status.${problem.status}`)}
+                </Badge>
+              ),
+            },
+            {
+              id: 'testCases',
+              header: t('organizer.problems.columns.testCases'),
+              width: 'w-[10%]',
+              cell: (problem) => (
+                <span className="font-display font-semibold tabular-nums">
+                  {problem.testCaseCount}
+                </span>
+              ),
+            },
+            {
+              id: 'actions',
+              header: t('organizer.problems.columns.actions'),
+              width: 'w-[24%]',
+              mobileLabelVisible: false,
+              cell: (problem) => (
+                <>
+                  <Link
+                    to="/organizer/problems/$id/edit"
+                    params={{ id: problem.id }}
+                    data-testid={`organizer-problems-edit-${problem.id}`}
+                    className="text-primary text-sm underline"
+                  >
+                    {t('organizer.problems.editAction')}
+                  </Link>
+                  {problem.status !== 'archived' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      data-testid={`organizer-problems-archive-${problem.id}`}
+                      onClick={() => setArchiveTargetId(problem.id)}
+                    >
+                      {t('organizer.problems.archiveAction')}
+                    </Button>
+                  )}
+                </>
+              ),
+            },
+          ]}
+        />
       )}
 
       <AlertDialog

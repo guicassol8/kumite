@@ -1,8 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { ChevronRight } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PANEL_EYEBROW } from '@/components/organizer/panel-table'
 import { RoundCountdown } from '@/components/round-countdown'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,6 +13,7 @@ import { useRoundStream } from '@/hooks/use-round-stream'
 import { formatDate } from '@/i18n/format'
 import { fetchRoundRanking } from '@/lib/ranking-query'
 import { fetchOrganizerStats, ORGANIZER_STATS_QUERY_KEY } from '@/lib/stats-query'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/organizer/')({
   component: OrganizerOverviewScreen,
@@ -22,6 +25,12 @@ export const Route = createFileRoute('/organizer/')({
 // scored submission via ranking.updated), and a slow interval covers what it
 // doesn't announce at all — a new signup, a team formed.
 const STATS_REFETCH_INTERVAL_MS = 30_000
+
+// The "stat" role from the identity's type scale: 44px display, tabular so a
+// number changing under SSE does not shift the card's width.
+const STAT = 'font-bold font-display text-[44px] leading-none tabular-nums'
+const CARD_TITLE = `${PANEL_EYEBROW} text-muted-foreground`
+const DETAIL = 'text-muted-foreground text-sm'
 
 function OrganizerOverviewScreen() {
   const { t, i18n } = useTranslation()
@@ -79,7 +88,10 @@ function OrganizerOverviewScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="font-semibold text-xl" data-testid="overview-heading">
+      <h2
+        className="font-display font-semibold text-2xl uppercase tracking-[0.01em]"
+        data-testid="overview-heading"
+      >
         {t('organizer.overview.heading')}
       </h2>
 
@@ -101,25 +113,23 @@ function OrganizerOverviewScreen() {
 
       {stats.data && (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          {/* Four numeric cards in one row: the mock puts Rodada alongside the
+              other three rather than on a wide band of its own. */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Card data-testid="overview-signups-card">
               <CardHeader>
-                <CardTitle>{t('organizer.overview.signups.title')}</CardTitle>
+                <CardTitle className={CARD_TITLE}>
+                  {t('organizer.overview.signups.title')}
+                </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col gap-1">
-                <span className="font-bold text-3xl" data-testid="overview-signups-total">
+              <CardContent className="flex flex-col gap-2">
+                <span className={STAT} data-testid="overview-signups-total">
                   {stats.data.participants.total}
                 </span>
-                <span
-                  className="text-muted-foreground text-sm"
-                  data-testid="overview-signups-pucrs"
-                >
+                <span className={DETAIL} data-testid="overview-signups-pucrs">
                   {t('organizer.overview.signups.pucrs', { count: stats.data.participants.pucrs })}
                 </span>
-                <span
-                  className="text-muted-foreground text-sm"
-                  data-testid="overview-signups-merida"
-                >
+                <span className={DETAIL} data-testid="overview-signups-merida">
                   {t('organizer.overview.signups.merida', {
                     count: stats.data.participants.merida,
                   })}
@@ -129,28 +139,22 @@ function OrganizerOverviewScreen() {
 
             <Card data-testid="overview-teams-card">
               <CardHeader>
-                <CardTitle>{t('organizer.overview.teams.title')}</CardTitle>
+                <CardTitle className={CARD_TITLE}>{t('organizer.overview.teams.title')}</CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col gap-1">
-                <span className="font-bold text-3xl" data-testid="overview-teams-total">
+              <CardContent className="flex flex-col gap-2">
+                <span className={STAT} data-testid="overview-teams-total">
                   {stats.data.teams.total}
                 </span>
-                <span
-                  className="text-muted-foreground text-sm"
-                  data-testid="overview-teams-members"
-                >
+                <span className={DETAIL} data-testid="overview-teams-members">
                   {t('organizer.overview.teams.members', {
                     inTeam: stats.data.participants.inTeam,
                     total: stats.data.participants.total,
                   })}
                 </span>
-                <span className="text-muted-foreground text-sm" data-testid="overview-teams-slots">
+                <span className={DETAIL} data-testid="overview-teams-slots">
                   {t('organizer.overview.teams.openSlots', { count: stats.data.teams.openSlots })}
                 </span>
-                <span
-                  className="text-muted-foreground text-sm"
-                  data-testid="overview-teams-without-team"
-                >
+                <span className={DETAIL} data-testid="overview-teams-without-team">
                   {t('organizer.overview.teams.withoutTeam', {
                     count: stats.data.participants.withoutTeam,
                   })}
@@ -160,17 +164,16 @@ function OrganizerOverviewScreen() {
 
             <Card data-testid="overview-submissions-card">
               <CardHeader>
-                <CardTitle>{t('organizer.overview.submissions.title')}</CardTitle>
+                <CardTitle className={CARD_TITLE}>
+                  {t('organizer.overview.submissions.title')}
+                </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col gap-1">
-                <span className="font-bold text-3xl" data-testid="overview-submissions-total">
+              <CardContent className="flex flex-col gap-2">
+                <span className={STAT} data-testid="overview-submissions-total">
                   {stats.data.submissions.total}
                 </span>
                 {stats.data.submissions.inRound !== null && (
-                  <span
-                    className="text-muted-foreground text-sm"
-                    data-testid="overview-submissions-in-round"
-                  >
+                  <span className={DETAIL} data-testid="overview-submissions-in-round">
                     {t(
                       activeRound
                         ? 'organizer.overview.submissions.inActiveRound'
@@ -181,106 +184,166 @@ function OrganizerOverviewScreen() {
                 )}
               </CardContent>
             </Card>
-          </div>
 
-          <Card data-testid="overview-round-card">
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <CardTitle>{t('organizer.overview.round.title')}</CardTitle>
-              {eventStream.status !== 'open' && (
-                <Badge variant="outline" data-testid="overview-stream-status">
-                  {t('organizer.overview.round.streamOffline')}
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent className="flex flex-col items-start gap-2">
-              {activeRound && closesAt ? (
-                <>
-                  <span className="font-medium" data-testid="overview-round-name">
-                    {activeRound.name}
-                  </span>
-                  <RoundCountdown closesAt={closesAt} serverTimeOffsetMs={serverTimeOffsetMs} />
-                  <Button asChild size="sm" data-testid="overview-round-cta">
-                    <Link to="/organizer/rounds">{t('organizer.overview.round.manageCta')}</Link>
-                  </Button>
-                </>
-              ) : lastClosedRound ? (
-                <>
+            {/* An open round is the one thing on this screen that is happening
+                right now, so it is the only card the identity lets carry the
+                brand border. */}
+            <Card data-testid="overview-round-card" className={cn(activeRound && 'border-brand')}>
+              <CardHeader className="flex flex-row items-start justify-between gap-2">
+                <CardTitle className={CARD_TITLE}>{t('organizer.overview.round.title')}</CardTitle>
+                {eventStream.status !== 'open' && (
+                  <Badge variant="outline" data-testid="overview-stream-status">
+                    {t('organizer.overview.round.streamOffline')}
+                  </Badge>
+                )}
+              </CardHeader>
+              <CardContent className="flex flex-col items-start gap-2">
+                {activeRound && closesAt ? (
+                  <>
+                    <span
+                      className={cn(PANEL_EYEBROW, 'flex items-center gap-1.5 text-brand-text')}
+                      data-testid="overview-round-open-state"
+                    >
+                      <span aria-hidden="true" className="size-1.5 rounded-full bg-brand" />
+                      {t('organizer.overview.round.openState')}
+                    </span>
+                    <span className="font-medium" data-testid="overview-round-name">
+                      {activeRound.name}
+                    </span>
+                    <RoundCountdown
+                      closesAt={closesAt}
+                      serverTimeOffsetMs={serverTimeOffsetMs}
+                      roundName={activeRound.name}
+                      bare
+                      className={cn(STAT, 'text-brand-text')}
+                    />
+                  </>
+                ) : lastClosedRound ? (
                   <span className="font-medium" data-testid="overview-round-name">
                     {t('organizer.overview.round.lastClosed', { name: lastClosedRound.name })}
                   </span>
-                  {lastClosedRound.closedAt && (
-                    <span
-                      className="text-muted-foreground text-sm"
-                      data-testid="overview-round-closed-at"
+                ) : (
+                  <span className={DETAIL} data-testid="overview-round-none">
+                    {t('organizer.overview.round.none')}
+                  </span>
+                )}
+
+                {(activeRound || lastClosedRound) && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Button asChild size="sm" data-testid="overview-round-cta">
+                      <Link to="/organizer/rounds">{t('organizer.overview.round.manageCta')}</Link>
+                    </Button>
+                    {/* Until #223 these two shared `overview-round-cta`, because
+                        only one of them was ever on screen; now that both are,
+                        the leaderboard link needs a name of its own. */}
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="outline"
+                      data-testid="overview-round-leaderboard-cta"
                     >
+                      <Link to="/leaderboard">{t('organizer.overview.round.leaderboardCta')}</Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Same condition as before: a podium only while no round is open
+                and one has already closed. */}
+            {!activeRound && lastClosedRound && (
+              <Card data-testid="overview-podium-card">
+                <CardHeader className="gap-1">
+                  <CardTitle className={CARD_TITLE}>
+                    {t('organizer.overview.round.podiumTitle', { name: lastClosedRound.name })}
+                  </CardTitle>
+                  {lastClosedRound.closedAt && (
+                    <span className={DETAIL} data-testid="overview-round-closed-at">
                       {t('organizer.overview.round.closedAt', {
                         date: formatDate(new Date(lastClosedRound.closedAt), locale),
                       })}
                     </span>
                   )}
-                  <ol className="flex flex-col gap-1" data-testid="overview-round-podium">
+                </CardHeader>
+                <CardContent>
+                  <ol className="flex flex-col" data-testid="overview-round-podium">
                     {podium.length === 0 ? (
-                      <span
-                        className="text-muted-foreground text-sm"
-                        data-testid="overview-round-podium-empty"
-                      >
+                      <span className={DETAIL} data-testid="overview-round-podium-empty">
                         {t('organizer.overview.round.podiumEmpty')}
                       </span>
                     ) : (
                       podium.map((team) => (
                         <li
                           key={team.teamId}
-                          className="text-sm"
                           data-testid={`overview-round-podium-${team.teamId}`}
+                          className="flex items-center gap-3 border-border border-b py-3 last:border-b-0"
                         >
-                          {t('organizer.overview.round.podiumEntry', {
-                            rank: team.rank,
-                            name: team.teamName,
-                            score: team.totalScore,
-                          })}
+                          <span
+                            className={cn(
+                              'font-bold font-display text-2xl leading-none tabular-nums',
+                              // Only the winner takes the brand numeral.
+                              team.rank === 1 ? 'text-brand-text' : 'text-muted-foreground',
+                            )}
+                          >
+                            {team.rank}
+                          </span>
+                          <span className="min-w-0 flex-1 wrap-anywhere font-medium text-sm">
+                            {team.teamName}
+                          </span>
+                          <span className="font-display font-semibold text-sm tabular-nums">
+                            {t('organizer.overview.round.podiumPoints', {
+                              score: team.totalScore,
+                            })}
+                          </span>
                         </li>
                       ))
                     )}
                   </ol>
-                  <Button asChild size="sm" variant="outline" data-testid="overview-round-cta">
-                    <Link to="/leaderboard">{t('organizer.overview.round.leaderboardCta')}</Link>
-                  </Button>
-                </>
-              ) : (
-                <span className="text-muted-foreground text-sm" data-testid="overview-round-none">
-                  {t('organizer.overview.round.none')}
-                </span>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )}
 
-          <Card data-testid="overview-shortcuts-card">
-            <CardHeader>
-              <CardTitle>{t('organizer.overview.shortcuts.title')}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-2">
-              <Button asChild size="sm" variant="outline" data-testid="overview-shortcuts-problems">
-                <Link to="/organizer/problems">{t('organizer.nav.problems')}</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline" data-testid="overview-shortcuts-rounds">
-                <Link to="/organizer/rounds">{t('organizer.nav.rounds')}</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline" data-testid="overview-shortcuts-teams">
-                <Link to="/organizer/teams">{t('organizer.nav.teams')}</Link>
-              </Button>
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                data-testid="overview-shortcuts-event-config"
-              >
-                <Link to="/organizer/event-config">{t('organizer.nav.eventConfig')}</Link>
-              </Button>
-              <Button asChild size="sm" variant="outline" data-testid="overview-shortcuts-users">
-                <Link to="/organizer/users">{t('organizer.nav.users')}</Link>
-              </Button>
-            </CardContent>
-          </Card>
+            {/* With a round open there is no podium, so the shortcuts take
+                the whole row instead of leaving half of it blank. */}
+            <Card
+              data-testid="overview-shortcuts-card"
+              className={cn(!(!activeRound && lastClosedRound) && 'lg:col-span-2')}
+            >
+              <CardHeader>
+                <CardTitle className={CARD_TITLE}>
+                  {t('organizer.overview.shortcuts.title')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* A list of links with hairlines, not a row of buttons: five
+                    of them wrapped into a ragged block at panel width. */}
+                <ul className="flex flex-col">
+                  {(
+                    [
+                      ['overview-shortcuts-problems', '/organizer/problems', 'problems'],
+                      ['overview-shortcuts-rounds', '/organizer/rounds', 'rounds'],
+                      ['overview-shortcuts-teams', '/organizer/teams', 'teams'],
+                      ['overview-shortcuts-event-config', '/organizer/event-config', 'eventConfig'],
+                      ['overview-shortcuts-users', '/organizer/users', 'users'],
+                    ] as const
+                  ).map(([testId, to, key]) => (
+                    <li key={testId} className="border-border border-b last:border-b-0">
+                      <Link
+                        to={to}
+                        data-testid={testId}
+                        className="flex items-center justify-between gap-2 py-3 font-medium text-sm hover:text-brand-text"
+                      >
+                        {t(`organizer.nav.${key}`)}
+                        <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
         </>
       )}
     </div>

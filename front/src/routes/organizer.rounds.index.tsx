@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PanelTable } from '@/components/organizer/panel-table'
 import { RoundCountdown } from '@/components/round-countdown'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -26,14 +27,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useRoundStream } from '@/hooks/use-round-stream'
 import { formatDate } from '@/i18n/format'
@@ -159,8 +152,10 @@ function OrganizerRoundsList() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-xl">{t('organizer.rounds.heading')}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display font-semibold text-2xl uppercase tracking-[0.01em]">
+          {t('organizer.rounds.heading')}
+        </h2>
         <Button asChild data-testid="organizer-rounds-create">
           <Link to="/organizer/rounds/new">{t('organizer.rounds.createAction')}</Link>
         </Button>
@@ -203,47 +198,84 @@ function OrganizerRoundsList() {
       )}
 
       {rounds.data && rounds.data.length > 0 && (
-        <Table data-testid="organizer-rounds-table">
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('organizer.rounds.columns.name')}</TableHead>
-              <TableHead>{t('organizer.rounds.columns.status')}</TableHead>
-              <TableHead>{t('organizer.rounds.columns.duration')}</TableHead>
-              <TableHead>{t('organizer.rounds.columns.problems')}</TableHead>
-              <TableHead>{t('organizer.rounds.columns.actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rounds.data.map((round) => {
-              const closesAt = closesAtFor(round)
-              const serverTimeOffsetMs = eventStream.serverTime
-                ? eventStream.serverTime.getTime() - Date.now()
-                : 0
-              const disableOpen = round.status === 'draft' && anotherRoundOpenId !== null
-
-              return (
-                <TableRow key={round.id} data-testid={`organizer-rounds-row-${round.id}`}>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <span>{round.name}</span>
-                      {round.status === 'open' && closesAt && (
-                        <RoundCountdown
-                          closesAt={closesAt}
-                          serverTimeOffsetMs={serverTimeOffsetMs}
-                        />
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge>{t(`organizer.rounds.status.${round.status}`)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    {t('organizer.rounds.durationValue', { minutes: round.durationMinutes })}
-                  </TableCell>
-                  <TableCell>{round.problemCount}</TableCell>
-                  <TableCell>
+        <PanelTable
+          testId="organizer-rounds-table"
+          rows={rounds.data}
+          rowKey={(round) => round.id}
+          rowTestId={(round) => `organizer-rounds-row-${round.id}`}
+          columns={[
+            {
+              id: 'name',
+              header: t('organizer.rounds.columns.name'),
+              width: 'w-[26%]',
+              cell: (round) => {
+                const closesAt = closesAtFor(round)
+                const serverTimeOffsetMs = eventStream.serverTime
+                  ? eventStream.serverTime.getTime() - Date.now()
+                  : 0
+                return (
+                  <span className="flex flex-col items-end gap-1 md:items-start">
+                    <span className="font-medium">{round.name}</span>
+                    {round.status === 'open' && closesAt && (
+                      <RoundCountdown closesAt={closesAt} serverTimeOffsetMs={serverTimeOffsetMs} />
+                    )}
+                  </span>
+                )
+              },
+            },
+            {
+              id: 'status',
+              header: t('organizer.rounds.columns.status'),
+              width: 'w-[14%]',
+              cell: (round) => (
+                <Badge
+                  variant={round.status === 'open' ? 'outline' : 'secondary'}
+                  data-testid={`organizer-rounds-status-${round.id}`}
+                >
+                  {round.status === 'open' && (
+                    // "Aberta" is the outlined badge with a red dot (§ 5); the
+                    // dot is decoration, the word carries the meaning.
+                    <span
+                      aria-hidden="true"
+                      className="size-1.5 rounded-full bg-brand"
+                      data-testid={`organizer-rounds-status-dot-${round.id}`}
+                    />
+                  )}
+                  {t(`organizer.rounds.status.${round.status}`)}
+                </Badge>
+              ),
+            },
+            {
+              id: 'duration',
+              header: t('organizer.rounds.columns.duration'),
+              width: 'w-[14%]',
+              cell: (round) => (
+                <span className="font-display font-semibold tabular-nums">
+                  {t('organizer.rounds.durationValue', { minutes: round.durationMinutes })}
+                </span>
+              ),
+            },
+            {
+              id: 'problems',
+              header: t('organizer.rounds.columns.problems'),
+              width: 'w-[12%]',
+              cell: (round) => (
+                <span className="font-display font-semibold tabular-nums">
+                  {round.problemCount}
+                </span>
+              ),
+            },
+            {
+              id: 'actions',
+              header: t('organizer.rounds.columns.actions'),
+              width: 'w-[34%]',
+              mobileLabelVisible: false,
+              cell: (round) => {
+                const disableOpen = round.status === 'draft' && anotherRoundOpenId !== null
+                return (
+                  <>
                     {round.status === 'draft' && (
-                      <div className="flex items-center gap-2">
+                      <>
                         <Link
                           to="/organizer/rounds/$id/edit"
                           params={{ id: round.id }}
@@ -287,10 +319,10 @@ function OrganizerRoundsList() {
                             )}
                           </Tooltip>
                         </TooltipProvider>
-                      </div>
+                      </>
                     )}
                     {round.status === 'open' && (
-                      <div className="flex items-center gap-2">
+                      <>
                         <Button
                           type="button"
                           variant="outline"
@@ -309,7 +341,7 @@ function OrganizerRoundsList() {
                         >
                           {t('organizer.rounds.closeAction')}
                         </Button>
-                      </div>
+                      </>
                     )}
                     {round.status === 'closed' && round.closedAt && (
                       <span
@@ -324,12 +356,12 @@ function OrganizerRoundsList() {
                         })}
                       </span>
                     )}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
+                  </>
+                )
+              },
+            },
+          ]}
+        />
       )}
 
       <AlertDialog

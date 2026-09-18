@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { KeyRound, ShieldMinus, ShieldPlus, UserCheck, UserX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
+import { PANEL_EYEBROW, PanelTable } from '@/components/organizer/panel-table'
 import { UniversityBadge } from '@/components/teams/university-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -36,14 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useSession } from '@/hooks/use-session'
 import { api } from '@/lib/api'
@@ -142,16 +134,26 @@ function OrganizerUsersScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="font-semibold text-xl" data-testid="organizer-users-heading">
+      <h2
+        className="font-display font-semibold text-2xl uppercase tracking-[0.01em]"
+        data-testid="organizer-users-heading"
+      >
         {t('organizer.users.heading')}
       </h2>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="organizer-users-search">{t('organizer.users.search.label')}</Label>
+        <div className="flex min-w-0 flex-col gap-1">
+          <Label
+            htmlFor="organizer-users-search"
+            className={`${PANEL_EYEBROW} text-muted-foreground`}
+          >
+            {t('organizer.users.search.label')}
+          </Label>
           <Input
             id="organizer-users-search"
-            className="h-9 w-56"
+            // Full width on a phone, fixed from `sm` up: a 224px box inside a
+            // 390px screen leaves the filter bar ragged.
+            className="h-9 w-full sm:w-56"
             data-testid="organizer-users-search-input"
             placeholder={t('organizer.users.search.placeholder')}
             value={filters.q}
@@ -214,59 +216,96 @@ function OrganizerUsersScreen() {
 
       {users.data && users.data.items.length > 0 && (
         <>
-          <Table data-testid="organizer-users-table">
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('organizer.users.columns.name')}</TableHead>
-                <TableHead>{t('organizer.users.columns.email')}</TableHead>
-                <TableHead>{t('organizer.users.columns.university')}</TableHead>
-                <TableHead>{t('organizer.users.columns.role')}</TableHead>
-                <TableHead>{t('organizer.users.columns.team')}</TableHead>
-                <TableHead>{t('organizer.users.columns.status')}</TableHead>
-                <TableHead>{t('organizer.users.columns.actions')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.data.items.map((item) => (
-                <TableRow
-                  key={item.id}
-                  data-testid={`organizer-users-row-${item.id}`}
-                  className={item.active ? undefined : 'text-muted-foreground'}
-                >
-                  {/* Accounts predating #122 have no name — an em dash, not a
-                      blank cell, so the column still reads as filled in. */}
-                  <TableCell>{item.name ?? t('organizer.users.noName')}</TableCell>
-                  <TableCell>{item.email}</TableCell>
-                  <TableCell>
-                    <UniversityBadge university={item.university} />
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{t(ROLE_KEYS[item.role])}</Badge>
-                  </TableCell>
-                  <TableCell>{item.team?.name ?? t('organizer.users.noTeam')}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={item.active ? 'outline' : 'secondary'}
-                      data-testid={`organizer-users-status-${item.id}`}
-                    >
-                      {item.active
-                        ? t('organizer.users.status.active')
-                        : t('organizer.users.status.inactive')}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <UserRowActions user={item} isSelf={session.user?.id === item.id} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <PanelTable
+            testId="organizer-users-table"
+            rows={users.data.items}
+            rowKey={(item) => item.id}
+            rowTestId={(item) => `organizer-users-row-${item.id}`}
+            rowClassName={(item) => (item.active ? undefined : 'text-muted-foreground')}
+            columns={[
+              {
+                id: 'name',
+                header: t('organizer.users.columns.name'),
+                width: 'w-[14%]',
+                // Accounts predating #122 have no name — an em dash, not a
+                // blank cell, so the column still reads as filled in.
+                cell: (item) => (
+                  <span className="font-medium">{item.name ?? t('organizer.users.noName')}</span>
+                ),
+              },
+              {
+                id: 'email',
+                header: t('organizer.users.columns.email'),
+                width: 'w-[13%]',
+                // The widest string in the panel, and the only one with no
+                // spaces to break at — the one column that earns
+                // `wrapAnywhere`, and what keeps it from pushing the page
+                // into horizontal scroll.
+                wrapAnywhere: true,
+                cell: (item) => item.email,
+              },
+              {
+                id: 'university',
+                header: t('organizer.users.columns.university'),
+                width: 'w-[13%]',
+                cell: (item) => <UniversityBadge university={item.university} />,
+              },
+              {
+                id: 'role',
+                header: t('organizer.users.columns.role'),
+                width: 'w-[16%]',
+                cell: (item) => (
+                  <Badge
+                    variant="outline"
+                    className="whitespace-normal wrap-normal"
+                    data-testid={`organizer-users-role-${item.id}`}
+                  >
+                    {t(ROLE_KEYS[item.role])}
+                  </Badge>
+                ),
+              },
+              {
+                id: 'team',
+                header: t('organizer.users.columns.team'),
+                width: 'w-[11%]',
+                cell: (item) => item.team?.name ?? t('organizer.users.noTeam'),
+              },
+              {
+                id: 'status',
+                header: t('organizer.users.columns.status'),
+                width: 'w-[15%]',
+                cell: (item) => (
+                  <Badge
+                    variant={item.active ? 'outline' : 'secondary'}
+                    className="whitespace-normal wrap-normal"
+                    data-testid={`organizer-users-status-${item.id}`}
+                  >
+                    {item.active
+                      ? t('organizer.users.status.active')
+                      : t('organizer.users.status.inactive')}
+                  </Badge>
+                ),
+              },
+              {
+                id: 'actions',
+                header: t('organizer.users.columns.actions'),
+                width: 'w-[18%]',
+                mobileLabelVisible: false,
+                cell: (item) => (
+                  <UserRowActions user={item} isSelf={session.user?.id === item.id} />
+                ),
+              },
+            ]}
+          />
 
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-muted-foreground text-sm" data-testid="organizer-users-range">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span
+              className="text-muted-foreground text-sm tabular-nums"
+              data-testid="organizer-users-range"
+            >
               {t('organizer.users.pagination.range', { from, to, total })}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -318,10 +357,10 @@ function FilterSelect({
   const { t } = useTranslation()
 
   return (
-    <div className="flex flex-col gap-1">
-      <Label>{label}</Label>
+    <div className="flex min-w-0 flex-col gap-1">
+      <Label className={`${PANEL_EYEBROW} text-muted-foreground`}>{label}</Label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger className="h-9 w-44" data-testid={testId}>
+        <SelectTrigger className="h-9 w-full sm:w-44" data-testid={testId}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

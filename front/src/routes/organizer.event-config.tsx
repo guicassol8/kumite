@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
-
+import { PanelTable } from '@/components/organizer/panel-table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -38,14 +38,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 
@@ -100,7 +92,10 @@ function OrganizerEventConfigScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="font-semibold text-xl" data-testid="event-config-heading">
+      <h2
+        className="font-display font-semibold text-2xl uppercase tracking-[0.01em]"
+        data-testid="event-config-heading"
+      >
         {t('organizer.eventConfig.heading')}
       </h2>
 
@@ -373,49 +368,71 @@ function EventCodesSection({ eventCodes }: { eventCodes: EventCode[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Table data-testid="event-config-codes-table">
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('organizer.eventConfig.codes.columns.university')}</TableHead>
-            <TableHead>{t('organizer.eventConfig.codes.columns.code')}</TableHead>
-            <TableHead>{t('organizer.eventConfig.codes.columns.suffixes')}</TableHead>
-            <TableHead>{t('organizer.eventConfig.codes.columns.active')}</TableHead>
-            <TableHead>{t('organizer.eventConfig.codes.columns.actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {eventCodes.map((eventCode) => (
-            <TableRow
-              key={eventCode.university}
-              data-testid={`event-config-codes-row-${eventCode.university}`}
-            >
-              <TableCell>{t(`teams.university.${eventCode.university}`)}</TableCell>
-              <TableCell>{eventCode.code}</TableCell>
-              <TableCell>{eventCode.allowedEmailSuffixes.join(', ')}</TableCell>
-              <TableCell>
-                <Badge variant={eventCode.active ? 'default' : 'outline'}>
-                  {t(
-                    eventCode.active
-                      ? 'organizer.eventConfig.codes.activeYes'
-                      : 'organizer.eventConfig.codes.activeNo',
-                  )}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  data-testid={`event-config-codes-edit-${eventCode.university}`}
-                  onClick={() => setEditing(eventCode)}
-                >
-                  {t('organizer.eventConfig.codes.editAction')}
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <PanelTable
+        testId="event-config-codes-table"
+        rows={eventCodes}
+        rowKey={(eventCode) => eventCode.university}
+        rowTestId={(eventCode) => `event-config-codes-row-${eventCode.university}`}
+        columns={[
+          {
+            id: 'university',
+            header: t('organizer.eventConfig.codes.columns.university'),
+            width: 'w-[18%]',
+            cell: (eventCode) => (
+              <span className="font-medium">{t(`teams.university.${eventCode.university}`)}</span>
+            ),
+          },
+          {
+            id: 'code',
+            header: t('organizer.eventConfig.codes.columns.code'),
+            width: 'w-[18%]',
+            cell: (eventCode) => <span className="tabular-nums">{eventCode.code}</span>,
+          },
+          {
+            id: 'suffixes',
+            header: t('organizer.eventConfig.codes.columns.suffixes'),
+            width: 'w-[34%]',
+            // Domain suffixes are unbreakable tokens, same as an e-mail.
+            wrapAnywhere: true,
+            cell: (eventCode) => eventCode.allowedEmailSuffixes.join(', '),
+          },
+          {
+            id: 'active',
+            header: t('organizer.eventConfig.codes.columns.active'),
+            width: 'w-[14%]',
+            cell: (eventCode) => (
+              <Badge
+                variant={eventCode.active ? 'default' : 'secondary'}
+                className="whitespace-normal wrap-normal"
+                data-testid={`event-config-codes-active-${eventCode.university}`}
+              >
+                {t(
+                  eventCode.active
+                    ? 'organizer.eventConfig.codes.activeYes'
+                    : 'organizer.eventConfig.codes.activeNo',
+                )}
+              </Badge>
+            ),
+          },
+          {
+            id: 'actions',
+            header: t('organizer.eventConfig.codes.columns.actions'),
+            width: 'w-[16%]',
+            mobileLabelVisible: false,
+            cell: (eventCode) => (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid={`event-config-codes-edit-${eventCode.university}`}
+                onClick={() => setEditing(eventCode)}
+              >
+                {t('organizer.eventConfig.codes.editAction')}
+              </Button>
+            ),
+          },
+        ]}
+      />
 
       <EditEventCodeDialog eventCode={editing} onClose={() => setEditing(null)} />
     </div>

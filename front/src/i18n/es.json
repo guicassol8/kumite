@@ -118,6 +118,7 @@
   "organizer": {
     "heading": "Área del organizador",
     "nav": {
+      "ariaLabel": "Secciones del panel",
       "overview": "Visión general",
       "problems": "Problemas",
       "rounds": "Rondas",
@@ -365,6 +366,7 @@
         "retry": "Intentar de nuevo"
       },
       "frozenBadge": "Congelado",
+      "memberCountLabel": "Integrantes",
       "role": {
         "participant": "Participante",
         "organizer": "Organizador"
@@ -531,11 +533,13 @@
       "round": {
         "title": "Ronda",
         "streamOffline": "Sin conexión en vivo",
+        "openState": "Ronda abierta",
         "manageCta": "Gestionar rondas",
         "lastClosed": "Última ronda: {{name}}",
         "closedAt": "Cerrada el {{date}}",
+        "podiumTitle": "Última ronda cerrada · {{name}}",
         "podiumEmpty": "Ningún equipo puntuó en esta ronda.",
-        "podiumEntry": "#{{rank}} {{name}} · {{score}} pts",
+        "podiumPoints": "{{score}} pts",
         "leaderboardCta": "Ver clasificación",
         "none": "Aún no se ha creado ninguna ronda."
       },

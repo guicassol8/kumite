@@ -221,6 +221,11 @@ Must still be streaming past the 600s mark — not dropped by Caddy or the VM.
   VM:
   ```bash
   cd ~/kumite
+  mkdir -p backups
+  # On a VM deployed before the backup service existed, Docker created
+  # ./backups itself and it belongs to root — the redirect below would then
+  # fail with "Permission denied". This makes it yours; it is a no-op once done.
+  [ -w backups ] || sudo chown "$USER" backups
   docker compose -f docker-compose.prod.yml exec -T db \
     pg_dump -U kumite kumite | gzip > backups/kumite-$(date +%F).sql.gz
   ```
@@ -262,6 +267,10 @@ anything else:
 ```bash
 # on the VM
 cd ~/kumite
+mkdir -p backups
+# Docker may have created ./backups as root (see §13) — the redirect below
+# fails with "Permission denied" until this runs. No-op if already yours.
+[ -w backups ] || sudo chown "$USER" backups
 docker compose -f docker-compose.prod.yml exec -T db \
   pg_dump -U kumite kumite | gzip > backups/kumite-final-$(date +%F).sql.gz
 ```

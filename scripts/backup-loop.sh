@@ -86,7 +86,15 @@ CYCLE_GLOB='kumite-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]
 # Deletes everything past the newest BACKUP_KEEP cycle dumps. Only ever called
 # once a new, valid dump has landed.
 rotate() {
-  _stale="$(ls -1t "$BACKUP_DIR"/$CYCLE_GLOB 2>/dev/null | tail -n +"$((BACKUP_KEEP + 1))")" || _stale=''
+  # Ordered by FILE NAME, not by mtime. The name is this script's own identity
+  # for the file -- the same key CYCLE_GLOB matches on -- and is a zero-padded
+  # UTC stamp, so sorting it is exactly chronological. mtime is metadata any
+  # cp/scp/rsync rewrites (restoring a rotated set onto a fresh VM, S15, gives
+  # every file the same fresh mtime), and when mtimes tie `ls -t` falls back to
+  # name-ascending, which this loop would read as newest-first and delete the
+  # NEWEST dumps. The destructive step must not depend on metadata it does not
+  # own.
+  _stale="$(ls -1 "$BACKUP_DIR"/$CYCLE_GLOB 2>/dev/null | sort -r | tail -n +"$((BACKUP_KEEP + 1))")" || _stale=''
   [ -n "$_stale" ] || return 0
   echo "$_stale" | while IFS= read -r _old; do
     [ -n "$_old" ] || continue
@@ -140,6 +148,17 @@ run_cycle() {
 }
 
 mkdir -p -- "$BACKUP_DIR"
+
+# A dump interrupted mid-write -- `docker stop` falling through to SIGKILL, a
+# VM reboot, the OOM killer -- leaves its .tmp behind. That name never matches
+# CYCLE_GLOB, so rotation would never reclaim it: without this sweep one
+# full-dump-sized file leaks per hard kill, and a full disk is one of the loss
+# scenarios #275 exists for.
+for _orphan in "$BACKUP_DIR"/kumite-*.sql.gz.tmp; do
+  [ -e "$_orphan" ] || continue
+  rm -f -- "$_orphan"
+  log "descartado dump incompleto de uma execucao anterior: $(basename "$_orphan")"
+done
 
 if [ -n "$ROTATE_ONLY" ]; then
   log "ROTATE_ONLY=1: rotacionando $BACKUP_DIR para os $BACKUP_KEEP mais recentes, sem dumpar"

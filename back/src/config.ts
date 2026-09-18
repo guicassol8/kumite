@@ -38,6 +38,11 @@ const EnvSchema = z.object({
   JUDGE_CONCURRENCY: z.coerce.number().int().positive().default(4),
   SUBMISSION_COOLDOWN_MS: z.coerce.number().int().nonnegative().default(5000),
   SUBMISSION_MAX_BODY_BYTES: z.coerce.number().int().positive().default(262144),
+  // Ceiling for every request body the API accepts (#287), applied app-wide
+  // before any route's own limit. The public routes (login, signup, the
+  // password-reset pair, bug reports) had none: a 100 MB POST was read whole
+  // into memory before zod ever saw it. Caddy caps at 1 MB one layer out.
+  APP_MAX_BODY_BYTES: z.coerce.number().int().positive().default(524288),
   // Password-reset anti-abuse (#142): one sliding window, three ceilings.
   PASSWORD_RESET_WINDOW_MS: z.coerce.number().int().positive().default(900000),
   PASSWORD_RESET_MAX_PER_EMAIL: z.coerce.number().int().positive().default(3),
@@ -77,6 +82,7 @@ export const JUDGE_MEMORY_MB = env.JUDGE_MEMORY_MB
 export const JUDGE_CONCURRENCY = env.JUDGE_CONCURRENCY
 export const SUBMISSION_COOLDOWN_MS = env.SUBMISSION_COOLDOWN_MS
 export const SUBMISSION_MAX_BODY_BYTES = env.SUBMISSION_MAX_BODY_BYTES
+export const APP_MAX_BODY_BYTES = env.APP_MAX_BODY_BYTES
 export const PASSWORD_RESET_WINDOW_MS = env.PASSWORD_RESET_WINDOW_MS
 export const PASSWORD_RESET_MAX_PER_EMAIL = env.PASSWORD_RESET_MAX_PER_EMAIL
 export const PASSWORD_RESET_MAX_PER_IP = env.PASSWORD_RESET_MAX_PER_IP

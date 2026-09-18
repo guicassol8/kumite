@@ -111,8 +111,16 @@ explicitly, don't fix it partially.
 
 **Back-touching PRs:**
 1. `pnpm -r test` — paste trimmed output.
-2. Server up (`pnpm dev:back`) → `pnpm --filter @kumite/back hurl` — paste
-   trimmed output.
+2. `pnpm --filter @kumite/back db:reset` — the hurl suite is not re-runnable
+   on a dirty database (it asserts on seed state, and vitest leaves rounds,
+   teams and `event_config` behind). The script refuses any non-local
+   `DATABASE_URL`, so it is safe to run without checking first.
+3. Server up (`pnpm dev:back`) → `pnpm --filter @kumite/back hurl` — paste
+   trimmed output. Start that server *fresh*: `db:reset` empties the database,
+   not the API process, and the anti-abuse windows (the per-IP bug-report
+   cooldown, the password-reset ones) live in memory. Re-running the suite
+   against a warm server fails `bug-reports.hurl` on the cooldown alone, with
+   a clean database.
 
 No evidence = the review is NOT done. Say exactly that rather than approving.
 

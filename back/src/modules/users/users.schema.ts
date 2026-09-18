@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 import { UuidSchema } from '../../lib/uuid'
 
+import { VERIFIED_PASSWORD_MAX_LENGTH } from '../auth/auth.schema'
+
 // Mirrors the `users` drizzle table (db/schema.ts).
 export const RoleSchema = z.enum(['participant', 'organizer'])
 export const UniversitySchema = z.enum(['pucrs', 'merida'])
@@ -90,7 +92,7 @@ export const UserIdParamsSchema = z.object({
 // Step-up body for the organizer reset (#143). No `.min(8)`: this is checked
 // against a real hash, not for strength — same reasoning as LoginBodySchema.
 export const ResetUserPasswordBodySchema = z.object({
-  adminPassword: z.string().min(1),
+  adminPassword: z.string().min(1).max(VERIFIED_PASSWORD_MAX_LENGTH),
 })
 
 // Only the password comes back. Nothing visible in the users table changed, and

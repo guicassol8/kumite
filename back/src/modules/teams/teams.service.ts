@@ -357,16 +357,23 @@ export async function removeMember(db: Db, userId: string): Promise<RemoveMember
 export type RemoveTeamResult = { ok: true } | { ok: false; error: 'not_found' }
 
 export async function removeTeam(db: Db, teamId: string): Promise<RemoveTeamResult> {
-  const [team] = await db
-    .update(teamsTable)
-    .set({ removedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.removedAt)))
-    .returning()
-  if (!team) return { ok: false, error: 'not_found' }
+  // Achado M1 (#276): marking the team removed and unlinking its members were
+  // two loose statements. A failure between them committed the first half —
+  // the team vanished from every listing while its members stayed pinned to
+  // it, in no visible team and unable to join another. Both halves now live in
+  // one transaction, so the team is removed with its members or not at all.
+  return db.transaction(async (tx) => {
+    const [team] = await tx
+      .update(teamsTable)
+      .set({ removedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.removedAt)))
+      .returning()
+    if (!team) return { ok: false, error: 'not_found' }
 
-  // Submissions stay untouched (ON DELETE RESTRICT + the audit requirement):
-  // only membership is deleted, leaving members teamless.
-  await db.delete(teamMembersTable).where(eq(teamMembersTable.teamId, teamId))
+    // Submissions stay untouched (ON DELETE RESTRICT + the audit requirement):
+    // only membership is deleted, leaving members teamless.
+    await tx.delete(teamMembersTable).where(eq(teamMembersTable.teamId, teamId))
 
-  return { ok: true }
+    return { ok: true }
+  })
 }

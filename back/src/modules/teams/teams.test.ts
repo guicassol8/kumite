@@ -53,6 +53,13 @@ beforeEach(async () => {
   await db.execute(
     sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemsTable}, ${teamMembersTable}, ${teamsTable}, ${eventConfigTable}, ${usersTable} restart identity cascade`,
   )
+  // The removeTeam atomicity test injects a delete failure with this trigger.
+  // TRUNCATE does not fire row-level DELETE triggers, so a run interrupted
+  // between the create and the cleanup would otherwise poison every later
+  // test that deletes a membership.
+  await db.execute(
+    sql`drop trigger if exists kumite_test_fail_member_delete on ${teamMembersTable}`,
+  )
 })
 
 async function insertSubmission(teamId: string, userId: string) {
@@ -696,6 +703,46 @@ describe('removeTeam', () => {
     const result = await removeTeam(db, created.team.id)
 
     expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  // Achado M1 (#276): the removedAt update and the membership delete were two
+  // loose statements, so a failing delete left the team committed as removed —
+  // gone from every listing — while its members stayed pinned to it, unable to
+  // show up in any team or to join another. No FK on team_members is ON DELETE
+  // RESTRICT, so there is no natural way to make the delete fail: the failure
+  // is injected with a trigger, which proves the rollback in Postgres instead
+  // of proving a mock.
+  it('does not mark the team as removed when the member delete fails', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    try {
+      await db.execute(sql`
+        create or replace function kumite_test_fail_member_delete() returns trigger
+          language plpgsql as $$ begin raise exception 'injected delete failure'; end; $$
+      `)
+      await db.execute(sql`
+        create trigger kumite_test_fail_member_delete
+          before delete on ${teamMembersTable} for each row
+          execute function kumite_test_fail_member_delete()
+      `)
+
+      await expect(removeTeam(db, created.team.id)).rejects.toThrow()
+    } finally {
+      await db.execute(
+        sql`drop trigger if exists kumite_test_fail_member_delete on ${teamMembersTable}`,
+      )
+      await db.execute(sql`drop function if exists kumite_test_fail_member_delete()`)
+    }
+
+    const [team] = await db.select().from(teamsTable).where(eq(teamsTable.id, created.team.id))
+    expect(team?.removedAt).toBeNull()
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, creator.id))
+    expect(membership?.teamId).toBe(created.team.id)
   })
 
   it('removes the team from listTeams', async () => {

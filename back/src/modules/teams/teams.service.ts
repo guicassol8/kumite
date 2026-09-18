@@ -306,24 +306,40 @@ export async function moveMember(
     .where(eq(teamMembersTable.userId, userId))
   if (!membership) return { ok: false, error: 'member_not_found' }
 
-  const [destination] = await db
-    .select()
-    .from(teamsTable)
-    .where(and(eq(teamsTable.id, destinationTeamId), isNull(teamsTable.removedAt)))
-  if (!destination) return { ok: false, error: 'team_not_found' }
+  const { maxTeamSize } = await getEventConfig(db)
 
-  const [members, { maxTeamSize }] = await Promise.all([
-    db.select().from(teamMembersTable).where(eq(teamMembersTable.teamId, destinationTeamId)),
-    getEventConfig(db),
-  ])
-  if (members.length >= maxTeamSize) return { ok: false, error: 'team_full' }
+  // Achado M1 (#276): the capacity check and the update ran as two unlocked
+  // statements, so two organizers moving different members into the same team
+  // both read a free slot before either had written — the very TOCTOU joinTeam
+  // fixed in #22. The lock key is deliberately the one joinTeam uses, so a
+  // join and a move racing for the same slot serialize against each other too.
+  return db.transaction(async (tx) => {
+    const lockKey = `team-join:${destinationTeamId}`
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}::text))`)
 
-  await db
-    .update(teamMembersTable)
-    .set({ teamId: destinationTeamId })
-    .where(eq(teamMembersTable.userId, userId))
+    // Read under the lock, not before it: validated outside the transaction,
+    // the destination could be removed while this move waited its turn, and
+    // the member would land on a team nobody can see. `member_not_found` still
+    // wins over `team_not_found` — the membership check above comes first.
+    const [destination] = await tx
+      .select()
+      .from(teamsTable)
+      .where(and(eq(teamsTable.id, destinationTeamId), isNull(teamsTable.removedAt)))
+    if (!destination) return { ok: false, error: 'team_not_found' }
 
-  return { ok: true }
+    const members = await tx
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.teamId, destinationTeamId))
+    if (members.length >= maxTeamSize) return { ok: false, error: 'team_full' }
+
+    await tx
+      .update(teamMembersTable)
+      .set({ teamId: destinationTeamId })
+      .where(eq(teamMembersTable.userId, userId))
+
+    return { ok: true }
+  })
 }
 
 export type RemoveMemberResult = { ok: true } | { ok: false; error: 'not_found' }
@@ -345,16 +361,30 @@ export async function removeMember(db: Db, userId: string): Promise<RemoveMember
 export type RemoveTeamResult = { ok: true } | { ok: false; error: 'not_found' }
 
 export async function removeTeam(db: Db, teamId: string): Promise<RemoveTeamResult> {
-  const [team] = await db
-    .update(teamsTable)
-    .set({ removedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.removedAt)))
-    .returning()
-  if (!team) return { ok: false, error: 'not_found' }
+  // Achado M1 (#276): marking the team removed and unlinking its members were
+  // two loose statements. A failure between them committed the first half —
+  // the team vanished from every listing while its members stayed pinned to
+  // it, in no visible team and unable to join another. Both halves now live in
+  // one transaction, so the team is removed with its members or not at all.
+  //
+  // Same key as joinTeam/moveMember: without it this delete of the team's
+  // memberships can slip between a move's capacity check and its write, and
+  // the moved member is left pinned to a team that no longer exists.
+  return db.transaction(async (tx) => {
+    const lockKey = `team-join:${teamId}`
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}::text))`)
 
-  // Submissions stay untouched (ON DELETE RESTRICT + the audit requirement):
-  // only membership is deleted, leaving members teamless.
-  await db.delete(teamMembersTable).where(eq(teamMembersTable.teamId, teamId))
+    const [team] = await tx
+      .update(teamsTable)
+      .set({ removedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.removedAt)))
+      .returning()
+    if (!team) return { ok: false, error: 'not_found' }
 
-  return { ok: true }
+    // Submissions stay untouched (ON DELETE RESTRICT + the audit requirement):
+    // only membership is deleted, leaving members teamless.
+    await tx.delete(teamMembersTable).where(eq(teamMembersTable.teamId, teamId))
+
+    return { ok: true }
+  })
 }

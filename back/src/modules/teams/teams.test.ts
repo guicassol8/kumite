@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm'
+import { eq, isNotNull, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
@@ -53,6 +53,13 @@ beforeEach(async () => {
   await db.execute(
     sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemsTable}, ${teamMembersTable}, ${teamsTable}, ${eventConfigTable}, ${usersTable} restart identity cascade`,
   )
+  // The removeTeam atomicity test injects a delete failure with this trigger.
+  // TRUNCATE does not fire row-level DELETE triggers, so a run interrupted
+  // between the create and the cleanup would otherwise poison every later
+  // test that deletes a membership.
+  await db.execute(
+    sql`drop trigger if exists kumite_test_fail_member_delete on ${teamMembersTable}`,
+  )
 })
 
 async function insertSubmission(teamId: string, userId: string) {
@@ -97,6 +104,42 @@ async function insertSubmission(teamId: string, userId: string) {
     .returning()
   if (!submission) throw new Error('expected a submission fixture')
   return submission
+}
+
+// Holds `team-join:<teamId>` — the key joinTeam, moveMember and removeTeam all
+// share — on its own connection until `release` is called. Racing tests that
+// rely on a lucky `Promise.all` interleaving only catch a regression some of
+// the time; parking the contender on the lock freezes it at a chosen point and
+// makes the same proof deterministic.
+async function holdTeamJoinLock(teamId: string) {
+  const holder = createDb()
+  let acquired!: () => void
+  const lockAcquired = new Promise<void>((resolve) => {
+    acquired = resolve
+  })
+  let releaseRequested!: () => void
+  const releaseWanted = new Promise<void>((resolve) => {
+    releaseRequested = resolve
+  })
+
+  const holding = holder.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`team-join:${teamId}`}::text))`)
+    acquired()
+    await releaseWanted
+  })
+  await lockAcquired
+
+  let released = false
+  return {
+    // Idempotent: tests release in a `finally` and again on the happy path.
+    async release() {
+      if (released) return
+      released = true
+      releaseRequested()
+      await holding
+      await holder.$client.end()
+    },
+  }
 }
 
 afterAll(async () => {
@@ -545,6 +588,152 @@ describe('moveMember', () => {
 
     expect(result).toEqual({ ok: true })
   })
+
+  // Achado M1 (#276): moveMember read the destination's member count and
+  // wrote the new teamId as two unlocked statements, so two organizers
+  // moving different members into the same team both passed the capacity
+  // check before either had written. Same Promise.all burst as the joinTeam
+  // race test above, which #192 fixed with this very idiom.
+  it('admits exactly one move in a race for the last slot', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 2 })
+    const creatorA = await insertUser()
+    const moverB = await insertUser()
+    const moverC = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, moverB.id, 'Team B')
+    const teamC = await createTeam(db, moverC.id, 'Team C')
+    if (!teamA.ok || !teamB.ok || !teamC.ok) throw new Error('expected success')
+
+    const results = await Promise.all([
+      moveMember(db, moverB.id, teamA.team.id),
+      moveMember(db, moverC.id, teamA.team.id),
+    ])
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toEqual([{ ok: false, error: 'team_full' }])
+    const members = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.teamId, teamA.team.id))
+    expect(members).toHaveLength(2)
+  })
+
+  // The advisory key is shared with joinTeam (`team-join:<teamId>`) on
+  // purpose, so the two paths into a team serialize against each other and
+  // not just against themselves. Give the move its own key and this goes red
+  // again while the test above stays green.
+  it('serializes a join and a move disputing the same slot', async () => {
+    await db.insert(eventConfigTable).values({ id: 1, maxTeamSize: 2 })
+    const creatorA = await insertUser()
+    const joiner = await insertUser()
+    const mover = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, mover.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    const results = await Promise.all([
+      joinTeam(db, joiner.id, teamA.team.id),
+      moveMember(db, mover.id, teamA.team.id),
+    ])
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok)).toEqual([{ ok: false, error: 'team_full' }])
+    const members = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.teamId, teamA.team.id))
+    expect(members).toHaveLength(2)
+  })
+
+  // Beyond the issue's literal spec, same achado M1: moveMember validated the
+  // destination outside its transaction and removeTeam took no lock at all, so
+  // one organizer could remove a team inside the window between the other's
+  // check and write. The moved member ended up pinned to a removed team — in
+  // no visible team and unable to join another, exactly the damage #276
+  // describes. Whoever wins, the invariant is the same: no membership may
+  // point at a removed team.
+  it('never leaves a member pinned to a team removed in the same instant', async () => {
+    const creatorA = await insertUser()
+    const mover = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, mover.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    await Promise.all([moveMember(db, mover.id, teamA.team.id), removeTeam(db, teamA.team.id)])
+
+    const pinned = await db
+      .select({ userId: teamMembersTable.userId })
+      .from(teamMembersTable)
+      .innerJoin(teamsTable, eq(teamsTable.id, teamMembersTable.teamId))
+      .where(isNotNull(teamsTable.removedAt))
+    expect(pinned).toEqual([])
+  })
+
+  // The deterministic half of the test above: the move is parked on the shared
+  // lock, past every check it used to make outside its transaction, and the
+  // destination is removed while it waits. Validating the destination before
+  // the lock makes this move happily pin the member to a removed team.
+  it('rejects a move whose destination is removed while it waits for the lock', async () => {
+    const creatorA = await insertUser()
+    const mover = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, mover.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+    const lock = await holdTeamJoinLock(teamA.team.id)
+
+    let result: Awaited<ReturnType<typeof moveMember>>
+    try {
+      const move = moveMember(db, mover.id, teamA.team.id)
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      await db
+        .update(teamsTable)
+        .set({ removedAt: new Date() })
+        .where(eq(teamsTable.id, teamA.team.id))
+      await lock.release()
+      result = await move
+    } finally {
+      await lock.release()
+    }
+
+    expect(result).toEqual({ ok: false, error: 'team_not_found' })
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, mover.id))
+    expect(membership?.teamId).toBe(teamB.team.id)
+  })
+
+  // The other half: removeTeam must contend for the same key, or its delete of
+  // the destination's memberships can slip between a move's capacity check and
+  // its write — leaving the moved member behind on a removed team.
+  it('makes removeTeam wait for whoever holds the destination team lock', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    const lock = await holdTeamJoinLock(created.team.id)
+
+    const removal = removeTeam(db, created.team.id)
+    let settled = false
+    // Settle-or-reject, both observed: a bare `.then` would leave the rejected
+    // branch unhandled, and the unhandled rejection would surface before the
+    // `await removal` below that actually explains the failure.
+    void removal.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      expect(settled).toBe(false)
+    } finally {
+      await lock.release()
+    }
+
+    expect(await removal).toEqual({ ok: true })
+  })
 })
 
 describe('removeMember', () => {
@@ -640,6 +829,46 @@ describe('removeTeam', () => {
     const result = await removeTeam(db, created.team.id)
 
     expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  // Achado M1 (#276): the removedAt update and the membership delete were two
+  // loose statements, so a failing delete left the team committed as removed —
+  // gone from every listing — while its members stayed pinned to it, unable to
+  // show up in any team or to join another. No FK on team_members is ON DELETE
+  // RESTRICT, so there is no natural way to make the delete fail: the failure
+  // is injected with a trigger, which proves the rollback in Postgres instead
+  // of proving a mock.
+  it('does not mark the team as removed when the member delete fails', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    try {
+      await db.execute(sql`
+        create or replace function kumite_test_fail_member_delete() returns trigger
+          language plpgsql as $$ begin raise exception 'injected delete failure'; end; $$
+      `)
+      await db.execute(sql`
+        create trigger kumite_test_fail_member_delete
+          before delete on ${teamMembersTable} for each row
+          execute function kumite_test_fail_member_delete()
+      `)
+
+      await expect(removeTeam(db, created.team.id)).rejects.toThrow()
+    } finally {
+      await db.execute(
+        sql`drop trigger if exists kumite_test_fail_member_delete on ${teamMembersTable}`,
+      )
+      await db.execute(sql`drop function if exists kumite_test_fail_member_delete()`)
+    }
+
+    const [team] = await db.select().from(teamsTable).where(eq(teamsTable.id, created.team.id))
+    expect(team?.removedAt).toBeNull()
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, creator.id))
+    expect(membership?.teamId).toBe(created.team.id)
   })
 
   it('removes the team from listTeams', async () => {

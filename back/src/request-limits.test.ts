@@ -181,11 +181,23 @@ describe('numeric field ceilings', () => {
   // NaN and every "rejects one over" assertion below passes for the wrong
   // reason. Pinning both as real positive integers is what makes the rest mean
   // something.
-  it('exports both ceilings as positive integers', () => {
+  //
+  // The literals are pinned too, and that is the half that catches drift. Every
+  // other assertion in this file is written relative to the constant, so raising
+  // a ceiling here alone keeps this suite green while the front keeps promising
+  // the old limit — `front/src/lib/field-limits.ts` mirrors these by hand and
+  // no type ties the two together (`.max()` does not change the inferred type,
+  // so `hc<AppType>` cannot carry it). front/src/lib/field-limits.test.ts pins
+  // the same two numbers; changing one side without the other turns one of the
+  // two suites red instead of silently shipping a wrong limit to the organizer.
+  it('pins both ceilings to the literals the front mirrors', () => {
     expect(Number.isInteger(PROBLEM_POINTS_MAX)).toBe(true)
     expect(PROBLEM_POINTS_MAX).toBeGreaterThan(0)
     expect(Number.isInteger(EVENT_MAX_TEAM_SIZE)).toBe(true)
     expect(EVENT_MAX_TEAM_SIZE).toBeGreaterThan(0)
+
+    expect(PROBLEM_POINTS_MAX).toBe(10_000)
+    expect(EVENT_MAX_TEAM_SIZE).toBe(10)
   })
 
   it("caps a problem's points at PROBLEM_POINTS_MAX on both write schemas", () => {

@@ -187,6 +187,11 @@ describe('OrganizerEventConfigScreen', () => {
         'O tamanho máximo do time precisa ser no máximo 10.',
       ),
     )
+    // The message above is byte-identical to the one the *client* ceiling
+    // produces, so without this the test would still pass if the request never
+    // left the browser — and it would have stopped covering the 422 path it
+    // exists for. Asserting the call is what keeps the two paths apart.
+    expect(mockedConfigPatch).toHaveBeenCalled()
   })
 
   it('refuses a maxTeamSize over the ceiling without calling the API at all', async () => {

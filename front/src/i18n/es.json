@@ -201,6 +201,8 @@
         "jsonEmpty": "Ingresa un valor JSON",
         "jsonInvalid": "JSON inválido",
         "pointsInvalid": "Ingresa una puntuación entera mayor que cero.",
+        "pointsTooLarge": "La puntuación debe ser como máximo {{max}}.",
+        "fieldRejected": "El servidor rechazó este valor. Revisa el campo.",
         "translationIncomplete": "Completa título y enunciado, o deja la pestaña entera vacía.",
         "translationCannotBeCleared": "No se puede borrar una traducción ya guardada.",
         "publish": {
@@ -320,6 +322,8 @@
         "savedMessage": "Cambios guardados.",
         "errors": {
           "maxTeamSizeInvalid": "Ingresa un número entero mayor que cero.",
+          "maxTeamSizeTooLarge": "El tamaño máximo del equipo debe ser como máximo {{max}}.",
+          "fieldRejected": "El servidor rechazó este valor. Revisa el campo.",
           "saveFailed": "No se pudo guardar. Intenta de nuevo."
         },
         "mixingDialog": {
@@ -353,6 +357,7 @@
         "errors": {
           "codeRequired": "Ingresa el código.",
           "suffixesRequired": "Ingresa al menos un sufijo de email.",
+          "fieldRejected": "El servidor rechazó este valor. Revisa el campo.",
           "codeTaken": "Ese código ya está en uso.",
           "saveFailed": "No se pudo guardar. Intenta de nuevo."
         }

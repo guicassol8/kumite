@@ -40,6 +40,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
+import { readFieldIssues } from '@/lib/api-issues'
+import { MAX_TEAM_SIZE_MAX } from '@/lib/field-limits'
 
 export const Route = createFileRoute('/organizer/event-config')({
   component: OrganizerEventConfigScreen,
@@ -47,21 +49,6 @@ export const Route = createFileRoute('/organizer/event-config')({
 
 const EVENT_CONFIG_QUERY_KEY = ['organizer-event-config']
 const EVENT_CODES_QUERY_KEY = ['organizer-event-codes']
-
-type ApiErrorBody = {
-  error?: string
-  message?: string
-  issues?: Record<string, { path: string; message: string }[]>
-}
-
-// The event-config PATCH declares only its 200 schema (no error map), and
-// event-codes PATCH's map doesn't include kata's automatic 422 envelope
-// (framework-level, ADR-0011) — so the client type never covers those
-// branches. Reading the body through `unknown` sidesteps a `never`-typed
-// `res` in that `else` without lying about the 200 shape.
-async function readErrorBody(res: unknown): Promise<ApiErrorBody | null> {
-  return (await (res as Response).json().catch(() => null)) as ApiErrorBody | null
-}
 
 async function fetchEventConfig() {
   const res = await api.organizer['event-config'].$get()
@@ -267,7 +254,15 @@ function MaxTeamSizeForm({
             invalid_type_error: t('organizer.eventConfig.teamRules.errors.maxTeamSizeInvalid'),
           })
           .int(t('organizer.eventConfig.teamRules.errors.maxTeamSizeInvalid'))
-          .positive(t('organizer.eventConfig.teamRules.errors.maxTeamSizeInvalid')),
+          .positive(t('organizer.eventConfig.teamRules.errors.maxTeamSizeInvalid'))
+          // Mirrors EVENT_MAX_TEAM_SIZE, so the organizer is told the limit
+          // without spending a round-trip to find it out.
+          .max(
+            MAX_TEAM_SIZE_MAX,
+            t('organizer.eventConfig.teamRules.errors.maxTeamSizeTooLarge', {
+              max: MAX_TEAM_SIZE_MAX,
+            }),
+          ),
       }),
     [t],
   )
@@ -293,10 +288,18 @@ function MaxTeamSizeForm({
       return
     }
 
-    const body = await readErrorBody(res)
-    const fieldIssue = body?.issues?.body?.find((issue) => issue.path === 'maxTeamSize')
+    const fieldIssue = (await readFieldIssues(res)).find((issue) => issue.path === 'maxTeamSize')
     if (fieldIssue) {
-      form.setError('maxTeamSize', { message: fieldIssue.message })
+      // The catalog string, never `issue.message`: kata hands back zod's own
+      // English text, which would reach a pt/es organizer untranslated.
+      form.setError('maxTeamSize', {
+        message:
+          fieldIssue.code === 'too_big'
+            ? t('organizer.eventConfig.teamRules.errors.maxTeamSizeTooLarge', {
+                max: MAX_TEAM_SIZE_MAX,
+              })
+            : t('organizer.eventConfig.teamRules.errors.fieldRejected'),
+      })
       return
     }
     form.setError('root', { message: t('organizer.eventConfig.teamRules.errors.saveFailed') })
@@ -502,21 +505,22 @@ function EditEventCodeDialog({
       return
     }
 
-    const body = await readErrorBody(res)
-    const issues = body?.issues?.body ?? []
+    // Same localisation rule as the form above: the message is ours, not the
+    // English one zod put in the envelope.
+    const message = t('organizer.eventConfig.codes.errors.fieldRejected')
     let mapped = false
-    for (const issue of issues) {
+    for (const issue of await readFieldIssues(res)) {
       if (issue.path === 'code') {
-        form.setError('code', { message: issue.message })
+        form.setError('code', { message })
         mapped = true
       } else if (issue.path === 'active') {
-        form.setError('active', { message: issue.message })
+        form.setError('active', { message })
         mapped = true
       } else if (
         issue.path === 'allowedEmailSuffixes' ||
         issue.path.startsWith('allowedEmailSuffixes[')
       ) {
-        form.setError('suffixes', { message: issue.message })
+        form.setError('suffixes', { message })
         mapped = true
       }
     }

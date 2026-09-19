@@ -277,6 +277,52 @@ describe('EditProblemScreen', () => {
     expect(screen.queryByTestId('problem-form-success')).toBeNull()
   })
 
+  // #187: the PATCH's body used to be discarded, so a per-field 422 arrived as
+  // the same "try again" as a 500.
+  it('puts a 422 on points under the field, naming the ceiling', async () => {
+    mockedDetail.mockResolvedValue(jsonResponse(200, draftDetail))
+    mockedPatch.mockResolvedValue(
+      jsonResponse(422, {
+        error: 'validation_failed',
+        issues: {
+          body: [
+            {
+              path: 'points',
+              code: 'too_big',
+              message: 'Number must be less than or equal to 10000',
+            },
+          ],
+        },
+      }),
+    )
+    renderEdit()
+
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-points-error').textContent).toContain('10000'),
+    )
+    expect(screen.queryByTestId('problem-form-error')).toBeNull()
+    expect(screen.queryByTestId('problem-form-success')).toBeNull()
+  })
+
+  it('keeps the generic alert for a 500, which carries no issues', async () => {
+    mockedDetail.mockResolvedValue(jsonResponse(200, draftDetail))
+    mockedPatch.mockResolvedValue(jsonResponse(500, {}))
+    renderEdit()
+
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-error').textContent).toContain(
+        'Não foi possível salvar o problema',
+      ),
+    )
+    expect(screen.queryByTestId('problem-form-points-error')).toBeNull()
+  })
+
   // The screen must not throw away what the organizer is typing: alt-tabbing
   // out and back used to refetch in the background and re-seed the form.
   it('keeps the unsaved statement when the window regains focus', async () => {

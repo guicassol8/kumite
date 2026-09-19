@@ -83,6 +83,29 @@ HTTP 422
 [Asserts]
 jsonpath "$.error" == "validation_failed"
 
+# 2b. Points over PROBLEM_POINTS_MAX (#187) -> 422 naming the field, not the
+# 500 the int4 column used to raise. The organizer's form reads this `path` to
+# put the message under "Pontos", so the path is asserted, not just the status.
+POST {{host}}/organizer/problems
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "difficulty": "easy", "points": 10001 }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.body[0].path" == "points"
+
+# 2c. The same ceiling on the PATCH, which is the request the form actually
+# sends when the organizer saves an existing problem.
+PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "points": 10001 }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.body[0].path" == "points"
+
 # 3. Patch in only the pt translation.
 PATCH {{host}}/organizer/problems/{{problem_id}}
 Authorization: Bearer {{organizer_token}}

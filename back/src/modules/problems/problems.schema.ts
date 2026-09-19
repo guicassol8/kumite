@@ -43,9 +43,26 @@ export type ProblemTranslation = z.infer<typeof ProblemTranslationSchema>
 
 // --- Organizer CRUD DTOs (#10) ---
 
+/**
+ * Product ceiling on a problem's score (#187). The hard floor is the column
+ * itself — `points` is a Postgres `integer` (db/schema.ts), so anything past
+ * 2_147_483_647 used to pass zod and blow up in the INSERT as a 500 with no
+ * `issues`, leaving the organizer's form with nothing to point at. This number
+ * is far below that on purpose: it is what the event actually scores with, and
+ * it reads well inside the message the form shows.
+ *
+ * Only the *request* schemas below take it. `ProblemSchema`/`ProblemDetailSchema`
+ * describe rows being read back, and kata re-validates handler output against
+ * them — capping those would make any legacy row above the ceiling unserializable.
+ *
+ * Mirrored in the front as `POINTS_MAX` (front/src/lib/field-limits.ts); tests
+ * on both sides pin the literal, so a drift breaks the suite.
+ */
+export const PROBLEM_POINTS_MAX = 10_000
+
 export const CreateProblemBodySchema = z.object({
   difficulty: DifficultySchema,
-  points: z.number().int().positive().optional(),
+  points: z.number().int().positive().max(PROBLEM_POINTS_MAX).optional(),
 })
 
 export const ProblemIdParamsSchema = z.object({
@@ -61,7 +78,7 @@ export const TranslationInputSchema = z.object({
 export const UpdateProblemBodySchema = z
   .object({
     difficulty: DifficultySchema.optional(),
-    points: z.number().int().positive().optional(),
+    points: z.number().int().positive().max(PROBLEM_POINTS_MAX).optional(),
     testCases: z.array(TestCaseSchema).optional(),
     translations: z.array(TranslationInputSchema).optional(),
   })

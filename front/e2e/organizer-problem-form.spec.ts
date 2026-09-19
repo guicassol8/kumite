@@ -8,6 +8,7 @@ import { ORGANIZER_NAME } from './support/rounds'
 // `problems` table — every assertion is scoped to the problem it creates.
 const evidence = (name: string) => `e2e/evidence/13/${name}.png`
 const evidence129 = (name: string) => `e2e/evidence/129/${name}.png`
+const evidence187 = (name: string) => `e2e/evidence/187/${name}.png`
 
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
 const ORGANIZER_PASSWORD = process.env.ORGANIZER_PASSWORD ?? ''
@@ -153,5 +154,44 @@ test.describe('organizer problem form', () => {
     await page.getByTestId('problem-form-publish-hint').focus()
     await expect(page.getByRole('tooltip')).toContainText('Este problema já está publicado.')
     await page.screenshot({ path: evidence129('09-publish-hint-focus'), fullPage: true })
+  })
+
+  // #187: the reproduction from the issue. Before this task the field accepted
+  // the value, the API answered (a 500, in fact — `points` had no ceiling at
+  // all), and the screen said only "Não foi possível salvar o problema. Tente
+  // novamente." with `problem-form-points-error` absent from the DOM.
+  test('names the points ceiling instead of asking the organizer to try again', async ({
+    page,
+  }) => {
+    await loginAsOrganizer(page)
+
+    // Nothing may leave the browser: the acceptance is that the organizer
+    // learns the limit without a round-trip.
+    let createRequests = 0
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url() === `${BACK_URL}/organizer/problems`)
+        createRequests += 1
+    })
+
+    await page.goto('/organizer/problems/new')
+    await expect(page.getByTestId('problem-form')).toBeVisible()
+
+    await page.getByTestId('problem-form-title-pt').fill('Soma de dois números')
+    await page.getByTestId('problem-form-statement-pt').fill(PT_STATEMENT)
+    await page.getByTestId('problem-form-points').fill('9999999999')
+    await page.screenshot({ path: evidence187('01-points-huge-typed'), fullPage: true })
+
+    await page.getByTestId('problem-form-save').click()
+
+    const pointsError = page.getByTestId('problem-form-points-error')
+    await expect(pointsError).toBeVisible()
+    await expect(pointsError).toContainText('10000')
+    // The generic alert must stay away — that is the whole bug.
+    await expect(page.getByTestId('problem-form-error')).toBeHidden()
+    await page.screenshot({ path: evidence187('02-points-error-under-field'), fullPage: true })
+
+    expect(createRequests).toBe(0)
+    // Nothing was created, so the problems list is untouched by this test.
+    await expect(page).toHaveURL(/\/organizer\/problems\/new$/)
   })
 })

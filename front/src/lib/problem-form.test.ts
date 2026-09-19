@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { POINTS_MAX } from './field-limits'
 import {
   buildPatchBody,
   emptyProblemFormValues,
+  issuesToProblemFormErrors,
   localeState,
   moveTestCase,
   type ProblemFormValues,
@@ -151,8 +153,16 @@ describe('validateForSave', () => {
   })
 
   it('accepts any positive integer as the points value', () => {
-    for (const points of [1, 20, 1000]) {
+    for (const points of [1, 20, 1000, POINTS_MAX]) {
       expect(validateForSave({ ...ptOnlyValues(), points }, [])).toEqual([])
+    }
+  })
+
+  it('rejects a points value over the ceiling before any request goes out', () => {
+    for (const points of [POINTS_MAX + 1, 9_999_999_999]) {
+      expect(validateForSave({ ...ptOnlyValues(), points }, [])).toEqual([
+        { kind: 'pointsTooLarge', max: POINTS_MAX },
+      ])
     }
   })
 
@@ -264,5 +274,112 @@ describe('moveTestCase', () => {
     moveTestCase(cases, 1, 'up')
 
     expect(cases.map((c) => c.input)).toEqual(['1', '2', '3'])
+  })
+})
+
+describe('issuesToProblemFormErrors', () => {
+  const sent = [{ locale: 'pt' as const }, { locale: 'en' as const }]
+
+  it('maps a too_big points issue to the ceiling error, carrying the limit', () => {
+    expect(
+      issuesToProblemFormErrors(
+        [
+          {
+            path: 'points',
+            message: 'Number must be less than or equal to 10000',
+            code: 'too_big',
+          },
+        ],
+        sent,
+      ),
+    ).toEqual([{ kind: 'pointsTooLarge', max: POINTS_MAX }])
+  })
+
+  it('maps any other points issue to the generic points error', () => {
+    expect(
+      issuesToProblemFormErrors(
+        [{ path: 'points', message: 'Expected number, received string', code: 'invalid_type' }],
+        sent,
+      ),
+    ).toEqual([{ kind: 'pointsInvalid' }])
+  })
+
+  it('resolves a translation index against the array that was sent, not the tab order', () => {
+    // buildPatchBody drops incomplete locales, so `translations[1]` here is
+    // `en`, not `es`. Resolving against FORM_LOCALES would light up the wrong
+    // tab — which is the whole reason the sent array is threaded through.
+    expect(
+      issuesToProblemFormErrors([{ path: 'translations[1].title', message: 'Required' }], sent),
+    ).toEqual([
+      { kind: 'serverRejected', target: { field: 'translation', locale: 'en', key: 'title' } },
+    ])
+  })
+
+  it('maps a statement issue to the same locale', () => {
+    expect(
+      issuesToProblemFormErrors(
+        [{ path: 'translations[0].statementMd', message: 'Required' }],
+        sent,
+      ),
+    ).toEqual([
+      {
+        kind: 'serverRejected',
+        target: { field: 'translation', locale: 'pt', key: 'statementMd' },
+      },
+    ])
+  })
+
+  it('reuses the row-level JSON error for a rejected input or expected', () => {
+    expect(
+      issuesToProblemFormErrors(
+        [
+          { path: 'testCases[0].input', message: 'Invalid' },
+          { path: 'testCases[2].expected', message: 'Invalid' },
+        ],
+        sent,
+      ),
+    ).toEqual([
+      { kind: 'json', reason: 'invalid', index: 0, field: 'input' },
+      { kind: 'json', reason: 'invalid', index: 2, field: 'expected' },
+    ])
+  })
+
+  it('maps difficulty and a row’s hidden flag to their own fields', () => {
+    expect(
+      issuesToProblemFormErrors(
+        [
+          { path: 'difficulty', message: 'Invalid enum value' },
+          { path: 'testCases[1].hidden', message: 'Expected boolean, received string' },
+        ],
+        sent,
+      ),
+    ).toEqual([
+      { kind: 'serverRejected', target: { field: 'difficulty' } },
+      { kind: 'serverRejected', target: { field: 'testCase', index: 1, key: 'hidden' } },
+    ])
+  })
+
+  it('skips paths with no field on this form, leaving the caller its generic message', () => {
+    // `translations` bare is the duplicate-locale refinement; `id` and
+    // `whatever[0].x` stand for anything a future API adds; `translations[9]`
+    // is out of range of what was sent. None of them has a field here, and a
+    // message with nowhere to render is worse than the form-level fallback.
+    expect(
+      issuesToProblemFormErrors(
+        [
+          { path: 'translations', message: 'Duplicate locale(s) in translations: pt' },
+          { path: 'testCases', message: 'Required' },
+          { path: 'id', message: 'Invalid uuid' },
+          { path: 'whatever[0].x', message: 'Nope' },
+          { path: 'translations[9].title', message: 'Required' },
+          { path: 'translations[0].locale', message: 'Invalid enum value' },
+        ],
+        sent,
+      ),
+    ).toEqual([])
+  })
+
+  it('maps nothing when there are no issues', () => {
+    expect(issuesToProblemFormErrors([], sent)).toEqual([])
   })
 })

@@ -27,6 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { POINTS_MAX } from '@/lib/field-limits'
 import {
   type Difficulty,
   emptyTestCaseRow,
@@ -37,6 +38,7 @@ import {
   type ProblemFormValues,
   type ProblemStatus,
   parseJsonField,
+  type SubmitOutcome,
   validateForPublish,
   validateForSave,
 } from '@/lib/problem-form'
@@ -52,8 +54,11 @@ type ProblemFormProps = {
   isSubmitting?: boolean
   rootError?: string
   successMessage?: string
-  onSave: (values: ProblemFormValues) => void
-  onPublish: (values: ProblemFormValues) => void
+  // Async and result-bearing (#187): the API's per-field 422 has to come back
+  // here to be painted onto the field that caused it, instead of being flattened
+  // into the screen's form-level "could not save".
+  onSave: (values: ProblemFormValues) => Promise<SubmitOutcome>
+  onPublish: (values: ProblemFormValues) => Promise<SubmitOutcome>
 }
 
 function jsonFieldName(index: number, field: JsonFieldName) {
@@ -84,6 +89,13 @@ export function ProblemForm({
     switch (error.kind) {
       case 'pointsInvalid':
         return t('organizer.problemForm.errors.pointsInvalid')
+      case 'pointsTooLarge':
+        return t('organizer.problemForm.errors.pointsTooLarge', { max: error.max })
+      case 'serverRejected':
+        // Always the catalog string, never `issue.message`: kata's issues carry
+        // zod's own English text, which would land untranslated in front of a
+        // pt/es organizer.
+        return t('organizer.problemForm.errors.fieldRejected')
       case 'translationIncomplete':
         return t('organizer.problemForm.errors.translationIncomplete')
       case 'translationCannotBeCleared':
@@ -113,7 +125,7 @@ export function ProblemForm({
     let firstErroredLocale: UiLocale | undefined
 
     for (const error of validationErrors) {
-      if (error.kind === 'pointsInvalid') {
+      if (error.kind === 'pointsInvalid' || error.kind === 'pointsTooLarge') {
         form.setError('points', { message: messageFor(error) })
         continue
       }
@@ -125,6 +137,19 @@ export function ProblemForm({
         form.setError(jsonFieldName(error.index, error.field), { message: messageFor(error) })
         continue
       }
+      if (error.kind === 'serverRejected') {
+        const { target } = error
+        const message = messageFor(error)
+        if (target.field === 'points' || target.field === 'difficulty') {
+          form.setError(target.field, { message })
+        } else if (target.field === 'testCase') {
+          form.setError(`testCases.${target.index}.${target.key}`, { message })
+        } else {
+          form.setError(`translations.${target.locale}.${target.key}`, { message })
+          firstErroredLocale ??= target.locale
+        }
+        continue
+      }
       form.setError(`translations.${error.locale}.${error.field}`, { message: messageFor(error) })
       firstErroredLocale ??= error.locale
     }
@@ -133,7 +158,10 @@ export function ProblemForm({
     if (firstErroredLocale) setActiveLocale(firstErroredLocale)
   }
 
-  function submit(validate: typeof validateForSave, handler: (values: ProblemFormValues) => void) {
+  async function submit(
+    validate: typeof validateForSave,
+    handler: (values: ProblemFormValues) => Promise<SubmitOutcome>,
+  ) {
     const values = form.getValues()
     const validationErrors = validate(values, savedLocales)
     if (validationErrors.length > 0) {
@@ -142,7 +170,11 @@ export function ProblemForm({
     }
     form.clearErrors()
     setCaseSectionError(null)
-    handler(values)
+
+    // Client and server errors now reach the fields through the same door, so
+    // a 422 switches to the offending tab exactly like a local rule does.
+    const outcome = await handler(values)
+    if (!outcome.ok && outcome.fieldErrors.length > 0) applyErrors(outcome.fieldErrors)
   }
 
   function validateJsonFieldOnBlur(index: number, field: JsonFieldName): void {
@@ -202,6 +234,11 @@ export function ProblemForm({
                     ))}
                   </SelectContent>
                 </Select>
+                {/* Nearly unreachable from the UI — a three-option Select cannot
+                    produce an invalid value — but the 422 mapping is generic by
+                    path, so without a node here a rejection on `difficulty`
+                    would set an error with nothing to render it. */}
+                <FormMessage data-testid="problem-form-difficulty-error" />
               </FormItem>
             )}
           />
@@ -216,6 +253,7 @@ export function ProblemForm({
                   <Input
                     type="number"
                     min={1}
+                    max={POINTS_MAX}
                     data-testid="problem-form-points"
                     value={field.value}
                     onChange={(event) => field.onChange(event.target.valueAsNumber)}
@@ -366,6 +404,10 @@ export function ProblemForm({
                         {t('organizer.problemForm.testCases.columns.hidden')}
                       </Label>
                     </div>
+                    {/* Same reason as difficulty above: a Checkbox cannot send
+                        a non-boolean, but the generic path mapping can still
+                        land an error here and it needs somewhere to appear. */}
+                    <FormMessage data-testid={`problem-form-case-${index}-hidden-error`} />
                   </FormItem>
                 )}
               />

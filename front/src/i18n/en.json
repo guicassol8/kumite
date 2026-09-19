@@ -201,6 +201,8 @@
         "jsonEmpty": "Enter a JSON value",
         "jsonInvalid": "Invalid JSON",
         "pointsInvalid": "Enter a whole score greater than zero.",
+        "pointsTooLarge": "The score must be at most {{max}}.",
+        "fieldRejected": "The server rejected this value. Check the field.",
         "translationIncomplete": "Fill in both title and statement, or leave the whole tab empty.",
         "translationCannotBeCleared": "A saved translation can't be cleared.",
         "publish": {
@@ -320,6 +322,8 @@
         "savedMessage": "Changes saved.",
         "errors": {
           "maxTeamSizeInvalid": "Enter a whole number greater than zero.",
+          "maxTeamSizeTooLarge": "The maximum team size must be at most {{max}}.",
+          "fieldRejected": "The server rejected this value. Check the field.",
           "saveFailed": "Could not save. Please try again."
         },
         "mixingDialog": {
@@ -353,6 +357,7 @@
         "errors": {
           "codeRequired": "Enter the code.",
           "suffixesRequired": "Enter at least one email suffix.",
+          "fieldRejected": "The server rejected this value. Check the field.",
           "codeTaken": "This code is already in use.",
           "saveFailed": "Could not save. Please try again."
         }

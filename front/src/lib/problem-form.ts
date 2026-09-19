@@ -1,3 +1,5 @@
+import type { ApiFieldIssue } from './api-issues'
+import { POINTS_MAX } from './field-limits'
 import type { UiLocale } from './resolve-problem-title'
 
 export const FORM_LOCALES = ['pt', 'es', 'en'] as const
@@ -47,14 +49,33 @@ export type PatchBody = {
 
 export type JsonFieldName = 'input' | 'expected'
 
+/**
+ * Where a message goes when the API rejected a field the form has no rule of
+ * its own for. Mirrors the shape of the paths kata emits.
+ */
+export type ProblemFormFieldTarget =
+  | { field: 'points' }
+  | { field: 'difficulty' }
+  | { field: 'translation'; locale: UiLocale; key: keyof TranslationEntry }
+  | { field: 'testCase'; index: number; key: JsonFieldName | 'hidden' }
+
 export type ProblemFormError =
   | { kind: 'pointsInvalid' }
+  | { kind: 'pointsTooLarge'; max: number }
   | { kind: 'translationIncomplete'; locale: UiLocale; field: keyof TranslationEntry }
   | { kind: 'translationCannotBeCleared'; locale: UiLocale; field: keyof TranslationEntry }
   | { kind: 'json'; reason: 'empty' | 'invalid'; index: number; field: JsonFieldName }
   | { kind: 'publishMissingLocale'; locale: UiLocale; field: keyof TranslationEntry }
   | { kind: 'publishMissingVisibleCase' }
   | { kind: 'publishMissingHiddenCase' }
+  | { kind: 'serverRejected'; target: ProblemFormFieldTarget }
+
+/**
+ * What a save/publish handler hands back to the form. `fieldErrors` empty on a
+ * failure is the honest answer for a 500, a dropped connection or a 422 whose
+ * paths this form has no field for: the screen keeps its form-level message.
+ */
+export type SubmitOutcome = { ok: true } | { ok: false; fieldErrors: ProblemFormError[] }
 
 export const DEFAULT_POINTS = 100
 
@@ -135,6 +156,10 @@ export function validateForSave(
   // form-level "could not save" with nothing pointing at the field.
   if (!Number.isInteger(values.points) || values.points <= 0) {
     errors.push({ kind: 'pointsInvalid' })
+  } else if (values.points > POINTS_MAX) {
+    // The ceiling is checked before the request, not only after the 422: the
+    // organizer should be told the limit without spending a round-trip on it.
+    errors.push({ kind: 'pointsTooLarge', max: POINTS_MAX })
   }
 
   for (const locale of FORM_LOCALES) {
@@ -205,6 +230,82 @@ export function buildPatchBody(values: ProblemFormValues): PatchBody {
   }))
 
   return { difficulty: values.difficulty, points: values.points, testCases, translations }
+}
+
+/** `translations[2].title` -> `{ list: 'translations', index: 2, key: 'title' }`. */
+function parseIndexedPath(path: string): { list: string; index: number; key: string } | null {
+  const match = /^([A-Za-z]+)\[(\d+)\]\.([A-Za-z]+)$/.exec(path)
+  if (!match?.[1] || !match[2] || !match[3]) return null
+  return { list: match[1], index: Number(match[2]), key: match[3] }
+}
+
+/**
+ * Turns kata's per-field 422 issues into form errors, so a rejection lands under
+ * the field that caused it instead of in a form-level "could not save".
+ *
+ * `sentTranslations` is the array that actually went out — `buildPatchBody`
+ * drops incomplete locales, so `translations[0]` is not necessarily `pt` and the
+ * index has to be resolved against what was sent, not against the form's own
+ * locale order. Test-case indices need no such care: `buildPatchBody` maps them
+ * one to one.
+ *
+ * A path this form has no field for (`translations` on its own, from the
+ * duplicate-locale refinement, or anything a future API adds) is skipped, and
+ * the caller falls back to its generic message — never a message with nowhere
+ * to appear.
+ */
+export function issuesToProblemFormErrors(
+  issues: ApiFieldIssue[],
+  sentTranslations: { locale: UiLocale }[],
+): ProblemFormError[] {
+  const errors: ProblemFormError[] = []
+
+  for (const issue of issues) {
+    if (issue.path === 'points') {
+      errors.push(
+        issue.code === 'too_big'
+          ? { kind: 'pointsTooLarge', max: POINTS_MAX }
+          : { kind: 'pointsInvalid' },
+      )
+      continue
+    }
+
+    if (issue.path === 'difficulty') {
+      errors.push({ kind: 'serverRejected', target: { field: 'difficulty' } })
+      continue
+    }
+
+    const indexed = parseIndexedPath(issue.path)
+    if (!indexed) continue
+
+    if (indexed.list === 'translations') {
+      const locale = sentTranslations[indexed.index]?.locale
+      if (!locale) continue
+      if (indexed.key !== 'title' && indexed.key !== 'statementMd') continue
+      errors.push({
+        kind: 'serverRejected',
+        target: { field: 'translation', locale, key: indexed.key },
+      })
+      continue
+    }
+
+    if (indexed.list === 'testCases') {
+      if (indexed.key === 'input' || indexed.key === 'expected') {
+        // The row's own field already has a message for "this is not JSON";
+        // reuse it rather than inventing a second wording for the same fault.
+        errors.push({ kind: 'json', reason: 'invalid', index: indexed.index, field: indexed.key })
+        continue
+      }
+      if (indexed.key === 'hidden') {
+        errors.push({
+          kind: 'serverRejected',
+          target: { field: 'testCase', index: indexed.index, key: 'hidden' },
+        })
+      }
+    }
+  }
+
+  return errors
 }
 
 export function moveTestCase(

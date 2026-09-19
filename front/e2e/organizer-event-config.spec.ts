@@ -14,6 +14,7 @@ import {
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
 // Needs ORGANIZER_EMAIL/ORGANIZER_PASSWORD in the environment.
 const evidence = (name: string) => `e2e/evidence/49/${name}.png`
+const evidence187 = (name: string) => `e2e/evidence/187/${name}.png`
 
 // The seeded defaults this walkthrough starts from and must leave behind.
 const DEFAULT_MAX_TEAM_SIZE = 3
@@ -118,5 +119,42 @@ test.describe('organizer event config', () => {
       'aria-checked',
       'false',
     )
+  })
+
+  // #187: the second reproduction from the issue. The field used to accept the
+  // value and the screen showed only "Não foi possível salvar. Tente
+  // novamente." — the API answered a 500, since `maxTeamSize` had no ceiling
+  // and the int4 column overflowed.
+  test('names the team-size ceiling instead of asking the organizer to try again', async ({
+    page,
+  }) => {
+    await loginAsOrganizer(page)
+
+    // The event config is a single shared row; this path must not write it.
+    let configPatches = 0
+    page.on('request', (request) => {
+      if (request.method() === 'PATCH' && request.url() === `${BACK_URL}/organizer/event-config`)
+        configPatches += 1
+    })
+
+    await page.goto('/organizer/event-config')
+    await expect(page.getByTestId('event-config-max-team-size-input')).toBeVisible()
+
+    await page.getByTestId('event-config-max-team-size-input').fill('999999999999')
+    await page.screenshot({ path: evidence187('03-max-team-size-huge-typed'), fullPage: true })
+
+    await page.getByTestId('event-config-max-team-size-save').click()
+
+    const sizeError = page.getByTestId('event-config-max-team-size-error')
+    await expect(sizeError).toBeVisible()
+    await expect(sizeError).toContainText('10')
+    await expect(page.getByTestId('event-config-max-team-size-root-error')).toBeHidden()
+    await expect(page.getByTestId('event-config-max-team-size-saved')).toBeHidden()
+    await page.screenshot({
+      path: evidence187('04-max-team-size-error-under-field'),
+      fullPage: true,
+    })
+
+    expect(configPatches).toBe(0)
   })
 })

@@ -1,6 +1,7 @@
 import { emptyWorkspaceState, withRootBlock } from '@kumite/blocks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { Info, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -24,6 +25,8 @@ import { formatDate } from '@/i18n/format'
 import { api } from '@/lib/api'
 import { workspaceOptions } from '@/lib/blockly-setup'
 import { fetchProblem, ProblemNotFoundError, problemQueryKey } from '@/lib/problems-query'
+import { positionLabel } from '@/lib/round-position'
+import { fetchRound, roundQueryKey } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
 import { cn } from '@/lib/utils'
 
@@ -87,6 +90,28 @@ function ProblemScreen() {
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey[1] === id ? previous : undefined,
   })
+
+  // The problem's letter in the round (A, B, C) lives on `/rounds/:id`, not on
+  // `/problems/:id` — the participant payload carries no `position`. Same query
+  // key as `/rounds/$id`, so opening the problem from the round list reuses the
+  // round already in cache instead of fetching it twice.
+  //
+  // Declared here, above the `isError` / `!data` early returns below: a hook
+  // after them would run on some renders and not others.
+  const roundId = problem.data?.roundId ?? null
+  const round = useQuery({
+    queryKey: [...roundQueryKey(roundId ?? 'none'), locale],
+    queryFn: () => fetchRound(roundId ?? '', locale),
+    enabled: roundId !== null,
+    // The letter is a decoration on a screen whose real job is the editor.
+    // A failing round fetch drops it and nothing else — never a retry storm
+    // and never an error state over the workspace.
+    retry: false,
+  })
+  const problemLetter = (() => {
+    const entry = round.data?.problems.find((item) => item.problemId === id)
+    return entry ? positionLabel(entry.position) : undefined
+  })()
 
   const examples = problem.data?.examples ?? []
   const { state: runState, run } = useExampleRun(examples)
@@ -237,6 +262,10 @@ function ProblemScreen() {
         hasResults && 'short:max-h-16 short:overflow-auto',
       )}
     >
+      {/* Direct child of the Alert, not of the description: `alertVariants`
+          only opens the icon column for `has-[>svg]`. Neutral variant — § 5
+          calls read-only information neutral, not an error. */}
+      <Info />
       <AlertDescription className="flex flex-col gap-1">
         <span>{t('problem.closedRound.notice')}</span>
         {data.bestSubmission ? (
@@ -266,6 +295,7 @@ function ProblemScreen() {
           : 'problem-submit-error-banner'
       }
     >
+      <TriangleAlert />
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>{'key' in submitBanner ? t(submitBanner.key) : submitBanner.message}</span>
         <Button type="button" variant="outline" size="sm" onClick={() => setSubmitBanner(null)}>
@@ -313,6 +343,7 @@ function ProblemScreen() {
     <main className="flex min-h-0 grow basis-0 flex-col gap-4 overflow-hidden p-4 md:flex-row">
       <ProblemPanels
         problem={data}
+        positionLabel={problemLetter}
         hasResults={hasResults}
         closedNotice={closedNotice}
         submitBanner={submitBannerAlert}

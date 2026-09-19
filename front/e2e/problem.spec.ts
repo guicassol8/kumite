@@ -156,9 +156,14 @@ test.describe('problem screen (#7)', () => {
     await page.getByTestId('problem-submit-button').click()
     const verdict = page.getByTestId('problem-verdict-panel')
     await expect(verdict).toBeVisible()
-    await expect(page.getByTestId('problem-verdict-case-0')).toContainText('✓')
-    await expect(page.getByTestId('problem-verdict-case-1')).toContainText('✓')
-    await expect(page.getByTestId('problem-verdict-case-2')).toContainText('✓')
+    // Since #219 a case outcome is an icon plus the state in words, and the
+    // `✓` this used to read is gone. `data-status` is the stable carrier.
+    for (const index of [0, 1, 2]) {
+      await expect(page.getByTestId(`problem-verdict-case-${index}`)).toHaveAttribute(
+        'data-status',
+        'passed',
+      )
+    }
     await expect(page.getByTestId('problem-results-panel')).toBeVisible()
     await page.screenshot({ path: evidence('04-submissao-com-veredito'), fullPage: true })
 

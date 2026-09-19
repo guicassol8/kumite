@@ -1,8 +1,9 @@
+import { CircleCheck, CircleX, Loader } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { type CaseOutcome, EXAMPLE_TIMEOUT_MS, type ExampleCase } from '@/lib/run-examples'
-import { cn } from '@/lib/utils'
 
 /** Replaces the case list: nothing was built, or codegen refused the workspace. */
 export type ExampleResultsNotice = 'empty' | { message: string }
@@ -52,17 +53,17 @@ export function ExampleResults({ examples, outcomes, notice, timeoutMs }: Exampl
   return (
     <Card data-testid="problem-results-panel" className="shrink-0 gap-3 py-4">
       <CardHeader className="flex-row items-center gap-2">
-        <CardTitle>{t('problem.results.title')}</CardTitle>
-        <span
+        <CardTitle className="font-display">{t('problem.results.title')}</CardTitle>
+        {/* The pill of the mockup, but still the element the run specs read:
+            the testid, the `data-state` and the exact `n/n casos` text are
+            all part of the contract #5 and #155 wrote against. */}
+        <Badge
           data-testid="problem-results-summary"
           data-state={allPassed ? 'passed' : 'failed'}
-          className={cn(
-            'text-sm',
-            allPassed ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
-          )}
+          variant={allPassed ? 'success' : 'outline'}
         >
           {t('problem.results.summary', { passed, total: examples.length })}
-        </span>
+        </Badge>
       </CardHeader>
       <CardContent>
         <ul className="flex flex-col gap-1 text-sm">
@@ -75,9 +76,13 @@ export function ExampleResults({ examples, outcomes, notice, timeoutMs }: Exampl
               data-status={outcomes[index]?.status ?? 'pending'}
               className="flex flex-wrap items-baseline gap-x-2 rounded-md border p-2"
             >
-              <span aria-hidden="true">{icon(outcomes[index])}</span>
+              <StatusIcon outcome={outcomes[index]} />
               <span className="font-medium">
                 {t('problem.results.caseLabel', { index: index + 1 })}
+              </span>
+              <span className="font-mono text-muted-foreground text-xs">
+                <span className="sr-only">{t('problem.results.inputLabel')}: </span>
+                {formatValue(example.input)}
               </span>
               <CaseDetail
                 outcome={outcomes[index]}
@@ -92,9 +97,42 @@ export function ExampleResults({ examples, outcomes, notice, timeoutMs }: Exampl
   )
 }
 
-function icon(outcome: CaseOutcome | null | undefined): string {
-  if (!outcome) return '⋯'
-  return outcome.status === 'passed' ? '✓' : '✗'
+/**
+ * The glyphs `✓ ✗ ⋯` as real icons, each with the state in words beside it:
+ * identity § 3 does not let colour be the only carrier, and an `aria-hidden`
+ * icon on its own leaves a screen reader with nothing at all.
+ *
+ * The spinner is the one place `--warning` (pure amber) is the right token —
+ * it is an icon, not text, so the 1,95:1 that rules amber out for `text-`
+ * does not apply.
+ */
+function StatusIcon({ outcome }: { outcome: CaseOutcome | null | undefined }) {
+  const { t } = useTranslation()
+
+  if (!outcome) {
+    return (
+      <>
+        <Loader className="size-4 shrink-0 self-center text-warning" aria-hidden="true" />
+        <span className="sr-only">{t('problem.results.status.running')}</span>
+      </>
+    )
+  }
+
+  if (outcome.status === 'passed') {
+    return (
+      <>
+        <CircleCheck className="size-4 shrink-0 self-center text-success" aria-hidden="true" />
+        <span className="sr-only">{t('problem.results.status.passed')}</span>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <CircleX className="size-4 shrink-0 self-center text-destructive" aria-hidden="true" />
+      <span className="sr-only">{t('problem.results.status.failed')}</span>
+    </>
+  )
 }
 
 function CaseDetail({
@@ -109,12 +147,12 @@ function CaseDetail({
   const { t } = useTranslation()
 
   if (!outcome) {
-    return <span className="text-muted-foreground">{t('problem.results.pending')}</span>
+    return <span className="ml-auto text-muted-foreground">{t('problem.results.pending')}</span>
   }
 
   if (outcome.status === 'timeout') {
     return (
-      <span className="text-destructive">
+      <span className="ml-auto text-destructive">
         {t('problem.results.timeout', { seconds: timeoutMs / 1000 })}
       </span>
     )
@@ -122,14 +160,14 @@ function CaseDetail({
 
   if (outcome.status === 'error') {
     return (
-      <span className="text-destructive">
+      <span className="ml-auto text-destructive">
         {t('problem.results.runtimeError', { message: outcome.message })}
       </span>
     )
   }
 
   return (
-    <span className="text-muted-foreground">
+    <span className="ml-auto font-mono text-muted-foreground text-xs">
       {t('problem.results.expected')} {formatValue(expected)} · {t('problem.results.obtained')}{' '}
       {formatValue(outcome.actual)}
     </span>

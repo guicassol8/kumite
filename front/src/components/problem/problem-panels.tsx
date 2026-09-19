@@ -17,6 +17,8 @@ type Problem = Awaited<ReturnType<typeof fetchProblem>>
 
 export type ProblemPanelsProps = {
   problem: Problem
+  /** The problem's letter in the round it was opened from (#219, T4). */
+  positionLabel?: string
   hasResults: boolean
   closedNotice?: ReactNode
   submitBanner?: ReactNode
@@ -43,6 +45,7 @@ const DESKTOP_QUERY = '(min-width: 768px)'
  */
 export function ProblemPanels({
   problem,
+  positionLabel,
   hasResults,
   closedNotice,
   submitBanner,
@@ -56,7 +59,7 @@ export function ProblemPanels({
   if (!isDesktop) {
     return (
       <>
-        <StatementCard problem={problem} hasResults={hasResults} />
+        <StatementCard problem={problem} positionLabel={positionLabel} hasResults={hasResults} />
         <div
           data-testid="problem-workspace-panel"
           className="flex min-h-0 min-w-0 grow basis-0 flex-col gap-4"
@@ -96,6 +99,7 @@ export function ProblemPanels({
   return (
     <DesktopPanels
       problem={problem}
+      positionLabel={positionLabel}
       hasResults={hasResults}
       closedNotice={closedNotice}
       submitBanner={submitBanner}
@@ -109,6 +113,7 @@ export function ProblemPanels({
 
 function DesktopPanels({
   problem,
+  positionLabel,
   hasResults,
   closedNotice,
   submitBanner,
@@ -191,6 +196,7 @@ function DesktopPanels({
         >
           <StatementCard
             problem={problem}
+            positionLabel={positionLabel}
             hasResults={hasResults}
             fitContainer
             headerAction={

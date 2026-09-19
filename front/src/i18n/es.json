@@ -770,7 +770,13 @@
       "pending": "ejecutando...",
       "timeout": "Tiempo agotado ({{seconds}}s)",
       "runtimeError": "Error: {{message}}",
-      "empty": "Arma tu solución dentro del bloque “resolver” y haz clic en Ejecutar."
+      "empty": "Arma tu solución dentro del bloque “resolver” y haz clic en Ejecutar.",
+      "inputLabel": "entrada",
+      "status": {
+        "passed": "Pasó",
+        "failed": "Falló",
+        "running": "Ejecutando"
+      }
     },
     "verdict": {
       "title": "Veredicto",
@@ -779,7 +785,13 @@
       "expected": "esperado",
       "obtained": "obtenido",
       "timeout": "Tiempo agotado",
-      "runtimeError": "Error: {{detail}}"
+      "runtimeError": "Error: {{detail}}",
+      "status": {
+        "passed": "Pasó",
+        "failed": "Falló"
+      },
+      "approved": "Aprobado",
+      "rejected": "No aprobado"
     },
     "panels": {
       "statementRail": "Enunciado",
@@ -789,7 +801,14 @@
       "expandResults": "Mostrar resultados",
       "statementHandle": "Redimensionar enunciado y editor",
       "resultsHandle": "Redimensionar editor y resultados"
-    }
+    },
+    "difficulty": {
+      "easy": "Fácil",
+      "medium": "Media",
+      "hard": "Difícil"
+    },
+    "pointsBadge": "{{points}} pts",
+    "positionBadge": "Problema {{letter}}"
   },
   "leaderboard": {
     "heading": "Marcador",

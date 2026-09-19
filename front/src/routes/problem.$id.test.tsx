@@ -8,6 +8,12 @@ vi.mock('@/lib/api', () => ({
     problems: {
       ':id': { $get: vi.fn() },
     },
+    // The screen reads the round too since #219 (the problem's A/B/C letter
+    // lives on `/rounds/:id`). Left out, every test in this file dies in the
+    // jsdom network guard rather than in the assertion it was written for.
+    rounds: {
+      ':id': { $get: vi.fn() },
+    },
     submissions: { $post: vi.fn() },
   },
 }))
@@ -27,6 +33,7 @@ import { loadWorkspaceState, saveWorkspaceState } from '@/lib/workspace-storage'
 import { routeTree } from '@/routeTree.gen'
 
 const mockedGet = vi.mocked(api.problems[':id'].$get)
+const mockedRound = vi.mocked(api.rounds[':id'].$get)
 const mockedSubmit = vi.mocked(api.submissions.$post)
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stubs
@@ -112,9 +119,33 @@ function renderProblem(
   return { router, queryClient }
 }
 
+/** `GET /rounds/:id` as the participant sees it — only what this file reads. */
+function participantRound(problems: { problemId: string; position: number }[]) {
+  return {
+    id: 'r1',
+    name: 'Rodada 1',
+    status: 'open',
+    closesAt: null,
+    closedAt: null,
+    problems: problems.map(({ problemId, position }) => ({
+      problemId,
+      position,
+      title: 'Soma dos Pares',
+      difficulty: 'easy',
+      points: 10,
+      bestScore: null,
+    })),
+  }
+}
+
 beforeEach(() => {
   mockedGet.mockReset()
+  mockedRound.mockReset()
   mockedSubmit.mockReset()
+  // The default for every test that does not care about the letter: a round
+  // that simply has no entry for this problem, so no badge and no unhandled
+  // rejection either.
+  mockedRound.mockResolvedValue(jsonResponse(200, participantRound([])))
   setSession(fakeUser, 'tok-1')
 })
 
@@ -498,6 +529,54 @@ describe('ProblemScreen', () => {
       expect(mockedGet).toHaveBeenCalledTimes(2)
       expect(screen.queryByTestId('problem-load-error')).toBeNull()
       expect(screen.getByTestId('blockly-workspace')).toBe(editor)
+    })
+  })
+
+  describe('the problem letter in the round (#219)', () => {
+    it("shows the round's letter for this problem", async () => {
+      mockedGet.mockResolvedValue(jsonResponse(200, participantProblem({ roundId: 'r1' })))
+      mockedRound.mockResolvedValue(
+        jsonResponse(
+          200,
+          participantRound([
+            { problemId: 'p0', position: 0 },
+            { problemId: 'p1', position: 1 },
+          ]),
+        ),
+      )
+
+      renderProblem()
+
+      // Through its own testid, never the panel's text: the card keeps
+      // `sr-only` labels, and reading `textContent` would match a badge that
+      // is not on screen at all.
+      const badge = await screen.findByTestId('problem-position-badge')
+      expect(badge.textContent).toBe('Problema B')
+    })
+
+    it('omits the letter outside a round, where there is no position to read', async () => {
+      mockedGet.mockResolvedValue(
+        jsonResponse(200, participantProblem({ roundId: null, roundStatus: 'closed' })),
+      )
+
+      renderProblem()
+      await screen.findByTestId('problem-statement-panel')
+
+      expect(screen.queryByTestId('problem-position-badge')).toBeNull()
+      // A closed round leaves `roundId` null, so there is nothing to fetch.
+      expect(mockedRound).not.toHaveBeenCalled()
+    })
+
+    it('keeps the screen usable when the round request fails', async () => {
+      mockedGet.mockResolvedValue(jsonResponse(200, participantProblem({ roundId: 'r1' })))
+      mockedRound.mockResolvedValue(jsonResponse(500, { error: 'internal', message: 'boom' }))
+
+      renderProblem()
+
+      expect(await screen.findByTestId('problem-statement-panel')).toBeDefined()
+      await waitFor(() => expect(mockedRound).toHaveBeenCalled())
+      expect(screen.queryByTestId('problem-position-badge')).toBeNull()
+      expect(screen.getByTestId('problem-submit-button')).toBeDefined()
     })
   })
 })

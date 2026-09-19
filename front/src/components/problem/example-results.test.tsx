@@ -122,4 +122,49 @@ describe('ExampleResults', () => {
 
     expect(screen.getByTestId('problem-results-panel')).toBeDefined()
   })
+
+  describe('the identity restyle (#219)', () => {
+    it('shows the case input alongside expected and obtained', () => {
+      render(
+        <ExampleResults
+          examples={examples}
+          outcomes={[{ status: 'failed', actual: 4 }, null, null]}
+        />,
+      )
+
+      const row = screen.getByTestId('problem-result-0')
+      expect(row.textContent).toContain('[1,2,3,4]')
+      expect(row.textContent).toContain('esperado 6')
+      expect(row.textContent).toContain('obtido 4')
+    })
+
+    it('states each case outcome in words, not only in colour', () => {
+      render(
+        <ExampleResults
+          examples={examples}
+          outcomes={[passed(6), { status: 'failed', actual: 1 }, null]}
+        />,
+      )
+
+      expect(within(screen.getByTestId('problem-result-0')).getByText('Passou')).toBeDefined()
+      expect(within(screen.getByTestId('problem-result-1')).getByText('Falhou')).toBeDefined()
+      expect(within(screen.getByTestId('problem-result-2')).getByText('Executando')).toBeDefined()
+    })
+
+    it('reads the summary as a badge without changing what it says', () => {
+      render(<ExampleResults examples={examples} outcomes={[passed(6), passed(0), passed(20)]} />)
+
+      const summary = screen.getByTestId('problem-results-summary')
+      // Still exactly the contract the run specs assert on.
+      expect(summary.textContent).toBe('3/3 casos')
+      expect(summary.dataset.slot).toBe('badge')
+      expect(summary.dataset.variant).toBe('success')
+    })
+
+    it('drops the summary badge out of the success variant on a partial pass', () => {
+      render(<ExampleResults examples={examples} outcomes={[passed(6), null, null]} />)
+
+      expect(screen.getByTestId('problem-results-summary').dataset.variant).toBe('outline')
+    })
+  })
 })

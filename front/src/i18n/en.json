@@ -770,7 +770,13 @@
       "pending": "running...",
       "timeout": "Timed out ({{seconds}}s)",
       "runtimeError": "Error: {{message}}",
-      "empty": "Build your solution inside the “solve” block and click Run."
+      "empty": "Build your solution inside the “solve” block and click Run.",
+      "inputLabel": "input",
+      "status": {
+        "passed": "Passed",
+        "failed": "Failed",
+        "running": "Running"
+      }
     },
     "verdict": {
       "title": "Verdict",
@@ -779,7 +785,13 @@
       "expected": "expected",
       "obtained": "got",
       "timeout": "Timed out",
-      "runtimeError": "Error: {{detail}}"
+      "runtimeError": "Error: {{detail}}",
+      "status": {
+        "passed": "Passed",
+        "failed": "Failed"
+      },
+      "approved": "Approved",
+      "rejected": "Not approved"
     },
     "panels": {
       "statementRail": "Statement",
@@ -789,7 +801,14 @@
       "expandResults": "Show results",
       "statementHandle": "Resize statement and editor",
       "resultsHandle": "Resize editor and results"
-    }
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "pointsBadge": "{{points}} pts",
+    "positionBadge": "Problem {{letter}}"
   },
   "leaderboard": {
     "heading": "Leaderboard",

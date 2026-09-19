@@ -770,7 +770,13 @@
       "pending": "executando...",
       "timeout": "Tempo esgotado ({{seconds}}s)",
       "runtimeError": "Erro: {{message}}",
-      "empty": "Monte a sua solução dentro do bloco “resolver” e clique em Executar."
+      "empty": "Monte a sua solução dentro do bloco “resolver” e clique em Executar.",
+      "inputLabel": "entrada",
+      "status": {
+        "passed": "Passou",
+        "failed": "Falhou",
+        "running": "Executando"
+      }
     },
     "verdict": {
       "title": "Veredito",
@@ -779,7 +785,13 @@
       "expected": "esperado",
       "obtained": "obtido",
       "timeout": "Tempo esgotado",
-      "runtimeError": "Erro: {{detail}}"
+      "runtimeError": "Erro: {{detail}}",
+      "status": {
+        "passed": "Passou",
+        "failed": "Falhou"
+      },
+      "approved": "Aprovado",
+      "rejected": "Não aprovado"
     },
     "panels": {
       "statementRail": "Enunciado",
@@ -789,7 +801,14 @@
       "expandResults": "Mostrar resultados",
       "statementHandle": "Redimensionar enunciado e editor",
       "resultsHandle": "Redimensionar editor e resultados"
-    }
+    },
+    "difficulty": {
+      "easy": "Fácil",
+      "medium": "Médio",
+      "hard": "Difícil"
+    },
+    "pointsBadge": "{{points}} pts",
+    "positionBadge": "Problema {{letter}}"
   },
   "leaderboard": {
     "heading": "Placar",

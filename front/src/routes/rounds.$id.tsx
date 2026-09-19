@@ -10,21 +10,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useRoundStream } from '@/hooks/use-round-stream'
 import { formatTime } from '@/i18n/format'
+import { DIFFICULTY_BADGE_STYLE } from '@/lib/difficulty-badge'
 import { positionLabel } from '@/lib/round-position'
 import { fetchRound, RoundNotFoundError, roundQueryKey } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
 import { cn } from '@/lib/utils'
 
 const GRID_COLS = 'md:grid-cols-[3rem_1fr_8rem_5rem_10rem]'
-
-const DIFFICULTY_BADGE_STYLE: Record<
-  'easy' | 'medium' | 'hard',
-  { variant: 'success' | 'warning' | 'outline'; className?: string }
-> = {
-  easy: { variant: 'success' },
-  medium: { variant: 'warning' },
-  hard: { variant: 'outline', className: 'border-destructive text-destructive' },
-}
 
 export const Route = createFileRoute('/rounds/$id')({
   beforeLoad: requireAuth,

@@ -126,6 +126,23 @@ test.describe('problem screen identity (#219)', () => {
   }
 
   /**
+   * The judge throttles one submission per team per SUBMISSION_COOLDOWN_MS
+   * (5s by default), and this walkthrough submits twice — the second one lands
+   * inside that window and comes back as the cooldown banner instead of a
+   * verdict. Retrying until the verdict shows keeps the spec independent of
+   * the configured value rather than sleeping a hardcoded one.
+   */
+  async function submitUntilVerdict(page: Page): Promise<void> {
+    const verdict = page.getByTestId('problem-verdict-panel')
+    const cooldown = page.getByTestId('problem-cooldown-banner')
+    await expect(async () => {
+      await page.getByTestId('problem-submit-button').click()
+      await expect(verdict.or(cooldown).first()).toBeVisible({ timeout: 20_000 })
+      expect(await verdict.count()).toBe(1)
+    }).toPass({ timeout: 90_000, intervals: [3_000] })
+  }
+
+  /**
    * The guard this walkthrough needs most: `toBeVisible()` passes on an
    * element the results band has scrolled out of sight, because a box clipped
    * by an overflow ancestor still has a size. A screenshot taken then shows
@@ -181,7 +198,7 @@ test.describe('problem screen identity (#219)', () => {
     page,
     roundSlot,
   }) => {
-    test.setTimeout(120_000)
+    test.setTimeout(180_000)
     const auth = await organizerAuthHeader()
     await seedParticipantToken(page, participantToken)
     await seedWorkspace(page, mediumProblemId, somaDosPares)
@@ -275,7 +292,7 @@ test.describe('problem screen identity (#219)', () => {
 
     // 04 — Submeter with the canonical solution: a full score reads as an
     // approved verdict, in the green alert.
-    await page.getByTestId('problem-submit-button').click()
+    await submitUntilVerdict(page)
     const verdict = page.getByTestId('problem-verdict-panel')
     await expect(verdict).toBeVisible()
     await expect(verdict).toHaveAttribute('data-state', 'passed')
@@ -298,7 +315,7 @@ test.describe('problem screen identity (#219)', () => {
     await expect(hardBadge).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
     await page.getByTestId('problem-run-button').click()
     await expect(page.getByTestId('problem-results-summary')).toHaveText('0/3 casos')
-    await page.getByTestId('problem-submit-button').click()
+    await submitUntilVerdict(page)
     const rejected = page.getByTestId('problem-verdict-panel')
     await expect(rejected).toBeVisible()
     await expect(rejected).toHaveAttribute('data-state', 'failed')

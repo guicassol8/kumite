@@ -140,7 +140,8 @@ function AlertDialogAction({
     // next to the variant's `bg-primary` and lose on stylesheet order. Routed
     // here it reaches `buttonVariants({ variant, size, className })`, where
     // tailwind-merge drops the conflicting utility as it does for every other
-    // Button. No other caller passed a className, so nothing else changes.
+    // Button. `AlertDialogCancel` below is routed the same way, so the two
+    // siblings cannot drift back apart.
     <Button variant={variant} size={size} asChild className={className}>
       <AlertDialogPrimitive.Action data-slot="alert-dialog-action" {...props} />
     </Button>
@@ -155,12 +156,12 @@ function AlertDialogCancel({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Cancel> &
   Pick<React.ComponentProps<typeof Button>, 'variant' | 'size'>) {
   return (
-    <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Cancel
-        data-slot="alert-dialog-cancel"
-        className={cn(className)}
-        {...props}
-      />
+    // Same routing as `AlertDialogAction` above, and for the same reason: on
+    // the Slot a caller's class would only sit beside the variant's, not
+    // replace it. No caller passes one today, so this changes nothing now and
+    // keeps the next one from hitting the bug the panel's brand button hit.
+    <Button variant={variant} size={size} asChild className={className}>
+      <AlertDialogPrimitive.Cancel data-slot="alert-dialog-cancel" {...props} />
     </Button>
   )
 }

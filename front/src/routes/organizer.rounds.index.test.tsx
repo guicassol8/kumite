@@ -355,6 +355,11 @@ describe('organizer rounds — overlays in the panel identity (#233)', () => {
     )
     expect(branded).toHaveLength(1)
     expect(branded[0]?.getAttribute('data-testid')).toBe('organizer-rounds-open-confirm')
+    // `bg-brand` being present is not enough: while `AlertDialogAction` passed
+    // the class to Radix's Slot, the variant's `bg-primary` stayed next to it
+    // and won on stylesheet order, so this very assertion passed with the
+    // button rendering in ink. Its absence is what proves the merge happened.
+    expect(classesOf(branded[0] as Element)).not.toContain('bg-primary')
     expect(document.querySelector('[data-slot="alert-dialog-title"]')?.className).toContain(
       'font-display',
     )

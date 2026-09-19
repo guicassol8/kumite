@@ -23,6 +23,12 @@ import {
 // 791/827 were the *easy* case: the live-round chip adds a free-text round
 // name and, before this issue, a whole sentence ("Termina em 41:23") where
 // identity § 5 asks for a numeral.
+// Every screenshot below is taken right after `switchLanguage`, and the
+// segmented control's buttons carry shadcn's `transition-all`. Without
+// `animations: 'disabled'` the capture races that transition and the evidence
+// shows the *previous* language still lit — the PNG then contradicts the
+// assertion the same line just made. Playwright fast-forwards transitions to
+// their finished state instead of merely freezing them (found reviewing #304).
 const evidence = (name: string) => `e2e/evidence/297/${name}.png`
 
 // `size.breakpoint-cards`: the first width that gets the desktop bar, so the
@@ -200,7 +206,11 @@ test.describe('header width at the 768px breakpoint (#297)', () => {
       await expect(page.getByTestId('header-organizer-link')).toBeVisible()
       for (const testId of BAR_INVENTORY) await expect(page.getByTestId(testId)).toBeVisible()
       await expectFits(page, `organizer /organizer/users ${language} (no round)`)
-      await page.screenshot({ path: evidence(`01-organizador-768-${language}`), fullPage: true })
+      await page.screenshot({
+        path: evidence(`01-organizador-768-${language}`),
+        fullPage: true,
+        animations: 'disabled',
+      })
     }
     await switchLanguage(page, 'pt')
   })
@@ -217,7 +227,11 @@ test.describe('header width at the 768px breakpoint (#297)', () => {
       await switchLanguage(page, language)
       for (const testId of BAR_INVENTORY) await expect(page.getByTestId(testId)).toBeVisible()
       await expectFits(page, `participant /teams ${language} (no round)`)
-      await page.screenshot({ path: evidence(`02-participante-768-${language}`), fullPage: true })
+      await page.screenshot({
+        path: evidence(`02-participante-768-${language}`),
+        fullPage: true,
+        animations: 'disabled',
+      })
     }
     await switchLanguage(page, 'pt')
   })
@@ -282,6 +296,7 @@ test.describe('header width at the 768px breakpoint (#297)', () => {
           await page.screenshot({
             path: evidence(`03-${role}-rodada-${viewport.width}-${language}`),
             fullPage: true,
+            animations: 'disabled',
           })
         }
         await switchLanguage(page, 'pt')
@@ -308,17 +323,34 @@ test.describe('header width at the 768px breakpoint (#297)', () => {
 
     // Above `lg` the round name is back, whole — this is what #217's own spec
     // asserts at 1280x800, and it must keep passing.
+    //
+    // By testid, for the same reason the compact-band test gives above:
+    // `round-countdown-summary` (sr-only) carries the round name too, so
+    // `toContainText` on the chip passes even with the visible name gone from
+    // the bar — which is the only thing this cell exists to catch. Verified by
+    // mutation while reviewing #304: pinning the name to `hidden` at every
+    // width left both this test and #217's green.
     const chip = page.getByTestId('header-round-chip')
     await expect(chip).toBeVisible()
-    await expect(chip).toContainText(LONG_ROUND_NAME)
+    const name = chip.getByTestId('header-round-name')
+    await expect(name).toBeVisible()
+    await expect(name).toHaveText(LONG_ROUND_NAME)
     await expectFits(page, 'organizer 1280x800 (round open)')
-    await page.screenshot({ path: evidence('04-desktop-1280-nome-da-rodada'), fullPage: true })
+    await page.screenshot({
+      path: evidence('04-desktop-1280-nome-da-rodada'),
+      fullPage: true,
+      animations: 'disabled',
+    })
 
     // Below 768 the bar is the phone layout: lockup + language + menu button.
     await page.setViewportSize(PHONE)
     await page.reload()
     await expect(page.getByTestId('header-mobile-menu-trigger')).toBeVisible()
     await expectFits(page, 'organizer 390x844 (round open)')
-    await page.screenshot({ path: evidence('05-celular-390'), fullPage: true })
+    await page.screenshot({
+      path: evidence('05-celular-390'),
+      fullPage: true,
+      animations: 'disabled',
+    })
   })
 })

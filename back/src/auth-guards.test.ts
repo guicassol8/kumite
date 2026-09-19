@@ -6,6 +6,7 @@ import { app, modules } from './app'
 import { JWT_SECRET, TOKEN_TTL_SECONDS } from './config'
 import { k } from './context'
 import { problemsTable, problemTranslationsTable, usersTable } from './db/schema'
+import { registeredRoutes } from './lib/registered-routes'
 import { requirePasswordUpToDate, requireUser } from './middlewares/auth'
 
 // Cross-module HTTP suite (#27): proves the organizer role guard and the
@@ -141,22 +142,9 @@ describe('participant route guard (regression)', () => {
 // temporary password an organizer dictated out loud.
 const PASSWORD_CHANGE_EXEMPT = new Set(['GET /me', 'POST /auth/change-password'])
 
-type KataRoute = { method: string; path: string; use?: readonly unknown[] }
-
-function registeredRoutes(): KataRoute[] {
-  return modules.flatMap((module) =>
-    Object.values(module as Record<string, unknown>).filter(
-      (value): value is KataRoute =>
-        typeof value === 'object' &&
-        value !== null &&
-        (value as { __kata?: string }).__kata === 'route',
-    ),
-  )
-}
-
 describe('forced password change guard', () => {
   it('is wired on every authenticated route except the documented escape hatches', () => {
-    const offenders = registeredRoutes()
+    const offenders = registeredRoutes(modules)
       .filter((route) => route.use?.includes(requireUser))
       .filter((route) => !route.use?.includes(requirePasswordUpToDate))
       .map((route) => `${route.method} ${route.path}`)
@@ -168,7 +156,9 @@ describe('forced password change guard', () => {
   })
 
   it('never leaves the exemptions unreachable — both are real, registered routes', () => {
-    const registered = new Set(registeredRoutes().map((route) => `${route.method} ${route.path}`))
+    const registered = new Set(
+      registeredRoutes(modules).map((route) => `${route.method} ${route.path}`),
+    )
 
     for (const key of PASSWORD_CHANGE_EXEMPT) {
       expect(registered).toContain(key)
@@ -259,7 +249,9 @@ describe('deactivated account guard', () => {
     const token = await tokenFor(participant)
     await db.update(usersTable).set({ active: false }).where(eq(usersTable.id, participant.id))
 
-    const authenticated = registeredRoutes().filter((route) => route.use?.includes(requireUser))
+    const authenticated = registeredRoutes(modules).filter((route) =>
+      route.use?.includes(requireUser),
+    )
     expect(authenticated.length).toBeGreaterThan(0)
 
     const offenders: string[] = []

@@ -7,7 +7,6 @@ import * as auth from './modules/auth/auth.route'
 import * as bugReports from './modules/bug-reports/bug-reports.route'
 import * as eventCodes from './modules/event-codes/event-codes.route'
 import * as eventConfig from './modules/event-config/event-config.route'
-import * as greetings from './modules/greetings/greetings.route'
 import * as health from './modules/health/health.route'
 import * as passwordReset from './modules/password-reset/password-reset.route'
 import * as problems from './modules/problems/problems.route'
@@ -23,15 +22,16 @@ import * as users from './modules/users/users.route'
 // namespace imports — each file's exported routes are registered in order. The
 // app-level middleware chain (ADR-0012) runs before every route; add
 // cross-cutting concerns (cors(), secureHeaders(), bodyLimit() from 'kata') here.
-// Exported, not inlined below, so src/auth-guards.test.ts can walk every
-// registered route and assert the `requirePasswordUpToDate` convention
-// (ADR-0004) without keeping a second copy of this list to drift out of date.
+// Exported, not inlined below, so the cross-module suites can walk every
+// registered route — src/auth-guards.test.ts for the `requirePasswordUpToDate`
+// convention (ADR-0004), src/app.test.ts for the closed list of routes that
+// answer without a token (#188) — without keeping a second copy of this list
+// to drift out of date.
 // `as const` is load-bearing, not decoration: without it the array widens to a
 // union and `AppType` collapses, taking the front's whole typed RPC client down
 // with it (every `api.*` becomes `unknown`).
 export const modules = [
   health,
-  greetings,
   auth,
   users,
   passwordReset,

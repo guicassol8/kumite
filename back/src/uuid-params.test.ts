@@ -55,11 +55,12 @@ async function insertUser(role: 'participant' | 'organizer') {
 
 type Call = { method: string; path: string; body?: unknown }
 
-// `none` is greetings, the one module with no auth middleware. The participant
-// is deliberately left teamless: joinTeam checks `already_in_team` before it
-// looks the team up, so a participant with a team would answer 409 and hide
-// the 404 these probes are pinning down.
-type Auth = 'none' | 'participant' | 'organizer'
+// Every route that takes a uuid is behind `requireUser` — the public surface
+// (src/app.test.ts) has no id-bearing route at all — so every probe carries a
+// token. The participant is deliberately left teamless: joinTeam checks
+// `already_in_team` before it looks the team up, so a participant with a team
+// would answer 409 and hide the 404 these probes are pinning down.
+type Auth = 'participant' | 'organizer'
 
 type Probe = {
   module: string
@@ -81,18 +82,6 @@ type Probe = {
 const ROUND_BODY = { name: 'Rodada 1', durationMinutes: 30 }
 
 const probes: Probe[] = [
-  {
-    module: 'greetings',
-    field: 'GreetingParamsSchema.id',
-    auth: 'none',
-    malformed: { method: 'GET', path: `/greetings/${MALFORMED}` },
-    wellFormed: { method: 'GET', path: `/greetings/${NIL_ID}` },
-    issuesIn: 'params',
-    // The in-memory greetings store is empty on every run, so any well-formed
-    // id misses — this is the module's normal 404, not an id-shape rejection.
-    wellFormedStatus: 404,
-    wellFormedError: 'not_found',
-  },
   {
     module: 'problems',
     field: 'ProblemIdParamsSchema.id (GET)',
@@ -446,7 +435,6 @@ const ValidationFailedSchema = z.object({
 })
 
 async function tokenFor(auth: Auth) {
-  if (auth === 'none') return undefined
   return insertUser(auth)
 }
 

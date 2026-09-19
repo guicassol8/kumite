@@ -5,7 +5,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
-import { PANEL_FIELD_ERROR, PANEL_FIELD_LABEL } from '@/components/organizer/panel-form'
+import {
+  PANEL_DIALOG_TITLE,
+  PANEL_FIELD_ERROR,
+  PANEL_FIELD_LABEL,
+  PANEL_MONO,
+} from '@/components/organizer/panel-form'
 import { PanelTable } from '@/components/organizer/panel-table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -207,7 +212,7 @@ function TeamRulesSection({ eventConfig }: { eventConfig: EventConfig }) {
       >
         <AlertDialogContent data-testid="event-config-mixing-confirm">
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className={PANEL_DIALOG_TITLE}>
               {t(
                 mixingConfirmNext
                   ? 'organizer.eventConfig.teamRules.mixingDialog.titleLock'
@@ -223,6 +228,9 @@ function TeamRulesSection({ eventConfig }: { eventConfig: EventConfig }) {
               {t('organizer.eventConfig.teamRules.mixingDialog.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
+              // Travar a mistura é o ramo destrutivo deste diálogo;
+              // destravar devolve liberdade e sai em tinta.
+              variant={mixingConfirmNext ? 'destructive' : 'default'}
               data-testid="event-config-mixing-confirm-confirm"
               onClick={confirmMixingChange}
             >
@@ -541,7 +549,9 @@ function EditEventCodeDialog({
     <Dialog open={eventCode !== null} onOpenChange={(next) => !next && onClose()}>
       <DialogContent data-testid="event-config-codes-edit-dialog">
         <DialogHeader>
-          <DialogTitle>{t('organizer.eventConfig.codes.dialog.title')}</DialogTitle>
+          <DialogTitle className={PANEL_DIALOG_TITLE}>
+            {t('organizer.eventConfig.codes.dialog.title')}
+          </DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form className="flex flex-col gap-4" onSubmit={form.handleSubmit(onSubmit)}>
@@ -550,11 +560,20 @@ function EditEventCodeDialog({
               name="code"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('organizer.eventConfig.codes.dialog.codeLabel')}</FormLabel>
+                  <FormLabel className={PANEL_FIELD_LABEL}>
+                    {t('organizer.eventConfig.codes.dialog.codeLabel')}
+                  </FormLabel>
                   <FormControl>
-                    <Input data-testid="event-config-codes-edit-code" {...field} />
+                    <Input
+                      className={PANEL_MONO}
+                      data-testid="event-config-codes-edit-code"
+                      {...field}
+                    />
                   </FormControl>
-                  <FormMessage data-testid="event-config-codes-edit-code-error" />
+                  <FormMessage
+                    className={PANEL_FIELD_ERROR}
+                    data-testid="event-config-codes-edit-code-error"
+                  />
                 </FormItem>
               )}
             />
@@ -564,11 +583,20 @@ function EditEventCodeDialog({
               name="suffixes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('organizer.eventConfig.codes.dialog.suffixesLabel')}</FormLabel>
+                  <FormLabel className={PANEL_FIELD_LABEL}>
+                    {t('organizer.eventConfig.codes.dialog.suffixesLabel')}
+                  </FormLabel>
                   <FormControl>
-                    <Textarea data-testid="event-config-codes-edit-suffixes" {...field} />
+                    <Textarea
+                      className={PANEL_MONO}
+                      data-testid="event-config-codes-edit-suffixes"
+                      {...field}
+                    />
                   </FormControl>
-                  <FormMessage data-testid="event-config-codes-edit-suffixes-error" />
+                  <FormMessage
+                    className={PANEL_FIELD_ERROR}
+                    data-testid="event-config-codes-edit-suffixes-error"
+                  />
                 </FormItem>
               )}
             />
@@ -586,11 +614,14 @@ function EditEventCodeDialog({
                         onCheckedChange={field.onChange}
                       />
                     </FormControl>
-                    <FormLabel className="!mt-0">
+                    <FormLabel className={PANEL_FIELD_LABEL}>
                       {t('organizer.eventConfig.codes.dialog.activeLabel')}
                     </FormLabel>
                   </div>
-                  <FormMessage data-testid="event-config-codes-edit-active-error" />
+                  <FormMessage
+                    className={PANEL_FIELD_ERROR}
+                    data-testid="event-config-codes-edit-active-error"
+                  />
                 </FormItem>
               )}
             />

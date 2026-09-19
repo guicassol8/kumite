@@ -251,3 +251,41 @@ describe('OrganizerProblemsList', () => {
     }
   })
 })
+
+/** The element's classes as tokens — a substring match on the whole string
+ * hits things like `aria-invalid:border-destructive` by accident. */
+function classesOf(element: Element): string[] {
+  return [...element.classList]
+}
+
+/** The identity's destructive action: crimson draws the border and the text,
+ * never the surface (docs/design/identity.md § 3, Regra 1). */
+function expectCrimsonOutline(button: Element) {
+  const classes = classesOf(button)
+  expect(classes).toContain('border-destructive')
+  expect(classes).toContain('text-destructive')
+  expect(classes).not.toContain('bg-destructive')
+  expect(classes).not.toContain('bg-primary')
+}
+
+// #233 — the archive overlay.
+describe('organizer problems — archive dialog in the panel identity (#233)', () => {
+  it('titles the dialog as an H2 and puts the archive action in crimson outline', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [draftProblem]))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-problems-archive-p1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('organizer-problems-archive-p1'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('organizer-problems-archive-confirm')).toBeDefined(),
+    )
+    expectCrimsonOutline(screen.getByTestId('organizer-problems-archive-confirm'))
+
+    const title = document.querySelector('[data-slot="alert-dialog-title"]')
+    expect(title?.className).toContain('font-display')
+    // § 5: hairlines, no shadow beyond the focus ring.
+    const content = document.querySelector('[data-slot="alert-dialog-content"]')
+    expect(classesOf(content as Element)).not.toContain('shadow-lg')
+  })
+})

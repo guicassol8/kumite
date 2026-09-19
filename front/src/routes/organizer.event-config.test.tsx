@@ -444,3 +444,64 @@ describe('organizer event config — write surfaces in the panel identity (#233)
     ).toBe('true')
   })
 })
+
+// #233 — the two event-config overlays.
+describe('organizer event config — overlays in the panel identity (#233)', () => {
+  it('puts the mixing LOCK in crimson outline and leaves UNLOCK in ink', async () => {
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('event-config-mixing-switch')).toBeDefined())
+    fireEvent.click(screen.getByTestId('event-config-mixing-switch'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-mixing-confirm-confirm')).toBeDefined(),
+    )
+    const locking = screen.getByTestId('event-config-mixing-confirm-confirm')
+    expect(classesOf(locking)).toContain('border-destructive')
+    expect(classesOf(locking)).toContain('text-destructive')
+    expect(classesOf(locking)).not.toContain('bg-destructive')
+    expect(document.querySelector('[data-slot="alert-dialog-title"]')?.className).toContain(
+      'font-display',
+    )
+
+    cleanup()
+
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig({ mixingLocked: true })))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('event-config-mixing-switch')).toBeDefined())
+    fireEvent.click(screen.getByTestId('event-config-mixing-switch'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-mixing-confirm-confirm')).toBeDefined(),
+    )
+    const unlocking = screen.getByTestId('event-config-mixing-confirm-confirm')
+    expect(classesOf(unlocking)).toContain('bg-primary')
+    expect(classesOf(unlocking)).not.toContain('border-destructive')
+  })
+
+  it('dresses the event-code dialog: H2 title, 13/500 labels, mono code and suffixes', async () => {
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('event-config-codes-edit-pucrs')).toBeDefined())
+    fireEvent.click(screen.getByTestId('event-config-codes-edit-pucrs'))
+
+    await waitFor(() => expect(screen.getByTestId('event-config-codes-edit-dialog')).toBeDefined())
+    expect(document.querySelector('[data-slot="dialog-title"]')?.className).toContain(
+      'font-display',
+    )
+    expect(classesOf(labelFor('event-config-codes-edit-code'))).toContain('text-[13px]')
+    // § 4 puts event codes in Mono.
+    expect(classesOf(screen.getByTestId('event-config-codes-edit-code'))).toContain('font-mono')
+    expect(classesOf(screen.getByTestId('event-config-codes-edit-suffixes'))).toContain('font-mono')
+    // § 5: no shadow on the overlay.
+    expect(classesOf(screen.getByTestId('event-config-codes-edit-dialog'))).not.toContain(
+      'shadow-lg',
+    )
+  })
+})

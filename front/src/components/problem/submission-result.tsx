@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
 export type SubmissionResult = InferResponseType<typeof api.submissions.$post, 201>
 type SubmissionResultCase = SubmissionResult['cases'][number]
@@ -43,7 +44,13 @@ export function SubmissionResultPanel({ result }: SubmissionResultPanelProps) {
       data-testid="problem-verdict-panel"
       data-state={approved ? 'passed' : 'failed'}
       variant={approved ? 'success' : 'destructive'}
-      className="shrink-0"
+      // `alertVariants` gives `success` a `border-success` but leaves
+      // `destructive` on the neutral hairline, so the rejected verdict came
+      // out crimson-on-grey — text and icon only, no outline. The Acceptance
+      // asks for "crimson em contorno" and § 5 for "cartão com borda crimson",
+      // so the border is spelled out here. Scoped to this call site on
+      // purpose: the primitive feeds every other error alert in the app.
+      className={cn('shrink-0', !approved && 'border-destructive')}
     >
       {approved ? <CircleCheck /> : <CircleX />}
       <AlertTitle>

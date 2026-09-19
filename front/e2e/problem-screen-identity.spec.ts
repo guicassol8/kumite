@@ -30,6 +30,16 @@ const evidence = (name: string) => `e2e/evidence/219/${name}.png`
 const BRAND_FILL = 'rgb(221, 40, 36)'
 
 /**
+ * The semantic borders the verdict alert has to carry: `--success` (#008433)
+ * when approved, `--destructive` (#c1133a) when not. Asserting the background
+ * is not brand red proves only that it is not a filled plate — it says nothing
+ * about the outline, which is the half of "crimson em contorno" that went
+ * missing when `alertVariants` gave `destructive` no border of its own.
+ */
+const SUCCESS_BORDER = 'rgb(0, 132, 51)'
+const CRIMSON_BORDER = 'rgb(193, 19, 58)'
+
+/**
  * The canonical solution with its `resto = 0` test flipped to `resto ≠ 0`, so
  * it sums the ODD numbers and every case fails — which is what produces a
  * rejected verdict. Same trick run-examples.spec.ts (#5) uses.
@@ -298,6 +308,7 @@ test.describe('problem screen identity (#219)', () => {
     await expect(verdict).toHaveAttribute('data-state', 'passed')
     await expect(verdict).toHaveAttribute('role', 'alert')
     await expect(verdict.getByText('Aprovado')).toHaveCount(1)
+    await expect(verdict).toHaveCSS('border-color', SUCCESS_BORDER)
     await expect(page.getByTestId('problem-verdict-summary')).toContainText('100')
     // The band scrolls: the verdict lands below the run results, so bring it
     // into view before the screenshot and prove it arrived.
@@ -320,9 +331,13 @@ test.describe('problem screen identity (#219)', () => {
     await expect(rejected).toBeVisible()
     await expect(rejected).toHaveAttribute('data-state', 'failed')
     await expect(rejected.getByText('Não aprovado')).toHaveCount(1)
-    // Outline, not a plate: the alert's own background is the card's.
+    // Outline, not a plate: the alert's own background is the card's...
     const verdictFill = await rejected.evaluate((node) => getComputedStyle(node).backgroundColor)
     expect(verdictFill).not.toBe(BRAND_FILL)
+    // ...and the outline is really crimson, not the neutral hairline. Without
+    // this the panel read as crimson text on a grey border and every other
+    // assertion here still passed.
+    await expect(rejected).toHaveCSS('border-color', CRIMSON_BORDER)
     await rejected.scrollIntoViewIfNeeded()
     await expectOnScreen(page, 'problem-verdict-panel')
     await page.screenshot({ path: evidence('05-veredito-reprovado'), fullPage: true })

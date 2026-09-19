@@ -24,8 +24,12 @@ const NIL_ID = '00000000-0000-0000-0000-000000000000'
 // Guard on the guards. Every "no offenders" assertion below is a filter over
 // `registeredRoutes(modules)`, and a filter over an empty list is empty: if
 // the kata `__kata === 'route'` marker ever moves, this whole file would go
-// green while asserting nothing at all. This is the one test that fails in
-// that scenario.
+// green while asserting nothing at all. Verified by mutation: point the helper
+// at a different marker and the three "no offenders" filters below all go
+// vacuously green — this test is the one that names the cause ("expected 0 to
+// be greater than 40"). The reciprocal check at the bottom of the file also
+// goes red there, but reporting all six public routes as stale rather than the
+// reflection as broken.
 describe('route reflection', () => {
   it('sees the real, populated route table', () => {
     expect(registeredRoutes(modules).length).toBeGreaterThan(40)

@@ -1,6 +1,7 @@
 import { emptyWorkspaceState, withRootBlock } from '@kumite/blocks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { Info, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -261,6 +262,10 @@ function ProblemScreen() {
         hasResults && 'short:max-h-16 short:overflow-auto',
       )}
     >
+      {/* Direct child of the Alert, not of the description: `alertVariants`
+          only opens the icon column for `has-[>svg]`. Neutral variant — § 5
+          calls read-only information neutral, not an error. */}
+      <Info />
       <AlertDescription className="flex flex-col gap-1">
         <span>{t('problem.closedRound.notice')}</span>
         {data.bestSubmission ? (
@@ -290,6 +295,7 @@ function ProblemScreen() {
           : 'problem-submit-error-banner'
       }
     >
+      <TriangleAlert />
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>{'key' in submitBanner ? t(submitBanner.key) : submitBanner.message}</span>
         <Button type="button" variant="outline" size="sm" onClick={() => setSubmitBanner(null)}>

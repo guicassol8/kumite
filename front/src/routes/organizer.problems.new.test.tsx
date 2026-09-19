@@ -321,4 +321,14 @@ describe('NewProblemScreen', () => {
     )
     expect(router.state.location.pathname).toBe('/organizer/problems/new')
   })
+
+  // #233 — the form routes wear the same H2 as the listings restyled by #223.
+  it('renders the screen heading in the display face, upper case', async () => {
+    renderNewProblem()
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+
+    const heading = document.querySelector('h2')
+    expect(heading?.className).toContain('font-display')
+    expect(heading?.className).toContain('uppercase')
+  })
 })

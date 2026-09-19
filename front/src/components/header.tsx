@@ -40,7 +40,14 @@ import { cn } from '@/lib/utils'
 // testid, so a test that opens the mobile panel while a round is live scopes
 // its query (`within(...)`) the same way `index.test.tsx` already does for
 // `round-countdown`.
-function RoundChip({ className }: { className?: string }) {
+//
+// `nameClassName` is how the two callers differ (#297): the round name is
+// free text an organizer typed, with no ceiling but the 120-char column, and
+// on the desktop bar between 768 and 1023px there is simply no room for it —
+// so the bar hides it there and shows it again from `lg` up, while the mobile
+// panel, which has a whole column to itself, always shows it. The dot and the
+// timer — identity § 5's "ao vivo" role — stay at every width.
+function RoundChip({ className, nameClassName }: { className?: string; nameClassName?: string }) {
   const { status } = useSession()
   const { currentRoundId, closesAt, serverTime } = useRoundStream()
   const rounds = useQuery({
@@ -55,18 +62,40 @@ function RoundChip({ className }: { className?: string }) {
   const serverTimeOffsetMs = serverTime ? serverTime.getTime() - Date.now() : 0
 
   return (
-    <div data-testid="header-round-chip" className={cn('flex items-center gap-2', className)}>
+    // `shrink-0`, deliberately: the chip used to be the only flexible item
+    // left on the compressed bar, so flexbox paid for English by squeezing it
+    // to zero width — the page then measured a perfect 768 with no live round
+    // visible at all. Everything on the bar is now fixed except the user's
+    // name, which § 5 already says truncates; an inventory item may never buy
+    // the width by disappearing (#297).
+    <div
+      data-testid="header-round-chip"
+      className={cn('flex shrink-0 items-center gap-2', className)}
+    >
       <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-brand-on-chrome" />
       {openRound && (
-        <span className="font-display text-brand-on-chrome text-sm uppercase tracking-wide">
+        <span
+          data-testid="header-round-name"
+          className={cn(
+            'truncate font-display text-brand-on-chrome text-sm uppercase tracking-wide',
+            nameClassName,
+          )}
+        >
           {openRound.name}
         </span>
       )}
+      {/* `bare`: identity § 5 describes the chip as "ponto + nome da rodada +
+          timer", and the live-timer role as a numeral in Barlow Condensed —
+          not the sentence "Termina em 41:23", which is the home card's
+          wording and costs the bar ~70px it does not have. The full sentence
+          is still announced: `round-countdown-summary` (sr-only) carries it
+          verbatim, so nothing is lost to a screen reader. */}
       <RoundCountdown
+        bare
         closesAt={closesAt}
         serverTimeOffsetMs={serverTimeOffsetMs}
         roundName={openRound?.name}
-        className="font-display text-brand-on-chrome tabular-nums"
+        className="shrink-0 font-display text-brand-on-chrome tabular-nums"
       />
     </div>
   )
@@ -137,12 +166,12 @@ export function Header() {
       data-testid="app-header"
       className="border-chrome-border border-b bg-chrome text-chrome-foreground"
     >
-      <div className="flex items-center justify-between gap-4 p-4">
+      <div className="flex items-center justify-between gap-2 p-4 xl:gap-4">
         <Link
           to="/"
           data-testid="header-home-link"
           aria-label={t('header.homeLink')}
-          className="rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className="shrink-0 rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
           {/* Simbolo de 24px, o que da um lockup de ~80px: a excecao ao minimo
               de 96px que a Regra 3 de docs/design/logo/README.md documenta para
@@ -166,7 +195,13 @@ export function Header() {
           // need not be adjacent, and this is what keeps the draft and the
           // dialog's open state shared regardless of which one opened it.
           <BugReport open={bugReportOpen} onOpenChange={setBugReportOpen}>
-            <div className="flex flex-1 items-center justify-end gap-2 md:gap-4">
+            {/* `min-w-0` is this fix's load-bearing class (#297): without it a
+                flex item's `min-width` resolves to `auto`, i.e. to the
+                min-content width of everything inside it — the block then
+                refuses to shrink and pushes the document instead of
+                compressing, which is why the symptom was the page's
+                `scrollWidth` rather than a truncated label. */}
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-2 xl:gap-4">
               {/* Desktop (>=768px, size.breakpoint-cards). A single
                 `LanguageSelector` and a single mobile menu trigger sit
                 outside this block (below) — jsdom renders every `hidden
@@ -174,8 +209,21 @@ export function Header() {
                 second copy of either would collide on its testid in both
                 component tests and Playwright's testid locator, which also
                 ignores CSS visibility. */}
-              <div className="hidden items-center gap-4 md:flex">
-                <nav className="flex items-center gap-4">
+              {/* From 768px up the bar carries the whole closed inventory of
+                  § 5 with up to ~500px less room than at 1280, so it stays
+                  compressed — gap-2, tighter control padding, a shorter clamp
+                  on the user name — all the way to `xl`, and only then goes
+                  back to its roomy spacing. The round name returns earlier, at
+                  `lg`, and this compression is precisely what pays for it
+                  there: at 1024 the bar has 256px more than at 768 but has to
+                  find room for a name of up to 240px.
+
+                  Sized by English, not Portuguese — identity § 5, Expansão de
+                  texto: "Leaderboard" is 78px where "Placar" is 44, and the
+                  worst measured case was en with a round open (985px in a
+                  768px viewport, #297). */}
+              <div className="hidden min-w-0 items-center gap-2 md:flex xl:gap-4">
+                <nav className="flex shrink-0 items-center gap-2 xl:gap-4">
                   {isAuthenticated && user.role === 'organizer' && (
                     <Link
                       to="/organizer/problems"
@@ -201,7 +249,7 @@ export function Header() {
                   )}
                 </nav>
 
-                {isAuthenticated && <RoundChip />}
+                {isAuthenticated && <RoundChip nameClassName="hidden max-w-60 lg:block" />}
 
                 <DialogTrigger asChild>
                   <Button
@@ -210,7 +258,7 @@ export function Header() {
                     size="icon"
                     data-testid="header-bug-report-trigger"
                     aria-label={t('header.reportBug')}
-                    className="text-chrome-foreground hover:bg-chrome-foreground/10 hover:text-chrome-foreground"
+                    className="shrink-0 text-chrome-foreground hover:bg-chrome-foreground/10 hover:text-chrome-foreground"
                   >
                     <Bug className="size-5" aria-hidden="true" />
                   </Button>
@@ -223,13 +271,20 @@ export function Header() {
                         type="button"
                         variant="ghost"
                         data-testid="header-user-menu-trigger"
-                        className="gap-1 text-chrome-foreground hover:bg-chrome-foreground/10 hover:text-chrome-foreground"
+                        className="min-w-0 gap-1 px-2 text-chrome-foreground hover:bg-chrome-foreground/10 hover:text-chrome-foreground xl:px-4"
                       >
                         {/* Testid kept as-is (#122): it is the identity slot, and
                           renaming it would churn every spec for no gain.
                           Accounts that predate the name column fall back to
                           the email. */}
-                        <span data-testid="header-user-email" className="max-w-[200px] truncate">
+                        {/* § 5 already prescribes a truncated name here, which
+                          makes this clamp the one elastic thing left on the
+                          bar: 80px while the bar is compressed, the original
+                          200px once it is roomy again. */}
+                        <span
+                          data-testid="header-user-email"
+                          className="max-w-20 truncate xl:max-w-50"
+                        >
                           {user.name ?? user.email}
                         </span>
                         <ChevronDown className="size-4 shrink-0" aria-hidden="true" />
@@ -267,14 +322,14 @@ export function Header() {
                     variant="outline"
                     size="sm"
                     data-testid="header-logout-button"
-                    className="border-chrome-foreground/40 text-chrome-foreground hover:bg-chrome-foreground/10"
+                    className="shrink-0 border-chrome-foreground/40 px-2 text-chrome-foreground hover:bg-chrome-foreground/10 xl:px-3"
                     onClick={logout}
                   >
                     {t('header.logout')}
                   </Button>
                 )}
 
-                <ThemeToggle testId="header-theme-toggle" />
+                <ThemeToggle testId="header-theme-toggle" className="shrink-0" />
               </div>
 
               {/* Always visible: the language selector is the one preference
@@ -283,7 +338,7 @@ export function Header() {
               <LanguageSelector />
 
               {/* Mobile (<768px) menu trigger + panel */}
-              <div className="md:hidden">
+              <div className="shrink-0 md:hidden">
                 <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                   <SheetTrigger asChild>
                     <Button

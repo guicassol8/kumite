@@ -266,11 +266,12 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
     por leitor de tela (`round-countdown-summary`, `sr-only`), então a
     economia é só de pixels.
 
-  A medida que decide tudo isto é `document.scrollWidth ≤ window.innerWidth`
-  em **768 px e em 1024 px**, nos três catálogos, para participante e
-  organizador, com e sem rodada aberta — `front/e2e/header-width.spec.ts`. O
-  caso que dimensiona é o **inglês com rodada aberta**, não o português: veja
-  Expansão de texto, abaixo.
+  A medida que decide tudo isto é `document.scrollWidth ≤ window.innerWidth`,
+  nos três catálogos e para os dois papéis, em **768 px** (com e sem rodada
+  aberta) e em **1024 px** (com rodada aberta, que é o caso que carrega o
+  nome) — `front/e2e/header-width.spec.ts`. O caso que dimensiona é o
+  **inglês com rodada aberta**, não o português: veja Expansão de texto,
+  abaixo.
 
   **Header, celular (< 768 px)**: lockup + controle de idioma + botão de menu.
   O botão abre um **painel de menu** com navegação, bloco do usuário (nome e

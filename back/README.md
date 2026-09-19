@@ -14,12 +14,9 @@ pnpm dev        # tsx watch src/main.ts -> http://localhost:3000
 | Method | Path              | Description                          |
 |--------|-------------------|--------------------------------------|
 | GET    | /health           | Liveness probe -> `{ "status": "ok" }` |
-| POST   | /greetings        | Create a greeting (body: `{ "name" }`) |
-| GET    | /greetings/:id    | Read a greeting by id (404 if absent) |
 
 ```bash
 curl localhost:3000/health
-curl -X POST localhost:3000/greetings -H 'content-type: application/json' -d '{"name":"Ada"}'
 ```
 
 ## Verify your work
@@ -54,7 +51,7 @@ Then register it in `src/app.ts`:
 ```ts
 import * as orders from './modules/orders/orders.route'
 // ...
-createApp({ modules: [health, greetings, orders], middlewares: [requestLogger] })
+createApp({ modules: [health, orders], middlewares: [requestLogger] })
 ```
 
 ## Layout

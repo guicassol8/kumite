@@ -155,7 +155,13 @@ describe('OrganizerEventConfigScreen', () => {
         error: 'validation_failed',
         message: 'Request input validation failed',
         issues: {
-          body: [{ path: 'maxTeamSize', message: 'Máximo permitido é 50.', code: 'too_big' }],
+          body: [
+            {
+              path: 'maxTeamSize',
+              message: 'Number must be less than or equal to 10',
+              code: 'too_big',
+            },
+          ],
         },
       }),
     )
@@ -164,16 +170,44 @@ describe('OrganizerEventConfigScreen', () => {
     await waitFor(() =>
       expect(screen.getByTestId('event-config-max-team-size-input')).toBeDefined(),
     )
+    // Legal on the client, refused by the API: the value has to get past the
+    // form's own ceiling for this to exercise the 422 path at all.
     fireEvent.change(screen.getByTestId('event-config-max-team-size-input'), {
-      target: { value: '999' },
+      target: { value: '5' },
+    })
+    fireEvent.click(screen.getByTestId('event-config-max-team-size-save'))
+
+    // The catalog string, not the envelope's. This assertion used to read
+    // 'Máximo permitido é 50.' — a Portuguese `message` kata never emits (its
+    // issues carry zod's English) with a `too_big` the back could not yet
+    // produce, and it passed only because the screen rendered `issue.message`
+    // verbatim. Showing the localized string is the fix, not a weaker check.
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-max-team-size-error').textContent).toBe(
+        'O tamanho máximo do time precisa ser no máximo 10.',
+      ),
+    )
+  })
+
+  it('refuses a maxTeamSize over the ceiling without calling the API at all', async () => {
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+    renderScreen()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-max-team-size-input')).toBeDefined(),
+    )
+    fireEvent.change(screen.getByTestId('event-config-max-team-size-input'), {
+      target: { value: '999999999999' },
     })
     fireEvent.click(screen.getByTestId('event-config-max-team-size-save'))
 
     await waitFor(() =>
       expect(screen.getByTestId('event-config-max-team-size-error').textContent).toBe(
-        'Máximo permitido é 50.',
+        'O tamanho máximo do time precisa ser no máximo 10.',
       ),
     )
+    expect(mockedConfigPatch).not.toHaveBeenCalled()
   })
 
   it('confirms flipping the mixing lock and persists the new value', async () => {
@@ -278,7 +312,11 @@ describe('OrganizerEventConfigScreen', () => {
       jsonResponse(422, {
         error: 'validation_failed',
         message: 'Request input validation failed',
-        issues: { body: [{ path: 'active', message: 'Valor inválido.', code: 'invalid_type' }] },
+        issues: {
+          body: [
+            { path: 'active', message: 'Expected boolean, received string', code: 'invalid_type' },
+          ],
+        },
       }),
     )
     renderScreen()
@@ -289,9 +327,12 @@ describe('OrganizerEventConfigScreen', () => {
     await waitFor(() => expect(screen.getByTestId('event-config-codes-edit-dialog')).toBeDefined())
     fireEvent.click(screen.getByTestId('event-config-codes-edit-save'))
 
+    // Same correction as the maxTeamSize case above: the fixture's Portuguese
+    // `message` was never something kata emits, and rendering it verbatim was
+    // an i18n hole — a pt/es organizer would have been shown zod's English.
     await waitFor(() =>
       expect(screen.getByTestId('event-config-codes-edit-active-error').textContent).toBe(
-        'Valor inválido.',
+        'O servidor recusou este valor. Revise o campo.',
       ),
     )
   })

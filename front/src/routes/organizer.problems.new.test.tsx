@@ -169,6 +169,80 @@ describe('NewProblemScreen', () => {
     expect(mockedPatch).not.toHaveBeenCalled()
   })
 
+  // #187: the POST carries difficulty and points, so it is the request that
+  // refuses a score over the ceiling — and its body used to be thrown away.
+  it('puts the 422 from the create under the points field, not in a generic alert', async () => {
+    mockedCreate.mockResolvedValue(
+      jsonResponse(422, {
+        error: 'validation_failed',
+        issues: {
+          body: [
+            {
+              path: 'points',
+              code: 'too_big',
+              message: 'Number must be less than or equal to 10000',
+            },
+          ],
+        },
+      }),
+    )
+    renderNewProblem()
+
+    await fillPtDraft()
+    // Past the client-side ceiling the form would refuse this before sending,
+    // so the probe sends a legal value and lets the API be the one to say no.
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-points-error').textContent).toContain('10000'),
+    )
+    expect(screen.queryByTestId('problem-form-error')).toBeNull()
+    expect(mockedPatch).not.toHaveBeenCalled()
+  })
+
+  it('puts a 422 from the patch under the field it names', async () => {
+    mockedCreate.mockResolvedValue(jsonResponse(201, createdDetail))
+    mockedPatch.mockResolvedValue(
+      jsonResponse(422, {
+        error: 'validation_failed',
+        issues: {
+          body: [{ path: 'translations[0].title', code: 'too_small', message: 'Required' }],
+        },
+      }),
+    )
+    renderNewProblem()
+
+    await fillPtDraft()
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-title-pt-error').textContent).toBe(
+        'O servidor recusou este valor. Revise o campo.',
+      ),
+    )
+    expect(screen.queryByTestId('problem-form-error')).toBeNull()
+  })
+
+  it('keeps the generic alert for a 422 whose paths match no field', async () => {
+    mockedCreate.mockResolvedValue(jsonResponse(201, createdDetail))
+    mockedPatch.mockResolvedValue(
+      jsonResponse(422, {
+        error: 'validation_failed',
+        issues: { body: [{ path: 'translations', message: 'Duplicate locale(s)' }] },
+      }),
+    )
+    renderNewProblem()
+
+    await fillPtDraft()
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-error').textContent).toContain(
+        'Não foi possível salvar o problema',
+      ),
+    )
+  })
+
   it('chains create, patch and publish, then goes back to the list', async () => {
     mockedCreate.mockResolvedValue(jsonResponse(201, createdDetail))
     mockedPatch.mockResolvedValue(jsonResponse(200, createdDetail))

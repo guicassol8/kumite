@@ -3,9 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import '@/i18n'
 
+import { POINTS_MAX } from '@/lib/field-limits'
 import {
   emptyProblemFormValues,
+  type ProblemFormError,
   type ProblemFormValues,
+  type SubmitOutcome,
   type TestCaseRow,
 } from '@/lib/problem-form'
 import type { UiLocale } from '@/lib/resolve-problem-title'
@@ -41,9 +44,20 @@ function announcedError(testid: string): (string | undefined)[] {
     .map((id) => document.getElementById(id)?.textContent)
 }
 
+// The `_values` parameter is load-bearing, not decoration: without it the mock
+// is typed as taking none, and the tests that assert on
+// `onSave.mock.calls[0]?.[0]` lose the argument's type.
+/** A handler that accepted the values — the default for every test here. */
+const accepts = () =>
+  vi.fn(async (_values: ProblemFormValues): Promise<SubmitOutcome> => ({ ok: true }))
+
+/** A handler that failed with per-field errors the form is expected to paint. */
+const rejectsWith = (fieldErrors: ProblemFormError[]) =>
+  vi.fn(async (_values: ProblemFormValues): Promise<SubmitOutcome> => ({ ok: false, fieldErrors }))
+
 function renderForm(props: Partial<React.ComponentProps<typeof ProblemForm>> = {}) {
-  const onSave = vi.fn()
-  const onPublish = vi.fn()
+  const onSave = accepts()
+  const onPublish = accepts()
   render(
     <ProblemForm
       initialValues={ptOnly()}
@@ -313,8 +327,8 @@ describe('ProblemForm', () => {
         initialValues={ptOnly()}
         savedLocales={[]}
         rootError="Falhou"
-        onSave={vi.fn()}
-        onPublish={vi.fn()}
+        onSave={accepts()}
+        onPublish={accepts()}
       />,
     )
     expect(screen.getByTestId('problem-form-error').textContent).toContain('Falhou')
@@ -324,8 +338,8 @@ describe('ProblemForm', () => {
         initialValues={ptOnly()}
         savedLocales={[]}
         successMessage="Alterações salvas."
-        onSave={vi.fn()}
-        onPublish={vi.fn()}
+        onSave={accepts()}
+        onPublish={accepts()}
       />,
     )
     await waitFor(() =>
@@ -378,5 +392,139 @@ describe('ProblemForm', () => {
     expect(announcedError('problem-form-points')).toContain(
       'Informe uma pontuação inteira maior que zero.',
     )
+  })
+
+  it('blocks the save and names the ceiling when points is over the limit', () => {
+    const { onSave } = renderForm()
+
+    fireEvent.change(screen.getByTestId('problem-form-points'), {
+      target: { value: '9999999999' },
+    })
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    // No round-trip: the acceptance is that the organizer learns the limit
+    // without one.
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByTestId('problem-form-points-error').textContent).toContain(
+      String(POINTS_MAX),
+    )
+  })
+
+  it('caps the points input at the ceiling in the DOM too', () => {
+    renderForm()
+
+    expect(screen.getByTestId('problem-form-points').getAttribute('max')).toBe(String(POINTS_MAX))
+  })
+
+  it('paints a per-field error the handler brings back from the API', async () => {
+    const onSave = rejectsWith([{ kind: 'pointsTooLarge', max: POINTS_MAX }])
+    render(
+      <ProblemForm
+        initialValues={ptOnly()}
+        savedLocales={[]}
+        onSave={onSave}
+        onPublish={accepts()}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-points-error').textContent).toContain(
+        String(POINTS_MAX),
+      ),
+    )
+    expect(onSave).toHaveBeenCalledTimes(1)
+    // The form-level alert stays away: the message has a field of its own.
+    expect(screen.queryByTestId('problem-form-error')).toBeNull()
+  })
+
+  it('switches to the offending tab for a translation error from the API', async () => {
+    const onSave = rejectsWith([
+      { kind: 'serverRejected', target: { field: 'translation', locale: 'en', key: 'title' } },
+    ])
+    render(
+      <ProblemForm
+        initialValues={ptOnly()}
+        savedLocales={[]}
+        onSave={onSave}
+        onPublish={accepts()}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-tab-en').getAttribute('data-invalid')).toBe('true'),
+    )
+    expect(screen.getByTestId('problem-form-title-en-error').textContent).toBe(
+      'O servidor recusou este valor. Revise o campo.',
+    )
+  })
+
+  // The two fields that had no FormMessage before #187: with the 422 mapping
+  // generic by path, an error on either used to be set and never rendered.
+  it('has somewhere to render a rejection on difficulty', async () => {
+    const onSave = rejectsWith([{ kind: 'serverRejected', target: { field: 'difficulty' } }])
+    render(
+      <ProblemForm
+        initialValues={ptOnly()}
+        savedLocales={[]}
+        onSave={onSave}
+        onPublish={accepts()}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-difficulty-error').textContent).toBe(
+        'O servidor recusou este valor. Revise o campo.',
+      ),
+    )
+  })
+
+  it('has somewhere to render a rejection on a row’s hidden flag', async () => {
+    const onSave = rejectsWith([
+      { kind: 'serverRejected', target: { field: 'testCase', index: 0, key: 'hidden' } },
+    ])
+    render(
+      <ProblemForm
+        initialValues={valuesWith({
+          translations: { pt: { title: 'Soma', statementMd: 'Some a e b.' } },
+          testCases: [{ input: '1', expected: '1', hidden: false }],
+        })}
+        savedLocales={[]}
+        onSave={onSave}
+        onPublish={accepts()}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-case-0-hidden-error').textContent).toBe(
+        'O servidor recusou este valor. Revise o campo.',
+      ),
+    )
+  })
+
+  it('leaves the fields alone when the failure carries no field errors', async () => {
+    const onSave = rejectsWith([])
+    render(
+      <ProblemForm
+        initialValues={ptOnly()}
+        savedLocales={[]}
+        rootError="Não foi possível salvar o problema. Tente novamente."
+        onSave={onSave}
+        onPublish={accepts()}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId('problem-form-points-error')).toBeNull()
+    expect(screen.getByTestId('problem-form-error').textContent).toContain('Tente novamente')
   })
 })

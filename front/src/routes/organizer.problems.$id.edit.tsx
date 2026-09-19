@@ -6,10 +6,14 @@ import { useTranslation } from 'react-i18next'
 import { ProblemForm } from '@/components/organizer/problem-form'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
+import { readFieldIssues } from '@/lib/api-issues'
 import {
   buildPatchBody,
+  issuesToProblemFormErrors,
+  type ProblemFormError,
   type ProblemFormValues,
   problemDetailToFormValues,
+  type SubmitOutcome,
   savedLocalesOf,
 } from '@/lib/problem-form'
 
@@ -50,12 +54,27 @@ function EditProblemScreen() {
     refetchOnWindowFocus: false,
   })
 
-  async function patch(values: ProblemFormValues): Promise<boolean> {
-    const res = await api.organizer.problems[':id'].$patch({
-      param: { id },
-      json: buildPatchBody(values),
-    })
-    return res.status === 200
+  type PatchOutcome = { ok: true } | { ok: false; fieldErrors: ProblemFormError[] }
+
+  async function patch(values: ProblemFormValues): Promise<PatchOutcome> {
+    const body = buildPatchBody(values)
+    const res = await api.organizer.problems[':id'].$patch({ param: { id }, json: body })
+    if (res.status === 200) return { ok: true }
+    // The translations actually sent are what a `translations[i].*` path indexes
+    // into — buildPatchBody drops the incomplete locales.
+    return {
+      ok: false,
+      fieldErrors: issuesToProblemFormErrors(await readFieldIssues(res), body.translations),
+    }
+  }
+
+  /**
+   * No mappable field means the failure keeps the form-level message it always
+   * had: a 500, a dead connection, or a 422 on a path with no field here.
+   */
+  function saveFailure(fieldErrors: ProblemFormError[]): SubmitOutcome {
+    if (fieldErrors.length === 0) setRootError(t('organizer.problemForm.errors.saveFailed'))
+    return { ok: false, fieldErrors }
   }
 
   function invalidate() {
@@ -63,33 +82,31 @@ function EditProblemScreen() {
     queryClient.invalidateQueries({ queryKey: PROBLEMS_QUERY_KEY })
   }
 
-  async function handleSave(values: ProblemFormValues) {
+  async function handleSave(values: ProblemFormValues): Promise<SubmitOutcome> {
     setIsSubmitting(true)
     setRootError(undefined)
     setSuccessMessage(undefined)
     try {
-      if (!(await patch(values))) {
-        setRootError(t('organizer.problemForm.errors.saveFailed'))
-        return
-      }
+      const outcome = await patch(values)
+      if (!outcome.ok) return saveFailure(outcome.fieldErrors)
+
       // PATCH never touches `status`, so a published problem stays published;
       // the screen stays put so the organizer can keep editing.
       invalidate()
       setSuccessMessage(t('organizer.problemForm.savedMessage'))
+      return { ok: true }
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  async function handlePublish(values: ProblemFormValues) {
+  async function handlePublish(values: ProblemFormValues): Promise<SubmitOutcome> {
     setIsSubmitting(true)
     setRootError(undefined)
     setSuccessMessage(undefined)
     try {
-      if (!(await patch(values))) {
-        setRootError(t('organizer.problemForm.errors.saveFailed'))
-        return
-      }
+      const outcome = await patch(values)
+      if (!outcome.ok) return saveFailure(outcome.fieldErrors)
 
       const published = await api.organizer.problems[':id'].publish.$post({ param: { id } })
       if (published.status !== 200) {
@@ -97,11 +114,12 @@ function EditProblemScreen() {
         // client-side pre-validation is what points at a tab or a field.
         const body = await published.json().catch(() => null)
         setRootError(body?.message ?? t('organizer.problemForm.errors.publishFailed'))
-        return
+        return { ok: false, fieldErrors: [] }
       }
 
       invalidate()
       navigate({ to: '/organizer/problems' })
+      return { ok: true }
     } finally {
       setIsSubmitting(false)
     }

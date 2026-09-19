@@ -107,6 +107,19 @@ HTTP 422
 [Asserts]
 jsonpath "$.error" == "validation_failed"
 
+# 4b. maxTeamSize over EVENT_MAX_TEAM_SIZE (#187) -> 422 naming the field,
+# not the 500 the int4 column used to raise. The organizer's screen reads this
+# `path` to put the message under the field, so assert the path, not just the
+# status. Nothing is written, so the restore below still sees the same row.
+PATCH {{host}}/organizer/event-config
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "maxTeamSize": 11 }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.body[0].path" == "maxTeamSize"
+
 # 5. Restore the seeded defaults, so this file is idempotent for reruns.
 PATCH {{host}}/organizer/event-config
 Authorization: Bearer {{organizer_token}}

@@ -36,8 +36,13 @@ export const PANEL_FIELD_ERROR = 'text-[13px] text-destructive'
 /**
  * JetBrains Mono 13/20 for editable JSON, test-case values and event codes
  * (`docs/design/identity.md` § 4).
+ *
+ * `md:text-[13px]` is not redundant: `ui/input.tsx` and `ui/textarea.tsx` both
+ * carry `md:text-sm`, and tailwind-merge does not drop a `md:` utility because
+ * of an unprefixed one — without this the fields measured 14 px from the
+ * breakpoint up, which the browser acceptance run caught.
  */
-export const PANEL_MONO = 'font-mono text-[13px] leading-5'
+export const PANEL_MONO = 'font-mono text-[13px] leading-5 md:text-[13px]'
 
 /**
  * The single `--brand`-filled button of a screen (§ 3, Regra 2): "Publicar" on

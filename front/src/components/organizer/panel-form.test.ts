@@ -41,10 +41,13 @@ describe('panel form class tokens', () => {
     expect(PANEL_SECTION_TITLE).toContain('uppercase')
   })
 
-  it('mono fields are JetBrains Mono 13/20', () => {
+  it('mono fields are JetBrains Mono 13/20, at every width', () => {
     expect(PANEL_MONO).toContain('font-mono')
     expect(PANEL_MONO).toContain('text-[13px]')
     expect(PANEL_MONO).toContain('leading-5')
+    // The primitives ship `md:text-sm`, which tailwind-merge keeps unless the
+    // override carries the same `md:` prefix.
+    expect(PANEL_MONO).toContain('md:text-[13px]')
   })
 
   it('the segmented control has a hairline and the paper-2 track', () => {

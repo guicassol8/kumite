@@ -135,12 +135,14 @@ function AlertDialogAction({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Action> &
   Pick<React.ComponentProps<typeof Button>, 'variant' | 'size'>) {
   return (
-    <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Action
-        data-slot="alert-dialog-action"
-        className={cn(className)}
-        {...props}
-      />
+    // `className` goes through `Button`, not onto the child: Radix's Slot only
+    // concatenates the two class strings, so a caller's `bg-brand` used to land
+    // next to the variant's `bg-primary` and lose on stylesheet order. Routed
+    // here it reaches `buttonVariants({ variant, size, className })`, where
+    // tailwind-merge drops the conflicting utility as it does for every other
+    // Button. No other caller passed a className, so nothing else changes.
+    <Button variant={variant} size={size} asChild className={className}>
+      <AlertDialogPrimitive.Action data-slot="alert-dialog-action" {...props} />
     </Button>
   )
 }

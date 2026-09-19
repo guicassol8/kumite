@@ -316,3 +316,96 @@ describe('OrganizerRoundsList', () => {
     }
   })
 })
+
+/** The element's classes as tokens — a substring match on the whole string
+ * hits things like `aria-invalid:border-destructive` by accident. */
+function classesOf(element: Element): string[] {
+  return [...element.classList]
+}
+
+/** The identity's destructive action: crimson draws the border and the text,
+ * never the surface (docs/design/identity.md § 3, Regra 1). */
+function expectCrimsonOutline(button: Element) {
+  const classes = classesOf(button)
+  expect(classes).toContain('border-destructive')
+  expect(classes).toContain('text-destructive')
+  expect(classes).not.toContain('bg-destructive')
+  expect(classes).not.toContain('bg-primary')
+}
+
+// #233 — the three round overlays.
+describe('organizer rounds — overlays in the panel identity (#233)', () => {
+  it('makes "Abrir rodada" the screen\'s only brand-filled button, and only inside its dialog', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [roundSummary()]))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-open-r1')).toBeDefined())
+    // Before the overlay opens the table carries no brand fill at all.
+    expect(
+      [...document.querySelectorAll('button')].filter((button) =>
+        classesOf(button).includes('bg-brand'),
+      ),
+    ).toHaveLength(0)
+
+    fireEvent.click(screen.getByTestId('organizer-rounds-open-r1'))
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-open-confirm')).toBeDefined())
+
+    const branded = [...document.querySelectorAll('button')].filter((button) =>
+      classesOf(button).includes('bg-brand'),
+    )
+    expect(branded).toHaveLength(1)
+    expect(branded[0]?.getAttribute('data-testid')).toBe('organizer-rounds-open-confirm')
+    // `bg-brand` being present is not enough: while `AlertDialogAction` passed
+    // the class to Radix's Slot, the variant's `bg-primary` stayed next to it
+    // and won on stylesheet order, so this very assertion passed with the
+    // button rendering in ink. Its absence is what proves the merge happened.
+    expect(classesOf(branded[0] as Element)).not.toContain('bg-primary')
+    expect(document.querySelector('[data-slot="alert-dialog-title"]')?.className).toContain(
+      'font-display',
+    )
+  })
+
+  it('puts "Encerrar rodada" in crimson outline', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [roundSummary({ status: 'open' })]))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-close-r1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('organizer-rounds-close-r1'))
+
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-close-confirm')).toBeDefined())
+    expectCrimsonOutline(screen.getByTestId('organizer-rounds-close-confirm'))
+  })
+
+  it('dresses the extend dialog and marks an invalid minutes field aria-invalid', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [roundSummary({ status: 'open' })]))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-extend-r1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('organizer-rounds-extend-r1'))
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-extend-dialog')).toBeDefined())
+
+    expect(document.querySelector('[data-slot="dialog-title"]')?.className).toContain(
+      'font-display',
+    )
+    const minutes = screen.getByTestId('organizer-rounds-extend-minutes')
+    const label = document.querySelector(`label[for="${minutes.getAttribute('id')}"]`)
+    expect(classesOf(label as Element)).toContain('text-[13px]')
+    expect(classesOf(label as Element)).toContain('font-medium')
+    // The description moved into DialogDescription, so Radix gets its
+    // aria-describedby instead of a loose paragraph.
+    expect(document.querySelector('[data-slot="dialog-description"]')).toBeTruthy()
+    // Extending is not destructive: the confirm stays ink.
+    expect(classesOf(screen.getByTestId('organizer-rounds-extend-confirm'))).toContain('bg-primary')
+
+    fireEvent.change(minutes, { target: { value: '0' } })
+    fireEvent.click(screen.getByTestId('organizer-rounds-extend-confirm'))
+
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-extend-error')).toBeDefined())
+    expect(screen.getByTestId('organizer-rounds-extend-minutes').getAttribute('aria-invalid')).toBe(
+      'true',
+    )
+    const message = screen.getByTestId('organizer-rounds-extend-error')
+    expect(classesOf(message)).toContain('text-[13px]')
+    expect(classesOf(message)).toContain('text-destructive')
+  })
+})

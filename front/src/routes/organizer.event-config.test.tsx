@@ -387,3 +387,121 @@ describe('organizer event config — identity (#223)', () => {
     expect(screen.getByTestId('event-config-codes-edit-pucrs')).toBeDefined()
   })
 })
+
+/** The element's classes as tokens — a substring match on the whole string
+ * hits things like `aria-invalid:border-destructive` by accident. */
+function classesOf(element: Element): string[] {
+  return [...element.classList]
+}
+
+function labelFor(testid: string): Element {
+  const field = screen.getByTestId(testid)
+  const id = field.getAttribute('id')
+  const label = id ? document.querySelector(`label[for="${id}"]`) : null
+  if (!label) throw new Error(`no label bound to ${testid}`)
+  return label
+}
+
+// #233 — the event-rule write surfaces. The codes table and the cards stay
+// with #223 and are asserted on above, untouched.
+describe('organizer event config — write surfaces in the panel identity (#233)', () => {
+  beforeEach(() => {
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+  })
+
+  it('renders the mixing and max-team-size labels at 13/500', async () => {
+    renderScreen()
+    await waitFor(() => expect(screen.getByTestId('event-config-mixing-switch')).toBeDefined())
+
+    for (const testid of ['event-config-mixing-switch', 'event-config-max-team-size-input']) {
+      const classes = classesOf(labelFor(testid))
+      expect(classes).toContain('text-[13px]')
+      expect(classes).toContain('font-medium')
+    }
+  })
+
+  it('paints a rejected max team size in 13 px crimson, outline only', async () => {
+    renderScreen()
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-max-team-size-input')).toBeDefined(),
+    )
+
+    fireEvent.change(screen.getByTestId('event-config-max-team-size-input'), {
+      target: { value: '999999999999' },
+    })
+    fireEvent.click(screen.getByTestId('event-config-max-team-size-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-max-team-size-error').textContent).toBeTruthy(),
+    )
+    const message = screen.getByTestId('event-config-max-team-size-error')
+    expect(classesOf(message)).toContain('text-[13px]')
+    expect(classesOf(message)).toContain('text-destructive')
+    expect(classesOf(message)).not.toContain('bg-destructive')
+    expect(
+      screen.getByTestId('event-config-max-team-size-input').getAttribute('aria-invalid'),
+    ).toBe('true')
+  })
+})
+
+// #233 — the two event-config overlays.
+describe('organizer event config — overlays in the panel identity (#233)', () => {
+  it('puts the mixing LOCK in crimson outline and leaves UNLOCK in ink', async () => {
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('event-config-mixing-switch')).toBeDefined())
+    fireEvent.click(screen.getByTestId('event-config-mixing-switch'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-mixing-confirm-confirm')).toBeDefined(),
+    )
+    const locking = screen.getByTestId('event-config-mixing-confirm-confirm')
+    expect(classesOf(locking)).toContain('border-destructive')
+    expect(classesOf(locking)).toContain('text-destructive')
+    expect(classesOf(locking)).not.toContain('bg-destructive')
+    expect(document.querySelector('[data-slot="alert-dialog-title"]')?.className).toContain(
+      'font-display',
+    )
+
+    cleanup()
+
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig({ mixingLocked: true })))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('event-config-mixing-switch')).toBeDefined())
+    fireEvent.click(screen.getByTestId('event-config-mixing-switch'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-mixing-confirm-confirm')).toBeDefined(),
+    )
+    const unlocking = screen.getByTestId('event-config-mixing-confirm-confirm')
+    expect(classesOf(unlocking)).toContain('bg-primary')
+    expect(classesOf(unlocking)).not.toContain('border-destructive')
+  })
+
+  it('dresses the event-code dialog: H2 title, 13/500 labels, mono code and suffixes', async () => {
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('event-config-codes-edit-pucrs')).toBeDefined())
+    fireEvent.click(screen.getByTestId('event-config-codes-edit-pucrs'))
+
+    await waitFor(() => expect(screen.getByTestId('event-config-codes-edit-dialog')).toBeDefined())
+    expect(document.querySelector('[data-slot="dialog-title"]')?.className).toContain(
+      'font-display',
+    )
+    expect(classesOf(labelFor('event-config-codes-edit-code'))).toContain('text-[13px]')
+    // § 4 puts event codes in Mono.
+    expect(classesOf(screen.getByTestId('event-config-codes-edit-code'))).toContain('font-mono')
+    expect(classesOf(screen.getByTestId('event-config-codes-edit-suffixes'))).toContain('font-mono')
+    // § 5: no shadow on the overlay.
+    expect(classesOf(screen.getByTestId('event-config-codes-edit-dialog'))).not.toContain(
+      'shadow-lg',
+    )
+  })
+})

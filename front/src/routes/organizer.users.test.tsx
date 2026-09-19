@@ -533,3 +533,63 @@ describe('organizer users — identity (#223)', () => {
     expect(screen.getByTestId('organizer-users-filter-university').className).toContain('w-full')
   })
 })
+
+/** The element's classes as tokens — a substring match on the whole string
+ * hits things like `aria-invalid:border-destructive` by accident. */
+function classesOf(element: Element): string[] {
+  return [...element.classList]
+}
+
+/** The identity's destructive action: crimson draws the border and the text,
+ * never the surface (docs/design/identity.md § 3, Regra 1). */
+function expectCrimsonOutline(button: Element) {
+  const classes = classesOf(button)
+  expect(classes).toContain('border-destructive')
+  expect(classes).toContain('text-destructive')
+  expect(classes).not.toContain('bg-destructive')
+  expect(classes).not.toContain('bg-primary')
+}
+
+// #233 — the user overlays. Only the destructive branch goes crimson.
+describe('organizer users — overlays in the panel identity (#233)', () => {
+  it('puts "Desativar" in crimson outline', async () => {
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u1')
+    fireEvent.click(screen.getByTestId('organizer-users-deactivate-u1'))
+
+    const confirm = await screen.findByTestId('organizer-users-confirm-confirm-u1')
+    expectCrimsonOutline(confirm)
+    expect(document.querySelector('[data-slot="alert-dialog-title"]')?.className).toContain(
+      'font-display',
+    )
+  })
+
+  it('leaves "Rebaixar" in ink — it is trivially reversible, not destructive', async () => {
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u2')
+    fireEvent.click(screen.getByTestId('organizer-users-demote-u2'))
+
+    const confirm = await screen.findByTestId('organizer-users-confirm-confirm-u2')
+    expect(classesOf(confirm)).toContain('bg-primary')
+    expect(classesOf(confirm)).not.toContain('border-destructive')
+  })
+
+  it('keeps the reset-password submit in ink and titles the dialog as an H2', async () => {
+    renderScreen()
+    await screen.findByTestId('organizer-users-row-u1')
+    fireEvent.click(screen.getByTestId('organizer-users-reset-password-u1'))
+
+    const submit = await screen.findByTestId('organizer-users-reset-password-submit-u1')
+    // Crimson would be the dialog's only action and would read as danger where
+    // the organizer is in fact restoring a participant's access.
+    expect(classesOf(submit)).not.toContain('border-destructive')
+    expect(classesOf(submit)).toContain('bg-primary')
+
+    expect(document.querySelector('[data-slot="dialog-title"]')?.className).toContain(
+      'font-display',
+    )
+    const input = screen.getByTestId('organizer-users-reset-password-admin-password-input-u1')
+    const label = document.querySelector(`label[for="${input.getAttribute('id')}"]`)
+    expect(classesOf(label as Element)).toContain('text-[13px]')
+  })
+})

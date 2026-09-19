@@ -380,3 +380,51 @@ describe('organizer teams — identity (#223)', () => {
     expect(screen.getByTestId('team-moderation-remove-member-action-u1')).toBeDefined()
   })
 })
+
+/** The element's classes as tokens — a substring match on the whole string
+ * hits things like `aria-invalid:border-destructive` by accident. */
+function classesOf(element: Element): string[] {
+  return [...element.classList]
+}
+
+/** The identity's destructive action: crimson draws the border and the text,
+ * never the surface (docs/design/identity.md § 3, Regra 1). */
+function expectCrimsonOutline(button: Element) {
+  const classes = classesOf(button)
+  expect(classes).toContain('border-destructive')
+  expect(classes).toContain('text-destructive')
+  expect(classes).not.toContain('bg-destructive')
+  expect(classes).not.toContain('bg-primary')
+}
+
+// #233 — the two team-moderation overlays.
+describe('organizer teams — overlays in the panel identity (#233)', () => {
+  it('puts "Remover integrante" in crimson outline, under an H2 title', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    renderScreen()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-member-action-u1')).toBeDefined(),
+    )
+    fireEvent.click(screen.getByTestId('team-moderation-remove-member-action-u1'))
+
+    const confirm = await screen.findByTestId('team-moderation-remove-member-confirm-confirm-u1')
+    expectCrimsonOutline(confirm)
+    expect(document.querySelector('[data-slot="alert-dialog-title"]')?.className).toContain(
+      'font-display',
+    )
+  })
+
+  it('puts "Remover time" in crimson outline, matching its own row trigger', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    renderScreen()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('team-moderation-remove-team-action-team-2')).toBeDefined(),
+    )
+    fireEvent.click(screen.getByTestId('team-moderation-remove-team-action-team-2'))
+
+    const confirm = await screen.findByTestId('team-moderation-remove-team-confirm-confirm-team-2')
+    expectCrimsonOutline(confirm)
+  })
+})

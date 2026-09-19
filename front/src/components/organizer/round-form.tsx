@@ -1,10 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
+import {
+  PANEL_FIELD_ERROR,
+  PANEL_FIELD_LABEL,
+  PANEL_SECTION_TITLE,
+} from '@/components/organizer/panel-form'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -143,11 +149,13 @@ export function RoundForm({
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('organizer.roundForm.nameLabel')}</FormLabel>
+              <FormLabel className={PANEL_FIELD_LABEL}>
+                {t('organizer.roundForm.nameLabel')}
+              </FormLabel>
               <FormControl>
                 <Input data-testid="round-form-name" {...field} />
               </FormControl>
-              <FormMessage data-testid="round-form-name-error" />
+              <FormMessage className={PANEL_FIELD_ERROR} data-testid="round-form-name-error" />
             </FormItem>
           )}
         />
@@ -157,7 +165,9 @@ export function RoundForm({
           name="durationMinutes"
           render={({ field }) => (
             <FormItem className="w-40">
-              <FormLabel>{t('organizer.roundForm.durationLabel')}</FormLabel>
+              <FormLabel className={PANEL_FIELD_LABEL}>
+                {t('organizer.roundForm.durationLabel')}
+              </FormLabel>
               <FormControl>
                 <Input
                   type="number"
@@ -170,13 +180,13 @@ export function RoundForm({
                   ref={field.ref}
                 />
               </FormControl>
-              <FormMessage data-testid="round-form-duration-error" />
+              <FormMessage className={PANEL_FIELD_ERROR} data-testid="round-form-duration-error" />
             </FormItem>
           )}
         />
 
         <section className="flex flex-col gap-3">
-          <h3 className="font-semibold text-lg">{t('organizer.roundForm.problemsHeading')}</h3>
+          <h3 className={PANEL_SECTION_TITLE}>{t('organizer.roundForm.problemsHeading')}</h3>
 
           {problems.isPending && (
             <p data-testid="round-form-problems-loading">{t('organizer.roundForm.loading')}</p>
@@ -203,7 +213,10 @@ export function RoundForm({
                   checked={checked}
                   onCheckedChange={(next) => toggleProblem(problem.id, next === true)}
                 />
-                <Label htmlFor={`round-form-problem-${problem.id}-checkbox`} className="flex-1">
+                <Label
+                  htmlFor={`round-form-problem-${problem.id}-checkbox`}
+                  className={`${PANEL_FIELD_LABEL} flex-1`}
+                >
                   {problemTitle(problem)}
                 </Label>
                 {checked && (
@@ -217,7 +230,7 @@ export function RoundForm({
                       data-testid={`round-form-problem-${problem.id}-up`}
                       onClick={() => moveSelected(problem.id, 'up')}
                     >
-                      ↑
+                      <ArrowUp aria-hidden="true" />
                     </Button>
                     <Button
                       type="button"
@@ -228,7 +241,7 @@ export function RoundForm({
                       data-testid={`round-form-problem-${problem.id}-down`}
                       onClick={() => moveSelected(problem.id, 'down')}
                     >
-                      ↓
+                      <ArrowDown aria-hidden="true" />
                     </Button>
                   </div>
                 )}

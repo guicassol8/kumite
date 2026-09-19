@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
+import { PANEL_FORM_HEADING } from '@/components/organizer/panel-form'
 import { ProblemForm } from '@/components/organizer/problem-form'
 import { api } from '@/lib/api'
 import { readFieldIssues } from '@/lib/api-issues'
@@ -118,7 +118,7 @@ function NewProblemScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="font-semibold text-xl">{t('organizer.problemForm.createTitle')}</h2>
+      <h2 className={PANEL_FORM_HEADING}>{t('organizer.problemForm.createTitle')}</h2>
       <ProblemForm
         initialValues={emptyProblemFormValues()}
         savedLocales={[]}

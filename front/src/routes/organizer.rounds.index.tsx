@@ -2,7 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
+import {
+  PANEL_BRAND_BUTTON,
+  PANEL_DIALOG_TITLE,
+  PANEL_FIELD_ERROR,
+  PANEL_FIELD_LABEL,
+} from '@/components/organizer/panel-form'
 import { PanelTable } from '@/components/organizer/panel-table'
 import { RoundCountdown } from '@/components/round-countdown'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -21,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -370,7 +376,9 @@ function OrganizerRoundsList() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('organizer.rounds.dialogs.open.title')}</AlertDialogTitle>
+            <AlertDialogTitle className={PANEL_DIALOG_TITLE}>
+              {t('organizer.rounds.dialogs.open.title')}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t('organizer.rounds.dialogs.open.description')}
             </AlertDialogDescription>
@@ -378,6 +386,7 @@ function OrganizerRoundsList() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t('organizer.rounds.dialogs.open.cancel')}</AlertDialogCancel>
             <AlertDialogAction
+              className={PANEL_BRAND_BUTTON}
               data-testid="organizer-rounds-open-confirm"
               onClick={() => {
                 if (openTargetId) open.mutate(openTargetId)
@@ -396,7 +405,9 @@ function OrganizerRoundsList() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('organizer.rounds.dialogs.close.title')}</AlertDialogTitle>
+            <AlertDialogTitle className={PANEL_DIALOG_TITLE}>
+              {t('organizer.rounds.dialogs.close.title')}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t('organizer.rounds.dialogs.close.description')}
             </AlertDialogDescription>
@@ -404,6 +415,7 @@ function OrganizerRoundsList() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t('organizer.rounds.dialogs.close.cancel')}</AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               data-testid="organizer-rounds-close-confirm"
               onClick={() => {
                 if (closeTargetId) close.mutate(closeTargetId)
@@ -422,13 +434,15 @@ function OrganizerRoundsList() {
       >
         <DialogContent data-testid="organizer-rounds-extend-dialog">
           <DialogHeader>
-            <DialogTitle>{t('organizer.rounds.dialogs.extend.title')}</DialogTitle>
+            <DialogTitle className={PANEL_DIALOG_TITLE}>
+              {t('organizer.rounds.dialogs.extend.title')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('organizer.rounds.dialogs.extend.description')}
+            </DialogDescription>
           </DialogHeader>
-          <p className="text-muted-foreground text-sm">
-            {t('organizer.rounds.dialogs.extend.description')}
-          </p>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="organizer-rounds-extend-minutes">
+            <Label htmlFor="organizer-rounds-extend-minutes" className={PANEL_FIELD_LABEL}>
               {t('organizer.rounds.dialogs.extend.minutesLabel')}
             </Label>
             <Input
@@ -436,6 +450,7 @@ function OrganizerRoundsList() {
               type="number"
               min={1}
               data-testid="organizer-rounds-extend-minutes"
+              aria-invalid={extendMinutesError !== null}
               value={extendMinutes}
               onChange={(event) => {
                 setExtendMinutes(event.target.value)
@@ -443,7 +458,7 @@ function OrganizerRoundsList() {
               }}
             />
             {extendMinutesError && (
-              <p className="text-destructive text-sm" data-testid="organizer-rounds-extend-error">
+              <p className={PANEL_FIELD_ERROR} data-testid="organizer-rounds-extend-error">
                 {extendMinutesError}
               </p>
             )}

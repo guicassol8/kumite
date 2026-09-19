@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
+import { PANEL_DIALOG_TITLE } from '@/components/organizer/panel-form'
 import { PanelTable } from '@/components/organizer/panel-table'
 import {
   AlertDialog,
@@ -217,7 +217,9 @@ function OrganizerProblemsList() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('organizer.problems.archiveDialog.title')}</AlertDialogTitle>
+            <AlertDialogTitle className={PANEL_DIALOG_TITLE}>
+              {t('organizer.problems.archiveDialog.title')}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t('organizer.problems.archiveDialog.description')}
             </AlertDialogDescription>
@@ -225,6 +227,7 @@ function OrganizerProblemsList() {
           <AlertDialogFooter>
             <AlertDialogCancel>{t('organizer.problems.archiveDialog.cancel')}</AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               data-testid="organizer-problems-archive-confirm"
               onClick={() => {
                 if (archiveTargetId) archive.mutate(archiveTargetId)

@@ -127,4 +127,14 @@ describe('NewRoundScreen', () => {
     )
     expect(router.state.location.pathname).toBe('/organizer/rounds/new')
   })
+
+  // #233 — the form routes wear the same H2 as the listings restyled by #223.
+  it('renders the screen heading in the display face, upper case', async () => {
+    renderNewRound()
+    await waitFor(() => expect(screen.getByTestId('round-form')).toBeDefined())
+
+    const heading = document.querySelector('h2')
+    expect(heading?.className).toContain('font-display')
+    expect(heading?.className).toContain('uppercase')
+  })
 })

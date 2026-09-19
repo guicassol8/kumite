@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { KeyRound, ShieldMinus, ShieldPlus, UserCheck, UserX } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PANEL_DIALOG_TITLE, PANEL_FIELD_LABEL } from '@/components/organizer/panel-form'
 import { PANEL_EYEBROW, PanelTable } from '@/components/organizer/panel-table'
 import { UniversityBadge } from '@/components/teams/university-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -473,7 +474,7 @@ function UserRowActions({
       <AlertDialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
         <AlertDialogContent data-testid={`organizer-users-confirm-${user.id}`}>
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className={PANEL_DIALOG_TITLE}>
               {t(`organizer.users.actions.confirm.${confirming ?? 'demote'}.title`)}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -485,6 +486,9 @@ function UserRowActions({
               {t('organizer.users.actions.confirm.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
+              // Só desativar é destrutivo; rebaixar é trivialmente
+              // reversível e sai em tinta (docs/design/identity.md § 3).
+              variant={confirming === 'deactivate' ? 'destructive' : 'default'}
               data-testid={`organizer-users-confirm-confirm-${user.id}`}
               onClick={() => confirming && perform(confirming)}
             >
@@ -673,7 +677,7 @@ function ResetPasswordAction({
           {temporaryPassword === null ? (
             <>
               <DialogHeader>
-                <DialogTitle>
+                <DialogTitle className={PANEL_DIALOG_TITLE}>
                   {t('organizer.users.actions.reset.title', { email: user.email })}
                 </DialogTitle>
                 <DialogDescription>
@@ -681,7 +685,7 @@ function ResetPasswordAction({
                 </DialogDescription>
               </DialogHeader>
               <div className="flex flex-col gap-2">
-                <Label htmlFor={`reset-admin-password-${user.id}`}>
+                <Label htmlFor={`reset-admin-password-${user.id}`} className={PANEL_FIELD_LABEL}>
                   {t('organizer.users.actions.reset.adminPasswordLabel')}
                 </Label>
                 <PasswordInput
@@ -724,7 +728,9 @@ function ResetPasswordAction({
               data-testid={`organizer-users-reset-password-result-${user.id}`}
             >
               <DialogHeader>
-                <DialogTitle>{t('organizer.users.actions.reset.result.title')}</DialogTitle>
+                <DialogTitle className={PANEL_DIALOG_TITLE}>
+                  {t('organizer.users.actions.reset.result.title')}
+                </DialogTitle>
                 <DialogDescription>
                   {t('organizer.users.actions.reset.result.warning')}
                 </DialogDescription>

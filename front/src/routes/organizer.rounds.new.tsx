@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
+import { PANEL_FORM_HEADING } from '@/components/organizer/panel-form'
 import { RoundForm, type RoundFormValues } from '@/components/organizer/round-form'
 import { api } from '@/lib/api'
 
@@ -49,7 +49,7 @@ function NewRoundScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="font-semibold text-xl">{t('organizer.roundForm.createTitle')}</h2>
+      <h2 className={PANEL_FORM_HEADING}>{t('organizer.roundForm.createTitle')}</h2>
       <RoundForm
         initialValues={emptyRoundFormValues()}
         isSubmitting={isSubmitting}

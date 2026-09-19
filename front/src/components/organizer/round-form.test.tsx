@@ -158,3 +158,71 @@ describe('RoundForm', () => {
     )
   })
 })
+
+/** The element's classes as tokens — a substring match on the whole string
+ * hits things like `aria-invalid:border-destructive` by accident. */
+function classesOf(element: Element): string[] {
+  return [...element.classList]
+}
+
+function labelFor(testid: string): Element {
+  const field = screen.getByTestId(testid)
+  const id = field.getAttribute('id')
+  const label = id ? document.querySelector(`label[for="${id}"]`) : null
+  if (!label) throw new Error(`no label bound to ${testid}`)
+  return label
+}
+
+// #233 — the round form in the new identity.
+describe('RoundForm in the panel identity', () => {
+  it('has no brand-red button: "Abrir rodada" lives in its own dialog, not here', async () => {
+    renderForm()
+    await waitFor(() => expect(screen.getByTestId('round-form')).toBeDefined())
+
+    const branded = [...screen.getByTestId('round-form').querySelectorAll('button')].filter(
+      (button) => classesOf(button).includes('bg-brand'),
+    )
+    expect(branded).toHaveLength(0)
+    expect(classesOf(screen.getByTestId('round-form-save'))).toContain('bg-primary')
+  })
+
+  it('renders field labels at 13/500', async () => {
+    renderForm()
+    await waitFor(() => expect(screen.getByTestId('round-form')).toBeDefined())
+
+    for (const testid of ['round-form-name', 'round-form-duration']) {
+      const classes = classesOf(labelFor(testid))
+      expect(classes).toContain('text-[13px]')
+      expect(classes).toContain('font-medium')
+    }
+  })
+
+  it('paints a rejected duration with a crimson outline and 13 px crimson text', async () => {
+    renderForm()
+    await waitFor(() => expect(screen.getByTestId('round-form')).toBeDefined())
+
+    fireEvent.change(screen.getByTestId('round-form-duration'), { target: { value: '0' } })
+    fireEvent.click(screen.getByTestId('round-form-save'))
+
+    await waitFor(() => expect(screen.getByTestId('round-form-duration-error')).toBeTruthy())
+    const message = screen.getByTestId('round-form-duration-error')
+    expect(classesOf(message)).toContain('text-[13px]')
+    expect(classesOf(message)).toContain('text-destructive')
+    expect(classesOf(message)).not.toContain('bg-destructive')
+    expect(screen.getByTestId('round-form-duration').getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('reorders with Lucide arrows instead of glyphs', async () => {
+    renderForm({ initialValues: { name: 'Final', durationMinutes: 30, problemIds: ['p1', 'p2'] } })
+    await waitFor(() => expect(screen.getByTestId('round-form-problem-p1-up')).toBeDefined())
+
+    const up = screen.getByTestId('round-form-problem-p2-up')
+    expect(up.textContent).not.toContain('↑')
+    expect(up.querySelector('svg')).toBeTruthy()
+    expect(up.getAttribute('aria-label')).toBeTruthy()
+
+    const down = screen.getByTestId('round-form-problem-p1-down')
+    expect(down.textContent).not.toContain('↓')
+    expect(down.querySelector('svg')).toBeTruthy()
+  })
+})

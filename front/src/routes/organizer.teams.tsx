@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ArrowRightLeft, Check, Pencil, UserMinus, X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { PANEL_DIALOG_TITLE } from '@/components/organizer/panel-form'
 import { PanelTable } from '@/components/organizer/panel-table'
 import { UniversityBadge } from '@/components/teams/university-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -417,7 +418,7 @@ function RemoveMemberAction({ userId, onRemoved }: { userId: string; onRemoved: 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent data-testid={`team-moderation-remove-member-confirm-${userId}`}>
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className={PANEL_DIALOG_TITLE}>
               {t('organizer.teamModeration.removeMember.confirm.title')}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -431,6 +432,7 @@ function RemoveMemberAction({ userId, onRemoved }: { userId: string; onRemoved: 
               {t('organizer.teamModeration.removeMember.confirm.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               data-testid={`team-moderation-remove-member-confirm-confirm-${userId}`}
               onClick={onConfirm}
             >
@@ -482,7 +484,7 @@ function RemoveTeamAction({ teamId, onRemoved }: { teamId: string; onRemoved: ()
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent data-testid={`team-moderation-remove-team-confirm-${teamId}`}>
           <AlertDialogHeader>
-            <AlertDialogTitle>
+            <AlertDialogTitle className={PANEL_DIALOG_TITLE}>
               {t('organizer.teamModeration.removeTeam.confirm.title')}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -494,6 +496,7 @@ function RemoveTeamAction({ teamId, onRemoved }: { teamId: string; onRemoved: ()
               {t('organizer.teamModeration.removeTeam.confirm.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               data-testid={`team-moderation-remove-team-confirm-confirm-${teamId}`}
               onClick={onConfirm}
             >

@@ -528,3 +528,144 @@ describe('ProblemForm', () => {
     expect(screen.getByTestId('problem-form-error').textContent).toContain('Tente novamente')
   })
 })
+
+/** The element's classes as tokens — a substring match on the whole string
+ * hits things like `aria-invalid:border-destructive` by accident. */
+function classesOf(element: Element): string[] {
+  return [...element.classList]
+}
+
+/** The label element bound to a control, via its `id`. */
+function labelFor(testid: string): Element {
+  const field = screen.getByTestId(testid)
+  const id = field.getAttribute('id')
+  const label = id ? document.querySelector(`label[for="${id}"]`) : null
+  if (!label) throw new Error(`no label bound to ${testid}`)
+  return label
+}
+
+// #233 — the problem form in the new identity.
+describe('ProblemForm in the panel identity', () => {
+  it('makes Publicar the only button filled in brand red', () => {
+    renderForm({ status: 'draft' })
+
+    const form = screen.getByTestId('problem-form')
+    expect(classesOf(screen.getByTestId('problem-form-publish'))).toContain('bg-brand')
+
+    const branded = [...form.querySelectorAll('button')].filter((button) =>
+      classesOf(button).includes('bg-brand'),
+    )
+    expect(branded).toHaveLength(1)
+
+    const save = screen.getByTestId('problem-form-save')
+    expect(classesOf(save)).toContain('bg-primary')
+    expect(classesOf(save)).not.toContain('bg-brand')
+  })
+
+  it('renders field labels at 13/500', () => {
+    renderForm()
+
+    for (const testid of ['problem-form-points', 'problem-form-title-pt']) {
+      const classes = classesOf(labelFor(testid))
+      expect(classes).toContain('text-[13px]')
+      expect(classes).toContain('font-medium')
+    }
+  })
+
+  it('paints a rejected field with a crimson outline and 13 px crimson text', async () => {
+    const onSave = accepts()
+    render(
+      <ProblemForm
+        initialValues={ptOnly()}
+        savedLocales={[]}
+        onSave={onSave}
+        onPublish={accepts()}
+      />,
+    )
+
+    fireEvent.change(screen.getByTestId('problem-form-points'), { target: { value: '0' } })
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() => expect(screen.getByTestId('problem-form-points-error')).toBeTruthy())
+    const message = screen.getByTestId('problem-form-points-error')
+    expect(classesOf(message)).toContain('text-[13px]')
+    expect(classesOf(message)).toContain('text-destructive')
+    expect(screen.getByTestId('problem-form-points').getAttribute('aria-invalid')).toBe('true')
+    // The outline is the whole error signal — no red fill anywhere.
+    expect(classesOf(message)).not.toContain('bg-destructive')
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  // By slot, not by name: this also pins the two nodes #187 added
+  // (`problem-form-difficulty-error`, `problem-form-case-0-hidden-error`) and
+  // any that appear later, without enumerating them.
+  it('gives every form-message slot the 13 px crimson treatment', async () => {
+    renderForm({
+      initialValues: valuesWith({
+        translations: { pt: { title: 'Soma', statementMd: 'Some.' } },
+        testCases: [{ input: '[1]', expected: '1', hidden: false }],
+      }),
+    })
+
+    fireEvent.change(screen.getByTestId('problem-form-points'), { target: { value: '0' } })
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+    await waitFor(() => expect(screen.getByTestId('problem-form-points-error')).toBeTruthy())
+
+    const messages = [
+      ...screen.getByTestId('problem-form').querySelectorAll('[data-slot="form-message"]'),
+    ]
+    expect(messages.length).toBeGreaterThan(0)
+    for (const message of messages) {
+      expect(classesOf(message)).toContain('text-[13px]')
+      expect(classesOf(message)).toContain('text-destructive')
+    }
+  })
+
+  it('sets test-case values and the statement in mono', () => {
+    renderForm({
+      initialValues: valuesWith({
+        translations: { pt: { title: 'Soma', statementMd: 'Some.' } },
+        testCases: [{ input: '[1]', expected: '1', hidden: false }],
+      }),
+    })
+
+    for (const testid of [
+      'problem-form-case-0-input',
+      'problem-form-case-0-expected',
+      'problem-form-statement-pt',
+    ]) {
+      expect(classesOf(screen.getByTestId(testid))).toContain('font-mono')
+    }
+  })
+
+  it('reorders with Lucide arrows instead of glyphs, keeping the accessible names', () => {
+    renderForm({
+      initialValues: valuesWith({
+        translations: { pt: { title: 'Soma', statementMd: 'Some.' } },
+        testCases: [
+          { input: '[1]', expected: '1', hidden: false },
+          { input: '[2]', expected: '2', hidden: false },
+        ],
+      }),
+    })
+
+    const up = screen.getByTestId('problem-form-case-1-up')
+    expect(up.textContent).not.toContain('↑')
+    expect(up.querySelector('svg')).toBeTruthy()
+    expect(up.getAttribute('aria-label')).toBeTruthy()
+
+    const down = screen.getByTestId('problem-form-case-0-down')
+    expect(down.textContent).not.toContain('↓')
+    expect(down.querySelector('svg')).toBeTruthy()
+  })
+
+  it('keeps the invalid-tab hint while wearing the segmented control', () => {
+    renderForm({
+      initialValues: valuesWith({ translations: { pt: { title: '', statementMd: '' } } }),
+    })
+
+    const tab = screen.getByTestId('problem-form-tab-pt')
+    expect(classesOf(tab)).toContain('data-[invalid=true]:text-destructive')
+    expect(classesOf(tab)).toContain('text-[13px]')
+  })
+})

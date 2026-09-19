@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-
+import { PANEL_FORM_HEADING } from '@/components/organizer/panel-form'
 import { RoundForm, type RoundFormValues } from '@/components/organizer/round-form'
 import { api } from '@/lib/api'
 
@@ -96,7 +96,7 @@ function EditRoundScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="font-semibold text-xl">{t('organizer.roundForm.editTitle')}</h2>
+      <h2 className={PANEL_FORM_HEADING}>{t('organizer.roundForm.editTitle')}</h2>
 
       {round.isPending && (
         <p data-testid="round-form-loading">{t('organizer.roundForm.loading')}</p>

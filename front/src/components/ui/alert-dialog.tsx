@@ -46,8 +46,11 @@ function AlertDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         data-size={size}
+        // Sem `shadow-lg` (docs/design/identity.md § 5: "Hairlines de 1 px,
+        // sem sombra alem do anel de foco"). A separacao do fundo continua
+        // vindo do overlay `bg-black/50`, nao de uma sombra difusa.
         className={cn(
-          'group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[size=sm]:max-w-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-lg',
+          'group/alert-dialog-content fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 duration-200 data-[size=sm]:max-w-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-lg',
           className,
         )}
         {...props}
@@ -132,12 +135,15 @@ function AlertDialogAction({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Action> &
   Pick<React.ComponentProps<typeof Button>, 'variant' | 'size'>) {
   return (
-    <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Action
-        data-slot="alert-dialog-action"
-        className={cn(className)}
-        {...props}
-      />
+    // `className` goes through `Button`, not onto the child: Radix's Slot only
+    // concatenates the two class strings, so a caller's `bg-brand` used to land
+    // next to the variant's `bg-primary` and lose on stylesheet order. Routed
+    // here it reaches `buttonVariants({ variant, size, className })`, where
+    // tailwind-merge drops the conflicting utility as it does for every other
+    // Button. `AlertDialogCancel` below is routed the same way, so the two
+    // siblings cannot drift back apart.
+    <Button variant={variant} size={size} asChild className={className}>
+      <AlertDialogPrimitive.Action data-slot="alert-dialog-action" {...props} />
     </Button>
   )
 }
@@ -150,12 +156,12 @@ function AlertDialogCancel({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Cancel> &
   Pick<React.ComponentProps<typeof Button>, 'variant' | 'size'>) {
   return (
-    <Button variant={variant} size={size} asChild>
-      <AlertDialogPrimitive.Cancel
-        data-slot="alert-dialog-cancel"
-        className={cn(className)}
-        {...props}
-      />
+    // Same routing as `AlertDialogAction` above, and for the same reason: on
+    // the Slot a caller's class would only sit beside the variant's, not
+    // replace it. No caller passes one today, so this changes nothing now and
+    // keeps the next one from hitting the bug the panel's brand button hit.
+    <Button variant={variant} size={size} asChild className={className}>
+      <AlertDialogPrimitive.Cancel data-slot="alert-dialog-cancel" {...props} />
     </Button>
   )
 }

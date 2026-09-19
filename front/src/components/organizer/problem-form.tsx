@@ -1,8 +1,18 @@
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useState } from 'react'
 import { type FieldPath, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 
 import { MarkdownPreview } from '@/components/markdown-preview'
+import {
+  PANEL_BRAND_BUTTON,
+  PANEL_FIELD_ERROR,
+  PANEL_FIELD_LABEL,
+  PANEL_MONO,
+  PANEL_SECTION_TITLE,
+  PANEL_SEG_LIST,
+  PANEL_SEG_TRIGGER,
+} from '@/components/organizer/panel-form'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -215,7 +225,9 @@ export function ProblemForm({
             name="difficulty"
             render={({ field }) => (
               <FormItem className="w-40">
-                <FormLabel>{t('organizer.problemForm.difficultyLabel')}</FormLabel>
+                <FormLabel className={PANEL_FIELD_LABEL}>
+                  {t('organizer.problemForm.difficultyLabel')}
+                </FormLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <FormControl>
                     <SelectTrigger data-testid="problem-form-difficulty">
@@ -238,7 +250,10 @@ export function ProblemForm({
                     produce an invalid value — but the 422 mapping is generic by
                     path, so without a node here a rejection on `difficulty`
                     would set an error with nothing to render it. */}
-                <FormMessage data-testid="problem-form-difficulty-error" />
+                <FormMessage
+                  className={PANEL_FIELD_ERROR}
+                  data-testid="problem-form-difficulty-error"
+                />
               </FormItem>
             )}
           />
@@ -248,7 +263,9 @@ export function ProblemForm({
             name="points"
             render={({ field }) => (
               <FormItem className="w-32">
-                <FormLabel>{t('organizer.problemForm.pointsLabel')}</FormLabel>
+                <FormLabel className={PANEL_FIELD_LABEL}>
+                  {t('organizer.problemForm.pointsLabel')}
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -262,7 +279,10 @@ export function ProblemForm({
                     ref={field.ref}
                   />
                 </FormControl>
-                <FormMessage data-testid="problem-form-points-error" />
+                <FormMessage
+                  className={PANEL_FIELD_ERROR}
+                  data-testid="problem-form-points-error"
+                />
               </FormItem>
             )}
           />
@@ -275,7 +295,7 @@ export function ProblemForm({
         </div>
 
         <Tabs value={activeLocale} onValueChange={(value) => setActiveLocale(value as UiLocale)}>
-          <TabsList>
+          <TabsList className={PANEL_SEG_LIST}>
             {FORM_LOCALES.map((locale) => {
               const localeErrors = errors.translations?.[locale]
               const invalid = Boolean(localeErrors?.title || localeErrors?.statementMd)
@@ -285,7 +305,7 @@ export function ProblemForm({
                   value={locale}
                   data-testid={`problem-form-tab-${locale}`}
                   data-invalid={invalid}
-                  className="data-[invalid=true]:text-destructive"
+                  className={`${PANEL_SEG_TRIGGER} data-[invalid=true]:text-destructive`}
                 >
                   {t(`language.${locale}`)}
                   {invalid && <span aria-hidden="true">•</span>}
@@ -301,11 +321,16 @@ export function ProblemForm({
                 name={`translations.${locale}.title`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('organizer.problemForm.titleLabel')}</FormLabel>
+                    <FormLabel className={PANEL_FIELD_LABEL}>
+                      {t('organizer.problemForm.titleLabel')}
+                    </FormLabel>
                     <FormControl>
                       <Input data-testid={`problem-form-title-${locale}`} {...field} />
                     </FormControl>
-                    <FormMessage data-testid={`problem-form-title-${locale}-error`} />
+                    <FormMessage
+                      className={PANEL_FIELD_ERROR}
+                      data-testid={`problem-form-title-${locale}-error`}
+                    />
                   </FormItem>
                 )}
               />
@@ -315,12 +340,14 @@ export function ProblemForm({
                 name={`translations.${locale}.statementMd`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('organizer.problemForm.statementLabel')}</FormLabel>
+                    <FormLabel className={PANEL_FIELD_LABEL}>
+                      {t('organizer.problemForm.statementLabel')}
+                    </FormLabel>
                     <div className="grid gap-4 md:grid-cols-2">
                       <FormControl>
                         <Textarea
                           rows={14}
-                          className="font-mono text-sm"
+                          className={PANEL_MONO}
                           data-testid={`problem-form-statement-${locale}`}
                           {...field}
                         />
@@ -336,7 +363,10 @@ export function ProblemForm({
                         />
                       </div>
                     </div>
-                    <FormMessage data-testid={`problem-form-statement-${locale}-error`} />
+                    <FormMessage
+                      className={PANEL_FIELD_ERROR}
+                      data-testid={`problem-form-statement-${locale}-error`}
+                    />
                   </FormItem>
                 )}
               />
@@ -345,7 +375,7 @@ export function ProblemForm({
         </Tabs>
 
         <section className="flex flex-col gap-3">
-          <h3 className="font-semibold text-lg">{t('organizer.problemForm.testCases.heading')}</h3>
+          <h3 className={PANEL_SECTION_TITLE}>{t('organizer.problemForm.testCases.heading')}</h3>
 
           {testCases.length === 0 && (
             <p className="text-muted-foreground text-sm" data-testid="problem-form-cases-empty">
@@ -370,10 +400,12 @@ export function ProblemForm({
                   name={`testCases.${index}.${field}`}
                   render={({ field: controlled }) => (
                     <FormItem>
-                      <FormLabel>{t(`organizer.problemForm.testCases.columns.${field}`)}</FormLabel>
+                      <FormLabel className={PANEL_FIELD_LABEL}>
+                        {t(`organizer.problemForm.testCases.columns.${field}`)}
+                      </FormLabel>
                       <FormControl>
                         <Input
-                          className="font-mono text-sm"
+                          className={PANEL_MONO}
                           data-testid={`problem-form-case-${index}-${field}`}
                           {...controlled}
                           onBlur={() => {
@@ -382,7 +414,10 @@ export function ProblemForm({
                           }}
                         />
                       </FormControl>
-                      <FormMessage data-testid={`problem-form-case-${index}-${field}-error`} />
+                      <FormMessage
+                        className={PANEL_FIELD_ERROR}
+                        data-testid={`problem-form-case-${index}-${field}-error`}
+                      />
                     </FormItem>
                   )}
                 />
@@ -400,14 +435,20 @@ export function ProblemForm({
                         checked={field.value}
                         onCheckedChange={(checked) => field.onChange(checked === true)}
                       />
-                      <Label htmlFor={`problem-form-case-${index}-hidden`}>
+                      <Label
+                        htmlFor={`problem-form-case-${index}-hidden`}
+                        className={PANEL_FIELD_LABEL}
+                      >
                         {t('organizer.problemForm.testCases.columns.hidden')}
                       </Label>
                     </div>
                     {/* Same reason as difficulty above: a Checkbox cannot send
                         a non-boolean, but the generic path mapping can still
                         land an error here and it needs somewhere to appear. */}
-                    <FormMessage data-testid={`problem-form-case-${index}-hidden-error`} />
+                    <FormMessage
+                      className={PANEL_FIELD_ERROR}
+                      data-testid={`problem-form-case-${index}-hidden-error`}
+                    />
                   </FormItem>
                 )}
               />
@@ -422,7 +463,7 @@ export function ProblemForm({
                   data-testid={`problem-form-case-${index}-up`}
                   onClick={() => updateTestCases(moveTestCase(testCases, index, 'up'))}
                 >
-                  ↑
+                  <ArrowUp aria-hidden="true" />
                 </Button>
                 <Button
                   type="button"
@@ -433,7 +474,7 @@ export function ProblemForm({
                   data-testid={`problem-form-case-${index}-down`}
                   onClick={() => updateTestCases(moveTestCase(testCases, index, 'down'))}
                 >
-                  ↓
+                  <ArrowDown aria-hidden="true" />
                 </Button>
                 <Button
                   type="button"
@@ -451,7 +492,7 @@ export function ProblemForm({
           ))}
 
           {caseSectionError && (
-            <p data-testid="problem-form-cases-error" className="text-destructive text-sm">
+            <p data-testid="problem-form-cases-error" className={PANEL_FIELD_ERROR}>
               {caseSectionError}
             </p>
           )}
@@ -504,7 +545,7 @@ export function ProblemForm({
                 >
                   <Button
                     type="button"
-                    variant="secondary"
+                    className={PANEL_BRAND_BUTTON}
                     data-testid="problem-form-publish"
                     disabled={isSubmitting || publishDisabledReason !== null}
                     onClick={() => submit(validateForPublish, onPublish)}

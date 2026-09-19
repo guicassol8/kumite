@@ -295,8 +295,25 @@ test.describe('organizer panel forms and dialogs in the identity (#233)', () => 
     }, brand)
     expect(branded).toEqual(['problem-form-publish'])
 
-    // The statement and the case values are Mono.
-    await expect(page.getByTestId('problem-form-statement-pt')).toHaveCSS('font-size', '13px')
+    // The statement and the case values are Mono, at 13 px — asserted at a
+    // desktop width on purpose: `ui/input.tsx` and `ui/textarea.tsx` carry
+    // `md:text-sm`, and tailwind-merge does not drop a `md:` utility for an
+    // unprefixed one, so only `PANEL_MONO`'s own `md:text-[13px]` keeps these
+    // at 13 px from the breakpoint up. Below `md` they would pass either way.
+    const statement = page.getByTestId('problem-form-statement-pt')
+    await expect(statement).toHaveCSS('font-size', '13px')
+    expect(
+      (await statement.evaluate((node) => getComputedStyle(node).fontFamily)).toLowerCase(),
+    ).toContain('mono')
+
+    await page.getByTestId('problem-form-add-case').click()
+    for (const field of ['input', 'expected'] as const) {
+      const cell = page.getByTestId(`problem-form-case-0-${field}`)
+      await expect(cell).toHaveCSS('font-size', '13px')
+      expect(
+        (await cell.evaluate((node) => getComputedStyle(node).fontFamily)).toLowerCase(),
+      ).toContain('mono')
+    }
 
     await capture(page, '01-problema-formulario-desktop')
 

@@ -387,3 +387,60 @@ describe('organizer event config — identity (#223)', () => {
     expect(screen.getByTestId('event-config-codes-edit-pucrs')).toBeDefined()
   })
 })
+
+/** The element's classes as tokens — a substring match on the whole string
+ * hits things like `aria-invalid:border-destructive` by accident. */
+function classesOf(element: Element): string[] {
+  return [...element.classList]
+}
+
+function labelFor(testid: string): Element {
+  const field = screen.getByTestId(testid)
+  const id = field.getAttribute('id')
+  const label = id ? document.querySelector(`label[for="${id}"]`) : null
+  if (!label) throw new Error(`no label bound to ${testid}`)
+  return label
+}
+
+// #233 — the event-rule write surfaces. The codes table and the cards stay
+// with #223 and are asserted on above, untouched.
+describe('organizer event config — write surfaces in the panel identity (#233)', () => {
+  beforeEach(() => {
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+  })
+
+  it('renders the mixing and max-team-size labels at 13/500', async () => {
+    renderScreen()
+    await waitFor(() => expect(screen.getByTestId('event-config-mixing-switch')).toBeDefined())
+
+    for (const testid of ['event-config-mixing-switch', 'event-config-max-team-size-input']) {
+      const classes = classesOf(labelFor(testid))
+      expect(classes).toContain('text-[13px]')
+      expect(classes).toContain('font-medium')
+    }
+  })
+
+  it('paints a rejected max team size in 13 px crimson, outline only', async () => {
+    renderScreen()
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-max-team-size-input')).toBeDefined(),
+    )
+
+    fireEvent.change(screen.getByTestId('event-config-max-team-size-input'), {
+      target: { value: '999999999999' },
+    })
+    fireEvent.click(screen.getByTestId('event-config-max-team-size-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('event-config-max-team-size-error').textContent).toBeTruthy(),
+    )
+    const message = screen.getByTestId('event-config-max-team-size-error')
+    expect(classesOf(message)).toContain('text-[13px]')
+    expect(classesOf(message)).toContain('text-destructive')
+    expect(classesOf(message)).not.toContain('bg-destructive')
+    expect(
+      screen.getByTestId('event-config-max-team-size-input').getAttribute('aria-invalid'),
+    ).toBe('true')
+  })
+})

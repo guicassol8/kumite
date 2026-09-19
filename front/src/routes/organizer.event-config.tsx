@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
+import { PANEL_FIELD_ERROR, PANEL_FIELD_LABEL } from '@/components/organizer/panel-form'
 import { PanelTable } from '@/components/organizer/panel-table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -177,7 +178,7 @@ function TeamRulesSection({ eventConfig }: { eventConfig: EventConfig }) {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <Label htmlFor="event-config-mixing-switch">
+          <Label htmlFor="event-config-mixing-switch" className={PANEL_FIELD_LABEL}>
             {t('organizer.eventConfig.teamRules.mixingLabel')}
           </Label>
           <p className="text-muted-foreground text-sm">
@@ -319,7 +320,9 @@ function MaxTeamSizeForm({
           name="maxTeamSize"
           render={({ field }) => (
             <FormItem className="w-48">
-              <FormLabel>{t('organizer.eventConfig.teamRules.maxTeamSizeLabel')}</FormLabel>
+              <FormLabel className={PANEL_FIELD_LABEL}>
+                {t('organizer.eventConfig.teamRules.maxTeamSizeLabel')}
+              </FormLabel>
               <FormControl>
                 <Input
                   type="number"
@@ -335,7 +338,10 @@ function MaxTeamSizeForm({
                   ref={field.ref}
                 />
               </FormControl>
-              <FormMessage data-testid="event-config-max-team-size-error" />
+              <FormMessage
+                className={PANEL_FIELD_ERROR}
+                data-testid="event-config-max-team-size-error"
+              />
             </FormItem>
           )}
         />

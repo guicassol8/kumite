@@ -37,17 +37,26 @@ const HANDLE_SELECTOR = '.injectionDiv .blocklyScrollbarHandle'
 /**
  * 1280x600: the event's notebooks, minus browser chrome. The height matters —
  * the spec is only meaningful while the flyout actually overflows and Blockly
- * really draws a handle for it. At 720px tall no curated category overflows,
- * the handle is 0px high, and the ghost is an empty box: the bug is there in
- * the DOM but invisible, and every assertion would pass vacuously.
+ * really draws a handle for it. Measured across 900/800/720/700/650/600/560px
+ * of viewport height, the first overflow appears between 650 and 600: at 650
+ * and taller *no* curated category overflows, the handle is 0px high, and the
+ * ghost is an empty box — the bug is there in the DOM but invisible, and every
+ * assertion below would pass vacuously.
+ *
+ * Nothing here is tuned to make the spec pass, and the number is not load-
+ * bearing in silence: the first test asserts `toBeVisible()` on the *handle*
+ * while the flyout is open, and Playwright counts a zero-area box as hidden.
+ * Raise this viewport past the overflow threshold and that precondition fails
+ * loudly (verified at 1280x720) instead of going quietly green.
  */
 test.use({ viewport: { width: 1280, height: 600 } })
 
 /**
- * The one curated category whose flyout overflows at the viewport above
- * (measured: a 284px handle on a 317px track). `Matemática`, `Texto`,
- * `Listas` and `Variáveis` all fit, so Blockly draws no handle for them and
- * they cannot leave a ghost behind.
+ * A curated category whose flyout overflows at the viewport above (measured:
+ * a 284px handle on a 317px track). `Lógica` is the other one that overflows
+ * there (295px on the same track); `Matemática`, `Texto`, `Listas` and
+ * `Variáveis` all fit, so Blockly draws no handle for them and they cannot
+ * leave a ghost behind.
  */
 const SCROLLING_CATEGORY = 'Laços'
 

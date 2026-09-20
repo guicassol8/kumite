@@ -146,9 +146,12 @@ test.describe('organizer-driven password reset', () => {
       await expect(participantPage.getByTestId('change-password-back-link')).toHaveCount(0)
       await participantPage.screenshot({ path: evidence('08-forced-change'), fullPage: true })
 
-      // And there is no way around it: /teams bounces straight back.
+      // And there is no way around it: /teams bounces straight back — now
+      // saying why it did (#190), instead of silently swapping the screen the
+      // participant asked for.
       await participantPage.goto('/teams')
-      await expect(participantPage).toHaveURL(/\/change-password$/)
+      await expect(participantPage).toHaveURL(/\/change-password\?notice=required$/)
+      await expect(participantPage.getByTestId('change-password-bounced-notice')).toBeVisible()
       await participantPage.screenshot({ path: evidence('09-blocked-elsewhere'), fullPage: true })
 
       // Changing it clears the block and drops them on the home page.

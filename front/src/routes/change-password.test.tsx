@@ -47,10 +47,10 @@ function response(status: number, body: unknown = undefined): any {
   return { ok: status >= 200 && status < 300, status, json: async () => body }
 }
 
-function renderScreen() {
+function renderScreen(entry = '/change-password') {
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ['/change-password'] }),
+    history: createMemoryHistory({ initialEntries: [entry] }),
   })
   const queryClient = new QueryClient()
   render(
@@ -163,5 +163,106 @@ describe('change-password screen', () => {
 
     expect(await screen.findByTestId('change-password-back-link')).toBeTruthy()
     expect(screen.queryByTestId('change-password-required-notice')).toBeNull()
+  })
+})
+
+// #190: the password did change (204), but the `/me` that clears
+// `mustChangePassword` in the store failed. Navigating home anyway left every
+// guard bouncing the user straight back here, with nothing on screen to say
+// why. The screen now stays put and says so.
+describe('change-password refresh failure (#190)', () => {
+  const flagged: SessionUser = { ...participant, mustChangePassword: true }
+
+  it('stays put and explains itself when the refresh answers 5xx', async () => {
+    setSession(flagged, 'tok-1')
+    mockedChangePassword.mockResolvedValue(response(204))
+    mockedMe.mockResolvedValue(response(502, { error: 'bad_gateway' }))
+    const router = renderScreen()
+
+    await screen.findByTestId('change-password-submit-button')
+    fill('k7fq-3nrv-9wzt', 'brand-new-password')
+
+    expect(await screen.findByTestId('change-password-refresh-error')).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/change-password')
+    // Re-submitting would 401 (`currentPassword` is now the old one), so the
+    // form has to be out of reach — only the retry is offered.
+    expect(screen.queryByTestId('change-password-submit-button')).toBeNull()
+    expect(screen.queryByTestId('change-password-current-input')).toBeNull()
+    expect(await screen.findByTestId('change-password-refresh-retry')).toBeTruthy()
+    // The store only ever mirrors `/me`: nothing was forged locally.
+    expect(getState().user?.mustChangePassword).toBe(true)
+  })
+
+  it('handles a refresh that dies at the network layer the same way', async () => {
+    setSession(flagged, 'tok-1')
+    mockedChangePassword.mockResolvedValue(response(204))
+    mockedMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    const router = renderScreen()
+
+    await screen.findByTestId('change-password-submit-button')
+    fill('k7fq-3nrv-9wzt', 'brand-new-password')
+
+    expect(await screen.findByTestId('change-password-refresh-error')).toBeTruthy()
+    expect(router.state.location.pathname).toBe('/change-password')
+    expect(screen.queryByTestId('change-password-form-error')).toBeNull()
+  })
+
+  it('retries only the refresh — never the change — and then lands on the home page', async () => {
+    setSession(flagged, 'tok-1')
+    mockedChangePassword.mockResolvedValue(response(204))
+    mockedMe.mockResolvedValue(response(502, { error: 'bad_gateway' }))
+    const router = renderScreen()
+
+    await screen.findByTestId('change-password-submit-button')
+    fill('k7fq-3nrv-9wzt', 'brand-new-password')
+
+    const retry = await screen.findByTestId('change-password-refresh-retry')
+    mockedMe.mockResolvedValue(response(200, { ...participant, mustChangePassword: false }))
+    fireEvent.click(retry)
+
+    await waitFor(() => {
+      expect(getState().user?.mustChangePassword).toBe(false)
+    })
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/')
+    })
+    expect(mockedChangePassword).toHaveBeenCalledTimes(1)
+  })
+
+  it('sends a genuinely dead token to /login instead of offering a retry', async () => {
+    setSession(flagged, 'tok-1')
+    mockedChangePassword.mockResolvedValue(response(204))
+    mockedMe.mockResolvedValue(response(401, { error: 'unauthorized' }))
+    const router = renderScreen()
+
+    await screen.findByTestId('change-password-submit-button')
+    fill('k7fq-3nrv-9wzt', 'brand-new-password')
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/login')
+    })
+    expect(await screen.findByTestId('login-expired-notice')).toBeTruthy()
+    expect(getState().status).toBe('anonymous')
+    expect(screen.queryByTestId('change-password-refresh-error')).toBeNull()
+  })
+})
+
+// AC3: landing back here after a guard bounced the user is not self-evident.
+describe('change-password bounce notice (#190)', () => {
+  it('explains the bounce when the guards sent the user back', async () => {
+    setSession({ ...participant, mustChangePassword: true }, 'tok-1')
+    renderScreen('/change-password?notice=required')
+
+    expect(await screen.findByTestId('change-password-bounced-notice')).toBeTruthy()
+    // One alert, never two: the bounce message replaces the generic one.
+    expect(screen.queryByTestId('change-password-required-notice')).toBeNull()
+  })
+
+  it('keeps the generic notice when the user arrived on their own', async () => {
+    setSession({ ...participant, mustChangePassword: true }, 'tok-1')
+    renderScreen()
+
+    expect(await screen.findByTestId('change-password-required-notice')).toBeTruthy()
+    expect(screen.queryByTestId('change-password-bounced-notice')).toBeNull()
   })
 })

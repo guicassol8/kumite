@@ -184,6 +184,57 @@ export function ensureHydrated(): Promise<void> {
   return run
 }
 
+// 'ok' — `/me` answered and the store now mirrors it; 'unauthorized' — the
+// token is dead and the session was dropped (the root is already navigating to
+// /login); 'failed' — anything else, with the session left exactly as it was.
+export type RefreshOutcome = 'ok' | 'unauthorized' | 'failed'
+
+/**
+ * One shot at `/me`, for a caller that owns its own retry UI (#190).
+ *
+ * Deliberately NOT `retryHydration()`: that one parks the session in 'error',
+ * which makes the root swap the route for `SessionErrorScreen` — on
+ * /change-password that would throw away the one thing the user needs to know,
+ * that the password *was* changed. So 'failed' touches no state at all: the
+ * screen keeps rendering and decides what to say.
+ *
+ * Never rejects.
+ */
+export async function refreshSession(): Promise<RefreshOutcome> {
+  const token = state.token
+  if (!token) return 'failed'
+  // Same deadline as `attemptHydration`. A `/me` that neither answers nor
+  // fails — captive wifi, a back stuck mid-restart — is a failure the user
+  // has to be told about too, and without this the screen would sit on a
+  // disabled button forever: the exact "stuck, with nothing on screen to
+  // explain it" symptom #190 exists to remove.
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), HYDRATION_TIMEOUT_MS)
+  try {
+    const res = await api.me.$get({}, { init: { signal: controller.signal } })
+    // `meRoute` declares only `output: PublicUserSchema`, so `res.status` is
+    // the literal 200 and comparing it to 401 is a TS2367 (#174).
+    const status: number = res.status
+    if (status === 200) {
+      setSession(await res.json(), token)
+      return 'ok'
+    }
+    if (status === 401 || status === 403) {
+      // Same guard as `attemptHydration`: `authFetch` already dropped the
+      // session on a 401 that carried our header, and clearing it twice fires
+      // the root's redirect twice.
+      if (state.status !== 'anonymous') clearSession('expired')
+      return 'unauthorized'
+    }
+    return 'failed'
+  } catch {
+    // The abort above lands here too, as an AbortError.
+    return 'failed'
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 // What the retry button calls. A fresh cycle of attempts, in place — no
 // `window.location.reload()`, since "the user should not need F5" is the
 // whole point.

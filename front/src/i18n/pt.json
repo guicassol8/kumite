@@ -739,6 +739,14 @@
         "passwordTooShort": "A senha precisa ter pelo menos 8 caracteres",
         "passwordMismatch": "As senhas não coincidem",
         "unexpected": "Não foi possível trocar a senha. Tente novamente."
+      },
+      "notices": {
+        "required": "Precisamos que você troque a sua senha temporária antes de abrir qualquer outra tela."
+      },
+      "refresh": {
+        "failed": "Sua senha foi trocada, mas não conseguimos atualizar a sua sessão. Tente novamente para continuar.",
+        "retry": "Tentar novamente",
+        "retrying": "Tentando…"
       }
     }
   },

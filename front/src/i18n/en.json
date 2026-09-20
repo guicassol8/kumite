@@ -739,6 +739,14 @@
         "passwordTooShort": "Password must be at least 8 characters",
         "passwordMismatch": "Passwords do not match",
         "unexpected": "Could not change the password. Please try again."
+      },
+      "notices": {
+        "required": "You need to change your temporary password before opening any other screen."
+      },
+      "refresh": {
+        "failed": "Your password was changed, but we could not refresh your session. Try again to continue.",
+        "retry": "Try again",
+        "retrying": "Trying…"
       }
     }
   },

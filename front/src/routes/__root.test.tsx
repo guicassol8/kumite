@@ -116,6 +116,9 @@ describe('root session bootstrap', () => {
     setSession({ ...fakeUser, mustChangePassword: true }, 'tok-1')
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/change-password'))
+    // #190: same notice the guards use — the screen has to be able to say why
+    // the user is suddenly looking at it.
+    expect(router.state.location.search).toMatchObject({ notice: 'required' })
   })
 
   it('leaves an unflagged session where it is', async () => {

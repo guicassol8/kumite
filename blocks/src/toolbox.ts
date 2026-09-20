@@ -133,25 +133,11 @@ export const allowedBlockTypes: readonly string[] = [
 ]
 
 /**
- * Dropdown values the curated toolbox subtracts from blocks it otherwise
- * offers, by block type and field name.
- *
- * `allowedBlockTypes` is granular per type and cannot express "this block, but
- * not that one mode", so this is its companion: a declarative table, read by
- * the editor (`defineKumiteBlocks` removes the options) and by the judge
- * (`generateSolution` refuses a serialized state that still carries one).
- *
- * `lists_getIndex` with `WHERE=RANDOM` emits `listsGetRandomItem`, i.e.
- * `Math.floor(Math.random() * ...)`: the same workspace passed "Run" and
- * failed "Submit", and re-judged differently on every attempt (#182). It is
- * the only non-deterministic option in the whole curated toolbox —
- * `determinism.test.ts` is what keeps that true for the next block added here.
+ * The other half of the curation, one level finer: the dropdown values the
+ * toolbox subtracts from blocks it does offer. Declared in `./denied` only so
+ * that `blocks.ts` can read it without closing an import cycle with this file.
  */
-export const deniedFieldValues: Readonly<
-  Record<string, Readonly<Record<string, readonly string[]>>>
-> = {
-  lists_getIndex: { WHERE: ['RANDOM'] },
-}
+export { deniedFieldValues } from './denied'
 
 type SerializedBlock = { type?: string; [key: string]: unknown }
 type SerializedBlocks = { languageVersion?: number; blocks?: SerializedBlock[] }

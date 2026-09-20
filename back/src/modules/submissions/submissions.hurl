@@ -199,6 +199,27 @@ HTTP 400
 [Asserts]
 jsonpath "$.error" == "disabled_block"
 
+# 4c. A block option that is not deterministic -> 400 field_value_not_allowed
+#     (#182). `lists_getIndex` with `WHERE: "RANDOM"` generates
+#     `Math.random()`, so the same workspace passed "Run", failed "Submit" and
+#     re-judged differently on every attempt. The editor no longer offers the
+#     option, so this shape only ever arrives from a direct POST — which is
+#     exactly why the refusal has to live here and not only in the browser.
+#     The TS twin of this workspace is `indiceAleatorio` in @kumite/blocks
+#     (hurl cannot import it). Before the happy path for the same reason as
+#     4b: a codegen refusal arms no cooldown.
+POST {{host}}/submissions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+{
+  "problemId": "{{problem_id}}",
+  "roundId": "{{round_id}}",
+  "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "lists_getIndex", "id": "sorteia", "fields": { "MODE": "GET", "WHERE": "RANDOM" }, "inputs": { "VALUE": { "block": { "type": "kumite_input", "id": "entrada" } } } } } } }] } }
+}
+HTTP 400
+[Asserts]
+jsonpath "$.error" == "field_value_not_allowed"
+
 # 5. The happy path -> 201, full score, and the hidden case comes back as a
 #    bare ✓/✗: no expected, no actual, no ms.
 POST {{host}}/submissions

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ROOT_BLOCK_TYPE } from './blocks'
 import { BlocksError } from './errors'
 import { comentarioComQuebra } from './fixtures/comentario-com-quebra'
+import { indiceAleatorio } from './fixtures/indice-aleatorio'
 import { raizDesabilitada } from './fixtures/raiz-desabilitada'
 import { somaDosPares } from './fixtures/soma-dos-pares'
 import { variavelChamadaInput } from './fixtures/variavel-chamada-input'
@@ -125,6 +126,113 @@ describe('generateSolution', () => {
     expect(error.code).toBe('block-not-allowed')
     expect(error.blockType).toBe('text_print')
     expect(error.message).toContain('text_print')
+  })
+
+  it('rejects the non-deterministic RANDOM mode of lists_getIndex, naming the block (#182)', () => {
+    const error = expectBlocksError(() => generateSolution(indiceAleatorio))
+
+    expect(error.code).toBe('field-value-not-allowed')
+    expect(error.blockType).toBe('lists_getIndex')
+    expect(error.message).toContain('lists_getIndex')
+  })
+
+  it('finds a denied field value however deep it is buried', () => {
+    // The walk is over the raw state, so it has to descend `inputs`, `next`
+    // and shadow blocks by itself — a workspace load would already have
+    // flattened the offending value into the field's default.
+    const buried = (deep: WorkspaceState): WorkspaceState => ({
+      blocks: {
+        languageVersion: 0,
+        blocks: [
+          {
+            type: ROOT_BLOCK_TYPE,
+            id: 'raiz',
+            inputs: {
+              BODY: {
+                block: {
+                  type: 'controls_repeat_ext',
+                  id: 'repete',
+                  inputs: {
+                    TIMES: { shadow: { type: 'math_number', id: 'vezes', fields: { NUM: 3 } } },
+                    DO: { block: deep },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    })
+    const sorteio = {
+      type: 'lists_getIndex',
+      id: 'sorteia',
+      fields: { MODE: 'GET', WHERE: 'RANDOM' },
+    }
+
+    for (const deep of [
+      // inside `inputs`
+      { type: 'variables_set', id: 'guarda', inputs: { VALUE: { block: sorteio } } },
+      // behind a `next`
+      {
+        type: 'variables_set',
+        id: 'guarda',
+        next: {
+          block: { type: 'variables_set', id: 'depois', inputs: { VALUE: { block: sorteio } } },
+        },
+      },
+      // as a shadow block
+      { type: 'variables_set', id: 'guarda', inputs: { VALUE: { shadow: sorteio } } },
+    ]) {
+      const error = expectBlocksError(() =>
+        generateSolution(buried(deep as unknown as WorkspaceState)),
+      )
+
+      expect(error.code, JSON.stringify(deep)).toBe('field-value-not-allowed')
+      expect(error.blockType, JSON.stringify(deep)).toBe('lists_getIndex')
+    }
+  })
+
+  it('still generates every WHERE mode that stayed in the toolbox', () => {
+    for (const where of ['FROM_START', 'FROM_END', 'FIRST', 'LAST']) {
+      const state: WorkspaceState = {
+        blocks: {
+          languageVersion: 0,
+          blocks: [
+            {
+              type: ROOT_BLOCK_TYPE,
+              id: 'raiz',
+              inputs: {
+                RETURN: {
+                  block: {
+                    type: 'lists_getIndex',
+                    id: 'pega',
+                    fields: { MODE: 'GET', WHERE: where },
+                    inputs: {
+                      VALUE: { block: { type: 'kumite_input', id: 'entrada' } },
+                      ...(where === 'FROM_START' || where === 'FROM_END'
+                        ? {
+                            AT: {
+                              block: { type: 'math_number', id: 'posicao', fields: { NUM: 1 } },
+                            },
+                          }
+                        : {}),
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      }
+
+      const code = generateSolution(state)
+
+      expect(code, where).toContain('function solve(input)')
+      expect(code, where).not.toMatch(/Math\.random/)
+      expect(instantiate(code)(['a', 'b', 'c']), where).toBe(
+        where === 'LAST' || where === 'FROM_END' ? 'c' : 'a',
+      )
+    }
   })
 
   it('renames a participant variable that collides with the generated names', () => {

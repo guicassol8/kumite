@@ -24,6 +24,7 @@ const CODEGEN_ERROR_CODES: Record<BlocksErrorCode, CodegenErrorCode> = {
   'missing-root': 'missing_root',
   'duplicate-root': 'duplicate_root',
   'block-not-allowed': 'block_not_allowed',
+  'field-value-not-allowed': 'field_value_not_allowed',
   'disabled-block': 'disabled_block',
   'invalid-generated-code': 'invalid_generated_code',
 }

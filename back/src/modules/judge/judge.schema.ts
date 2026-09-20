@@ -41,6 +41,7 @@ export const CodegenErrorCodeSchema = z.enum([
   'missing_root',
   'duplicate_root',
   'block_not_allowed',
+  'field_value_not_allowed',
   'disabled_block',
   'invalid_generated_code',
 ])

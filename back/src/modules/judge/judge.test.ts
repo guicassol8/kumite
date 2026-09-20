@@ -1,4 +1,4 @@
-import { raizDesabilitada, somaDosPares } from '@kumite/blocks'
+import { indiceAleatorio, raizDesabilitada, somaDosPares } from '@kumite/blocks'
 import { javascriptGenerator } from 'blockly/javascript'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -16,6 +16,7 @@ const CRASH_WORKER_URL = new URL('../../judge-test-worker.mjs', import.meta.url)
 // route (#21) performs on the incoming body, never a cast.
 const somaDosParesWorkspace = WorkspaceSchema.parse(somaDosPares)
 const raizDesabilitadaWorkspace = WorkspaceSchema.parse(raizDesabilitada)
+const indiceAleatorioWorkspace = WorkspaceSchema.parse(indiceAleatorio)
 // U+000D built from its code point: it is invisible in an editor and some
 // tools normalize it away on save, and its presence is the whole point.
 const textoQueNaoParseia = WorkspaceSchema.parse({
@@ -231,6 +232,29 @@ describe('generateJudgeSource', () => {
     expect(result.ok).toBe(false)
     expect(result).toMatchObject({ error: 'block_not_allowed', blockType: 'text_print' })
     expect(result.ok === false && result.message).toContain('text_print')
+  })
+
+  it('refuses a non-deterministic block option, naming the block (#182)', () => {
+    // The workspace the editor can no longer build, arriving from a direct
+    // POST. It used to be judged — differently on every attempt.
+    const result = generateJudgeSource(indiceAleatorioWorkspace)
+
+    expect(result.ok).toBe(false)
+    expect(result).toMatchObject({
+      error: 'field_value_not_allowed',
+      blockType: 'lists_getIndex',
+    })
+    expect(result.ok === false && result.message).toBe(
+      'O bloco "lists_getIndex" está com uma opção que não é permitida: a sua solução precisa dar sempre o mesmo resultado.',
+    )
+    expect(generateJudgeSource(indiceAleatorioWorkspace, 'es')).toMatchObject({
+      message:
+        'El bloque "lists_getIndex" tiene una opción que no está permitida: tu solución tiene que dar siempre el mismo resultado.',
+    })
+    expect(generateJudgeSource(indiceAleatorioWorkspace, 'en')).toMatchObject({
+      message:
+        'The "lists_getIndex" block has an option that is not allowed: your solution must always give the same result.',
+    })
   })
 
   it('refuses a workspace Blockly cannot read', () => {

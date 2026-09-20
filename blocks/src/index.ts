@@ -4,6 +4,7 @@ export { defineKumiteBlocks, INPUT_BLOCK_TYPE, ROOT_BLOCK_TYPE } from './blocks'
 export { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
 export { BlocksError, type BlocksErrorCode } from './errors'
 export { comentarioComQuebra } from './fixtures/comentario-com-quebra'
+export { indiceAleatorio } from './fixtures/indice-aleatorio'
 export { raizDesabilitada } from './fixtures/raiz-desabilitada'
 export { somaDosPares } from './fixtures/soma-dos-pares'
 export { variavelChamadaInput } from './fixtures/variavel-chamada-input'
@@ -18,6 +19,7 @@ export {
   allowedBlockTypes,
   buildToolbox,
   CREATE_VARIABLE_BUTTON_KEY,
+  deniedFieldValues,
   emptyWorkspaceState,
   VARIABLES_CATEGORY_KEY,
   variablesFlyout,

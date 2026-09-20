@@ -150,6 +150,80 @@ describe('defineKumiteBlocks', () => {
     expect(reserved.filter((word) => word === SOLUTION_PARAM_NAME)).toHaveLength(1)
   })
 
+  it('strips the non-deterministic RANDOM mode from lists_getIndex (#182)', () => {
+    defineKumiteBlocks()
+
+    withBlock('lists_getIndex', (block) => {
+      const where = block.getField('WHERE') as Blockly.FieldDropdown
+
+      expect(where.getOptions(false).map(([, value]) => value)).toEqual([
+        'FROM_START',
+        'FROM_END',
+        'FIRST',
+        'LAST',
+      ])
+    })
+  })
+
+  it('keeps every remaining MODE × WHERE combination generating and round-tripping', () => {
+    defineKumiteBlocks()
+
+    for (const mode of ['GET', 'GET_REMOVE', 'REMOVE']) {
+      for (const where of ['FROM_START', 'FROM_END', 'FIRST', 'LAST']) {
+        const workspace = new Blockly.Workspace()
+        try {
+          const block = workspace.newBlock('lists_getIndex')
+          block.setFieldValue(mode, 'MODE')
+          block.setFieldValue(where, 'WHERE')
+
+          expect(block.getFieldValue('WHERE'), `${mode}/${where}`).toBe(where)
+          // `updateAt_` rebuilds the AT input from WHERE: it is a value input
+          // (connectable) only for the two indexed modes, a dummy otherwise,
+          // and that wiring has to survive the stripping.
+          expect(Boolean(block.getInput('AT')?.connection), `${mode}/${where} AT`).toBe(
+            where === 'FROM_START' || where === 'FROM_END',
+          )
+
+          javascriptGenerator.init(workspace)
+          const generated = javascriptGenerator.blockToCode(block, true)
+          const code = typeof generated === 'string' ? generated : generated[0]
+          expect(code, `${mode}/${where} code`).not.toBe('')
+
+          const state = Blockly.serialization.workspaces.save(workspace)
+          const reloaded = new Blockly.Workspace()
+          try {
+            Blockly.serialization.workspaces.load(state, reloaded)
+            const back = reloaded.getTopBlocks(false)[0] as Blockly.Block
+            expect(back.getFieldValue('MODE'), `${mode}/${where} reload`).toBe(mode)
+            expect(back.getFieldValue('WHERE'), `${mode}/${where} reload`).toBe(where)
+          } finally {
+            reloaded.dispose()
+          }
+        } finally {
+          workspace.dispose()
+        }
+      }
+    }
+  })
+
+  it('strips the denied options once, however often it is called', () => {
+    // `defineKumiteBlocks` runs on every `generateSolution` call and #57 calls
+    // it again to relabel. Without a guard each call would wrap the previous
+    // `init`, so the chain — and the work every new block does — would grow
+    // without bound in the judge process.
+    defineKumiteBlocks()
+    const wrapped = (Blockly.Blocks.lists_getIndex as { init: unknown }).init
+
+    defineKumiteBlocks('en')
+    defineKumiteBlocks('es')
+
+    expect((Blockly.Blocks.lists_getIndex as { init: unknown }).init).toBe(wrapped)
+    withBlock('lists_getIndex', (block) => {
+      const where = block.getField('WHERE') as Blockly.FieldDropdown
+      expect(where.getOptions(false)).toHaveLength(4)
+    })
+  })
+
   it('re-registers with another locale without throwing (#57 relabels at runtime)', () => {
     defineKumiteBlocks('pt')
 

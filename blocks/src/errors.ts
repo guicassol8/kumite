@@ -3,6 +3,7 @@ export type BlocksErrorCode =
   | 'missing-root'
   | 'duplicate-root'
   | 'block-not-allowed'
+  | 'field-value-not-allowed'
   | 'disabled-block'
   | 'invalid-generated-code'
 

@@ -3,8 +3,9 @@ import { javascriptGenerator } from 'blockly/javascript'
 
 import { defineKumiteBlocks, ROOT_BLOCK_TYPE } from './blocks'
 import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
+import { deniedFieldValues } from './denied'
 import { BlocksError } from './errors'
-import { type BlockLocale, DEFAULT_LOCALE, messagesFor } from './messages'
+import { type BlockLocale, type BlockMessages, DEFAULT_LOCALE, messagesFor } from './messages'
 import { allowedBlockTypes, type WorkspaceState } from './toolbox'
 
 /**
@@ -45,6 +46,64 @@ function neutralizeCommentTerminators(blocks: Blockly.Block[]): void {
     const safe = text.replace(COMMENT_LINE_TERMINATORS, ' ')
     if (safe !== text) block.setCommentText(safe)
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+/**
+ * Refuses a workspace that still carries one of the dropdown values the
+ * curated toolbox subtracts (`deniedFieldValues`) — today, the `RANDOM` mode
+ * of `lists_getIndex`, whose generated code draws a different item on every
+ * run (#182).
+ *
+ * Reads the **serialized state**, not the loaded workspace, and that is the
+ * whole trick: with the option gone from the dropdown, Blockly loads
+ * `WHERE: "RANDOM"` as the field's default without a word, so a workspace
+ * inspected after loading would never show it. Only the raw state still has
+ * it, and the raw state is what a direct POST to the API sends.
+ *
+ * The walk is defensive — anything that is not an object is skipped. A truly
+ * malformed state was already refused by `malformed-workspace` on load, which
+ * gives the participant a better message than this one would.
+ */
+function assertNoDeniedFieldValues(state: WorkspaceState, messages: BlockMessages): void {
+  function visit(node: unknown): void {
+    if (!isRecord(node)) return
+
+    const type = node.type
+    const denied = typeof type === 'string' ? deniedFieldValues[type] : undefined
+    if (denied && isRecord(node.fields)) {
+      const fields = node.fields
+      for (const [name, values] of Object.entries(denied)) {
+        const value = fields[name]
+        if (typeof value === 'string' && values.includes(value)) {
+          throw new BlocksError(
+            'field-value-not-allowed',
+            messages.errorFieldValueNotAllowed.replace('{type}', type as string),
+            { blockType: type as string },
+          )
+        }
+      }
+    }
+
+    if (isRecord(node.inputs)) {
+      for (const input of Object.values(node.inputs)) {
+        if (!isRecord(input)) continue
+        visit(input.block)
+        visit(input.shadow)
+      }
+    }
+    if (isRecord(node.next)) {
+      visit(node.next.block)
+      visit(node.next.shadow)
+    }
+  }
+
+  const container = (state as Record<string, unknown>).blocks
+  if (!isRecord(container) || !Array.isArray(container.blocks)) return
+  for (const block of container.blocks) visit(block)
 }
 
 /**
@@ -113,6 +172,8 @@ export function generateSolution(
         )
       }
     }
+
+    assertNoDeniedFieldValues(state, messages)
 
     neutralizeCommentTerminators(blocks)
 

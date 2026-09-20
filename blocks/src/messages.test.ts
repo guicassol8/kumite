@@ -21,9 +21,10 @@ describe('block messages', () => {
     }
   })
 
-  it('keeps the {type} placeholder in every block-not-allowed message', () => {
+  it('keeps the {type} placeholder in every message that names a block', () => {
     for (const locale of locales) {
       expect(messages[locale].errorBlockNotAllowed, locale).toContain('{type}')
+      expect(messages[locale].errorFieldValueNotAllowed, locale).toContain('{type}')
     }
   })
 

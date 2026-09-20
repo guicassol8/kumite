@@ -132,6 +132,13 @@ export const allowedBlockTypes: readonly string[] = [
   ...CURATED_CATEGORIES.flatMap((category) => category.blocks),
 ]
 
+/**
+ * The other half of the curation, one level finer: the dropdown values the
+ * toolbox subtracts from blocks it does offer. Declared in `./denied` only so
+ * that `blocks.ts` can read it without closing an import cycle with this file.
+ */
+export { deniedFieldValues } from './denied'
+
 type SerializedBlock = { type?: string; [key: string]: unknown }
 type SerializedBlocks = { languageVersion?: number; blocks?: SerializedBlock[] }
 

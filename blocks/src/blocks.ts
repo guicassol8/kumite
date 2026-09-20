@@ -5,6 +5,7 @@ import * as Blockly from 'blockly'
 import { javascriptGenerator, Order } from 'blockly/javascript'
 
 import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
+import { deniedFieldValues } from './denied'
 import { type BlockLocale, DEFAULT_LOCALE, messagesFor } from './messages'
 
 export const ROOT_BLOCK_TYPE = 'kumite_solve'
@@ -18,6 +19,52 @@ export const INPUT_BLOCK_TYPE = 'kumite_input'
  * the process — and `init()` re-splits the whole string every time.
  */
 let reservedNamesRegistered = false
+
+/** Same reason as `reservedNamesRegistered`: the stripping below wraps the
+ * block's own `init`, so running it twice would wrap the wrapper. */
+let deniedOptionsStripped = false
+
+type BlockDefinition = { init?: (this: Blockly.Block) => void }
+
+/**
+ * Removes the options in `deniedFieldValues` from the blocks Blockly ships, so
+ * the editor never offers them in the first place.
+ *
+ * It has to happen inside `init`, not on the block definition: `lists_getIndex`
+ * builds its `WHERE` field once, in `init`, from `this.WHERE_OPTIONS`, and
+ * `updateAt_` only ever rebuilds the `AT` input — filtering `WHERE_OPTIONS`
+ * afterwards has no effect on a field that already exists. `setOptions` is the
+ * public, typed way in, and it leaves the field's own validator (the one that
+ * drives `updateAt_`) alone.
+ *
+ * Only half the defence: a serialized state can reach the judge without ever
+ * passing through an editor, and Blockly loads a value the dropdown no longer
+ * offers as the field's default without complaining. `generateSolution` reads
+ * the raw state for exactly that reason.
+ */
+function stripDeniedFieldOptions(): void {
+  if (deniedOptionsStripped) return
+  deniedOptionsStripped = true
+
+  for (const [type, fields] of Object.entries(deniedFieldValues)) {
+    const definition = Blockly.Blocks[type] as BlockDefinition | undefined
+    const original = definition?.init
+    // A consumer that never loaded Blockly's standard blocks has nothing to
+    // strip — and nothing to offer either, so there is no hole to plug.
+    if (!original) continue
+
+    definition.init = function stripped(this: Blockly.Block) {
+      original.call(this)
+      for (const [name, denied] of Object.entries(fields)) {
+        const field = this.getField(name)
+        if (!(field instanceof Blockly.FieldDropdown)) continue
+        field.setOptions(
+          field.getOptions(false).filter(([, value]) => !denied.includes(value as string)),
+        )
+      }
+    }
+  }
+}
 
 /**
  * Registers the two kumite blocks and their JS generators. Idempotent by
@@ -37,6 +84,8 @@ export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
     javascriptGenerator.addReservedWords(`${SOLUTION_FUNCTION_NAME},${SOLUTION_PARAM_NAME}`)
     reservedNamesRegistered = true
   }
+
+  stripDeniedFieldOptions()
 
   Blockly.Blocks[ROOT_BLOCK_TYPE] = {
     init(this: Blockly.Block) {

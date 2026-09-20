@@ -13,6 +13,7 @@ import {
   usersTable,
 } from '../../db/schema'
 import { closeRound, createRound, openRound } from '../rounds/rounds.service'
+import type { ProblemDetail, TestCase } from './problems.schema'
 import {
   ParticipantProblemParamsSchema,
   ParticipantProblemQuerySchema,
@@ -20,6 +21,7 @@ import {
   TestCaseSchema,
   UpdateProblemBodySchema,
 } from './problems.schema'
+import type { UpdateProblemResult } from './problems.service'
 import {
   archiveProblem,
   computeMissingLocales,
@@ -29,6 +31,7 @@ import {
   getPublishedProblem,
   listProblems,
   publishProblem,
+  testCasesEqual,
   updateProblem,
 } from './problems.service'
 
@@ -46,6 +49,51 @@ describe('TestCaseSchema', () => {
   it('rejects a missing input', () => {
     const result = TestCaseSchema.safeParse({ expected: 2, hidden: false })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('testCasesEqual', () => {
+  const visible: TestCase = { input: 1, expected: 1, hidden: false }
+  const hidden: TestCase = { input: 2, expected: 2, hidden: true }
+
+  it('treats an identical list as equal', () => {
+    expect(testCasesEqual([visible, hidden], [visible, hidden])).toBe(true)
+  })
+
+  it('ignores the key order inside each case — jsonb does not preserve it', () => {
+    expect(testCasesEqual([visible], [{ hidden: false, expected: 1, input: 1 } as TestCase])).toBe(
+      true,
+    )
+  })
+
+  it('ignores key order deep inside a structured input', () => {
+    const a: TestCase = { input: { x: 1, y: [{ p: 1, q: 2 }] }, expected: null, hidden: true }
+    const b: TestCase = { input: { y: [{ q: 2, p: 1 }], x: 1 }, expected: null, hidden: true }
+    expect(testCasesEqual([a], [b])).toBe(true)
+  })
+
+  it('reports a different length as different', () => {
+    expect(testCasesEqual([visible], [visible, hidden])).toBe(false)
+  })
+
+  it('reports a reorder as different — caseResults indices are positional', () => {
+    expect(testCasesEqual([visible, hidden], [hidden, visible])).toBe(false)
+  })
+
+  it('reports a flipped hidden flag as different', () => {
+    expect(testCasesEqual([hidden], [{ ...hidden, hidden: false }])).toBe(false)
+  })
+
+  it('reports a changed expected value as different', () => {
+    expect(testCasesEqual([hidden], [{ ...hidden, expected: 99 }])).toBe(false)
+  })
+
+  it('reports a changed input as different', () => {
+    expect(testCasesEqual([hidden], [{ ...hidden, input: 99 }])).toBe(false)
+  })
+
+  it('treats two empty lists as equal', () => {
+    expect(testCasesEqual([], [])).toBe(true)
   })
 })
 
@@ -255,6 +303,14 @@ describe('problems.service', () => {
   const visibleCase = { input: 1, expected: 1, hidden: false }
   const hiddenCase = { input: 2, expected: 2, hidden: true }
 
+  // updateProblem answers a union (#193), so every test that reads the updated
+  // problem has to narrow it first. Throwing here keeps the assertion that
+  // follows about the problem, not about the discriminant.
+  const expectUpdated = (result: UpdateProblemResult): ProblemDetail => {
+    if (!result.ok) throw new Error(`expected the update to succeed, got '${result.error}'`)
+    return result.problem
+  }
+
   it('creates a problem as a draft, defaulting points to 100', async () => {
     const problem = await createProblem(db, { difficulty: 'easy' })
 
@@ -279,29 +335,31 @@ describe('problems.service', () => {
       translations: [{ locale: 'pt', title: 'Soma', statementMd: 'Some dois números.' }],
     })
 
-    const updated = await updateProblem(db, problem.id, {
-      translations: [{ locale: 'es', title: 'Suma', statementMd: 'Suma dos números.' }],
-    })
+    const updated = expectUpdated(
+      await updateProblem(db, problem.id, {
+        translations: [{ locale: 'es', title: 'Suma', statementMd: 'Suma dos números.' }],
+      }),
+    )
 
-    expect(updated?.translations).toHaveLength(2)
-    expect(updated?.translations.find((t) => t.locale === 'pt')?.title).toBe('Soma')
-    expect(updated?.translations.find((t) => t.locale === 'es')?.title).toBe('Suma')
+    expect(updated.translations).toHaveLength(2)
+    expect(updated.translations.find((t) => t.locale === 'pt')?.title).toBe('Soma')
+    expect(updated.translations.find((t) => t.locale === 'es')?.title).toBe('Suma')
   })
 
-  it('returns null from updateProblem for an unknown id', async () => {
+  it('returns not_found from updateProblem for an unknown id', async () => {
     const result = await updateProblem(db, '00000000-0000-0000-0000-000000000000', {
       difficulty: 'hard',
     })
-    expect(result).toBeNull()
+    expect(result).toEqual({ ok: false, error: 'not_found' })
   })
 
   it('replaces testCases wholesale', async () => {
     const problem = await createProblem(db, { difficulty: 'easy' })
     await updateProblem(db, problem.id, { testCases: [visibleCase, hiddenCase] })
 
-    const updated = await updateProblem(db, problem.id, { testCases: [visibleCase] })
+    const updated = expectUpdated(await updateProblem(db, problem.id, { testCases: [visibleCase] }))
 
-    expect(updated?.testCases).toEqual([visibleCase])
+    expect(updated.testCases).toEqual([visibleCase])
   })
 
   const fullyTranslate = async (problemId: string) =>
@@ -377,6 +435,205 @@ describe('problems.service', () => {
     expect(first?.status).toBe('archived')
     expect(second?.status).toBe('archived')
     expect(await archiveProblem(db, '00000000-0000-0000-0000-000000000000')).toBeNull()
+  })
+
+  // #193: editing the scoring inputs of a problem while its round is open
+  // leaves the round's teams prorated over different denominators, which the
+  // ranking then sums as if they were commensurable. The guard refuses the
+  // edit; everything that does not feed `scoreSubmission` stays editable, so
+  // the organizer can still fix a typo in the statement mid-round.
+  describe('updateProblem guard for a problem in an open round', () => {
+    const otherHiddenCase = { input: 3, expected: 3, hidden: true }
+
+    const publishedProblemInOpenRound = async () => {
+      const problem = await createProblem(db, { difficulty: 'easy' })
+      await updateProblem(db, problem.id, {
+        translations: [
+          { locale: 'pt', title: 'Soma', statementMd: 'a' },
+          { locale: 'es', title: 'Suma', statementMd: 'b' },
+          { locale: 'en', title: 'Sum', statementMd: 'c' },
+        ],
+        testCases: [visibleCase, hiddenCase],
+      })
+      const published = await publishProblem(db, problem.id)
+      if (!published.ok) throw new Error('expected the problem to publish')
+
+      const created = await createRound(db, {
+        name: 'Rodada 193',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected the round to be created')
+      return { problemId: problem.id, roundId: created.round.id }
+    }
+
+    const open = async (roundId: string) => {
+      const opened = await openRound(db, roundId)
+      if (!opened.ok) throw new Error(`expected the round to open, got '${opened.error}'`)
+    }
+
+    it('refuses different testCases and writes nothing', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+
+      const result = await updateProblem(db, problemId, {
+        testCases: [visibleCase, hiddenCase, otherHiddenCase],
+      })
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'problem_in_open_round',
+        fields: ['testCases'],
+      })
+      const untouched = await getProblem(db, problemId)
+      expect(untouched?.testCases).toEqual([visibleCase, hiddenCase])
+    })
+
+    it('refuses a different points value', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+
+      const result = await updateProblem(db, problemId, { points: 250 })
+
+      expect(result).toEqual({ ok: false, error: 'problem_in_open_round', fields: ['points'] })
+      expect((await getProblem(db, problemId))?.points).toBe(100)
+    })
+
+    it('names both fields when both would change', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+
+      const result = await updateProblem(db, problemId, {
+        points: 250,
+        testCases: [visibleCase, otherHiddenCase],
+      })
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'problem_in_open_round',
+        fields: ['testCases', 'points'],
+      })
+    })
+
+    it('refuses test cases that are only reordered — the indices of caseResults move', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+
+      const result = await updateProblem(db, problemId, {
+        testCases: [hiddenCase, visibleCase],
+      })
+
+      expect(result).toEqual({
+        ok: false,
+        error: 'problem_in_open_round',
+        fields: ['testCases'],
+      })
+    })
+
+    it('refuses a case whose hidden flag flipped, even at the same length', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+
+      const result = await updateProblem(db, problemId, {
+        testCases: [visibleCase, { ...hiddenCase, hidden: false }],
+      })
+
+      expect(result).toMatchObject({ ok: false, error: 'problem_in_open_round' })
+    })
+
+    it('allows a statement fix mid-round — the case the issue asks to keep working', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+
+      const updated = expectUpdated(
+        await updateProblem(db, problemId, {
+          difficulty: 'hard',
+          translations: [{ locale: 'pt', title: 'Soma', statementMd: 'Some dois números.' }],
+        }),
+      )
+
+      expect(updated.difficulty).toBe('hard')
+      expect(updated.translations.find((t) => t.locale === 'pt')?.statementMd).toBe(
+        'Some dois números.',
+      )
+    })
+
+    it('allows the form resending the identical testCases and points it just loaded', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+
+      // buildPatchBody (front/src/lib/problem-form.ts) always sends all four
+      // fields, so a guard on presence rather than on value would reject every
+      // save while a round is open.
+      const updated = expectUpdated(
+        await updateProblem(db, problemId, {
+          difficulty: 'easy',
+          points: 100,
+          testCases: [visibleCase, hiddenCase],
+          translations: [{ locale: 'pt', title: 'Soma', statementMd: 'a' }],
+        }),
+      )
+
+      expect(updated.testCases).toEqual([visibleCase, hiddenCase])
+    })
+
+    it('allows the same testCases sent with the object keys in another order', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+
+      const updated = expectUpdated(
+        await updateProblem(db, problemId, {
+          testCases: [
+            { hidden: false, expected: 1, input: 1 },
+            { expected: 2, hidden: true, input: 2 },
+          ],
+        }),
+      )
+
+      expect(updated.testCases).toHaveLength(2)
+    })
+
+    it('allows the edit once the round is closed', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+      const closed = await closeRound(db, roundId)
+      if (!closed.ok) throw new Error('expected the round to close')
+
+      const updated = expectUpdated(
+        await updateProblem(db, problemId, { points: 250, testCases: [visibleCase] }),
+      )
+
+      expect(updated.points).toBe(250)
+      expect(updated.testCases).toEqual([visibleCase])
+    })
+
+    it('allows the edit while the round is still a draft', async () => {
+      const { problemId } = await publishedProblemInOpenRound()
+
+      const updated = expectUpdated(
+        await updateProblem(db, problemId, { testCases: [visibleCase, otherHiddenCase] }),
+      )
+
+      expect(updated.testCases).toEqual([visibleCase, otherHiddenCase])
+    })
+
+    it('keeps the hidden-case denominator of an open round immutable', async () => {
+      const { problemId, roundId } = await publishedProblemInOpenRound()
+      await open(roundId)
+      const denominator = (await getProblem(db, problemId))?.testCases.filter(
+        (testCase) => testCase.hidden,
+      ).length
+
+      await updateProblem(db, problemId, { testCases: [visibleCase] })
+      await updateProblem(db, problemId, {
+        testCases: [visibleCase, hiddenCase, otherHiddenCase],
+      })
+
+      const after = (await getProblem(db, problemId))?.testCases.filter(
+        (testCase) => testCase.hidden,
+      ).length
+      expect(after).toBe(denominator)
+    })
   })
 
   it('listProblems orders by createdAt desc with the right testCaseCount', async () => {

@@ -67,11 +67,21 @@ export const updateProblemRoute = defineRoute({
   path: '/organizer/problems/:id',
   use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: ProblemIdParamsSchema, body: UpdateProblemBodySchema },
-  output: { 200: ProblemDetailSchema, 404: ErrorBodySchema },
+  output: { 200: ProblemDetailSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
   handler: async (c) => {
-    const problem = await updateProblem(c.get('db'), c.input.params.id, c.input.body)
-    if (!problem) return c.error('not_found', 'Problem not found', { status: 404 })
-    return problem
+    const result = await updateProblem(c.get('db'), c.input.params.id, c.input.body)
+    if (result.ok) return c.json(result.problem, 200)
+
+    switch (result.error) {
+      case 'not_found':
+        return c.error('not_found', 'Problem not found', { status: 404 })
+      case 'problem_in_open_round':
+        return c.error(
+          'problem_in_open_round',
+          `Cannot change ${result.fields.join(' and ')} while the problem is in an open round`,
+          { status: 409 },
+        )
+    }
   },
 })
 

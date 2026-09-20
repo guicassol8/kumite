@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 
 import type { Db } from '../../db/client'
 import { problemsTable, problemTranslationsTable } from '../../db/schema'
+import { canonicalJson } from '../../lib/json'
 import type { Locale } from '../../lib/locale'
 import { LocaleSchema } from '../../lib/locale'
 
@@ -174,13 +175,68 @@ export async function listProblems(db: Db): Promise<ProblemSummary[]> {
   }))
 }
 
+/**
+ * Compares two test-case lists by value, the way Postgres compares the `jsonb`
+ * column they live in: object key order is irrelevant, array order is not.
+ *
+ * A reorder counts as a change on purpose. `caseResults[].index`
+ * (submissions.service.ts) is the position of the case at judging time, and
+ * `toResponseCases` matches a stored result to a case positionally — moving a
+ * case silently re-points every result already written.
+ */
+export function testCasesEqual(a: TestCase[], b: TestCase[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((testCase, index) => {
+    const other = b[index]
+    if (!other) return false
+    return (
+      testCase.hidden === other.hidden &&
+      canonicalJson(testCase.input) === canonicalJson(other.input) &&
+      canonicalJson(testCase.expected) === canonicalJson(other.expected)
+    )
+  })
+}
+
+/**
+ * The fields of a problem that feed `scoreSubmission` — `points` is the literal
+ * multiplier of the numerator and the hidden cases are the denominator. Changing
+ * either one mid-round leaves the round's teams prorated over incommensurable
+ * scales (#193). `difficulty` and `translations` touch neither, so they stay
+ * editable while a round is open.
+ */
+export type ScoringField = 'testCases' | 'points'
+
+export type UpdateProblemResult =
+  | { ok: true; problem: ProblemDetail }
+  | { ok: false; error: 'not_found' }
+  | { ok: false; error: 'problem_in_open_round'; fields: ScoringField[] }
+
 export async function updateProblem(
   db: Db,
   id: string,
   input: UpdateProblemBody,
-): Promise<ProblemDetail | null> {
+): Promise<UpdateProblemResult> {
   const [existing] = await db.select().from(problemsTable).where(eq(problemsTable.id, id))
-  if (!existing) return null
+  if (!existing) return { ok: false, error: 'not_found' }
+
+  // Compares values, never mere presence: the organizer's form rebuilds the
+  // whole patch body on every save (front/src/lib/problem-form.ts), so a guard
+  // on `input.testCases !== undefined` would refuse even a statement fix.
+  const changedScoringFields: ScoringField[] = []
+  if (input.testCases !== undefined && !testCasesEqual(input.testCases, existing.testCases)) {
+    changedScoringFields.push('testCases')
+  }
+  if (input.points !== undefined && input.points !== existing.points) {
+    changedScoringFields.push('points')
+  }
+
+  // Only pays for the round lookup when something that matters would move.
+  if (changedScoringFields.length > 0) {
+    const access = await getProblemRoundAccess(db, id)
+    if (access.status === 'open') {
+      return { ok: false, error: 'problem_in_open_round', fields: changedScoringFields }
+    }
+  }
 
   const patch: Partial<typeof problemsTable.$inferInsert> = {}
   if (input.difficulty !== undefined) patch.difficulty = input.difficulty
@@ -214,7 +270,9 @@ export async function updateProblem(
       })
   }
 
-  return getProblem(db, id)
+  const problem = await getProblem(db, id)
+  if (!problem) throw new Error('expected problem to still exist after update')
+  return { ok: true, problem }
 }
 
 export type PublishResult =

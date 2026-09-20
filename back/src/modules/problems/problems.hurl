@@ -214,6 +214,52 @@ HTTP 200
 [Asserts]
 jsonpath "$.status" == "open"
 
+# 10c-i. #193: with that round open, changing the test cases is refused. The
+# denominator of the hidden cases is what every score in the round is prorated
+# over, so moving it mid-round makes the round's teams incomparable.
+PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{
+  "testCases": [
+    { "input": [1, 2], "expected": 3, "hidden": false },
+    { "input": [2, 2], "expected": 4, "hidden": true },
+    { "input": [5, 5], "expected": 10, "hidden": true }
+  ]
+}
+HTTP 409
+[Asserts]
+jsonpath "$.error" == "problem_in_open_round"
+
+# 10c-ii. Changing `points` is refused for the same reason: it is the literal
+# multiplier of the numerator.
+PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "points": 250 }
+HTTP 409
+[Asserts]
+jsonpath "$.error" == "problem_in_open_round"
+
+# 10c-iii. The positive control for the third acceptance criterion: fixing the
+# statement mid-round still works, and resending the test cases and points
+# unchanged (which the organizer's form does on every save) is not an edit.
+PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{
+  "points": 100,
+  "translations": [ { "locale": "es", "title": "Suma", "statementMd": "Suma dos números." } ],
+  "testCases": [
+    { "input": [1, 2], "expected": 3, "hidden": false },
+    { "input": [2, 2], "expected": 4, "hidden": true }
+  ]
+}
+HTTP 200
+[Asserts]
+jsonpath "$.testCases" count == 2
+jsonpath "$.points" == 100
+
 # 10d. Participant read in es -> Spanish title and statement, only the
 # visible case (no `hidden` key anywhere, no trace of the hidden expected (4)),
 # and the round now reported as open with no bestSubmission query performed.
@@ -292,6 +338,22 @@ HTTP 200
 jsonpath "$.roundStatus" == "closed"
 jsonpath "$.roundId" == null
 jsonpath "$.bestSubmission" == null
+
+# 10k. #193, the other half of the third criterion: with no open round left,
+# editing the test cases is allowed again, exactly as before.
+PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{
+  "testCases": [
+    { "input": [1, 2], "expected": 3, "hidden": false },
+    { "input": [2, 2], "expected": 4, "hidden": true },
+    { "input": [5, 5], "expected": 10, "hidden": true }
+  ]
+}
+HTTP 200
+[Asserts]
+jsonpath "$.testCases" count == 3
 
 # 11. Archive -> terminal state.
 POST {{host}}/organizer/problems/{{problem_id}}/archive

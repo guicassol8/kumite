@@ -212,6 +212,7 @@
         },
         "saveFailed": "No se pudo guardar el problema. Intenta de nuevo.",
         "publishFailed": "No se pudo publicar el problema. Intenta de nuevo.",
+        "problemInOpenRound": "Los casos de prueba y los puntos no pueden cambiar mientras este problema está en una ronda abierta: los equipos ya puntuados quedarían sobre un denominador distinto al de los siguientes. Cierra la ronda para modificarlos; el enunciado y la dificultad siguen siendo editables ahora.",
         "loadFailed": "No se pudo cargar el problema.",
         "retry": "Intentar de nuevo",
         "notFound": "Problema no encontrado."

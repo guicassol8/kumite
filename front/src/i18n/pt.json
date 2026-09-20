@@ -212,6 +212,7 @@
         },
         "saveFailed": "Não foi possível salvar o problema. Tente novamente.",
         "publishFailed": "Não foi possível publicar o problema. Tente novamente.",
+        "problemInOpenRound": "Os casos de teste e a pontuação não podem mudar enquanto este problema está numa rodada aberta: as equipes já pontuadas ficariam sobre um denominador diferente do das próximas. Feche a rodada para alterá-los — o enunciado e a dificuldade continuam editáveis agora.",
         "loadFailed": "Não foi possível carregar o problema.",
         "retry": "Tentar novamente",
         "notFound": "Problema não encontrado."

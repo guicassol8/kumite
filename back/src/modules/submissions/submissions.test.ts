@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { signJwt } from '@katajs-framework/core/jwt'
 import { somaDosPares } from '@kumite/blocks'
 import { eq, sql } from 'drizzle-orm'
@@ -278,6 +280,137 @@ describe('submissions table', () => {
     })
 
     await expect(db.delete(usersTable).where(eq(usersTable.id, user.id))).rejects.toThrow()
+  })
+})
+
+// #193, migration 0022. The SQL under test is read from the migration file
+// itself, so the test cannot drift from what actually runs against the
+// database.
+describe('0022 backfill of the submission denominators', () => {
+  const backfillSql = readFileSync(
+    new URL('../../../drizzle/0022_backfill_submissions_denominators.sql', import.meta.url),
+    'utf8',
+  )
+
+  const legacySubmission = async (
+    problemId: string,
+    roundId: string,
+    userId: string,
+    teamId: string,
+    caseCount: number,
+    attemptNumber: number,
+  ) => {
+    const [row] = await db
+      .insert(submissionsTable)
+      .values({
+        problemId,
+        roundId,
+        userId,
+        teamId,
+        workspace: { blocks: { languageVersion: 0, blocks: [] } },
+        generatedCode: 'return 7',
+        caseResults: Array.from({ length: caseCount }, (_, index) => ({
+          index,
+          status: 'passed' as const,
+        })),
+        score: 50,
+        attemptNumber,
+        acceptedAt: new Date(),
+      })
+      .returning()
+    if (!row) throw new Error('expected a legacy submission fixture')
+    // The column did not exist when these rows were written.
+    await db
+      .update(submissionsTable)
+      .set({ maxScore: null, hiddenCaseCount: null })
+      .where(eq(submissionsTable.id, row.id))
+    return row.id
+  }
+
+  it('stamps only the rows that still have a witness, and says so about the rest', async () => {
+    // 1 visible + 4 hidden today.
+    const [problem] = await db
+      .insert(problemsTable)
+      .values({
+        difficulty: 'easy',
+        status: 'published',
+        points: 100,
+        testCases: [
+          { input: 1, expected: 1, hidden: false },
+          { input: 7, expected: 7, hidden: true },
+          { input: 3, expected: 3, hidden: true },
+          { input: 5, expected: 5, hidden: true },
+          { input: 9, expected: 9, hidden: true },
+        ],
+      })
+      .returning()
+    if (!problem) throw new Error('expected a problem fixture')
+    const [round] = await db
+      .insert(roundsTable)
+      .values({ name: 'Rodada 0022', durationMinutes: 30, status: 'closed' })
+      .returning()
+    if (!round) throw new Error('expected a round fixture')
+    const { user, team } = await insertTeamMember()
+
+    // The witness: judged over a set of the same size the problem still has.
+    const witnessed = await legacySubmission(problem.id, round.id, user.id, team.id, 5, 1)
+    // Proven stale: judged over three cases, the problem now has five.
+    const stale = await legacySubmission(problem.id, round.id, user.id, team.id, 3, 2)
+
+    await db.execute(sql.raw(backfillSql))
+
+    const rows = await db.select().from(submissionsTable)
+    const witnessedRow = rows.find((row) => row.id === witnessed)
+    const staleRow = rows.find((row) => row.id === stale)
+
+    expect(witnessedRow?.maxScore).toBe(100)
+    expect(witnessedRow?.hiddenCaseCount).toBe(4)
+    // Not five: the visible case is in case_results but is not a denominator.
+    expect(staleRow?.maxScore).toBeNull()
+    expect(staleRow?.hiddenCaseCount).toBeNull()
+  })
+
+  it('leaves a row with no case_results alone — an empty array witnesses nothing', async () => {
+    const problem = await insertProblem()
+    const { user, team } = await insertTeamMember()
+    const empty = await legacySubmission(problem.id, problem.roundId, user.id, team.id, 0, 1)
+
+    await db.execute(sql.raw(backfillSql))
+
+    const [row] = await db.select().from(submissionsTable).where(eq(submissionsTable.id, empty))
+    expect(row?.maxScore).toBeNull()
+    expect(row?.hiddenCaseCount).toBeNull()
+  })
+
+  it('never overwrites a stamp the application already wrote', async () => {
+    const problem = await insertProblem()
+    const { user, team } = await insertTeamMember()
+    const [row] = await db
+      .insert(submissionsTable)
+      .values({
+        problemId: problem.id,
+        roundId: problem.roundId,
+        userId: user.id,
+        teamId: team.id,
+        workspace: { blocks: { languageVersion: 0, blocks: [] } },
+        generatedCode: 'return 7',
+        caseResults: [],
+        score: 50,
+        maxScore: 40,
+        hiddenCaseCount: 9,
+        attemptNumber: 1,
+        acceptedAt: new Date(),
+      })
+      .returning()
+
+    await db.execute(sql.raw(backfillSql))
+
+    const [after] = await db
+      .select()
+      .from(submissionsTable)
+      .where(eq(submissionsTable.id, row?.id ?? ''))
+    expect(after?.maxScore).toBe(40)
+    expect(after?.hiddenCaseCount).toBe(9)
   })
 })
 
@@ -682,6 +815,66 @@ describe('submitSolution', () => {
         { index: 2, status: 'passed' },
         { index: 3, status: 'passed' },
       ])
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'stamps the denominator the score was prorated over (#193)',
+    async () => {
+      const problem = await insertPublishedProblem(
+        [
+          { input: [1, 2, 3, 4], expected: 6, hidden: false },
+          { input: [2, 4], expected: 6, hidden: true },
+          { input: [1, 3, 5], expected: 0, hidden: true },
+        ],
+        250,
+      )
+      const { user, team } = await insertTeamMember()
+
+      const result = expectSubmitted(
+        await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        ),
+      )
+
+      const [row] = await db.select().from(submissionsTable)
+      expect(row?.maxScore).toBe(250)
+      expect(row?.hiddenCaseCount).toBe(2)
+      // The stamp is the scale `score` lives on: reading back how many hidden
+      // cases passed has to give an integer, not an approximation.
+      const passedHidden = ((row?.score ?? 0) * (row?.hiddenCaseCount ?? 0)) / (row?.maxScore ?? 1)
+      expect(passedHidden).toBe(2)
+      // What the participant is told and what the row carries never disagree.
+      expect(result.maxScore).toBe(row?.maxScore)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'stamps the same denominator scoreSubmission divided by, on a partial score',
+    async () => {
+      const problem = await insertPublishedProblem([
+        { input: [2, 4], expected: 6, hidden: true },
+        { input: [2, 4], expected: 999, hidden: true },
+        { input: [1, 2], expected: 2, hidden: false },
+      ])
+      const { user, team } = await insertTeamMember()
+
+      await submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+      )
+
+      const [row] = await db.select().from(submissionsTable)
+      // Two hidden of three cases: a stamp that counted every case (3) or only
+      // the passing one (1) would both break this.
+      expect(row?.hiddenCaseCount).toBe(2)
+      expect(row?.score).toBe(50)
+      expect(row?.maxScore).toBe(100)
     },
     JUDGED_TEST_TIMEOUT_MS,
   )

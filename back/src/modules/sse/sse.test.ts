@@ -138,6 +138,7 @@ describe('sse.schema', () => {
         roundId: 'r1',
         roundName: 'Round 1',
         problemIds: ['p1'],
+        denominators: 'consistent' as const,
         teams: [
           {
             teamId: 't1',
@@ -146,7 +147,7 @@ describe('sse.schema', () => {
             totalScore: 100,
             totalAttempts: 3,
             tiebreakTimeMs: 5000,
-            problems: [{ problemId: 'p1', score: 100, attempts: 3 }],
+            problems: [{ problemId: 'p1', score: 100, attempts: 3, maxScore: 100 }],
           },
         ],
       },

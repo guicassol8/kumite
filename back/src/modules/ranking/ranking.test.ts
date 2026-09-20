@@ -14,6 +14,7 @@ import { closeRound, createRound, getProblemRoundAccess, openRound } from '../ro
 import { getBestSubmission } from '../submissions/submissions.service'
 
 import {
+  assessDenominators,
   getEventRanking,
   getRoundRanking,
   rankTeams,
@@ -30,7 +31,12 @@ describe('reduceBestPerProblem', () => {
   it('zeroes a team/key pair with no rows', () => {
     const result = reduceBestPerProblem([], ['team-a'], ['p1'])
 
-    expect(result.get('team-a')?.get('p1')).toEqual({ score: 0, attempts: 0, achievedAt: null })
+    expect(result.get('team-a')?.get('p1')).toEqual({
+      score: 0,
+      attempts: 0,
+      achievedAt: null,
+      maxScore: null,
+    })
   })
 
   it('picks the highest score and counts every attempt', () => {
@@ -44,6 +50,7 @@ describe('reduceBestPerProblem', () => {
       score: 80,
       attempts: 3,
       achievedAt: new Date('2026-09-01T10:05:00Z'),
+      maxScore: null,
     })
   })
 
@@ -58,6 +65,7 @@ describe('reduceBestPerProblem', () => {
       score: 80,
       attempts: 2,
       achievedAt: earliest,
+      maxScore: null,
     })
   })
 
@@ -81,29 +89,81 @@ describe('toScoringEntries', () => {
 
   it('measures elapsed time from the reference only when scored above zero', () => {
     const best = new Map([
-      ['p1', { score: 80, attempts: 2, achievedAt: new Date('2026-09-01T10:05:00Z') }],
-      ['p2', { score: 0, attempts: 1, achievedAt: new Date('2026-09-01T10:01:00Z') }],
+      [
+        'p1',
+        { score: 80, attempts: 2, achievedAt: new Date('2026-09-01T10:05:00Z'), maxScore: 100 },
+      ],
+      [
+        'p2',
+        { score: 0, attempts: 1, achievedAt: new Date('2026-09-01T10:01:00Z'), maxScore: 100 },
+      ],
     ])
 
     expect(toScoringEntries(best, ['p1', 'p2'], referenceTime)).toEqual([
-      { key: 'p1', score: 80, attempts: 2, elapsedMs: 5 * 60_000 },
-      { key: 'p2', score: 0, attempts: 1, elapsedMs: null },
+      { key: 'p1', score: 80, attempts: 2, elapsedMs: 5 * 60_000, maxScore: 100 },
+      { key: 'p2', score: 0, attempts: 1, elapsedMs: null, maxScore: 100 },
     ])
   })
 
   it('defaults a missing key to a zeroed entry', () => {
     expect(toScoringEntries(new Map(), ['p1'], referenceTime)).toEqual([
-      { key: 'p1', score: 0, attempts: 0, elapsedMs: null },
+      { key: 'p1', score: 0, attempts: 0, elapsedMs: null, maxScore: null },
     ])
+  })
+})
+
+describe('assessDenominators', () => {
+  const stamp = (problemId: string, maxScore: number | null, hiddenCaseCount: number | null) => ({
+    problemId,
+    maxScore,
+    hiddenCaseCount,
+  })
+
+  it('is consistent when every stamp of every problem agrees', () => {
+    expect(
+      assessDenominators([stamp('p1', 100, 2), stamp('p1', 100, 2), stamp('p2', 250, 5)]),
+    ).toBe('consistent')
+  })
+
+  it('is consistent over no submissions at all', () => {
+    expect(assessDenominators([])).toBe('consistent')
+  })
+
+  it('is inconsistent when one problem was judged over two hidden-case counts', () => {
+    // Exactly the situation the issue reports: the test cases changed between
+    // two submissions of the same round.
+    expect(assessDenominators([stamp('p1', 100, 2), stamp('p1', 100, 4)])).toBe('inconsistent')
+  })
+
+  it('is inconsistent when one problem was judged over two point values', () => {
+    expect(assessDenominators([stamp('p1', 100, 2), stamp('p1', 250, 2)])).toBe('inconsistent')
+  })
+
+  it('is not inconsistent merely because two different problems differ', () => {
+    expect(assessDenominators([stamp('p1', 100, 2), stamp('p2', 100, 4)])).toBe('consistent')
+  })
+
+  it('is unknown when a stamp is missing and nothing proves a mismatch', () => {
+    expect(assessDenominators([stamp('p1', 100, 2), stamp('p1', null, null)])).toBe('unknown')
+  })
+
+  it('is unknown when only half a stamp survived', () => {
+    expect(assessDenominators([stamp('p1', 100, null)])).toBe('unknown')
+  })
+
+  it('prefers a proven inconsistency over an unknown', () => {
+    expect(
+      assessDenominators([stamp('p1', 100, 2), stamp('p1', 100, 4), stamp('p1', null, null)]),
+    ).toBe('inconsistent')
   })
 })
 
 describe('sumScoring', () => {
   it('sums score and attempts, and elapsed time only over scored entries', () => {
     const entries: ScoringEntry[] = [
-      { key: 'p1', score: 80, attempts: 2, elapsedMs: 1000 },
-      { key: 'p2', score: 0, attempts: 3, elapsedMs: null },
-      { key: 'p3', score: 20, attempts: 1, elapsedMs: 500 },
+      { key: 'p1', score: 80, attempts: 2, elapsedMs: 1000, maxScore: 100 },
+      { key: 'p2', score: 0, attempts: 3, elapsedMs: null, maxScore: 100 },
+      { key: 'p3', score: 20, attempts: 1, elapsedMs: 500, maxScore: 100 },
     ]
 
     expect(sumScoring(entries)).toEqual({ totalScore: 100, totalAttempts: 6, tiebreakTimeMs: 1500 })
@@ -116,7 +176,7 @@ describe('sumScoring', () => {
 
 describe('rankTeams', () => {
   function entry(overrides: Partial<ScoringEntry> = {}): ScoringEntry {
-    return { key: 'p1', score: 0, attempts: 0, elapsedMs: null, ...overrides }
+    return { key: 'p1', score: 0, attempts: 0, elapsedMs: null, maxScore: null, ...overrides }
   }
 
   it('orders by total score, highest first', () => {
@@ -240,7 +300,15 @@ async function submit(
   teamId: string,
   problemId: string,
   score: number,
-  options: { attemptNumber?: number } = {},
+  options: {
+    attemptNumber?: number
+    // The scale this score was prorated over (#193). Defaults to the fixture
+    // problem's own 100 points over 2 hidden cases, which is what the
+    // application stamps today; pass `null` for a legacy row written before the
+    // stamp existed.
+    maxScore?: number | null
+    hiddenCaseCount?: number | null
+  } = {},
 ) {
   const user = await insertUser()
   await db.insert(submissionsTable).values({
@@ -252,6 +320,8 @@ async function submit(
     generatedCode: '',
     caseResults: [],
     score,
+    maxScore: options.maxScore === undefined ? 100 : options.maxScore,
+    hiddenCaseCount: options.hiddenCaseCount === undefined ? 2 : options.hiddenCaseCount,
     attemptNumber: options.attemptNumber ?? 1,
     acceptedAt: new Date(),
   })
@@ -299,8 +369,81 @@ describe('getRoundRanking', () => {
       ['Time B', 50, 2],
     ])
     expect(ranking?.teams[0]?.problems).toEqual([
-      { problemId: problem.id, score: 100, attempts: 1 },
+      { problemId: problem.id, score: 100, attempts: 1, maxScore: 100 },
     ])
+  })
+
+  // #193: the round now says which denominators its scores sit on, instead of
+  // assuming they all agree. Nothing is rescaled — see assessDenominators.
+  describe('denominators', () => {
+    const openRoundWith = async (problemId: string) => {
+      const created = await createRound(db, {
+        name: 'Rodada 193',
+        durationMinutes: 30,
+        problemIds: [problemId],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      return opened.round.id
+    }
+
+    it('reports consistent when every submission was judged on the same scale', async () => {
+      const problem = await insertProblem()
+      const teamA = await insertTeam('Time A')
+      const teamB = await insertTeam('Time B')
+      const roundId = await openRoundWith(problem.id)
+
+      await submit(roundId, teamA.id, problem.id, 100, { maxScore: 100, hiddenCaseCount: 2 })
+      await submit(roundId, teamB.id, problem.id, 50, { maxScore: 100, hiddenCaseCount: 2 })
+
+      const ranking = await getRoundRanking(db, roundId)
+
+      expect(ranking?.denominators).toBe('consistent')
+      expect(ranking?.teams.flatMap((team) => team.problems).map((p) => p.maxScore)).toEqual([
+        100, 100,
+      ])
+    })
+
+    it('reports inconsistent when the hidden-case count moved mid-round', async () => {
+      // The reproduction of the issue: Time A judged over 2 hidden cases, the
+      // organizer edited the problem, Time B judged over 4. Their totals are
+      // not comparable, and the round now says so.
+      const problem = await insertProblem()
+      const teamA = await insertTeam('Time A')
+      const teamB = await insertTeam('Time B')
+      const roundId = await openRoundWith(problem.id)
+
+      await submit(roundId, teamA.id, problem.id, 50, { maxScore: 100, hiddenCaseCount: 2 })
+      await submit(roundId, teamB.id, problem.id, 25, { maxScore: 100, hiddenCaseCount: 4 })
+
+      const ranking = await getRoundRanking(db, roundId)
+
+      expect(ranking?.denominators).toBe('inconsistent')
+      // Reported, never repaired: the scores are exactly the ones on the rows.
+      expect(ranking?.teams.map((team) => team.totalScore)).toEqual([50, 25])
+    })
+
+    it('reports unknown when a counted submission predates the stamp', async () => {
+      const problem = await insertProblem()
+      const teamA = await insertTeam('Time A')
+      const roundId = await openRoundWith(problem.id)
+
+      await submit(roundId, teamA.id, problem.id, 50, { maxScore: null, hiddenCaseCount: null })
+
+      const ranking = await getRoundRanking(db, roundId)
+
+      expect(ranking?.denominators).toBe('unknown')
+      expect(ranking?.teams[0]?.problems[0]?.maxScore).toBeNull()
+    })
+
+    it('reports consistent for a round with no submissions at all', async () => {
+      const problem = await insertProblem()
+      await insertTeam('Time A')
+      const roundId = await openRoundWith(problem.id)
+
+      expect((await getRoundRanking(db, roundId))?.denominators).toBe('consistent')
+    })
   })
 
   it('keeps a team that submitted and scored zero ahead of one that never submitted', async () => {
@@ -441,7 +584,7 @@ describe('getRoundRanking', () => {
     // 40, the second round's score — not 100, the best across both rounds.
     expect(pageScore?.score).toBe(40)
     expect(secondRanking?.teams[0]?.problems).toEqual([
-      { problemId: problem.id, score: 40, attempts: 1 },
+      { problemId: problem.id, score: 40, attempts: 1, maxScore: 100 },
     ])
   })
 

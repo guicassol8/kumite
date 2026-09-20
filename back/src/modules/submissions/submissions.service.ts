@@ -155,15 +155,25 @@ export function scoreSubmission(
   results: JudgeCaseResult[],
   points: number,
 ): number {
-  let hiddenCount = 0
+  const hiddenCount = countHiddenCases(testCases)
   let passedCount = 0
   for (const [index, testCase] of testCases.entries()) {
     if (!testCase.hidden) continue
-    hiddenCount++
     if (results[index]?.outcome === 'passed') passedCount++
   }
 
   return hiddenCount === 0 ? 0 : Math.round((points * passedCount) / hiddenCount)
+}
+
+/**
+ * The denominator every score is prorated over.
+ *
+ * Extracted so the number stamped into `submissions.hidden_case_count` and the
+ * number `scoreSubmission` divides by are the same expression, not two readings
+ * that could drift apart (#193).
+ */
+export function countHiddenCases(testCases: TestCase[]): number {
+  return testCases.filter((testCase) => testCase.hidden).length
 }
 
 /** What goes in `submissions.case_results`: the full picture, hidden included. */
@@ -323,6 +333,11 @@ export async function submitSolution(
           generatedCode: generated.source,
           caseResults: toPersistedCaseResults(results),
           score,
+          // The scale `score` was computed on, stamped from the same `problem`
+          // row `scoreSubmission` just used (#193). Re-reading the problem here
+          // would reopen the very window this issue is about.
+          maxScore: problem.points,
+          hiddenCaseCount: countHiddenCases(problem.testCases),
           attemptNumber,
           acceptedAt,
         })
@@ -345,7 +360,9 @@ export async function submitSolution(
         submissionId: submission.id,
         attemptNumber,
         score,
-        maxScore: problem.points,
+        // The value just stamped on the row, so what the participant is told
+        // and what the ranking will read can never disagree (#193).
+        maxScore: submission.maxScore ?? problem.points,
         cases: toResponseCases(problem.testCases, results),
       },
     }

@@ -32,8 +32,22 @@ export const submissionCaseStatusEnum = pgEnum('submission_case_status', [
 
 export type TestCase = { input: JsonValue; expected: JsonValue; hidden: boolean }
 
-// Explicit `index`, not a positional array: a submission's results stay
-// readable even if a problem's test cases are reordered later.
+// `index` is the position of the case **at judging time** — `toPersistedCaseResults`
+// numbers the judge's results as they come, and `toResponseCases` matches a
+// stored result back to a case positionally. It does NOT survive a reorder, so
+// it is not what keeps a submission's history meaningful.
+//
+// What does, since #193: while the round is open, `updateProblem` refuses any
+// change to the test cases or the points, so the indices cannot move under a
+// score that is still being ranked; and `max_score`/`hidden_case_count` below
+// stamp the denominator each score was actually computed against. Outside an
+// open round the edit is allowed again (the issue's third criterion), so the
+// indices of old submissions can still age — today no production path reads
+// this column, it is forensic only.
+//
+// Its one lasting use is as a witness of size: `jsonb_array_length(case_results)`
+// is the number of test cases the problem had at judging time, which is what
+// migration 0022 used to decide which legacy rows it could honestly backfill.
 export type SubmissionCaseResult = {
   index: number
   status: (typeof submissionCaseStatusEnum.enumValues)[number]
@@ -266,6 +280,24 @@ export const submissionsTable = pgTable(
     generatedCode: text('generated_code').notNull(),
     caseResults: jsonb('case_results').notNull().default([]).$type<SubmissionCaseResult[]>(),
     score: integer('score').notNull(),
+    // The denominator this score was actually prorated over, stamped at INSERT
+    // from the very same `problem` row `scoreSubmission` just divided by (#193):
+    // `maxScore` is the problem's `points` at judging time and `hiddenCaseCount`
+    // its number of hidden cases. Without them `score` is an integer with no
+    // scale attached, and the ranking sums prorations over denominators that may
+    // differ — which is exactly the unfairness #193 reports.
+    //
+    // NULLABLE on purpose, and with no `SET NOT NULL` follow-up migration —
+    // this is the deliberate departure from the 0018→0019→0020 pattern. There
+    // the legacy value was derivable (`accepted_at` fell back to `created_at`).
+    // Here the denominator of the day is recorded nowhere: not in `submissions`,
+    // not in `problems` (which keeps no history), not in any log. Forcing
+    // NOT NULL would mean writing a guess, and a guess stored as fact is the
+    // very defect this issue exists to remove. So NULL has a meaning of its own:
+    // "judged before the stamp existed, and the denominator of that moment was
+    // never recorded". Application writes always fill both, so no new row is null.
+    maxScore: integer('max_score'),
+    hiddenCaseCount: integer('hidden_case_count'),
     attemptNumber: integer('attempt_number').notNull(),
     // When the submission passed the accept gate (isProblemInOpenRound),
     // stamped before codegen/judging — unlike createdAt, which is the INSERT

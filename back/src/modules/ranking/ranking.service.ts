@@ -4,7 +4,7 @@ import type { Db } from '../../db/client'
 import { roundProblemsTable, roundsTable, submissionsTable, teamsTable } from '../../db/schema'
 import { reapExpiredRound } from '../rounds/rounds.service'
 
-import type { EventRanking, RoundRanking } from './ranking.schema'
+import type { DenominatorVerdict, EventRanking, RoundRanking } from './ranking.schema'
 
 // --- Pure scoring/ranking core (#43) ---
 //
@@ -15,9 +15,23 @@ import type { EventRanking, RoundRanking } from './ranking.schema'
 
 /** One submission, reduced to what scoring needs: who, for what key
  * (a problemId in a round, or a roundId in the event), how much, and when. */
-export type ScoringRow = { teamId: string; key: string; score: number; acceptedAt: Date }
+export type ScoringRow = {
+  teamId: string
+  key: string
+  score: number
+  acceptedAt: Date
+  // The scale `score` sits on, stamped at judging time (#193). Absent for the
+  // event-wide aggregation, where a key is a round and no single maximum
+  // applies; `null` for a submission judged before the stamp existed.
+  maxScore?: number | null
+}
 
-export type BestEntry = { score: number; attempts: number; achievedAt: Date | null }
+export type BestEntry = {
+  score: number
+  attempts: number
+  achievedAt: Date | null
+  maxScore: number | null
+}
 
 /**
  * For every (team, key) pair in `teamIds` x `keys`, the best-scoring row
@@ -49,7 +63,7 @@ export function reduceBestPerProblem(
     for (const key of keys) {
       const group = grouped.get(`${teamId}\0${key}`)
       if (!group || group.length === 0) {
-        perKey.set(key, { score: 0, attempts: 0, achievedAt: null })
+        perKey.set(key, { score: 0, attempts: 0, achievedAt: null, maxScore: null })
         continue
       }
 
@@ -63,7 +77,13 @@ export function reduceBestPerProblem(
           best = row
         }
       }
-      perKey.set(key, { score: best.score, attempts: group.length, achievedAt: best.acceptedAt })
+      perKey.set(key, {
+        score: best.score,
+        attempts: group.length,
+        achievedAt: best.acceptedAt,
+        // The scale of the submission that actually counts, not of the group.
+        maxScore: best.maxScore ?? null,
+      })
     }
     result.set(teamId, perKey)
   }
@@ -77,6 +97,7 @@ export type ScoringEntry = {
   score: number
   attempts: number
   elapsedMs: number | null
+  maxScore: number | null
 }
 
 /** Converts one team's `reduceBestPerProblem` row into `ScoringEntry[]`,
@@ -87,13 +108,57 @@ export function toScoringEntries(
   referenceTime: Date,
 ): ScoringEntry[] {
   return keys.map((key) => {
-    const entry = best.get(key) ?? { score: 0, attempts: 0, achievedAt: null }
+    const entry = best.get(key) ?? { score: 0, attempts: 0, achievedAt: null, maxScore: null }
     const elapsedMs =
       entry.score > 0 && entry.achievedAt
         ? entry.achievedAt.getTime() - referenceTime.getTime()
         : null
-    return { key, score: entry.score, attempts: entry.attempts, elapsedMs }
+    return {
+      key,
+      score: entry.score,
+      attempts: entry.attempts,
+      elapsedMs,
+      maxScore: entry.maxScore,
+    }
   })
+}
+
+/** One counted submission's stamp, as `assessDenominators` reads it. */
+export type DenominatorStamp = {
+  problemId: string
+  maxScore: number | null
+  hiddenCaseCount: number | null
+}
+
+/**
+ * The round's verdict on its own comparability (#193).
+ *
+ * Deliberately reports rather than repairs: rescaling an old score would need
+ * the number of hidden cases it passed, and that is not recoverable from a
+ * rounded integer (nor from `case_results`, which does not say which cases were
+ * hidden). So the round states the denominators it used instead of assuming
+ * they agree. See `DenominatorVerdictSchema` for what each value means.
+ */
+export function assessDenominators(stamps: DenominatorStamp[]): DenominatorVerdict {
+  const scalesByProblem = new Map<string, Set<string>>()
+  let sawUnstamped = false
+
+  for (const stamp of stamps) {
+    if (stamp.maxScore === null || stamp.hiddenCaseCount === null) {
+      sawUnstamped = true
+      continue
+    }
+    const scales = scalesByProblem.get(stamp.problemId) ?? new Set<string>()
+    scales.add(`${stamp.maxScore}/${stamp.hiddenCaseCount}`)
+    scalesByProblem.set(stamp.problemId, scales)
+  }
+
+  // Proof beats absence of proof: a round that both contains a legacy row and
+  // demonstrably mixes two scales is inconsistent, not merely unknown.
+  for (const scales of scalesByProblem.values()) {
+    if (scales.size > 1) return 'inconsistent'
+  }
+  return sawUnstamped ? 'unknown' : 'consistent'
 }
 
 export type ScoringSummary = { totalScore: number; totalAttempts: number; tiebreakTimeMs: number }
@@ -166,8 +231,8 @@ async function fetchSubmissionRows(
   db: Db,
   problemIds: string[],
   roundId: string,
-): Promise<ScoringRow[]> {
-  if (problemIds.length === 0) return []
+): Promise<{ rows: ScoringRow[]; stamps: DenominatorStamp[] }> {
+  if (problemIds.length === 0) return { rows: [], stamps: [] }
 
   const rows = await db
     .select({
@@ -175,18 +240,32 @@ async function fetchSubmissionRows(
       problemId: submissionsTable.problemId,
       score: submissionsTable.score,
       acceptedAt: submissionsTable.acceptedAt,
+      // The scale each score was computed on (#193), read instead of assumed.
+      maxScore: submissionsTable.maxScore,
+      hiddenCaseCount: submissionsTable.hiddenCaseCount,
     })
     .from(submissionsTable)
     .where(
       and(eq(submissionsTable.roundId, roundId), inArray(submissionsTable.problemId, problemIds)),
     )
 
-  return rows.map((row) => ({
-    teamId: row.teamId,
-    key: row.problemId,
-    score: row.score,
-    acceptedAt: row.acceptedAt,
-  }))
+  return {
+    rows: rows.map((row) => ({
+      teamId: row.teamId,
+      key: row.problemId,
+      score: row.score,
+      acceptedAt: row.acceptedAt,
+      maxScore: row.maxScore,
+    })),
+    // Every submission of the round, not just the best of each team: a
+    // denominator that moved mid-round shows up in any two rows that straddle
+    // the edit, whichever of them ends up counting.
+    stamps: rows.map((row) => ({
+      problemId: row.problemId,
+      maxScore: row.maxScore,
+      hiddenCaseCount: row.hiddenCaseCount,
+    })),
+  }
 }
 
 // closedAt is not part of this: a round's submissions are the rows stamped
@@ -200,11 +279,15 @@ async function computeRoundEntries(
   db: Db,
   round: AnnouncedRound,
   teamIds: string[],
-): Promise<{ problemIds: string[]; entriesByTeam: Map<string, ScoringEntry[]> }> {
+): Promise<{
+  problemIds: string[]
+  entriesByTeam: Map<string, ScoringEntry[]>
+  denominators: DenominatorVerdict
+}> {
   if (!round.openedAt) throw new Error('expected an announced round to have openedAt')
 
   const problemIds = await fetchRoundProblemIds(db, round.id)
-  const rows = await fetchSubmissionRows(db, problemIds, round.id)
+  const { rows, stamps } = await fetchSubmissionRows(db, problemIds, round.id)
   const best = reduceBestPerProblem(rows, teamIds, problemIds)
 
   const entriesByTeam = new Map<string, ScoringEntry[]>()
@@ -212,7 +295,7 @@ async function computeRoundEntries(
     const bestForTeam = best.get(teamId) ?? new Map<string, BestEntry>()
     entriesByTeam.set(teamId, toScoringEntries(bestForTeam, problemIds, round.openedAt))
   }
-  return { problemIds, entriesByTeam }
+  return { problemIds, entriesByTeam, denominators: assessDenominators(stamps) }
 }
 
 /**
@@ -227,7 +310,7 @@ export async function getRoundRanking(db: Db, roundId: string): Promise<RoundRan
   if (!round || round.status === 'draft') return null
 
   const teams = await fetchTeams(db)
-  const { problemIds, entriesByTeam } = await computeRoundEntries(
+  const { problemIds, entriesByTeam, denominators } = await computeRoundEntries(
     db,
     round,
     teams.map((team) => team.id),
@@ -253,6 +336,7 @@ export async function getRoundRanking(db: Db, roundId: string): Promise<RoundRan
     roundId: round.id,
     roundName: round.name,
     problemIds,
+    denominators,
     teams: ranked.map((team) => ({
       teamId: team.teamId,
       teamName: team.teamName,
@@ -264,6 +348,7 @@ export async function getRoundRanking(db: Db, roundId: string): Promise<RoundRan
         problemId: entry.key,
         score: entry.score,
         attempts: entry.attempts,
+        maxScore: entry.maxScore,
       })),
     })),
   }
@@ -298,6 +383,10 @@ export async function getEventRanking(db: Db): Promise<EventRanking> {
         score: summary.totalScore,
         attempts: summary.totalAttempts,
         elapsedMs: summary.totalScore > 0 ? summary.tiebreakTimeMs : null,
+        // A key here is a whole round, which has no single maximum: the
+        // per-problem stamps do not add up to one number, and EventRanking
+        // never exposes it.
+        maxScore: null,
       })
     }
   }

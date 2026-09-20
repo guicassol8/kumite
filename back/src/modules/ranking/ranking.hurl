@@ -187,6 +187,13 @@ jsonpath "$.teams[0].teamName" == "Ranking E2E Time A"
 jsonpath "$.teams[0].totalScore" == 100
 jsonpath "$.teams[0].rank" == 1
 jsonpath "$.teams[0].problems[0].score" == 100
+# #193: both submissions were judged against the same problem, untouched since
+# it was published, so the round declares its scores comparable — and each
+# entry carries the maximum its own score was computed against, instead of the
+# problem's points read live.
+jsonpath "$.denominators" == "consistent"
+jsonpath "$.teams[0].problems[0].maxScore" == 100
+jsonpath "$.teams[1].problems[0].maxScore" == 100
 jsonpath "$.teams[1].teamName" == "Ranking E2E Time B"
 jsonpath "$.teams[1].totalScore" == 50
 jsonpath "$.teams[1].rank" == 2

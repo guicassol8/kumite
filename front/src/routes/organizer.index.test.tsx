@@ -259,6 +259,44 @@ describe('organizer overview', () => {
     expect(mockedRankingGet).toHaveBeenCalledWith({ param: { id: 'r-closed' } })
   })
 
+  // Achado #10 (#185): the podium is a ranking like any other, so a team
+  // stored blank before the fix used to take a podium place with nothing
+  // written on it — the organizer's own dashboard, and the one render point
+  // the first pass missed.
+  it('labels a blank-named team on the podium instead of leaving it nameless', async () => {
+    mockedStatsGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        stats({
+          submissions: { total: 120, inRound: 9 },
+          round: {
+            active: null,
+            lastClosed: roundRef({
+              id: 'r-closed',
+              name: 'Rodada 2',
+              status: 'closed',
+              closedAt: '2026-09-02T13:00:00.000Z',
+            }),
+          },
+        }),
+      ),
+    )
+    mockedRankingGet.mockResolvedValue(
+      jsonResponse(200, {
+        roundId: 'r-closed',
+        roundName: 'Rodada 2',
+        problemIds: [],
+        teams: [rankingTeam({ teamName: '   ' })],
+      }),
+    )
+
+    renderScreen()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('overview-round-podium-t1').textContent).toContain('Time sem nome'),
+    )
+  })
+
   it('offers the four panel shortcuts', async () => {
     mockedStatsGet.mockResolvedValue(jsonResponse(200, stats()))
 

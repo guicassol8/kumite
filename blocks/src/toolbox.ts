@@ -132,6 +132,27 @@ export const allowedBlockTypes: readonly string[] = [
   ...CURATED_CATEGORIES.flatMap((category) => category.blocks),
 ]
 
+/**
+ * Dropdown values the curated toolbox subtracts from blocks it otherwise
+ * offers, by block type and field name.
+ *
+ * `allowedBlockTypes` is granular per type and cannot express "this block, but
+ * not that one mode", so this is its companion: a declarative table, read by
+ * the editor (`defineKumiteBlocks` removes the options) and by the judge
+ * (`generateSolution` refuses a serialized state that still carries one).
+ *
+ * `lists_getIndex` with `WHERE=RANDOM` emits `listsGetRandomItem`, i.e.
+ * `Math.floor(Math.random() * ...)`: the same workspace passed "Run" and
+ * failed "Submit", and re-judged differently on every attempt (#182). It is
+ * the only non-deterministic option in the whole curated toolbox —
+ * `determinism.test.ts` is what keeps that true for the next block added here.
+ */
+export const deniedFieldValues: Readonly<
+  Record<string, Readonly<Record<string, readonly string[]>>>
+> = {
+  lists_getIndex: { WHERE: ['RANDOM'] },
+}
+
 type SerializedBlock = { type?: string; [key: string]: unknown }
 type SerializedBlocks = { languageVersion?: number; blocks?: SerializedBlock[] }
 

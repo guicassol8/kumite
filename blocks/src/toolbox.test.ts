@@ -8,6 +8,7 @@ import {
   allowedBlockTypes,
   buildToolbox,
   CREATE_VARIABLE_BUTTON_KEY,
+  deniedFieldValues,
   emptyWorkspaceState,
   VARIABLES_CATEGORY_KEY,
   variablesFlyout,
@@ -214,6 +215,29 @@ describe('allowedBlockTypes', () => {
 
   it('has no duplicates', () => {
     expect(new Set(allowedBlockTypes).size).toBe(allowedBlockTypes.length)
+  })
+})
+
+describe('deniedFieldValues', () => {
+  it('never names a block the toolbox does not offer', () => {
+    // The table is a subtraction from the curated toolbox: citing a type that
+    // is not in `allowedBlockTypes` would be a rule nothing could ever apply.
+    for (const type of Object.keys(deniedFieldValues)) {
+      expect(allowedBlockTypes, type).toContain(type)
+    }
+  })
+
+  it('denies the RANDOM mode of lists_getIndex — the one non-deterministic option (#182)', () => {
+    expect(deniedFieldValues.lists_getIndex?.WHERE).toContain('RANDOM')
+  })
+
+  it('never carries an entry that denies nothing', () => {
+    for (const [type, fields] of Object.entries(deniedFieldValues)) {
+      expect(Object.keys(fields).length, type).toBeGreaterThan(0)
+      for (const [field, values] of Object.entries(fields)) {
+        expect(values.length, `${type}.${field}`).toBeGreaterThan(0)
+      }
+    }
   })
 })
 

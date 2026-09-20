@@ -18,6 +18,7 @@ export {
   allowedBlockTypes,
   buildToolbox,
   CREATE_VARIABLE_BUTTON_KEY,
+  deniedFieldValues,
   emptyWorkspaceState,
   VARIABLES_CATEGORY_KEY,
   variablesFlyout,

@@ -1,7 +1,12 @@
 import { expect, test } from '@playwright/test'
 
 import { seedParticipantToken } from './support/editor-fixture'
-import { BACK_URL, E2E_PARTICIPANT_NAME } from './support/rounds'
+import {
+  BACK_URL,
+  E2E_PARTICIPANT_NAME,
+  hasOrganizerCredentials,
+  organizerAuthHeader,
+} from './support/rounds'
 
 // Repro + visual walkthrough for #190: the password change succeeds (204) but
 // the `GET /me` that follows it fails. The screen used to navigate to the home
@@ -19,13 +24,13 @@ const NEW_PASSWORD = 'brand-new-password'
 const stamp = Date.now()
 const participantEmail = `change-password-refresh-e2e-${stamp}@edu.pucrs.br`
 
-async function apiSignupAndLogin(): Promise<string> {
+async function apiSignupAndLogin(email = participantEmail): Promise<string> {
   await fetch(`${BACK_URL}/auth/signup`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       name: E2E_PARTICIPANT_NAME,
-      email: participantEmail,
+      email,
       password: PASSWORD,
       code: 'PUCRS2026',
     }),
@@ -33,10 +38,30 @@ async function apiSignupAndLogin(): Promise<string> {
   const res = await fetch(`${BACK_URL}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: participantEmail, password: PASSWORD }),
+    body: JSON.stringify({ email, password: PASSWORD }),
   })
   const { token } = (await res.json()) as { token: string }
   return token
+}
+
+async function apiMyId(token: string): Promise<string> {
+  const res = await fetch(`${BACK_URL}/me`, { headers: { Authorization: `Bearer ${token}` } })
+  const { id } = (await res.json()) as { id: string }
+  return id
+}
+
+// The only way to flag an account: the on-site reset of #143. Done through the
+// API rather than the organizer UI, which `organizer-reset-password.spec.ts`
+// already walks — here it is a fixture, not the thing under test.
+async function apiOrganizerReset(userId: string): Promise<string> {
+  const auth = await organizerAuthHeader()
+  const res = await fetch(`${BACK_URL}/organizer/users/${userId}/reset-password`, {
+    method: 'POST',
+    headers: { ...auth, 'content-type': 'application/json' },
+    body: JSON.stringify({ adminPassword: process.env.ORGANIZER_PASSWORD }),
+  })
+  const { temporaryPassword } = (await res.json()) as { temporaryPassword: string }
+  return temporaryPassword
 }
 
 test.describe('change-password refresh failure (#190)', () => {
@@ -81,5 +106,39 @@ test.describe('change-password refresh failure (#190)', () => {
     await expect(page.getByTestId('change-password-refresh-error')).toHaveCount(0)
     await expect(page.getByTestId('header-user-email')).toBeVisible()
     await page.screenshot({ path: evidence('02-retry-recuperado'), fullPage: true })
+  })
+})
+
+// AC3 of #190, in the browser: a flagged account that clicks somewhere else is
+// bounced back here by `requireAuth`, and the screen now says why instead of
+// silently swapping the page under the user. Needs the organizer credentials
+// because flagging an account is an organizer-only action.
+test.describe('change-password bounce notice (#190)', () => {
+  test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
+
+  test('explains why a guard sent the user back', async ({ page }) => {
+    const bouncedEmail = `change-password-bounce-e2e-${stamp}@edu.pucrs.br`
+    const token = await apiSignupAndLogin(bouncedEmail)
+    const temporaryPassword = await apiOrganizerReset(await apiMyId(token))
+
+    // Signing in with the temporary password lands on the change screen by way
+    // of login.tsx, which carries no notice — the generic copy is the right one
+    // there, since nothing was taken away from the user.
+    await page.goto('/login')
+    await page.getByTestId('login-email-input').fill(bouncedEmail)
+    await page.getByTestId('login-password-input').fill(temporaryPassword)
+    await page.getByTestId('login-submit-button').click()
+    await expect(page).toHaveURL(/\/change-password$/)
+    await expect(page.getByTestId('change-password-required-notice')).toBeVisible()
+    await expect(page.getByTestId('change-password-bounced-notice')).toHaveCount(0)
+    await page.screenshot({ path: evidence('03-chegada-pelo-login'), fullPage: true })
+
+    // Asking for another screen is where the bounce happens — and this is what
+    // used to be silent.
+    await page.goto('/teams')
+    await expect(page).toHaveURL(/\/change-password\?notice=required$/)
+    await expect(page.getByTestId('change-password-bounced-notice')).toBeVisible()
+    await expect(page.getByTestId('change-password-required-notice')).toHaveCount(0)
+    await page.screenshot({ path: evidence('04-bounce-com-motivo'), fullPage: true })
   })
 })

@@ -91,6 +91,14 @@ test.describe('deterministic list blocks (#182)', () => {
     await expect(menu).toBeVisible()
     await expect(menu.locator('.blocklyMenuItem')).toHaveCount(4)
     await expect(menu.getByText('aleatório')).toHaveCount(0)
+    // Blockly fades the drop-down in. `toBeVisible` is already true at the
+    // first frame, so screenshotting here catches a half-transparent menu and
+    // the evidence is unreadable — wait for the transition to land instead.
+    await expect
+      .poll(() =>
+        page.locator('.blocklyDropDownDiv').evaluate((el) => getComputedStyle(el).opacity),
+      )
+      .toBe('1')
     await page.screenshot({ path: evidence('02-dropdown-sem-aleatorio') })
   })
 
@@ -115,7 +123,11 @@ test.describe('deterministic list blocks (#182)', () => {
     const block = page.locator(LIST_BLOCK)
     await expect(block).toHaveCount(1)
     await expect(block.getByText('aleatório')).toHaveCount(0)
-    await expect(block.getByText('#', { exact: true })).toBeVisible()
+    // `nº` is Blockly's pt-BR label for `FROM_START`, the field's first
+    // option and so the value it falls back to: an indexed read, which is
+    // deterministic. The `AT` socket it brings back is the proof the
+    // fallback went through the field's own validator.
+    await expect(block.getByText('nº', { exact: true })).toBeVisible()
     await page.screenshot({ path: evidence('03-solucao-salva-coagida') })
   })
 })

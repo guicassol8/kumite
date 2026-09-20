@@ -13,6 +13,7 @@ import { useRoundStream } from '@/hooks/use-round-stream'
 import { formatDate } from '@/i18n/format'
 import { fetchRoundRanking } from '@/lib/ranking-query'
 import { fetchOrganizerStats, ORGANIZER_STATS_QUERY_KEY } from '@/lib/stats-query'
+import { displayTeamName } from '@/lib/team-name'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/organizer/')({
@@ -290,7 +291,10 @@ function OrganizerOverviewScreen() {
                             {team.rank}
                           </span>
                           <span className="min-w-0 flex-1 wrap-anywhere font-medium text-sm">
-                            {team.teamName}
+                            {/* Achado #10: the podium is a ranking like any
+                                other, so a team stored blank before #185 would
+                                take a podium place with nothing written on it. */}
+                            {displayTeamName(team.teamName, t('teams.unnamed'))}
                           </span>
                           <span className="font-display font-semibold text-sm tabular-nums">
                             {t('organizer.overview.round.podiumPoints', {

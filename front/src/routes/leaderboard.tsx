@@ -20,6 +20,7 @@ import { positionLabel } from '@/lib/round-position'
 import { fetchRounds, ROUNDS_QUERY_KEY } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
 import type { EventRankingTeam, RoundRanking, RoundRankingTeam } from '@/lib/sse-schema'
+import { displayTeamName } from '@/lib/team-name'
 import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 import { cn } from '@/lib/utils'
 
@@ -310,7 +311,7 @@ function LeaderboardScreen() {
       mobileLabel: t('leaderboard.columns.team'),
       cell: (row) => (
         <div className="flex items-center gap-2">
-          <span>{row.teamName}</span>
+          <span>{displayTeamName(row.teamName, t('teams.unnamed'))}</span>
           {row.teamId === myTeamId && (
             <Badge variant="brand" data-testid="leaderboard-your-team-badge">
               {t('teams.yourTeamBadge')}

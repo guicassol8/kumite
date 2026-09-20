@@ -357,6 +357,92 @@ describe('TeamsScreen — creating a team', () => {
     expect(mockedCreate).not.toHaveBeenCalled()
   })
 
+  // Achado #10: "   " passed the front's min(1) and the back's, so a team with
+  // no visible name was created and then rendered as an empty cell.
+  it('rejects a whitespace-only name before touching the API', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope({ teams: [] })))
+    renderTeams()
+    await openCreateDialog()
+
+    fillAndSubmit('   ')
+
+    const error = await screen.findByTestId('teams-create-name-error')
+    expect(error.textContent).toContain('Informe o nome do time')
+    expect(mockedCreate).not.toHaveBeenCalled()
+  })
+
+  // Achado #11: what reaches the API is the normalized name, so the unique
+  // index sees "Os Dragoes " and "Os Dragoes" as the same team.
+  it('sends the normalized name', async () => {
+    mockedList.mockResolvedValueOnce(jsonResponse(200, envelope({ teams: [] })))
+    mockedCreate.mockResolvedValue(jsonResponse(201, { id: 't2', name: 'Novo Time' }))
+    renderTeams()
+    await openCreateDialog()
+
+    mockedList.mockResolvedValueOnce(jsonResponse(200, envelope({ myTeamId: 't2' })))
+    fillAndSubmit('  Novo   Time  ')
+
+    await waitFor(() => expect(mockedCreate).toHaveBeenCalledWith({ json: { name: 'Novo Time' } }))
+  })
+
+  it('puts a 422 about the name on the name field, not on the form', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope({ teams: [] })))
+    mockedCreate.mockResolvedValue(
+      jsonResponse(422, {
+        error: 'validation_failed',
+        issues: {
+          body: [
+            {
+              path: 'name',
+              message: 'String must contain at least 1 character(s)',
+              code: 'too_small',
+            },
+          ],
+        },
+      }),
+    )
+    renderTeams()
+    await openCreateDialog()
+
+    fillAndSubmit('Novo Time')
+
+    const error = await screen.findByTestId('teams-create-name-error')
+    expect(error.textContent).toContain('Informe o nome do time')
+    expect(screen.queryByTestId('teams-create-form-error')).toBeNull()
+  })
+
+  it('translates a 422 that names no known code', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope({ teams: [] })))
+    mockedCreate.mockResolvedValue(
+      jsonResponse(422, {
+        error: 'validation_failed',
+        issues: { body: [{ path: 'name', message: 'Invalid', code: 'custom' }] },
+      }),
+    )
+    renderTeams()
+    await openCreateDialog()
+
+    fillAndSubmit('Novo Time')
+
+    const error = await screen.findByTestId('teams-create-name-error')
+    // The catalog string, never `issue.message` — kata hands back zod's own
+    // English text.
+    expect(error.textContent).toContain('Nome de time inválido')
+  })
+
+  it('falls back to a form-level error for a 422 that names no field', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, envelope({ teams: [] })))
+    mockedCreate.mockResolvedValue(
+      jsonResponse(422, { error: 'validation_failed', issues: { body: [] } }),
+    )
+    renderTeams()
+    await openCreateDialog()
+
+    fillAndSubmit('Novo Time')
+
+    expect(await screen.findByTestId('teams-create-form-error')).toBeDefined()
+  })
+
   it('opens the same dialog from the empty-state shortcut', async () => {
     mockedList.mockResolvedValue(jsonResponse(200, envelope({ teams: [] })))
     renderTeams()

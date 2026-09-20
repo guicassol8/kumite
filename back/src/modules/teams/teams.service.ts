@@ -16,6 +16,23 @@ import type {
   TeamsList,
 } from './teams.schema'
 
+// Achados #10 and #11: the name used to reach both the length check and the
+// insert exactly as typed, so "   " was a valid 3-character name and
+// "Os Dragoes " sailed past teams_lower_name_idx, which folds case but not
+// whitespace — leaving two teams nobody can tell apart on the leaderboard.
+//
+// It lives here rather than in a `z.transform()` inside teams.schema.ts on
+// purpose: the persistence boundary is what must be normalized, so anything
+// calling the service directly (tests, seeds) gets the same rule. The schema
+// still carries a `.trim()`, which is what buys the 422 for a blank name.
+//
+// `\s` covers tabs, newlines and NBSP (U+00A0). Zero-width characters are
+// deliberately out of scope: they are not the reported defect and sanitizing
+// them is a much wider rule.
+export function normalizeTeamName(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ')
+}
+
 // Mirrors joinTeam's guards, in the same order, so a disabled button in the
 // UI and a 409 from the API always agree on the reason.
 function resolveJoinBlockedReason(
@@ -174,8 +191,14 @@ export async function createTeam(db: Db, userId: string, name: string): Promise<
   // Transactional (achado #31): a failed member insert used to leave a
   // memberless team row committed, permanently hoarding its name under
   // teams_lower_name_idx. Wrapping both inserts rolls the team back too.
+  const normalized = normalizeTeamName(name)
+
   return db.transaction(async (tx) => {
-    const [team] = await tx.insert(teamsTable).values({ name }).onConflictDoNothing().returning()
+    const [team] = await tx
+      .insert(teamsTable)
+      .values({ name: normalized })
+      .onConflictDoNothing()
+      .returning()
     if (!team) return { ok: false, error: 'name_taken' }
 
     await tx.insert(teamMembersTable).values({ userId, teamId: team.id })
@@ -268,7 +291,7 @@ export async function renameTeam(db: Db, teamId: string, name: string): Promise<
   try {
     const [team] = await db
       .update(teamsTable)
-      .set({ name, updatedAt: new Date() })
+      .set({ name: normalizeTeamName(name), updatedAt: new Date() })
       .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.removedAt)))
       .returning()
     if (!team) return { ok: false, error: 'not_found' }

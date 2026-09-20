@@ -15,6 +15,7 @@ import {
 import { updateEventConfig } from '../event-config/event-config.service'
 import type { University } from '../users/users.schema'
 
+import { CreateTeamBodySchema, RenameTeamBodySchema } from './teams.schema'
 import {
   createTeam,
   joinTeam,
@@ -22,6 +23,7 @@ import {
   listOrganizerTeams,
   listTeams,
   moveMember,
+  normalizeTeamName,
   removeMember,
   removeTeam,
   renameTeam,
@@ -190,6 +192,65 @@ describe('event_config table', () => {
   })
 })
 
+describe('normalizeTeamName', () => {
+  // Achados #10 and #11: the raw name reached both the length check and the
+  // insert, so "   " was a valid 3-character name and "Os Dragoes " slipped
+  // past teams_lower_name_idx, which folds case but not whitespace.
+  it.each([
+    ['  Os Dragoes  ', 'Os Dragoes'],
+    ['Os   Dragoes', 'Os Dragoes'],
+    ['Os\tDragoes', 'Os Dragoes'],
+    ['Os\nDragoes', 'Os Dragoes'],
+    ['Os\u00a0Dragoes', 'Os Dragoes'],
+    ['\t Os \n Dragoes \u00a0', 'Os Dragoes'],
+    ['   ', ''],
+    ['', ''],
+    ['Os Dragoes', 'Os Dragoes'],
+  ])('normalizes %j into %j', (raw, expected) => {
+    expect(normalizeTeamName(raw)).toBe(expected)
+  })
+
+  it('is idempotent', () => {
+    for (const raw of ['  Os   Dragoes  ', '   ', 'Os Dragoes', 'A\u00a0\u00a0B']) {
+      expect(normalizeTeamName(normalizeTeamName(raw))).toBe(normalizeTeamName(raw))
+    }
+  })
+})
+
+describe('team name body schemas', () => {
+  // `.trim()` runs before the length checks, so a whitespace-only name is a
+  // 0-character name and the route answers 422 instead of creating it.
+  it.each([
+    ['CreateTeamBodySchema', CreateTeamBodySchema],
+    ['RenameTeamBodySchema', RenameTeamBodySchema],
+  ])('%s rejects a whitespace-only name on the name path', (_label, schema) => {
+    const result = schema.safeParse({ name: '   ' })
+
+    expect(result.success).toBe(false)
+    if (result.success) throw new Error('expected a validation failure')
+    expect(result.error.issues[0]?.path).toEqual(['name'])
+  })
+
+  it.each([
+    ['CreateTeamBodySchema', CreateTeamBodySchema],
+    ['RenameTeamBodySchema', RenameTeamBodySchema],
+  ])('%s trims the edges of an accepted name', (_label, schema) => {
+    const result = schema.safeParse({ name: ' Os Dragoes ' })
+
+    expect(result.success).toBe(true)
+    if (!result.success) throw new Error('expected success')
+    expect(result.data.name).toBe('Os Dragoes')
+  })
+
+  it.each([
+    ['CreateTeamBodySchema', CreateTeamBodySchema],
+    ['RenameTeamBodySchema', RenameTeamBodySchema],
+  ])('%s measures max(40) on the trimmed value', (_label, schema) => {
+    expect(schema.safeParse({ name: `  ${'a'.repeat(40)}  ` }).success).toBe(true)
+    expect(schema.safeParse({ name: 'a'.repeat(41) }).success).toBe(false)
+  })
+})
+
 describe('createTeam', () => {
   it('creates the team with the creator already a member', async () => {
     const creator = await insertUser()
@@ -220,6 +281,39 @@ describe('createTeam', () => {
     await createTeam(db, creatorA.id, 'Blockly Busters')
 
     const result = await createTeam(db, creatorB.id, 'blockly busters')
+
+    expect(result).toEqual({ ok: false, error: 'name_taken' })
+  })
+
+  // Achado #11: the index folds case but not whitespace, so the normalization
+  // has to happen before the insert, not only in the schema.
+  it('stores the normalized name', async () => {
+    const creator = await insertUser()
+
+    const result = await createTeam(db, creator.id, '  Os   Dragoes  ')
+
+    expect(result).toMatchObject({ ok: true, team: { name: 'Os Dragoes' } })
+    if (!result.ok) throw new Error('expected success')
+    const [stored] = await db.select().from(teamsTable).where(eq(teamsTable.id, result.team.id))
+    expect(stored?.name).toBe('Os Dragoes')
+  })
+
+  it('rejects a name that collides only by surrounding whitespace', async () => {
+    const creatorA = await insertUser()
+    const creatorB = await insertUser()
+    await createTeam(db, creatorA.id, 'Os Dragoes')
+
+    const result = await createTeam(db, creatorB.id, 'Os Dragoes ')
+
+    expect(result).toEqual({ ok: false, error: 'name_taken' })
+  })
+
+  it('rejects a name that collides only by repeated inner whitespace', async () => {
+    const creatorA = await insertUser()
+    const creatorB = await insertUser()
+    await createTeam(db, creatorA.id, 'Os Dragoes')
+
+    const result = await createTeam(db, creatorB.id, 'Os   Dragoes')
 
     expect(result).toEqual({ ok: false, error: 'name_taken' })
   })
@@ -458,6 +552,35 @@ describe('renameTeam', () => {
     const result = await renameTeam(db, teamA.team.id, 'team b')
 
     expect(result).toEqual({ ok: false, error: 'name_taken' })
+  })
+
+  it('stores the normalized name', async () => {
+    const creator = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+
+    const result = await renameTeam(db, created.team.id, '  Os   Dragoes  ')
+
+    expect(result).toMatchObject({ ok: true, team: { name: 'Os Dragoes' } })
+    const [stored] = await db.select().from(teamsTable).where(eq(teamsTable.id, created.team.id))
+    expect(stored?.name).toBe('Os Dragoes')
+  })
+
+  it('rejects a rename colliding with another active team only by whitespace', async () => {
+    const creatorA = await insertUser()
+    const creatorB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    const teamB = await createTeam(db, creatorB.id, 'Team B')
+    if (!teamA.ok || !teamB.ok) throw new Error('expected success')
+
+    expect(await renameTeam(db, teamA.team.id, 'Team B ')).toEqual({
+      ok: false,
+      error: 'name_taken',
+    })
+    expect(await renameTeam(db, teamA.team.id, 'Team   B')).toEqual({
+      ok: false,
+      error: 'name_taken',
+    })
   })
 
   it('allows renaming to a name that collided only with a removed team', async () => {

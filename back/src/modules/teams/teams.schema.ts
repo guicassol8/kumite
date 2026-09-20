@@ -30,7 +30,12 @@ export type TeamMember = z.infer<typeof TeamMemberSchema>
 // --- Team lifecycle DTOs (#31) ---
 
 export const CreateTeamBodySchema = z.object({
-  name: z.string().min(1).max(40),
+  // `.trim()` runs before the length checks (achado #10), so "   " is a
+  // 0-character name and the route answers 422 instead of creating a team
+  // nobody can identify. The inner-whitespace collapse is the service's job
+  // (teams.service.ts, normalizeTeamName): it has to hold for every caller,
+  // not just for HTTP.
+  name: z.string().trim().min(1).max(40),
 })
 
 export const JoinTeamParamsSchema = z.object({
@@ -82,7 +87,9 @@ export const RenameTeamParamsSchema = z.object({
 })
 
 export const RenameTeamBodySchema = z.object({
-  name: z.string().min(1).max(40),
+  // Same rule as CreateTeamBodySchema above — an organizer renaming a team to
+  // "   " would blank it out just as effectively as creating it blank.
+  name: z.string().trim().min(1).max(40),
 })
 
 export const MoveMemberParamsSchema = z.object({

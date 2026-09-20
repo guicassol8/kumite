@@ -40,7 +40,9 @@ import { Input } from '@/components/ui/input'
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useSession } from '@/hooks/use-session'
 import { api } from '@/lib/api'
+import { readFieldIssues } from '@/lib/api-issues'
 import { requireAuth } from '@/lib/route-guards'
+import { displayTeamName, normalizeTeamName } from '@/lib/team-name'
 import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 
 export const Route = createFileRoute('/teams')({
@@ -76,6 +78,10 @@ function useCreateTeamSchema() {
       z.object({
         name: z
           .string()
+          // `.trim()` runs before the length checks, exactly as in the back's
+          // schema, so "   " is a 0-character name and is refused here rather
+          // than costing a round trip (achado #10).
+          .trim()
           .min(1, t('teams.create.errors.nameRequired'))
           .max(40, t('teams.create.errors.nameTooLong')),
       }),
@@ -138,7 +144,11 @@ function TeamsScreen() {
   }
 
   async function onCreateSubmit(values: CreateTeamFormValues) {
-    const res = await api.teams.$post({ json: { name: values.name } })
+    // Normalized before it leaves the browser (#185), so the name the API
+    // stores is the one the unique index compares: "Os Dragoes " and
+    // "Os  Dragoes" both collide with "Os Dragoes" instead of creating a
+    // second, visually identical team.
+    const res = await api.teams.$post({ json: { name: normalizeTeamName(values.name) } })
 
     if (res.status === 201) {
       setCreateDialogOpen(false)
@@ -152,6 +162,24 @@ function TeamsScreen() {
         createForm.setError('name', { message: t('teams.create.errors.nameTaken') })
         return
       }
+    }
+
+    // kata's validation envelope names the field, so a rejected name belongs
+    // under the input and not in the dialog's generic alert — same shape as
+    // organizer.event-config.tsx's 422 branch.
+    const nameIssue = (await readFieldIssues(res)).find((issue) => issue.path === 'name')
+    if (nameIssue) {
+      // The catalog string, never `issue.message`: kata hands back zod's own
+      // English text, which would reach a pt/es participant untranslated.
+      createForm.setError('name', {
+        message:
+          nameIssue.code === 'too_small'
+            ? t('teams.create.errors.nameRequired')
+            : nameIssue.code === 'too_big'
+              ? t('teams.create.errors.nameTooLong')
+              : t('teams.create.errors.fieldRejected'),
+      })
+      return
     }
 
     // already_in_team (someone raced us) or an undeclared status: nothing
@@ -206,7 +234,7 @@ function TeamsScreen() {
               data-testid="my-team-name"
               className="max-w-full whitespace-normal wrap-anywhere"
             >
-              {myTeam.name}
+              {displayTeamName(myTeam.name, t('teams.unnamed'))}
             </Badge>
             <span data-testid="my-team-count" className="text-muted-foreground text-sm">
               {t('home.team.memberCount', {
@@ -355,7 +383,9 @@ function TeamsScreen() {
                     <span className={`${eyebrow} text-muted-foreground md:hidden`}>
                       {t('teams.columns.name')}
                     </span>
-                    <span className="min-w-0 wrap-anywhere font-medium">{team.name}</span>
+                    <span className="min-w-0 wrap-anywhere font-medium">
+                      {displayTeamName(team.name, t('teams.unnamed'))}
+                    </span>
                   </TableCell>
                   <TableCell role="cell" className={cellClass}>
                     <span className={`${eyebrow} text-muted-foreground md:hidden`}>

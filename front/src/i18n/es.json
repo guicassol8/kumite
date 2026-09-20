@@ -385,12 +385,16 @@
         "actions": "Acciones"
       },
       "noName": "—",
+      "unnamedTeam": "Equipo sin nombre · {{id}}",
       "rename": {
         "editAction": "Renombrar",
         "save": "Guardar",
         "cancel": "Cancelar",
         "errors": {
+          "nameRequired": "Indica el nombre del equipo",
+          "nameTooLong": "El nombre puede tener como máximo 40 caracteres",
           "nameTaken": "Ya existe un equipo con ese nombre.",
+          "fieldRejected": "Nombre de equipo no válido. Ajústalo e inténtalo de nuevo.",
           "saveFailed": "No se pudo guardar. Intenta de nuevo."
         }
       },
@@ -589,6 +593,7 @@
     "full": "Completo",
     "joinAction": "Entrar",
     "yourTeamBadge": "Tu equipo",
+    "unnamed": "Equipo sin nombre",
     "mixingLockedNotice": "La mezcla entre universidades está bloqueada: solo puedes entrar en equipos de tu universidad.",
     "university": {
       "pucrs": "PUCRS",
@@ -620,6 +625,7 @@
         "nameRequired": "Indica el nombre del equipo",
         "nameTooLong": "El nombre puede tener como máximo 40 caracteres",
         "nameTaken": "Ya existe un equipo con ese nombre",
+        "fieldRejected": "Nombre de equipo no válido. Ajústalo e inténtalo de nuevo.",
         "unexpected": "No se pudo crear el equipo. Inténtalo de nuevo."
       }
     },

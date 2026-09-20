@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { readFieldIssues } from './api-issues'
+import { errorCodeFrom, fieldIssuesFrom, readFieldIssues } from './api-issues'
 
 function jsonResponse(body: unknown) {
   return { json: async () => body }
@@ -88,5 +88,44 @@ describe('readFieldIssues', () => {
     expect(await readFieldIssues(jsonResponse({ issues: { body: { path: 'points' } } }))).toEqual(
       [],
     )
+  })
+})
+
+// `readFieldIssues` consumes the response body, so a caller that needs both the
+// error code and the field issues — the organizer's problem form, which has to
+// tell a 409 `problem_in_open_round` from a generic failure (#193) — cannot
+// call it and then read the code. These two take the already-parsed envelope.
+describe('fieldIssuesFrom / errorCodeFrom', () => {
+  it('reads the code and the issues from the same parsed envelope', () => {
+    const body = {
+      error: 'validation_failed',
+      message: 'Invalid input',
+      issues: { body: [{ path: 'points', message: 'Too big', code: 'too_big' }] },
+    }
+
+    expect(errorCodeFrom(body)).toBe('validation_failed')
+    expect(fieldIssuesFrom(body)).toEqual([{ path: 'points', message: 'Too big', code: 'too_big' }])
+  })
+
+  it('reads the code of a 409 that carries no issues at all', () => {
+    const body = {
+      error: 'problem_in_open_round',
+      message: 'Cannot change testCases while the problem is in an open round',
+    }
+
+    expect(errorCodeFrom(body)).toBe('problem_in_open_round')
+    expect(fieldIssuesFrom(body)).toEqual([])
+  })
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['a string', 'not an envelope'],
+    ['an array', []],
+    ['an empty object', {}],
+    ['a non-string error', { error: 42 }],
+  ])('returns null for the code of %s', (_label, body) => {
+    expect(errorCodeFrom(body)).toBeNull()
+    expect(fieldIssuesFrom(body)).toEqual([])
   })
 })

@@ -212,6 +212,7 @@
         },
         "saveFailed": "Couldn't save the problem. Try again.",
         "publishFailed": "Couldn't publish the problem. Try again.",
+        "problemInOpenRound": "Test cases and points can't change while this problem is in an open round: the teams already scored would sit on a different denominator from the ones still to come. Close the round to change them — the statement and the difficulty are still editable now.",
         "loadFailed": "Couldn't load the problem.",
         "retry": "Try again",
         "notFound": "Problem not found."

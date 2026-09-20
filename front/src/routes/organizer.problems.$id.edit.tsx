@@ -6,7 +6,7 @@ import { PANEL_FORM_HEADING } from '@/components/organizer/panel-form'
 import { ProblemForm } from '@/components/organizer/problem-form'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
-import { readFieldIssues } from '@/lib/api-issues'
+import { errorCodeFrom, fieldIssuesFrom, readEnvelope } from '@/lib/api-issues'
 import {
   buildPatchBody,
   issuesToProblemFormErrors,
@@ -54,27 +54,46 @@ function EditProblemScreen() {
     refetchOnWindowFocus: false,
   })
 
-  type PatchOutcome = { ok: true } | { ok: false; fieldErrors: ProblemFormError[] }
+  type PatchOutcome =
+    | { ok: true }
+    | { ok: false; code: string | null; fieldErrors: ProblemFormError[] }
 
   async function patch(values: ProblemFormValues): Promise<PatchOutcome> {
     const body = buildPatchBody(values)
     const res = await api.organizer.problems[':id'].$patch({ param: { id }, json: body })
     if (res.status === 200) return { ok: true }
+    // Read once: `readFieldIssues` would consume the body, leaving no way to
+    // reach the error code that tells a 409 apart from a generic failure.
+    const envelope = await readEnvelope(res)
     // The translations actually sent are what a `translations[i].*` path indexes
     // into — buildPatchBody drops the incomplete locales.
     return {
       ok: false,
-      fieldErrors: issuesToProblemFormErrors(await readFieldIssues(res), body.translations),
+      code: errorCodeFrom(envelope),
+      fieldErrors: issuesToProblemFormErrors(fieldIssuesFrom(envelope), body.translations),
     }
   }
 
   /**
-   * No mappable field means the failure keeps the form-level message it always
-   * had: a 500, a dead connection, or a 422 on a path with no field here.
+   * The 409 of #193 is the one refusal with a reason worth naming: it is not a
+   * failure to save but a rule, and the organizer needs to know both why and
+   * what is still allowed. Everything else keeps the form-level message it
+   * always had — a 500, a dead connection, or a 422 on a path with no field
+   * here. Translated from the envelope's `code`, never from its English
+   * `message`.
    */
-  function saveFailure(fieldErrors: ProblemFormError[]): SubmitOutcome {
-    if (fieldErrors.length === 0) setRootError(t('organizer.problemForm.errors.saveFailed'))
-    return { ok: false, fieldErrors }
+  function saveFailure(outcome: { code: string | null; fieldErrors: ProblemFormError[] }) {
+    if (outcome.code === 'problem_in_open_round') {
+      setRootError(t('organizer.problemForm.errors.problemInOpenRound'))
+      // The server refused, so the form is now showing values the problem does
+      // not have — refetch the truth (the same move as round_not_draft).
+      invalidate()
+      return { ok: false as const, fieldErrors: outcome.fieldErrors }
+    }
+    if (outcome.fieldErrors.length === 0) {
+      setRootError(t('organizer.problemForm.errors.saveFailed'))
+    }
+    return { ok: false as const, fieldErrors: outcome.fieldErrors }
   }
 
   function invalidate() {
@@ -88,7 +107,7 @@ function EditProblemScreen() {
     setSuccessMessage(undefined)
     try {
       const outcome = await patch(values)
-      if (!outcome.ok) return saveFailure(outcome.fieldErrors)
+      if (!outcome.ok) return saveFailure(outcome)
 
       // PATCH never touches `status`, so a published problem stays published;
       // the screen stays put so the organizer can keep editing.
@@ -106,7 +125,7 @@ function EditProblemScreen() {
     setSuccessMessage(undefined)
     try {
       const outcome = await patch(values)
-      if (!outcome.ok) return saveFailure(outcome.fieldErrors)
+      if (!outcome.ok) return saveFailure(outcome)
 
       const published = await api.organizer.problems[':id'].publish.$post({ param: { id } })
       if (published.status !== 200) {

@@ -15,6 +15,7 @@ export type ApiFieldIssue = {
 }
 
 type Envelope = {
+  error?: unknown
   issues?: {
     body?: unknown
   }
@@ -45,8 +46,35 @@ function isFieldIssue(value: unknown): value is ApiFieldIssue {
  * `path` is `''` and belongs to no field.
  */
 export async function readFieldIssues(res: unknown): Promise<ApiFieldIssue[]> {
-  const body = (await (res as Response).json().catch(() => null)) as Envelope | null
-  const issues = body?.issues?.body
+  return fieldIssuesFrom(await readEnvelope(res))
+}
+
+/**
+ * Parses a response body once, so a caller that needs both the error code and
+ * the field issues can have them without reading the stream twice.
+ *
+ * `res.clone()` would be the obvious alternative, but the plain `{ json() }`
+ * stubs the route tests use do not implement it.
+ */
+export async function readEnvelope(res: unknown): Promise<unknown> {
+  return await (res as Response).json().catch(() => null)
+}
+
+/** The `fieldIssuesFrom` half of `readFieldIssues`, over an already-parsed body. */
+export function fieldIssuesFrom(body: unknown): ApiFieldIssue[] {
+  const issues = (body as Envelope | null)?.issues?.body
   if (!Array.isArray(issues)) return []
   return issues.filter(isFieldIssue).filter((issue) => issue.path !== '')
+}
+
+/**
+ * The `error` code of kata's envelope — the machine-readable half that a screen
+ * translates, as opposed to `message`, which is English prose written for the
+ * API's own logs. `null` whenever the body is not an envelope with a string
+ * code.
+ */
+export function errorCodeFrom(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null) return null
+  const code = (body as Envelope).error
+  return typeof code === 'string' ? code : null
 }

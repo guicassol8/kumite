@@ -204,6 +204,42 @@ describe('EditProblemScreen', () => {
     )
   })
 
+  it('explains the 409 of a problem in an open round instead of the generic failure', async () => {
+    // #193: the API refuses the edit because the round's scores would stop
+    // being comparable. The banner has to say that — "Tente novamente" would
+    // be a lie, since retrying is exactly what does not work.
+    mockedDetail.mockResolvedValue(jsonResponse(200, publishedDetail))
+    mockedPatch.mockResolvedValue(
+      jsonResponse(409, {
+        error: 'problem_in_open_round',
+        message: 'Cannot change testCases while the problem is in an open round',
+      }),
+    )
+    renderEdit()
+
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() => {
+      const banner = screen.getByTestId('problem-form-error').textContent ?? ''
+      expect(banner).toContain('rodada aberta')
+      expect(banner).not.toContain('Tente novamente')
+    })
+  })
+
+  it('keeps the generic failure for a refusal that is not the open-round 409', async () => {
+    mockedDetail.mockResolvedValue(jsonResponse(200, publishedDetail))
+    mockedPatch.mockResolvedValue(jsonResponse(500, { error: 'internal_error' }))
+    renderEdit()
+
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-error').textContent).toContain('Tente novamente'),
+    )
+  })
+
   it('keeps an archived problem editable while Publicar stays disabled', async () => {
     mockedDetail.mockResolvedValue(jsonResponse(200, { ...publishedDetail, status: 'archived' }))
     mockedPatch.mockResolvedValue(jsonResponse(200, publishedDetail))

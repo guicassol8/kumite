@@ -380,3 +380,36 @@ describe('refreshSession', () => {
     expect(mockedGetMe).not.toHaveBeenCalled()
   })
 })
+
+// A `/me` that neither answers nor fails is the other half of "the refresh
+// failed": `attemptHydration` has guarded its own call with an 8s
+// AbortController since #179, and without the same guard here the screen sits
+// on a disabled button forever — the "stuck with nothing on screen" symptom
+// #190 exists to remove.
+describe('refreshSession against a /me that never answers', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('gives up and reports failed instead of hanging forever', async () => {
+    const session = await loadSession()
+    session.setSession(fakeUser, 'tok-1')
+    mockedGetMe.mockImplementation((_input, options) => {
+      const signal = options?.init?.signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+      })
+    })
+
+    const outcome = session.refreshSession()
+    await vi.advanceTimersByTimeAsync(10_000)
+
+    await expect(outcome).resolves.toBe('failed')
+    // The session is untouched, exactly as on any other 'failed'.
+    expect(session.getState()).toMatchObject({ status: 'authenticated', token: 'tok-1' })
+  })
+})

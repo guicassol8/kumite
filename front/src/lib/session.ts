@@ -203,8 +203,15 @@ export type RefreshOutcome = 'ok' | 'unauthorized' | 'failed'
 export async function refreshSession(): Promise<RefreshOutcome> {
   const token = state.token
   if (!token) return 'failed'
+  // Same deadline as `attemptHydration`. A `/me` that neither answers nor
+  // fails — captive wifi, a back stuck mid-restart — is a failure the user
+  // has to be told about too, and without this the screen would sit on a
+  // disabled button forever: the exact "stuck, with nothing on screen to
+  // explain it" symptom #190 exists to remove.
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), HYDRATION_TIMEOUT_MS)
   try {
-    const res = await api.me.$get()
+    const res = await api.me.$get({}, { init: { signal: controller.signal } })
     // `meRoute` declares only `output: PublicUserSchema`, so `res.status` is
     // the literal 200 and comparing it to 401 is a TS2367 (#174).
     const status: number = res.status
@@ -221,7 +228,10 @@ export async function refreshSession(): Promise<RefreshOutcome> {
     }
     return 'failed'
   } catch {
+    // The abort above lands here too, as an AbortError.
     return 'failed'
+  } finally {
+    clearTimeout(timeout)
   }
 }
 

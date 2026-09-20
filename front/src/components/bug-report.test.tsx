@@ -365,6 +365,80 @@ describe('BugReport', () => {
     expect(error.textContent).toContain('Não conseguimos enviar o relato agora.')
   })
 
+  // The other half of the ownership check, and the reason it is written
+  // `ownerRef.current !== null && ...` rather than a bare inequality: the reset
+  // above must not fire for the *same* person. Without these three the guard
+  // can be dropped and every case above still passes, while the draft promised
+  // by #145 starts disappearing under its own author.
+
+  it('keeps the draft and the address across close and reopen for the same account', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderApp()
+    await openDialog()
+    await waitFor(() =>
+      expect(screen.getByTestId<HTMLInputElement>('bug-report-email').value).toBe(
+        'ada@edu.pucrs.br',
+      ),
+    )
+    fireEvent.change(screen.getByTestId('bug-report-description'), {
+      target: { value: 'rascunho da Ada' },
+    })
+    fireEvent.click(screen.getByTestId('bug-report-cancel'))
+    await waitFor(() => expect(screen.queryByTestId('bug-report-dialog')).toBeNull())
+
+    await openDialog()
+    expect(screen.getByTestId<HTMLTextAreaElement>('bug-report-description').value).toBe(
+      'rascunho da Ada',
+    )
+    expect(screen.getByTestId<HTMLInputElement>('bug-report-email').value).toBe('ada@edu.pucrs.br')
+  })
+
+  it('keeps a draft started while anonymous when its author then signs in', async () => {
+    renderApp()
+    await openDialog()
+    fireEvent.change(screen.getByTestId('bug-report-description'), {
+      target: { value: 'rascunho comecado deslogado' },
+    })
+    fireEvent.click(screen.getByTestId('bug-report-cancel'))
+    await waitFor(() => expect(screen.queryByTestId('bug-report-dialog')).toBeNull())
+
+    act(() => setSession(fakeUser, 'tok-1'))
+
+    await openDialog()
+    expect(screen.getByTestId<HTMLTextAreaElement>('bug-report-description').value).toBe(
+      'rascunho comecado deslogado',
+    )
+    // The address was never typed, so signing in fills it — the draft is the
+    // same person's either way.
+    await waitFor(() =>
+      expect(screen.getByTestId<HTMLInputElement>('bug-report-email').value).toBe(
+        'ada@edu.pucrs.br',
+      ),
+    )
+  })
+
+  it('gives the draft back to whoever comes back from an expired session', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderApp()
+    await openDialog()
+    fireEvent.change(screen.getByTestId('bug-report-description'), {
+      target: { value: 'rascunho da Ada' },
+    })
+    fireEvent.click(screen.getByTestId('bug-report-cancel'))
+    await waitFor(() => expect(screen.queryByTestId('bug-report-dialog')).toBeNull())
+
+    // The session dies on its own and the same person signs back in — which is
+    // why the check is on *opening* and not in an effect watching the session:
+    // an effect would have wiped the draft the moment the token expired.
+    act(() => clearSession('expired'))
+    act(() => setSession(fakeUser, 'tok-2'))
+
+    await openDialog()
+    expect(screen.getByTestId<HTMLTextAreaElement>('bug-report-description').value).toBe(
+      'rascunho da Ada',
+    )
+  })
+
   it('opens clean after a failed send was dismissed', async () => {
     mockedPost.mockRejectedValue(new Error('network down'))
     renderApp()

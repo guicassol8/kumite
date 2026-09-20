@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { MAX_TEAM_SIZE_MAX, POINTS_MAX } from './field-limits'
+import {
+  BUG_REPORT_CONTEXT_EMAIL_MAX,
+  BUG_REPORT_CONTEXT_ID_MAX,
+  BUG_REPORT_CONTEXT_TEXT_MAX,
+  MAX_TEAM_SIZE_MAX,
+  POINTS_MAX,
+} from './field-limits'
 
 // These assertions look tautological on purpose. The constants mirror ceilings
 // that live in the back's request schemas, and nothing in the type system ties
@@ -16,5 +22,11 @@ describe('field limits mirrored from the back', () => {
 
   it('pins MAX_TEAM_SIZE_MAX to EVENT_MAX_TEAM_SIZE', () => {
     expect(MAX_TEAM_SIZE_MAX).toBe(10)
+  })
+
+  it('pins the bug report context ceilings to BUG_REPORT_CONTEXT_* in the back', () => {
+    expect(BUG_REPORT_CONTEXT_TEXT_MAX).toBe(500)
+    expect(BUG_REPORT_CONTEXT_EMAIL_MAX).toBe(320)
+    expect(BUG_REPORT_CONTEXT_ID_MAX).toBe(100)
   })
 })

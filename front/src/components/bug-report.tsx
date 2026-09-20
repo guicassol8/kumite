@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouterState } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
@@ -29,6 +29,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useSession } from '@/hooks/use-session'
 import { api } from '@/lib/api'
+import { readFieldIssues } from '@/lib/api-issues'
+import { buildBugReportContext } from '@/lib/bug-report-context'
 
 // Mirrors CreateBugReportBodySchema's ceiling in the back — over it the API
 // answers 422, so the counter and the client-side check use the same number.
@@ -88,7 +90,10 @@ function useBugReportSchema() {
  * Mounted once inside the header, which itself lives in `__root.tsx`, so the
  * trigger exists on every route and the draft survives closing the dialog
  * (#145): the component never unmounts, so closing and reopening it keeps
- * what was typed. Only a successful send clears it.
+ * what was typed. A successful send clears it — and so does opening it under a
+ * different account than the one that typed it (#194), which is the price of
+ * never unmounting: the draft would otherwise outlive the session it belongs
+ * to and be handed to whoever signs in next in the same tab.
  */
 export function BugReport({
   open,
@@ -105,6 +110,12 @@ export function BugReport({
   const [sent, setSent] = useState(false)
   const schema = useBugReportSchema()
 
+  // Who filled the form in, checked when it is next opened (#194). The
+  // component is mounted in the header and never unmounts, so without an owner
+  // the draft — address *and* description — crosses a logout and greets the
+  // next account in the same tab with the previous one's data.
+  const ownerRef = useRef<string | null>(null)
+
   const form = useForm<BugReportFormValues>({
     resolver: zodResolver(schema),
     defaultValues: { description: '', replyTo: '' },
@@ -112,12 +123,36 @@ export function BugReport({
 
   // The session's address is a starting point, not a lock: it fills the field
   // the first time the dialog opens and stays editable afterwards.
+  //
+  // Everything here happens on *opening*, not on closing and not in an effect
+  // watching the session, and each of the three lines below depends on that:
+  //
+  // - the error alert (#194) is cleared here because Cancelar and Fechar call
+  //   the parent's `setOpen` directly, without passing through this handler, so
+  //   clearing on close would miss the common path — and the dialog stays
+  //   mounted through its 200ms exit animation, so it would also wipe the alert
+  //   in the face of whoever is closing it;
+  // - the ownership check (#194) is here, rather than reacting to the session
+  //   changing, so that someone whose session merely expired finds their own
+  //   draft again when they come back, while a different account never sees it;
+  // - the prefill is here because that is where it has always been (#145).
   function onOpenChange(next: boolean) {
     if (next) {
       setSent(false)
-      if (user?.email && form.getValues('replyTo') === '') {
+      form.clearErrors('root')
+
+      const owner = user?.id ?? null
+      if (ownerRef.current !== null && ownerRef.current !== owner) {
+        // A different account — or a logout. Nothing the previous one typed
+        // survives into this dialog, not even as a starting point.
+        form.reset({ description: '', replyTo: user?.email ?? '' })
+      } else if (user?.email && form.getValues('replyTo') === '') {
+        // Either the same account as before, or a draft started while anonymous
+        // (or while the session was still hydrating) by the person now signing
+        // in: their own text stays, and the address they never typed is filled.
         form.setValue('replyTo', user.email)
       }
+      ownerRef.current = owner
     }
     setOpen(next)
   }
@@ -132,13 +167,15 @@ export function BugReport({
         json: {
           description: values.description.trim(),
           ...(replyTo === '' ? {} : { replyTo }),
-          // Attached automatically — never editable fields of the form.
-          context: {
+          // Attached automatically — never editable fields of the form, and
+          // trimmed to the ceilings the API accepts so a long user agent
+          // cannot make a real report unsendable (#194).
+          context: buildBugReportContext({
             route: pathname,
             userAgent: navigator.userAgent,
             occurredAt: new Date().toISOString(),
-            ...(user ? { userEmail: user.email, userId: user.id } : {}),
-          },
+            user,
+          }),
         },
       })
 
@@ -157,7 +194,25 @@ export function BugReport({
       // directly is a TS2367 ("no overlap") — the coerced number is what
       // makes kata's validation envelope reachable from the typed client.
       if ((res.status as number) === 422) {
-        form.setError('root', { message: t('bugReport.errors.validation') })
+        // Only an issue that names a field of the form may blame that field
+        // (#194). A 422 about `context.*` — or one carrying no issues at all —
+        // is about the block attached automatically, which nobody typed and
+        // nobody can correct: "confira a descrição e o e-mail" would send the
+        // reporter to rewrite something that was never wrong, and the report
+        // would still never arrive.
+        //
+        // The message stays at form level either way, never on the fields: the
+        // front validates description and reply-to with the same rules as the
+        // back, so a 422 on those is a schema divergence, not a typo.
+        const issues = await readFieldIssues(res)
+        const blamesTheForm = issues.some(
+          (issue) => issue.path === 'description' || issue.path === 'replyTo',
+        )
+        form.setError('root', {
+          message: blamesTheForm
+            ? t('bugReport.errors.validation')
+            : t('bugReport.errors.unexpected'),
+        })
         return
       }
 

@@ -15,3 +15,16 @@ export const POINTS_MAX = 10_000
 
 /** Mirrors `EVENT_MAX_TEAM_SIZE` in back/src/modules/event-config/event-config.schema.ts. */
 export const MAX_TEAM_SIZE_MAX = 10
+
+/**
+ * Mirrors `BUG_REPORT_CONTEXT_*` in back/src/modules/bug-reports/bug-reports.schema.ts.
+ *
+ * Unlike the two above, these are not shown to anyone: the bug report's context
+ * block is machine-written, so the client trims each field to its ceiling
+ * before sending (`lib/bug-report-context.ts`) instead of warning about it.
+ * A 700-character `navigator.userAgent` — Chrome on Android ships one — used to
+ * make the whole report a 422 about a field the reporter never filled in (#194).
+ */
+export const BUG_REPORT_CONTEXT_TEXT_MAX = 500
+export const BUG_REPORT_CONTEXT_EMAIL_MAX = 320
+export const BUG_REPORT_CONTEXT_ID_MAX = 100

@@ -114,6 +114,40 @@ HTTP 409
 [Asserts]
 jsonpath "$.error" == "name_taken"
 
+# 2b. Collision that differs only by a trailing space (achado #11) -> 409.
+# The unique index folds case but not whitespace, so this only holds because
+# the service normalizes the name before the insert. `rival_token` stays
+# teamless through 2b-2d: every one of them is refused.
+POST {{host}}/teams
+Authorization: Bearer {{rival_token}}
+Content-Type: application/json
+{ "name": "blockly busters " }
+HTTP 409
+[Asserts]
+jsonpath "$.error" == "name_taken"
+
+# 2c. Collision that differs only by repeated inner whitespace -> 409.
+POST {{host}}/teams
+Authorization: Bearer {{rival_token}}
+Content-Type: application/json
+{ "name": "  Blockly   Busters  " }
+HTTP 409
+[Asserts]
+jsonpath "$.error" == "name_taken"
+
+# 2d. Whitespace-only name (achado #10) -> 422, not a nameless team. The
+# create screen reads this `path` to put the message under the field, so
+# assert the path and not just the status (same reason as
+# event-config.hurl's 4b).
+POST {{host}}/teams
+Authorization: Bearer {{rival_token}}
+Content-Type: application/json
+{ "name": "   " }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.body[0].path" == "name"
+
 # 3. Duplicate create by someone already on a team -> 409 already_in_team.
 POST {{host}}/teams
 Authorization: Bearer {{creator_token}}
@@ -242,10 +276,14 @@ fourth_id: jsonpath "$.id"
 POST {{host}}/teams
 Authorization: Bearer {{fourth_token}}
 Content-Type: application/json
-{ "name": "Second Squad" }
+{ "name": "  Second   Squad  " }
 HTTP 201
 [Captures]
 team2_id: jsonpath "$.id"
+[Asserts]
+# What is persisted is the normalized name, so every later step in this file
+# still matches on "Second Squad".
+jsonpath "$.name" == "Second Squad"
 
 # 17. A 5th user, kept teamless on purpose — the member_not_found fixture.
 POST {{host}}/auth/signup
@@ -264,7 +302,7 @@ fifth_token: jsonpath "$.token"
 PATCH {{host}}/organizer/teams/{{team_id}}
 Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
-{ "name": "Renamed Busters" }
+{ "name": " Renamed  Busters " }
 HTTP 200
 [Asserts]
 jsonpath "$.name" == "Renamed Busters"
@@ -278,6 +316,27 @@ Content-Type: application/json
 HTTP 409
 [Asserts]
 jsonpath "$.error" == "name_taken"
+
+# 19b. Rename colliding with another active team only by whitespace -> 409.
+PATCH {{host}}/organizer/teams/{{team_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "name": "second squad " }
+HTTP 409
+[Asserts]
+jsonpath "$.error" == "name_taken"
+
+# 19c. Rename to a whitespace-only name -> 422 naming the field, so the
+# moderation screen can put the message under the inline input. Nothing is
+# written, so team_id keeps the name from step 18.
+PATCH {{host}}/organizer/teams/{{team_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "name": "   " }
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.body[0].path" == "name"
 
 # 20. Rename an unknown team id -> 404 not_found.
 PATCH {{host}}/organizer/teams/00000000-0000-0000-0000-000000000000

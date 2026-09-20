@@ -169,4 +169,16 @@
   body {
     @apply bg-background font-sans text-foreground;
   }
+
+  /* O preflight do Tailwind v4 declara `svg { display: block }`. O Blockly
+     esconde a barra de rolagem do flyout pelo ATRIBUTO de apresentação
+     `display="none"` (core/scrollbar.ts), e atributo de apresentação perde
+     para qualquer regra CSS — o SVG continuava computando `block`. Como ele é
+     irmão do flyout (filho do .injectionDiv) e tem z-index 30, sobrava
+     flutuando no meio do canvas: o scroll fantasma da #204. A regra devolve a
+     semântica padrão do atributo e vence o preflight por especificidade
+     (0,1,1 > 0,0,1), dentro da mesma layer. */
+  svg[display='none'] {
+    display: none;
+  }
 }

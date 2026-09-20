@@ -45,7 +45,9 @@ function RootComponent() {
         state.user?.mustChangePassword &&
         router.state.location.pathname !== '/change-password'
       ) {
-        router.navigate({ to: '/change-password' })
+        // Same notice as the route guards (#190) — whichever of the two got
+        // here first, the screen can explain itself.
+        router.navigate({ to: '/change-password', search: { notice: 'required' } })
       }
     })
   }, [router])

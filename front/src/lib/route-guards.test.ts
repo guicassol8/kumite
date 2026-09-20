@@ -107,6 +107,23 @@ describe('forced password change (#143)', () => {
     expect(caught).toMatchObject({ options: { to: '/change-password' } })
   })
 
+  // #190: without the notice the user lands on a screen they did not ask for,
+  // with no idea which click was refused or why.
+  it('carries the reason for the bounce in the search params', async () => {
+    setSession(flagged, 'tok-1')
+
+    let caught: unknown
+    try {
+      await requireAuth(ctx)
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toMatchObject({
+      options: { to: '/change-password', search: { notice: 'required' } },
+    })
+  })
+
   it('applies to role-guarded screens too, before the role is even checked', async () => {
     setSession({ ...organizer, mustChangePassword: true }, 'tok-2')
 

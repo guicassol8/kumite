@@ -306,3 +306,77 @@ describe('hydration with a failing /me (#179)', () => {
     })
   })
 })
+
+// One-shot refresh of `/me`, used by /change-password right after the 204
+// (#190). Unlike `ensureHydrated` it never retries, never parks the session in
+// 'error' and never invents a user: the calling screen owns the retry UI.
+describe('refreshSession', () => {
+  it('adopts the fresh user and reports ok', async () => {
+    const session = await loadSession()
+    session.setSession({ ...fakeUser, mustChangePassword: true }, 'tok-1')
+    mockedGetMe.mockResolvedValue(meResponse(200, fakeUser))
+
+    await expect(session.refreshSession()).resolves.toBe('ok')
+
+    expect(session.getState()).toMatchObject({
+      status: 'authenticated',
+      user: fakeUser,
+      token: 'tok-1',
+    })
+  })
+
+  it('reports unauthorized and drops the session on a 401', async () => {
+    const session = await loadSession()
+    session.setSession(fakeUser, 'tok-1')
+    mockedGetMe.mockResolvedValue(meResponse(401, { error: 'unauthorized' }))
+
+    await expect(session.refreshSession()).resolves.toBe('unauthorized')
+
+    expect(session.getState()).toMatchObject({ status: 'anonymous', reason: 'expired' })
+    expect(localStorage.getItem('kumite-token')).toBeNull()
+  })
+
+  it('reports unauthorized on a 403 too', async () => {
+    const session = await loadSession()
+    session.setSession(fakeUser, 'tok-1')
+    mockedGetMe.mockResolvedValue(meResponse(403, { error: 'forbidden' }))
+
+    await expect(session.refreshSession()).resolves.toBe('unauthorized')
+    expect(session.getState().status).toBe('anonymous')
+  })
+
+  // A 502/503 is the back restarting, not a logout — and not an 'error'
+  // either: parking the session there would swap /change-password for the
+  // root's retry card and lose the news that the password *did* change.
+  it('reports failed on a 5xx without touching the session', async () => {
+    const session = await loadSession()
+    const flagged = { ...fakeUser, mustChangePassword: true }
+    session.setSession(flagged, 'tok-1')
+    mockedGetMe.mockResolvedValue(meResponse(502, { error: 'bad_gateway' }))
+
+    await expect(session.refreshSession()).resolves.toBe('failed')
+
+    expect(session.getState()).toMatchObject({
+      status: 'authenticated',
+      user: flagged,
+      token: 'tok-1',
+    })
+    expect(localStorage.getItem('kumite-token')).toBe('tok-1')
+  })
+
+  it('reports failed instead of rejecting when the request dies', async () => {
+    const session = await loadSession()
+    session.setSession(fakeUser, 'tok-1')
+    mockedGetMe.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    await expect(session.refreshSession()).resolves.toBe('failed')
+    expect(session.getState().status).toBe('authenticated')
+  })
+
+  it('reports failed without calling /me when there is no token', async () => {
+    const session = await loadSession()
+
+    await expect(session.refreshSession()).resolves.toBe('failed')
+    expect(mockedGetMe).not.toHaveBeenCalled()
+  })
+})

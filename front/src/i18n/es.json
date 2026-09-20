@@ -739,6 +739,14 @@
         "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
         "passwordMismatch": "Las contraseñas no coinciden",
         "unexpected": "No se pudo cambiar la contraseña. Inténtalo de nuevo."
+      },
+      "notices": {
+        "required": "Necesitamos que cambies tu contraseña temporal antes de abrir cualquier otra pantalla."
+      },
+      "refresh": {
+        "failed": "Tu contraseña fue cambiada, pero no pudimos actualizar tu sesión. Inténtalo de nuevo para continuar.",
+        "retry": "Intentar de nuevo",
+        "retrying": "Intentando…"
       }
     }
   },

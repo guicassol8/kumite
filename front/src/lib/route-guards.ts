@@ -38,7 +38,9 @@ export async function requireAuth(context: GuardContext): Promise<void> {
   await requireSession(context)
   if (getState().status === 'error') return
   if (getState().user?.mustChangePassword) {
-    throw redirect({ to: '/change-password' })
+    // The notice is what keeps this from being a silent hijack (#190): the
+    // user clicked something else and has to be told why they are here.
+    throw redirect({ to: '/change-password', search: { notice: 'required' } })
   }
 }
 

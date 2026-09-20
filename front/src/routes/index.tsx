@@ -15,6 +15,7 @@ import { useSession } from '@/hooks/use-session'
 import { formatDate } from '@/i18n/format'
 import { fetchRoundRanking } from '@/lib/ranking-query'
 import { fetchRounds, ROUNDS_QUERY_KEY } from '@/lib/rounds-query'
+import { displayTeamName } from '@/lib/team-name'
 import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 
 export const Route = createFileRoute('/')({
@@ -193,7 +194,7 @@ function Home() {
                 (myTeam ? (
                   <>
                     <h2 className="wrap-anywhere font-display font-semibold text-2xl">
-                      {myTeam.name}
+                      {displayTeamName(myTeam.name, t('teams.unnamed'))}
                     </h2>
                     <span className="text-muted-foreground text-sm">
                       {t('home.team.memberCount', {

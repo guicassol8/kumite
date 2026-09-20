@@ -226,6 +226,108 @@ describe('OrganizerTeamsScreen', () => {
     expect(screen.getByTestId('team-moderation-rename-input-team-1')).toBeDefined()
   })
 
+  it('refuses a whitespace-only rename without calling the API', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('team-moderation-rename-start-team-1'))
+    fireEvent.change(screen.getByTestId('team-moderation-rename-input-team-1'), {
+      target: { value: '   ' },
+    })
+    fireEvent.click(screen.getByTestId('team-moderation-rename-save-team-1'))
+
+    const error = await screen.findByTestId('team-moderation-rename-error-team-1')
+    expect(error.textContent).toContain('Informe o nome do time')
+    expect(mockedTeamsPatch).not.toHaveBeenCalled()
+  })
+
+  it('sends the normalized name on rename', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedTeamsPatch.mockResolvedValue(jsonResponse(200, { id: 'team-1', name: 'New Name' }))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('team-moderation-rename-start-team-1'))
+    fireEvent.change(screen.getByTestId('team-moderation-rename-input-team-1'), {
+      target: { value: '  New   Name  ' },
+    })
+    fireEvent.click(screen.getByTestId('team-moderation-rename-save-team-1'))
+
+    await waitFor(() =>
+      expect(mockedTeamsPatch).toHaveBeenCalledWith({
+        param: { id: 'team-1' },
+        json: { name: 'New Name' },
+      }),
+    )
+  })
+
+  it('maps a 422 about the name onto the same inline field error', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedTeamsPatch.mockResolvedValue(
+      jsonResponse(422, {
+        error: 'validation_failed',
+        issues: { body: [{ path: 'name', message: 'Too big', code: 'too_big' }] },
+      }),
+    )
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('team-moderation-rename-start-team-1'))
+    fireEvent.change(screen.getByTestId('team-moderation-rename-input-team-1'), {
+      target: { value: 'Another Name' },
+    })
+    fireEvent.click(screen.getByTestId('team-moderation-rename-save-team-1'))
+
+    const error = await screen.findByTestId('team-moderation-rename-error-team-1')
+    // The catalog string, never `issue.message` — kata returns zod's English.
+    expect(error.textContent).toContain('no máximo 40 caracteres')
+  })
+
+  // Achado #10 (Acceptance 4): teams stored blank before #185 used to render a
+  // card with no title at all, so the organizer could not even tell two of
+  // them apart — which is exactly what the id suffix is here to fix.
+  it('labels blank-named teams distinguishably, each with its rename control', async () => {
+    mockedTeamsGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        organizerTeamsList({
+          teams: [
+            {
+              ...organizerTeamsList().teams[0],
+              id: 'aaaaaaaa-1111-2222-3333-444444444444',
+              name: '   ',
+            },
+            {
+              ...organizerTeamsList().teams[1],
+              id: 'bbbbbbbb-1111-2222-3333-444444444444',
+              name: '',
+            },
+          ],
+        }),
+      ),
+    )
+    renderScreen()
+
+    const first = await screen.findByTestId(
+      'team-moderation-name-aaaaaaaa-1111-2222-3333-444444444444',
+    )
+    const second = await screen.findByTestId(
+      'team-moderation-name-bbbbbbbb-1111-2222-3333-444444444444',
+    )
+    expect(first.textContent).toContain('Time sem nome')
+    expect(second.textContent).toContain('Time sem nome')
+    expect(first.textContent).not.toEqual(second.textContent)
+    expect(first.textContent).toContain('aaaaaaaa')
+    expect(second.textContent).toContain('bbbbbbbb')
+    expect(
+      screen.getByTestId('team-moderation-rename-start-aaaaaaaa-1111-2222-3333-444444444444'),
+    ).toBeDefined()
+    expect(
+      screen.getByTestId('team-moderation-rename-start-bbbbbbbb-1111-2222-3333-444444444444'),
+    ).toBeDefined()
+  })
+
   it('moves a member to another team and disables a full destination option', async () => {
     mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
     mockedMemberMove.mockResolvedValue(jsonResponse(204, undefined))

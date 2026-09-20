@@ -13,6 +13,7 @@ import { formatTime } from '@/i18n/format'
 import { setPresentationActive } from '@/lib/presentation-mode'
 import { positionLabel } from '@/lib/round-position'
 import type { EventRanking, RoundRanking } from '@/lib/sse-schema'
+import { displayTeamName } from '@/lib/team-name'
 import { applyTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
@@ -382,7 +383,9 @@ export function TelaoBoard({
                   </td>
                   <td className="px-2 py-2 align-top">
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="min-w-0 truncate">{row.teamName}</span>
+                      <span className="min-w-0 truncate">
+                        {displayTeamName(row.teamName, t('teams.unnamed'))}
+                      </span>
                       {isMyTeam && (
                         <Badge
                           variant="brand"

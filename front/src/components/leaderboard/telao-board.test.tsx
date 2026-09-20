@@ -414,6 +414,23 @@ describe('TelaoBoard — footer legend (#220 spec 4)', () => {
   })
 })
 
+describe('TelaoBoard — blank team names (#185)', () => {
+  // Achado #10: a team stored as "   " before #185 put a nameless row on the
+  // telao, next to the named ones and indistinguishable from a rendering bug.
+  it('labels a blank-named team instead of leaving the row nameless', () => {
+    const blankNamed: RoundRanking = {
+      ...roundRanking,
+      teams: [{ ...roundRanking.teams[0]!, teamName: '   ' }],
+    }
+
+    render(
+      <TelaoBoard {...baseProps()} hasActiveRound activeRoundId="r1" displayedRound={blankNamed} />,
+    )
+
+    expect(screen.getByTestId('leaderboard-row-t1').textContent).toContain('Time sem nome')
+  })
+})
+
 describe('TelaoBoard — reduced motion (#220 T11)', () => {
   it('does not pulse the live dot when prefers-reduced-motion is set', async () => {
     const { setMatchMediaMatches } = await import('@/test/match-media-jsdom')

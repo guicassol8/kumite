@@ -29,6 +29,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
+import { readFieldIssues } from '@/lib/api-issues'
+import { displayTeamName, normalizeTeamName } from '@/lib/team-name'
 
 export const Route = createFileRoute('/organizer/teams')({
   component: OrganizerTeamsScreen,
@@ -251,7 +253,10 @@ function MoveMemberAction({
                 value={destination.id}
                 disabled={destination.slotsAvailable === 0}
               >
-                {destination.name}
+                {displayTeamName(
+                  destination.name,
+                  t('organizer.teamModeration.unnamedTeam', { id: destination.id.slice(0, 8) }),
+                )}
               </SelectItem>
             ))}
           </SelectContent>
@@ -301,7 +306,16 @@ function TeamNameHeader({ team, onRenamed }: { team: OrganizerTeam; onRenamed: (
   }
 
   async function save() {
-    const res = await rename.mutateAsync(value)
+    // Normalized before the request (#185): renaming to "   " used to blank a
+    // team out, and renaming to "Frozen Squad " used to slip past the unique
+    // index and leave two identical cards on this very screen.
+    const name = normalizeTeamName(value)
+    if (name === '') {
+      setError(t('organizer.teamModeration.rename.errors.nameRequired'))
+      return
+    }
+
+    const res = await rename.mutateAsync(name)
     if (res.status === 200) {
       setEditing(false)
       setError(null)
@@ -312,13 +326,37 @@ function TeamNameHeader({ team, onRenamed }: { team: OrganizerTeam; onRenamed: (
       setError(t('organizer.teamModeration.rename.errors.nameTaken'))
       return
     }
+
+    // kata's validation envelope names the field, so it lands on the same
+    // inline alert as the 409 rather than in the generic "could not save".
+    const nameIssue = (await readFieldIssues(res)).find((issue) => issue.path === 'name')
+    if (nameIssue) {
+      // The catalog string, never `issue.message`: that one is zod's English.
+      setError(
+        nameIssue.code === 'too_small'
+          ? t('organizer.teamModeration.rename.errors.nameRequired')
+          : nameIssue.code === 'too_big'
+            ? t('organizer.teamModeration.rename.errors.nameTooLong')
+            : t('organizer.teamModeration.rename.errors.fieldRejected'),
+      )
+      return
+    }
+
     setError(t('organizer.teamModeration.rename.errors.saveFailed'))
   }
 
   if (!editing) {
     return (
       <div className="flex items-center gap-2">
-        <CardTitle data-testid={`team-moderation-name-${team.id}`}>{team.name}</CardTitle>
+        <CardTitle data-testid={`team-moderation-name-${team.id}`}>
+          {displayTeamName(
+            team.name,
+            // Only here does the id ride along: two teams stored blank before
+            // #185 would otherwise share one label, and this is the screen
+            // where the organizer has to tell them apart to rename them.
+            t('organizer.teamModeration.unnamedTeam', { id: team.id.slice(0, 8) }),
+          )}
+        </CardTitle>
         {team.frozen && (
           <Badge variant="secondary" data-testid={`team-moderation-frozen-${team.id}`}>
             {t('organizer.teamModeration.frozenBadge')}
@@ -345,6 +383,7 @@ function TeamNameHeader({ team, onRenamed }: { team: OrganizerTeam; onRenamed: (
           value={value}
           onChange={(event) => setValue(event.target.value)}
           data-testid={`team-moderation-rename-input-${team.id}`}
+          maxLength={40}
           className="h-8 w-48"
         />
         <Button

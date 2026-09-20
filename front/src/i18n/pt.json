@@ -385,12 +385,16 @@
         "actions": "Ações"
       },
       "noName": "—",
+      "unnamedTeam": "Time sem nome · {{id}}",
       "rename": {
         "editAction": "Renomear",
         "save": "Salvar",
         "cancel": "Cancelar",
         "errors": {
+          "nameRequired": "Informe o nome do time",
+          "nameTooLong": "O nome pode ter no máximo 40 caracteres",
           "nameTaken": "Já existe um time com esse nome.",
+          "fieldRejected": "Nome de time inválido. Ajuste e tente de novo.",
           "saveFailed": "Não foi possível salvar. Tente novamente."
         }
       },
@@ -589,6 +593,7 @@
     "full": "Cheio",
     "joinAction": "Entrar",
     "yourTeamBadge": "Seu time",
+    "unnamed": "Time sem nome",
     "mixingLockedNotice": "A mistura entre universidades está travada: você só pode entrar em times da sua universidade.",
     "university": {
       "pucrs": "PUCRS",
@@ -620,6 +625,7 @@
         "nameRequired": "Informe o nome do time",
         "nameTooLong": "O nome pode ter no máximo 40 caracteres",
         "nameTaken": "Já existe um time com esse nome",
+        "fieldRejected": "Nome de time inválido. Ajuste e tente de novo.",
         "unexpected": "Não foi possível criar o time. Tente novamente."
       }
     },

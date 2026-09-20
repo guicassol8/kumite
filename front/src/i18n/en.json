@@ -385,12 +385,16 @@
         "actions": "Actions"
       },
       "noName": "—",
+      "unnamedTeam": "Unnamed team · {{id}}",
       "rename": {
         "editAction": "Rename",
         "save": "Save",
         "cancel": "Cancel",
         "errors": {
+          "nameRequired": "Enter the team name",
+          "nameTooLong": "The name can have at most 40 characters",
           "nameTaken": "A team with this name already exists.",
+          "fieldRejected": "Invalid team name. Adjust it and try again.",
           "saveFailed": "Could not save. Please try again."
         }
       },
@@ -589,6 +593,7 @@
     "full": "Full",
     "joinAction": "Join",
     "yourTeamBadge": "Your team",
+    "unnamed": "Unnamed team",
     "mixingLockedNotice": "Mixing universities is locked: you can only join teams from your own university.",
     "university": {
       "pucrs": "PUCRS",
@@ -620,6 +625,7 @@
         "nameRequired": "Enter the team name",
         "nameTooLong": "The name can have at most 40 characters",
         "nameTaken": "A team with this name already exists",
+        "fieldRejected": "Invalid team name. Adjust it and try again.",
         "unexpected": "Could not create the team. Please try again."
       }
     },

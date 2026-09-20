@@ -57,6 +57,25 @@ HTTP 422
 [Asserts]
 jsonpath "$.error" == "validation_failed"
 
+# 4b. A context field over its ceiling. The front trims `navigator.userAgent`
+# to 500 before sending (#194) precisely because this is what happens when it
+# does not — but the server still refuses, so what matters here is the shape of
+# the refusal: the dialog reads `issues.body[].path` to decide whether to blame
+# a field of the form, and a context-only refusal must name `context.userAgent`
+# and nothing the reporter typed. If a kata upgrade changes that notation, this
+# case is what says so, instead of the right message quietly disappearing.
+# Refused before the handler, so it does not spend the cooldown window either.
+POST {{host}}/bug-reports
+Content-Type: application/json
+{
+  "description": "o editor de blocos travou",
+  "context": { "userAgent": "UUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU" }
+}
+HTTP 422
+[Asserts]
+jsonpath "$.error" == "validation_failed"
+jsonpath "$.issues.body[0].path" == "context.userAgent"
+
 # 5. A real report, with the full context the front attaches automatically.
 POST {{host}}/bug-reports
 Content-Type: application/json

@@ -1,15 +1,26 @@
 import { z } from 'zod'
 
+// Ceilings on the context block, named so the front can mirror them (#194).
+// They were literals until a 700-character `navigator.userAgent` — the kind
+// Chrome on Android ships — made every report from that browser a 422 the
+// person could do nothing about: the client now trims each field to these
+// before sending. `front/src/lib/field-limits.ts` holds the copies (front may
+// not import from back, and `.max()` does not change the inferred type, so
+// `hc<AppType>` cannot carry them); both sides pin the literals in a test.
+export const BUG_REPORT_CONTEXT_TEXT_MAX = 500
+export const BUG_REPORT_CONTEXT_EMAIL_MAX = 320
+export const BUG_REPORT_CONTEXT_ID_MAX = 100
+
 // What the client volunteers about where the bug happened (#145). Every field
 // is optional and only length-capped on purpose: the route is public and the
 // values are unverified, so an odd context must never be why a real report is
 // rejected. The email labels the whole block as client-supplied.
 export const BugReportContextSchema = z.object({
-  route: z.string().max(500).optional(),
-  userAgent: z.string().max(500).optional(),
-  userEmail: z.string().max(320).optional(),
-  userId: z.string().max(100).optional(),
-  occurredAt: z.string().max(100).optional(),
+  route: z.string().max(BUG_REPORT_CONTEXT_TEXT_MAX).optional(),
+  userAgent: z.string().max(BUG_REPORT_CONTEXT_TEXT_MAX).optional(),
+  userEmail: z.string().max(BUG_REPORT_CONTEXT_EMAIL_MAX).optional(),
+  userId: z.string().max(BUG_REPORT_CONTEXT_ID_MAX).optional(),
+  occurredAt: z.string().max(BUG_REPORT_CONTEXT_ID_MAX).optional(),
 })
 
 export const CreateBugReportBodySchema = z.object({

@@ -19,6 +19,12 @@ import {
   VERIFIED_PASSWORD_MAX_LENGTH,
 } from './modules/auth/auth.schema'
 import {
+  BUG_REPORT_CONTEXT_EMAIL_MAX,
+  BUG_REPORT_CONTEXT_ID_MAX,
+  BUG_REPORT_CONTEXT_TEXT_MAX,
+  BugReportContextSchema,
+} from './modules/bug-reports/bug-reports.schema'
+import {
   EVENT_MAX_TEAM_SIZE,
   UpdateEventConfigBodySchema,
 } from './modules/event-config/event-config.schema'
@@ -129,6 +135,55 @@ describe('password length ceilings', () => {
         password: 'p'.repeat(VERIFIED_PASSWORD_MAX_LENGTH + 1),
       }).success,
     ).toBe(false)
+  })
+})
+
+// The context block POST /bug-reports accepts (#194). Same contract as the
+// numeric ceilings above: the front mirrors these by hand in
+// `src/lib/field-limits.ts` and trims `navigator.userAgent` to them *before*
+// sending, because a 700-character user agent used to come back as a 422 the
+// reporter could not act on. Nothing in the type system ties the two sides
+// together, so both pin the literals.
+describe('bug report context ceilings', () => {
+  it('pins the context ceilings to the literals the front mirrors', () => {
+    expect(BUG_REPORT_CONTEXT_TEXT_MAX).toBe(500)
+    expect(BUG_REPORT_CONTEXT_EMAIL_MAX).toBe(320)
+    expect(BUG_REPORT_CONTEXT_ID_MAX).toBe(100)
+  })
+
+  it('accepts a context at the ceiling and refuses one character more', () => {
+    const at = {
+      route: 'r'.repeat(BUG_REPORT_CONTEXT_TEXT_MAX),
+      userAgent: 'u'.repeat(BUG_REPORT_CONTEXT_TEXT_MAX),
+      userEmail: 'e'.repeat(BUG_REPORT_CONTEXT_EMAIL_MAX),
+      userId: 'i'.repeat(BUG_REPORT_CONTEXT_ID_MAX),
+    }
+    expect(BugReportContextSchema.safeParse(at).success).toBe(true)
+    expect(
+      BugReportContextSchema.safeParse({
+        ...at,
+        userAgent: 'u'.repeat(BUG_REPORT_CONTEXT_TEXT_MAX + 1),
+      }).success,
+    ).toBe(false)
+  })
+
+  // The half the front's message depends on: a context-only refusal must come
+  // back with the offending field's own path, so the dialog can tell it apart
+  // from a refusal of the description or the reply-to address and stop
+  // blaming fields the person cannot fix (`front/src/components/bug-report.tsx`).
+  it('answers 422 naming context.userAgent when the user agent is over the ceiling', async () => {
+    const res = await app.request('/bug-reports', {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify({
+        description: 'o editor de blocos travou',
+        context: { userAgent: 'u'.repeat(BUG_REPORT_CONTEXT_TEXT_MAX + 1) },
+      }),
+    })
+    expect(res.status).toBe(422)
+    const body = (await res.json()) as { error?: string; issues?: { body?: { path?: string }[] } }
+    expect(body.error).toBe('validation_failed')
+    expect(body.issues?.body?.some((issue) => issue.path === 'context.userAgent')).toBe(true)
   })
 })
 

@@ -11,6 +11,10 @@ import { E2E_PARTICIPANT_NAME, ORGANIZER_NAME } from './support/rounds'
 // ORGANIZER_PASSWORD (the same pair `pnpm db:seed` consumes) and skips itself
 // when they are not set.
 const evidence = (name: string) => `e2e/evidence/33/${name}.png`
+// #185 rides along in this walkthrough because its two refusals are the same
+// create dialog as step 04, one keystroke apart — but its evidence belongs to
+// its own issue folder.
+const evidence185 = (name: string) => `e2e/evidence/185/${name}.png`
 
 const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
@@ -157,8 +161,31 @@ test('walks a participant through creating, filling, and leaving a team', async 
   await expect(page.getByTestId('teams-create-name-error')).toBeVisible()
   await page.screenshot({ path: evidence('04-nome-duplicado'), fullPage: true })
 
+  // 04b (#185, achado #11) — the same name with a trailing space is the same
+  // name: the index folds case but not whitespace, so this only fails because
+  // the name is normalized before it is stored.
+  await page.getByTestId('teams-create-name-input').fill(`${TEAM_NAME} `)
+  await page.getByTestId('teams-create-submit').click()
+  await expect(page.getByTestId('teams-create-name-error')).toBeVisible()
+  await expect(page.getByTestId('teams-create-name-error')).toContainText(
+    'Já existe um time com esse nome',
+  )
+  await page.screenshot({ path: evidence185('01-duplicado-por-espaco'), fullPage: true })
+
+  // 04c (#185, achado #10) — a name of nothing but spaces is refused on the
+  // field, and no nameless team is created.
+  await page.getByTestId('teams-create-name-input').fill('   ')
+  await page.getByTestId('teams-create-submit').click()
+  await expect(page.getByTestId('teams-create-name-error')).toContainText('Informe o nome do time')
+  await expect(page.getByTestId('teams-create-form-error')).toBeHidden()
+  await page.screenshot({ path: evidence185('02-nome-em-branco'), fullPage: true })
+
   // 05 — and Join on the now-full team is disabled, with the reason next to it.
   await page.getByTestId('teams-create-cancel').click()
+  // Neither refusal above created anything: the outsider is still teamless, so
+  // the create action is still on offer and there is no team panel.
+  await expect(page.getByTestId('teams-create-open')).toBeVisible()
+  await expect(page.getByTestId('my-team-panel')).toBeHidden()
   const row = page.getByTestId(`teams-row-${teamId}`)
   await expect(row).toContainText(`0/${maxTeamSize}`)
   await expect(page.getByTestId(`teams-join-${teamId}`)).toBeDisabled()

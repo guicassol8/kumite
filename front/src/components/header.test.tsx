@@ -619,8 +619,10 @@ describe('Header — telão (#220)', () => {
 // chrome classes, and two classes of the variant used to survive
 // `tailwind-merge` because the header passed no counterpart for them —
 // `bg-background` (paper, in the light theme) and `hover:text-accent-foreground`
-// (ink). Light label on a paper surface measured 1.08:1 at rest, 1.31:1 on
-// hover; AA asks for 4.5:1.
+// (ink). Light label on a paper surface measured 1.0814:1 at rest, 1.3062:1 on
+// hover; AA asks for 4.5:1. In the dark theme the same two classes happened to
+// resolve to legible colours (16.9:1 and 13.9:1), so this guard is what keeps
+// the light theme from regressing behind a passing dark one.
 //
 // The assertion is on classes, not on colors, because jsdom never applies
 // Tailwind's stylesheet: what is checkable here is the output of the merge.

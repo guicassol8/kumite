@@ -1,12 +1,18 @@
 import { expect, type Locator, type Page, test } from '@playwright/test'
 
 // #271 — the Sair button used to be a paper slab on the charcoal chrome, with
-// a nearly-white label on it: 1.08:1 at rest and 1.31:1 on hover in the light
-// theme, where AA asks for 4.5:1. The jsdom guard in
+// a nearly-white label on it: measured 1.0814:1 at rest and 1.3062:1 on hover
+// in the light theme, where AA asks for 4.5:1. The jsdom guard in
 // `src/components/header.test.tsx` can only assert the classes that survive
 // tailwind-merge — jsdom never applies Tailwind's stylesheet — so the actual
 // ratio is measured here, in a real browser, in both themes and at both
 // viewports. Doubles as the PR's visual evidence.
+//
+// The dark theme was never the broken one: there `--accent-foreground` and
+// `--chrome-foreground` are the same paper, so the variant's hover label
+// landed on the right colour by coincidence (16.9:1 at rest, 13.9:1 on hover,
+// even with the defect in). The spec still asserts it, because that
+// coincidence is exactly the kind of thing a token nudge in #214 would end.
 const evidence = (name: string) => `e2e/evidence/271/${name}.png`
 
 const DESKTOP = { width: 1280, height: 800 }
@@ -42,60 +48,85 @@ async function signUpParticipant(page: Page, email: string) {
   await expect(page).toHaveURL(/\/$/)
 }
 
-function textColor(locator: Locator): Promise<Rgb> {
+/**
+ * The label's colour and the colour a viewer actually sees behind it — the
+ * Acceptance's "fundo efetivo do botão".
+ *
+ * Reading `backgroundColor` off the button alone is not enough: the fix makes
+ * it `bg-transparent`, so what shows through is the chrome, and the hover veil
+ * is a `chrome-foreground/10` film over it. The ancestor chain is therefore
+ * painted onto a 1×1 canvas, outermost first, exactly as the compositor
+ * stacks it.
+ *
+ * The canvas is also the parser, deliberately. `getComputedStyle` does not
+ * always answer in `rgb()`: Tailwind's alpha modifier (`/10`) and any colour
+ * sampled during a transition come back as `oklab(0.959 0.001 0.003 / 0.1)`,
+ * and reading that with a `[\d.]+` regex yields `rgb(0.959, 0.001, 0.003)` —
+ * an almost-black that is nowhere near the paper it describes. Handing the
+ * string to `fillStyle` uses the browser's own colour parser instead, and
+ * because the stack is opaque by the time it is read, `getImageData` gives
+ * back exact sRGB bytes.
+ */
+function measure(locator: Locator): Promise<{ text: Rgb; background: Rgb }> {
   return locator.evaluate((el) => {
-    const parts = getComputedStyle(el).color.match(/[\d.]+/g) ?? ['0', '0', '0']
-    return [Number(parts[0]), Number(parts[1]), Number(parts[2])] as [number, number, number]
+    const canvas = document.createElement('canvas')
+    canvas.width = 1
+    canvas.height = 1
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) throw new Error('no 2d context to measure colours with')
+
+    // An unparseable value leaves `fillStyle` at whatever it was, so it is
+    // reset to fully transparent first: a value the browser rejects then
+    // paints nothing instead of silently repainting the previous layer.
+    const paint = (value: string) => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0)'
+      ctx.fillStyle = value
+      ctx.fillRect(0, 0, 1, 1)
+    }
+
+    const read = (): Rgb => {
+      const pixel = ctx.getImageData(0, 0, 1, 1).data
+      return [pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0]
+    }
+
+    const layers: string[] = []
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      layers.push(getComputedStyle(node).backgroundColor)
+    }
+    layers.reverse()
+
+    // Under everything there is the browser canvas, which is painted white.
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, 1, 1)
+    for (const layer of layers) paint(layer)
+    const background = read()
+
+    // The label on top of that stack: opaque text lands on its own colour,
+    // and a translucent one composites the way it is actually seen.
+    paint(getComputedStyle(el).color)
+    const text = read()
+
+    return { text, background }
   })
 }
 
 /**
- * The colour a viewer actually sees behind the label — the Acceptance's "fundo
- * efetivo do botão".
+ * Lets every running CSS transition finish before a colour is read.
  *
- * Reading `backgroundColor` off the button alone is not enough here: the fix
- * makes it `bg-transparent` (`rgba(0,0,0,0)`, the chrome showing through) and
- * the hover veil is `chrome-foreground/10` (`rgba(243,241,239,0.1)`). So this
- * walks up the ancestor chain compositing each layer over the next until the
- * accumulated alpha reaches 1, exactly as the compositor does.
+ * The button carries `transition-all` and the theme toggle repaints the page,
+ * so a `getComputedStyle` fired straight after a hover or a theme switch
+ * samples a colour mid-fade — a value that belongs to no state a user ever
+ * sees settle. That artifact is not hypothetical: it is what made this spec's
+ * first red/green run report a broken dark theme, when what it had sampled
+ * was the light palette still fading out. Keyframe animations are left alone
+ * — a looping one never finishes.
  */
-function effectiveBackground(locator: Locator): Promise<Rgb> {
-  return locator.evaluate((el) => {
-    const parse = (value: string): [number, number, number, number] => {
-      const parts = value.match(/[\d.]+/g)
-      if (!parts || parts.length < 3) return [0, 0, 0, 0]
-      return [
-        Number(parts[0]),
-        Number(parts[1]),
-        Number(parts[2]),
-        parts.length > 3 ? Number(parts[3]) : 1,
-      ]
-    }
-
-    const composited: [number, number, number] = [0, 0, 0]
-    let remaining = 1
-    let node: Element | null = el
-
-    while (node && remaining > 0.001) {
-      const [r, g, b, a] = parse(getComputedStyle(node).backgroundColor)
-      if (a > 0) {
-        const weight = remaining * a
-        composited[0] += r * weight
-        composited[1] += g * weight
-        composited[2] += b * weight
-        remaining -= weight
-      }
-      node = node.parentElement
-    }
-
-    // Past <html> there is only the canvas, which the browser paints white.
-    if (remaining > 0.001) {
-      composited[0] += 255 * remaining
-      composited[1] += 255 * remaining
-      composited[2] += 255 * remaining
-    }
-
-    return composited
+async function settle(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const transitions = document
+      .getAnimations()
+      .filter((animation) => animation instanceof CSSTransition)
+    await Promise.all(transitions.map((animation) => animation.finished.catch(() => undefined)))
   })
 }
 
@@ -114,10 +145,11 @@ function contrastRatio(a: Rgb, b: Rgb): number {
   return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05)
 }
 
-/** The measured ratio between a button's label and what is really behind it. */
-async function labelContrast(locator: Locator): Promise<number> {
-  const [color, background] = await Promise.all([textColor(locator), effectiveBackground(locator)])
-  return contrastRatio(color, background)
+/** The settled ratio between a button's label and what is really behind it. */
+async function labelContrast(page: Page, locator: Locator): Promise<number> {
+  await settle(page)
+  const { text, background } = await measure(locator)
+  return contrastRatio(text, background)
 }
 
 /** Reaches the button the way a keyboard user does, so `:focus-visible` fires. */
@@ -142,20 +174,20 @@ test.describe('o botão Sair sobre o chrome — desktop (#271)', () => {
     await expect(button).toBeVisible()
 
     // 1 — rest. This is the state the issue measured at 1.08:1.
-    expect(await labelContrast(button)).toBeGreaterThanOrEqual(AA_CONTRAST)
+    expect(await labelContrast(page, button)).toBeGreaterThanOrEqual(AA_CONTRAST)
     await page.screenshot({ path: evidence('01-claro-repouso'), clip: await headerClip(page) })
 
     // 2 — hover. A second defect the issue had not measured: the `outline`
     // variant's `hover:text-accent-foreground` painted the label ink-dark over
-    // a `chrome-foreground/10` veil, 1.31:1.
+    // a `chrome-foreground/10` veil, 1.3062:1.
     await button.hover()
-    expect(await labelContrast(button)).toBeGreaterThanOrEqual(AA_CONTRAST)
+    expect(await labelContrast(page, button)).toBeGreaterThanOrEqual(AA_CONTRAST)
     await page.screenshot({ path: evidence('02-claro-hover'), clip: await headerClip(page) })
 
     // 3 — keyboard focus: the label stays readable and the ring is drawn.
     await page.mouse.move(0, 0)
     await tabTo(page, 'header-logout-button')
-    expect(await labelContrast(button)).toBeGreaterThanOrEqual(AA_CONTRAST)
+    expect(await labelContrast(page, button)).toBeGreaterThanOrEqual(AA_CONTRAST)
     expect(await button.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe('none')
     await page.screenshot({ path: evidence('03-claro-foco'), clip: await headerClip(page) })
   })
@@ -167,12 +199,17 @@ test.describe('o botão Sair sobre o chrome — desktop (#271)', () => {
     await page.getByTestId('header-theme-toggle').click()
     await expect(page.locator('html')).toHaveClass(/dark/)
 
+    // 4 — rest, dark. Already legible before the fix (16.9:1): here the
+    // variant's paper `bg-background` sat on a dark page, so the accident ran
+    // the right way. The assertion holds the accident to the rule.
     const button = page.getByTestId('header-logout-button')
-    expect(await labelContrast(button)).toBeGreaterThanOrEqual(AA_CONTRAST)
+    expect(await labelContrast(page, button)).toBeGreaterThanOrEqual(AA_CONTRAST)
     await page.screenshot({ path: evidence('04-escuro-repouso'), clip: await headerClip(page) })
 
+    // 5 — hover, dark.
     await button.hover()
-    expect(await labelContrast(button)).toBeGreaterThanOrEqual(AA_CONTRAST)
+    expect(await labelContrast(page, button)).toBeGreaterThanOrEqual(AA_CONTRAST)
+    await page.screenshot({ path: evidence('05-escuro-hover'), clip: await headerClip(page) })
   })
 })
 
@@ -185,16 +222,17 @@ test.describe('o botão Sair no painel mobile — 390×844 (#271)', () => {
     const button = page.getByTestId('header-mobile-logout-button')
     await expect(button).toBeVisible()
 
-    // 5 — light, inside the sheet, which is `bg-chrome` like the bar itself.
+    // 6 — light, inside the sheet, which is `bg-chrome` like the bar itself.
     await expect(page.locator('html')).not.toHaveClass(/dark/)
-    expect(await labelContrast(button)).toBeGreaterThanOrEqual(AA_CONTRAST)
-    await page.screenshot({ path: evidence('05-mobile-claro') })
+    expect(await labelContrast(page, button)).toBeGreaterThanOrEqual(AA_CONTRAST)
+    await page.screenshot({ path: evidence('06-mobile-claro') })
 
-    // The panel carries its own theme control, so dark is reachable without
-    // closing it.
+    // 7 — the panel carries its own theme control, so dark is reachable
+    // without closing it.
     await page.getByTestId('header-mobile-theme-toggle').click()
     await expect(page.locator('html')).toHaveClass(/dark/)
-    expect(await labelContrast(button)).toBeGreaterThanOrEqual(AA_CONTRAST)
+    expect(await labelContrast(page, button)).toBeGreaterThanOrEqual(AA_CONTRAST)
+    await page.screenshot({ path: evidence('07-mobile-escuro') })
   })
 })
 
@@ -209,7 +247,7 @@ test.describe('o comportamento de logout segue intacto (#271)', () => {
     await expect(page.getByTestId('header-login-link')).toBeVisible()
     await expect(page.getByTestId('header-logout-button')).toHaveCount(0)
 
-    // 6 — signed out: the bar is back to Entrar/Cadastrar.
-    await page.screenshot({ path: evidence('06-deslogado'), clip: await headerClip(page) })
+    // 8 — signed out: the bar is back to Entrar/Cadastrar.
+    await page.screenshot({ path: evidence('08-deslogado'), clip: await headerClip(page) })
   })
 })

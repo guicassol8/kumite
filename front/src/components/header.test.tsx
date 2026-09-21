@@ -614,3 +614,42 @@ describe('Header — telão (#220)', () => {
     await waitFor(() => expect(screen.queryByTestId('app-header')).toBeNull())
   })
 })
+
+// #271: the logout button composes `variant="outline"` with the header's own
+// chrome classes, and two classes of the variant used to survive
+// `tailwind-merge` because the header passed no counterpart for them —
+// `bg-background` (paper, in the light theme) and `hover:text-accent-foreground`
+// (ink). Light label on a paper surface measured 1.08:1 at rest, 1.31:1 on
+// hover; AA asks for 4.5:1.
+//
+// The assertion is on classes, not on colors, because jsdom never applies
+// Tailwind's stylesheet: what is checkable here is the output of the merge.
+// The real contrast measurement runs in the browser —
+// `front/e2e/header-logout-contrast.spec.ts`.
+describe('Header — o botão Sair sobre o chrome (#271)', () => {
+  function expectChromeOutline(className: string) {
+    expect(className).toContain('bg-transparent')
+    expect(className).toContain('text-chrome-foreground')
+    expect(className).toContain('border-chrome-foreground/40')
+    expect(className).toContain('hover:bg-chrome-foreground/10')
+    expect(className).toContain('hover:text-chrome-foreground')
+    expect(className).not.toContain('bg-background')
+    expect(className).not.toContain('hover:text-accent-foreground')
+  }
+
+  it('keeps the desktop button transparent, so the chrome shows through', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    expectChromeOutline((await screen.findByTestId('header-logout-button')).className)
+  })
+
+  it('keeps the mobile panel button transparent too', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+
+    expectChromeOutline((await screen.findByTestId('header-mobile-logout-button')).className)
+  })
+})

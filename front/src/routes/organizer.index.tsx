@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ExportMenu } from '@/components/organizer/export-menu'
 import { PANEL_EYEBROW } from '@/components/organizer/panel-table'
 import { RoundCountdown } from '@/components/round-countdown'
 import { Badge } from '@/components/ui/badge'
@@ -89,12 +90,18 @@ function OrganizerOverviewScreen() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2
-        className="font-display font-semibold text-2xl uppercase tracking-[0.01em]"
-        data-testid="overview-heading"
-      >
-        {t('organizer.overview.heading')}
-      </h2>
+      {/* The export sits on the overview only (#278): it is the event's
+          front page, and a second entry point on Times or na classificação
+          would be a decision of its own, not a detail of this one. */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h2
+          className="font-display font-semibold text-2xl uppercase tracking-[0.01em]"
+          data-testid="overview-heading"
+        >
+          {t('organizer.overview.heading')}
+        </h2>
+        <ExportMenu />
+      </div>
 
       {stats.isPending && <p data-testid="overview-loading">{t('organizer.overview.loading')}</p>}
 

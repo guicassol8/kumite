@@ -555,6 +555,15 @@
       },
       "shortcuts": {
         "title": "Atalhos"
+      },
+      "export": {
+        "button": "Exportar",
+        "pending": "Exportando...",
+        "json": "JSON completo",
+        "csvRanking": "CSV da classificação",
+        "csvTeams": "CSV dos times",
+        "csvSubmissions": "CSV das submissões",
+        "error": "Não foi possível gerar o arquivo. Tente de novo."
       }
     }
   },

@@ -555,6 +555,15 @@
       },
       "shortcuts": {
         "title": "Accesos directos"
+      },
+      "export": {
+        "button": "Exportar",
+        "pending": "Exportando...",
+        "json": "JSON completo",
+        "csvRanking": "CSV de la clasificación",
+        "csvTeams": "CSV de los equipos",
+        "csvSubmissions": "CSV de los envíos",
+        "error": "No se pudo generar el archivo. Inténtalo de nuevo."
       }
     }
   },

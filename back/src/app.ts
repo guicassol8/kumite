@@ -7,6 +7,7 @@ import * as auth from './modules/auth/auth.route'
 import * as bugReports from './modules/bug-reports/bug-reports.route'
 import * as eventCodes from './modules/event-codes/event-codes.route'
 import * as eventConfig from './modules/event-config/event-config.route'
+import * as eventExport from './modules/export/export.route'
 import * as health from './modules/health/health.route'
 import * as passwordReset from './modules/password-reset/password-reset.route'
 import * as problems from './modules/problems/problems.route'
@@ -43,6 +44,7 @@ export const modules = [
   rounds,
   ranking,
   stats,
+  eventExport,
   sse,
   bugReports,
 ] as const

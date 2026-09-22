@@ -322,7 +322,18 @@ export function Header() {
                     variant="outline"
                     size="sm"
                     data-testid="header-logout-button"
-                    className="shrink-0 border-chrome-foreground/40 px-2 text-chrome-foreground hover:bg-chrome-foreground/10 xl:px-3"
+                    // `bg-transparent` and `hover:text-chrome-foreground` are
+                    // here to neutralize `bg-background` and
+                    // `hover:text-accent-foreground` from the `outline`
+                    // variant (#271). tailwind-merge only drops a variant
+                    // class when the caller passes its counterpart, and this
+                    // button passed neither — so the paper surface and the ink
+                    // hover label survived onto the charcoal chrome (1.0814:1
+                    // at rest, 1.3062:1 on hover, in the light theme). The dark
+                    // theme read 16.9:1 and 13.9:1 even with the defect in,
+                    // because there `--accent-foreground` happens to be the
+                    // same paper as `--chrome-foreground`.
+                    className="shrink-0 border-chrome-foreground/40 bg-transparent px-2 text-chrome-foreground hover:bg-chrome-foreground/10 hover:text-chrome-foreground xl:px-3"
                     onClick={logout}
                   >
                     {t('header.logout')}
@@ -477,7 +488,10 @@ export function Header() {
                           type="button"
                           variant="outline"
                           data-testid="header-mobile-logout-button"
-                          className="border-chrome-foreground/40 text-chrome-foreground hover:bg-chrome-foreground/10"
+                          // Same neutralization as the desktop button above
+                          // (#271): this is the same Sair, inside a
+                          // `bg-chrome` sheet, with the same defect.
+                          className="border-chrome-foreground/40 bg-transparent text-chrome-foreground hover:bg-chrome-foreground/10 hover:text-chrome-foreground"
                           onClick={() => {
                             closeMobileMenu()
                             logout()

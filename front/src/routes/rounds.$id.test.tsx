@@ -218,6 +218,24 @@ describe('RoundDetailScreen', () => {
     expect(screen.queryByTestId('round-connection-status')).toBeNull()
   })
 
+  // #189: 'error' is the status a rejected `/sse` or an exhausted retry cap
+  // reports. This screen has no REST fallback, so the indicator is the only
+  // thing telling a participant mid-round that the countdown and the ranking
+  // have stopped moving — it must not stay silent just because the status is
+  // not the literal 'reconnecting'.
+  it('shows the connection indicator on the error status too', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, roundDetail()))
+
+    renderRound()
+    await screen.findByTestId('round-problem-p1')
+
+    emitStatus('error')
+    expect(screen.getByTestId('round-connection-status')).toBeDefined()
+
+    emitStatus('open')
+    expect(screen.queryByTestId('round-connection-status')).toBeNull()
+  })
+
   it('shows the just-closed notice exactly once when the round flips to closed, and it can be dismissed', async () => {
     mockedGet
       .mockResolvedValueOnce(jsonResponse(200, roundDetail()))

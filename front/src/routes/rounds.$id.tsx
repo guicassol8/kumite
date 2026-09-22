@@ -123,7 +123,11 @@ function RoundDetailScreen() {
 
   return (
     <main className="mx-auto flex max-w-4xl flex-col items-start gap-4 p-8">
-      {eventStream.status === 'reconnecting' && (
+      {/* 'error' is as disconnected as 'reconnecting' (#189) — a rejected
+          /sse or the retry cap run out. This screen has no REST fallback, so
+          this alert is the only warning that the countdown and the ranking
+          have stopped moving. */}
+      {(eventStream.status === 'reconnecting' || eventStream.status === 'error') && (
         <Alert variant="warning" data-testid="round-connection-status">
           <WifiOff />
           <AlertDescription>{t('roundDetail.connection.reconnecting')}</AlertDescription>

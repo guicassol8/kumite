@@ -10,7 +10,7 @@ import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import type { SseConnectionStatus } from '@/lib/sse-client'
 import type { SseEvent } from '@/lib/sse-schema'
 
-import { useEventStream } from './use-event-stream'
+import { OFFLINE_AFTER_MS, useEventStream } from './use-event-stream'
 
 const fakeUser: SessionUser = {
   id: 'u1',
@@ -285,5 +285,45 @@ describe('useEventStream', () => {
 
     act(() => onStatusChange('reconnecting'))
     expect(result.current.status).toBe('reconnecting')
+
+    act(() => onStatusChange('error'))
+    expect(result.current.status).toBe('error')
+  })
+})
+
+// #189 widened `SseConnectionStatus` with 'error'. `isLive` is `=== 'open'`
+// and the offline timer is keyed on `isLive`, so both already treat the new
+// status as "not connected" — this pins that down, because the failure mode
+// it guards against is silent: a status the hook forgot to consider would
+// leave the big screen claiming to be live with a dead stream.
+describe('useEventStream — the error status counts as disconnected', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('is never live on error, and goes offline after OFFLINE_AFTER_MS', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useEventStream())
+
+    const onStatusChange = connectEventStream.mock.calls.at(-1)?.[1] as (
+      status: SseConnectionStatus,
+    ) => void
+
+    act(() => onStatusChange('open'))
+    expect(result.current.leaderboard.isLive).toBe(true)
+
+    act(() => onStatusChange('error'))
+    expect(result.current.leaderboard.isLive).toBe(false)
+    expect(result.current.leaderboard.isOffline).toBe(false)
+
+    act(() => vi.advanceTimersByTime(OFFLINE_AFTER_MS - 1))
+    expect(result.current.leaderboard.isOffline).toBe(false)
+
+    act(() => vi.advanceTimersByTime(1))
+    expect(result.current.leaderboard.isOffline).toBe(true)
   })
 })

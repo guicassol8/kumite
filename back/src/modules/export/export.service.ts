@@ -281,6 +281,8 @@ async function fetchRemovedTeams(db: Db, rounds: ExportRound[]): Promise<ExportR
 // ("one row per team and one column per problem and per round") forbids. The
 // BOM is what stops Excel reading "Mérida" as "MÃ©rida". Whoever consumes this
 // by machine uses the JSON, which is lossless and has no dialect.
+// Double-click is also why a leading formula character is neutralized — see
+// FORMULA_TRIGGER below.
 const CSV_DELIMITER = ';'
 const CSV_EOL = '\r\n'
 // Written via fromCharCode, never as a literal U+FEFF in the source: biome
@@ -288,7 +290,18 @@ const CSV_EOL = '\r\n'
 // a diff and in review (same reason as blocks/src/fixtures).
 const UTF8_BOM = String.fromCharCode(0xfeff)
 
+// CSV formula injection (CWE-1236, #329). A team name is free text chosen by
+// a participant, and Excel and LibreOffice evaluate a cell that starts with
+// one of these characters (`=1+1+cmd|'/C calc'!A0`). A leading apostrophe is
+// the convention both read as "this is text", so such a field is prefixed
+// with `'` and, from there on, always quoted. The scope is deliberately
+// narrow — first character only, these six — so every ordinary name stays
+// byte for byte what it was. Numeric columns are never negative and dates
+// start with the year, so no number can match.
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/
+
 function escapeCsvField(field: string): string {
+  if (FORMULA_TRIGGER.test(field)) return `"'${field.replaceAll('"', '""')}"`
   if (!/[;"\r\n]/.test(field)) return field
   return `"${field.replaceAll('"', '""')}"`
 }

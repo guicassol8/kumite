@@ -62,7 +62,7 @@ function emit(event: SseEvent) {
   act(() => onEvent(event))
 }
 
-function emitStatus(status: 'connecting' | 'open' | 'reconnecting') {
+function emitStatus(status: 'connecting' | 'open' | 'reconnecting' | 'error') {
   const onStatusChange = connectEventStream.mock.calls.at(-1)?.[1] as (s: string) => void
   act(() => onStatusChange(status))
 }
@@ -366,6 +366,31 @@ describe('LeaderboardScreen — alert-styled states (#220)', () => {
     await waitFor(() => expect(screen.queryByTestId('leaderboard-connection-banner')).toBeNull())
 
     emitStatus('reconnecting')
+    await waitFor(() => {
+      const banner = screen.getByTestId('leaderboard-connection-banner')
+      expect(banner.className).toContain('border-warning')
+      expect(banner.querySelector('svg')).not.toBeNull()
+    })
+  })
+
+  // #189 added 'error' to the status union — a rejected `/sse` response or the
+  // retry cap running out. It is a disconnection like any other, so the board
+  // has to warn exactly as it does for 'reconnecting'; a default-variant
+  // banner would understate a stream that is not coming back on its own.
+  it('warns the same way on the error status', async () => {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-connection-banner')).toBeDefined())
+
+    emitStatus('open')
+    emit({
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: roundRanking,
+      event: eventRanking,
+    })
+    await waitFor(() => expect(screen.queryByTestId('leaderboard-connection-banner')).toBeNull())
+
+    emitStatus('error')
     await waitFor(() => {
       const banner = screen.getByTestId('leaderboard-connection-banner')
       expect(banner.className).toContain('border-warning')

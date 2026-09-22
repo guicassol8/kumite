@@ -89,7 +89,16 @@ export function useEventStream(
   onRoundChange?: () => void,
   onRankingUpdate?: () => void,
 ): AppStreamState {
-  const { status } = useSession()
+  const { status, user } = useSession()
+  // A `/sse` 403 is terminal on purpose (#189): on that route it is only ever
+  // `requirePasswordUpToDate`, so retrying would answer the same 403 and
+  // dropping the session would take away the screen that fixes it. That makes
+  // this effect the only thing that can revive the stream — and changing the
+  // password does not touch `status`, so without this dep the stream would
+  // stay dead for the rest of the page's life. The boolean, not `user`:
+  // `refreshSession` hands back a fresh object on every call and a healthy
+  // stream must survive that.
+  const mustChangePassword = user?.mustChangePassword === true
   const [state, setState] = useState<EventStreamState>(INITIAL_STATE)
   const [leaderboardState, setLeaderboardState] =
     useState<LeaderboardStreamData>(INITIAL_LEADERBOARD)
@@ -219,7 +228,7 @@ export function useEventStream(
           setLeaderboardState((prev) => ({ ...prev, serverTime: event.serverTime }))
       }
     }
-  }, [status, connectionNonce])
+  }, [status, connectionNonce, mustChangePassword])
 
   const isLive = leaderboardState.connectionStatus === 'open'
 

@@ -420,6 +420,13 @@ function LeaderboardScreen() {
   const [manualTab, setManualTab] = useState<'round' | 'event' | null>(null)
   const selectedTab = manualTab ?? defaultTab
 
+  // 'error' joined the status union in #189: a `/sse` response the client
+  // refused (401/403) or the retry cap run out. It means "we know we are not
+  // connected", exactly like 'reconnecting' — only 'connecting' is the state
+  // where nothing has gone wrong yet, so a warning would be premature.
+  const connectionLost =
+    stream.connectionStatus === 'reconnecting' || stream.connectionStatus === 'error'
+
   function retry() {
     // Reopen the stream too: with /sse blocked the REST refetches alone would
     // leave the screen permanently not-live even after the network recovers.
@@ -503,10 +510,10 @@ function LeaderboardScreen() {
 
       {!stream.isLive && (
         <Alert
-          variant={stream.connectionStatus === 'reconnecting' ? 'warning' : 'default'}
+          variant={connectionLost ? 'warning' : 'default'}
           data-testid="leaderboard-connection-banner"
         >
-          {stream.connectionStatus === 'reconnecting' && <WifiOff />}
+          {connectionLost && <WifiOff />}
           <AlertDescription>
             {stream.isOffline
               ? t('leaderboard.connection.offline')

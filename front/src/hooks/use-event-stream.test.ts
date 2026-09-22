@@ -327,3 +327,44 @@ describe('useEventStream — the error status counts as disconnected', () => {
     expect(result.current.leaderboard.isOffline).toBe(true)
   })
 })
+
+// #189 made a 403 on `/sse` terminal — no retry, session intact — because on
+// that route a 403 is only ever `requirePasswordUpToDate`. That is right, but
+// it made the connect effect the only thing that can revive the stream, and
+// changing the password does not re-run it: `refreshSession` keeps the status
+// on 'authenticated' and only lowers `mustChangePassword`. Without that flag
+// in the deps the stream stays dead for the rest of the page's life — the old
+// 2s loop used to pick it back up on its own, so this is the regression
+// acceptance #5 guards against.
+describe('useEventStream — reconnects once the temporary password is changed', () => {
+  it('reopens the stream when mustChangePassword goes false', () => {
+    const pending: SessionUser = { ...fakeUser, mustChangePassword: true }
+    setSession(pending, 'tok-1')
+    renderHook(() => useEventStream())
+
+    // The 403 terminal: the client gave up on purpose and will not retry.
+    const onStatusChange = connectEventStream.mock.calls.at(-1)?.[1] as (
+      status: SseConnectionStatus,
+    ) => void
+    act(() => onStatusChange('error'))
+    expect(connectEventStream).toHaveBeenCalledTimes(1)
+
+    // What `change-password` does on success, before navigating home.
+    act(() => setSession({ ...pending, mustChangePassword: false }, 'tok-1'))
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    expect(connectEventStream).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not reopen it when a /me refresh changes nothing else', () => {
+    setSession(fakeUser, 'tok-1')
+    renderHook(() => useEventStream())
+    expect(connectEventStream).toHaveBeenCalledTimes(1)
+
+    // `refreshSession` runs on every retry of the session error card and
+    // hands back a fresh object with the same flag — not a reason to drop a
+    // healthy stream.
+    act(() => setSession({ ...fakeUser }, 'tok-1'))
+    expect(connectEventStream).toHaveBeenCalledTimes(1)
+  })
+})

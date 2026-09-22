@@ -414,7 +414,10 @@ describe('getEventExport', () => {
 // Pure functions over an EventExport: no database, so every case below is
 // about the shape of the file an organizer opens in Excel, not about SQL.
 
-const BOM = '﻿'
+// Written via fromCharCode, never as a literal U+FEFF in the source: biome
+// rewrites the escape '\uFEFF' into the raw character, which is invisible in
+// a diff and in review (same reason as blocks/src/fixtures).
+const BOM = String.fromCharCode(0xfeff)
 const CRLF = '\r\n'
 
 function emptyExport(): EventExport {

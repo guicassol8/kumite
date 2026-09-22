@@ -283,7 +283,10 @@ async function fetchRemovedTeams(db: Db, rounds: ExportRound[]): Promise<ExportR
 // by machine uses the JSON, which is lossless and has no dialect.
 const CSV_DELIMITER = ';'
 const CSV_EOL = '\r\n'
-const UTF8_BOM = '﻿'
+// Written via fromCharCode, never as a literal U+FEFF in the source: biome
+// rewrites the escape '\uFEFF' into the raw character, which is invisible in
+// a diff and in review (same reason as blocks/src/fixtures).
+const UTF8_BOM = String.fromCharCode(0xfeff)
 
 function escapeCsvField(field: string): string {
   if (!/[;"\r\n]/.test(field)) return field

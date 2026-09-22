@@ -45,8 +45,9 @@ export function ExportMenu() {
           'application/json',
         )
       } else {
-        // The body already carries the back's UTF-8 BOM — adding another here
-        // would put a stray U+FEFF inside the first cell.
+        // The Blob goes through untouched: it already carries the back's
+        // UTF-8 BOM, and decoding it to a string on the way here would strip
+        // exactly that (see fetchExportCsv).
         downloadFile(exportFilename(kind, 'csv'), await fetchExportCsv(kind), CSV_MIME)
       }
     } catch {

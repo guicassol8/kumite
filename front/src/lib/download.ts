@@ -3,8 +3,10 @@
 // URL is that missing URL, and it must be revoked or the blob stays alive for
 // the life of the document.
 
-/** Hands `content` to the browser as a file named `filename`. */
-export function downloadFile(filename: string, content: string, mimeType: string): void {
+/** Hands `content` to the browser as a file named `filename`. `content` is a
+ * BlobPart, not a string, so a body that must survive byte for byte (the
+ * CSV's UTF-8 BOM) can be passed through as the Blob it arrived as. */
+export function downloadFile(filename: string, content: BlobPart, mimeType: string): void {
   const url = URL.createObjectURL(new Blob([content], { type: mimeType }))
   try {
     const anchor = document.createElement('a')

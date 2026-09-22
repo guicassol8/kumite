@@ -20,6 +20,11 @@ import '@/i18n'
 
 import { ExportMenu } from './export-menu'
 
+// Written via fromCharCode, never as a literal U+FEFF in the source: biome
+// rewrites the escape '\uFEFF' into the raw character, which is invisible in
+// a diff and in review (same reason as blocks/src/fixtures).
+const BOM = String.fromCharCode(0xfeff)
+
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   vi.setSystemTime(new Date('2026-09-20T12:00:00Z'))
@@ -76,8 +81,10 @@ describe('ExportMenu', () => {
     ['export-menu-csv-teams', 'teams'],
     ['export-menu-csv-submissions', 'submissions'],
   ])('downloads %s as the %s CSV, untouched', async (testId, kind) => {
-    // The BOM is the back's; the menu must hand the body over verbatim.
-    fetchExportCsv.mockResolvedValue('﻿posicao;time\r\n')
+    // The body arrives as a Blob and must reach downloadFile as that very
+    // Blob: re-encoding it through a string is what loses the back's BOM.
+    const served = new Blob([`${BOM}posicao;time\r\n`], { type: 'text/csv' })
+    fetchExportCsv.mockResolvedValue(served)
     const menu = await openMenu()
 
     fireEvent.click(menu.getByTestId(testId))
@@ -85,7 +92,7 @@ describe('ExportMenu', () => {
     await waitFor(() => expect(downloadFile).toHaveBeenCalledTimes(1))
     expect(fetchExportCsv).toHaveBeenCalledWith(kind)
     expect(downloadFile.mock.calls[0]?.[0]).toBe(`kumite-${kind}-2026-09-20.csv`)
-    expect(downloadFile.mock.calls[0]?.[1]).toBe('﻿posicao;time\r\n')
+    expect(downloadFile.mock.calls[0]?.[1]).toBe(served)
     expect(downloadFile.mock.calls[0]?.[2]).toBe('text/csv;charset=utf-8')
   })
 
@@ -107,7 +114,7 @@ describe('ExportMenu', () => {
 
     // Selecting an item closes the menu, so the second download starts from a
     // freshly opened one — which is also the only way a user reaches it.
-    fetchExportCsv.mockResolvedValue('﻿time;congelado\r\n')
+    fetchExportCsv.mockResolvedValue(new Blob([`${BOM}time;congelado\r\n`]))
     const reopened = await open()
     fireEvent.click(reopened.getByTestId('export-menu-csv-teams'))
 

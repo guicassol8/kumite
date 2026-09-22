@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { downloadFile, exportFilename } from './download'
 
+// Written via fromCharCode, never as a literal U+FEFF in the source: biome
+// rewrites the escape '\uFEFF' into the raw character, which is invisible in
+// a diff and in review (same reason as blocks/src/fixtures).
+const BOM = String.fromCharCode(0xfeff)
+
 // jsdom implements neither of these, so they are stubbed rather than spied.
 // Typed with its argument so the Blob handed over can be asserted on.
 const createObjectURL = vi.fn((_blob: Blob) => 'blob:kumite/1')
@@ -62,7 +67,7 @@ describe('downloadFile', () => {
   it('passes the content and the mime type through to the Blob', () => {
     captureAnchors(() => {})
 
-    downloadFile('x.csv', '﻿a;b\r\n', 'text/csv;charset=utf-8')
+    downloadFile('x.csv', `${BOM}a;b\r\n`, 'text/csv;charset=utf-8')
 
     const blob = createObjectURL.mock.calls[0]?.[0]
     expect(blob?.type).toBe('text/csv;charset=utf-8')

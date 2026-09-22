@@ -14,12 +14,23 @@ export async function fetchEventExport() {
   return res.json()
 }
 
-/** One flat table as text. The route answers `text/csv`, so the body is read
- * with `.text()` — `.json()` on it is typed `never` by the raw() contract,
- * not a runtime SyntaxError waiting to happen. The BOM comes from the back;
- * the front must not add a second one. */
-export async function fetchExportCsv(kind: ExportCsvKind): Promise<string> {
+/**
+ * One flat table, as the bytes the API served.
+ *
+ * `.blob()` rather than `.text()`, and that is not a style choice: the Encoding
+ * Standard's UTF-8 decode — which `Response.text()` runs — *strips a leading
+ * BOM*. Going through a string therefore threw away the very three bytes the
+ * back puts there so Excel reads "Mérida" instead of "MÃ©rida", and the file an
+ * organizer saved was not the file `curl` gets. Measured, not assumed: the
+ * downloaded CSV started with `70 6f 73` ("pos"), never `ef bb bf`, until this
+ * read stopped decoding it. Keeping the body opaque leaves the back the single
+ * source of truth for the file's encoding.
+ *
+ * (`.json()` on this route is typed `never` by the raw() contract, so the
+ * mistake this replaces could not have been a runtime SyntaxError either.)
+ */
+export async function fetchExportCsv(kind: ExportCsvKind): Promise<Blob> {
   const res = await api.organizer['export.csv'].$get({ query: { kind } })
   if (!res.ok) throw new Error('failed to load the export csv')
-  return res.text()
+  return res.blob()
 }

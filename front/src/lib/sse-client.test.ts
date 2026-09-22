@@ -374,3 +374,93 @@ describe('connectEventStream — backoff and retry cap (#189)', () => {
     disconnect()
   })
 })
+
+// The cap would otherwise be a one-way door, and the venue's big screen has
+// nobody standing next to it to press "retry" — plus /rounds/$id has no REST
+// fallback at all. So the "network was down too long" terminal re-arms itself
+// when the browser says the environment came back.
+describe('connectEventStream — re-arming after the cap (#189)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    clearSession.mockClear()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  // The full schedule is 2+4+8+16+30*6 = 210s; 10 minutes of timers is well
+  // past it, so the loop is parked by the time this returns.
+  async function exhaustTheCap(): Promise<void> {
+    for (let i = 0; i < 10; i += 1) await vi.advanceTimersByTimeAsync(60_000)
+  }
+
+  it('reopens the stream when the network comes back', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(errorResponse(503))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const onStatusChange = vi.fn()
+    const disconnect = connectEventStream(vi.fn(), onStatusChange)
+
+    await exhaustTheCap()
+    expect(fetchMock).toHaveBeenCalledTimes(SSE_MAX_RETRIES + 1)
+
+    window.dispatchEvent(new Event('online'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchMock).toHaveBeenCalledTimes(SSE_MAX_RETRIES + 2)
+    // 'reconnecting', not 'connecting': the banner's existing copy stays
+    // true, which is why #189 needs no new i18n key.
+    expect(onStatusChange.mock.calls.at(-2)?.[0]).toBe('reconnecting')
+
+    disconnect()
+  })
+
+  it('reopens the stream when the tab becomes visible again', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(errorResponse(503))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const disconnect = connectEventStream(vi.fn())
+    await exhaustTheCap()
+    const parked = fetchMock.mock.calls.length
+
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchMock).toHaveBeenCalledTimes(parked + 1)
+
+    disconnect()
+  })
+
+  it('counts the cap from scratch after re-arming', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(errorResponse(503))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const disconnect = connectEventStream(vi.fn())
+    await exhaustTheCap()
+    expect(fetchMock).toHaveBeenCalledTimes(SSE_MAX_RETRIES + 1)
+
+    window.dispatchEvent(new Event('online'))
+    await exhaustTheCap()
+
+    // A fresh budget, not a single extra attempt — and it stops again.
+    expect(fetchMock).toHaveBeenCalledTimes((SSE_MAX_RETRIES + 1) * 2)
+
+    disconnect()
+  })
+
+  it('leaves no listener behind after disconnect', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(errorResponse(503))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const disconnect = connectEventStream(vi.fn())
+    await exhaustTheCap()
+    const parked = fetchMock.mock.calls.length
+
+    disconnect()
+
+    window.dispatchEvent(new Event('online'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(SSE_RETRY_DELAY_MS * 4)
+    expect(fetchMock).toHaveBeenCalledTimes(parked)
+  })
+})

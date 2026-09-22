@@ -320,6 +320,25 @@ describe('organizer overview', () => {
     )
   })
 
+  // #278: the export lives on the overview and nowhere else. Its own
+  // behaviour (which query each item calls, the error state) is covered by
+  // components/organizer/export-menu.test.tsx; what belongs here is that the
+  // screen carries it, next to the heading.
+  it('carries the export menu beside the heading', async () => {
+    mockedStatsGet.mockResolvedValue(jsonResponse(200, stats()))
+
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('overview-heading')).toBeDefined())
+    const trigger = screen.getByTestId('export-menu-trigger')
+    expect(trigger).toBeDefined()
+    // Same row as the heading: they share a parent, and nothing was fetched
+    // just by rendering the menu.
+    expect(trigger.closest('div')?.parentElement).toBe(
+      screen.getByTestId('overview-heading').parentElement,
+    )
+  })
+
   it('offers a retry when the stats request fails', async () => {
     mockedStatsGet.mockResolvedValue(jsonResponse(500, { error: 'boom' }))
 

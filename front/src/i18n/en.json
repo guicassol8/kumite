@@ -555,6 +555,15 @@
       },
       "shortcuts": {
         "title": "Shortcuts"
+      },
+      "export": {
+        "button": "Export",
+        "pending": "Exporting...",
+        "json": "Full JSON",
+        "csvRanking": "Ranking CSV",
+        "csvTeams": "Teams CSV",
+        "csvSubmissions": "Submissions CSV",
+        "error": "Could not build the file. Try again."
       }
     }
   },

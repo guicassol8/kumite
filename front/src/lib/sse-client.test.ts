@@ -388,6 +388,9 @@ describe('connectEventStream — re-arming after the cap (#189)', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.useRealTimers()
+    // The listener test below spies on add/removeEventListener; leaving those
+    // spies up would follow the suite into every later test in this file.
+    vi.restoreAllMocks()
   })
 
   // The full schedule is 2+4+8+16+30*6 = 210s; 10 minutes of timers is well
@@ -448,7 +451,7 @@ describe('connectEventStream — re-arming after the cap (#189)', () => {
     disconnect()
   })
 
-  it('leaves no listener behind after disconnect', async () => {
+  it('starts one loop, not two, when online and visibilitychange both fire', async () => {
     const fetchMock = vi.fn().mockResolvedValue(errorResponse(503))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -456,10 +459,78 @@ describe('connectEventStream — re-arming after the cap (#189)', () => {
     await exhaustTheCap()
     const parked = fetchMock.mock.calls.length
 
-    disconnect()
-
+    // `resume` detaches both listeners before it restarts the loop, so the
+    // second and third events land on nothing. Two concurrent loops would
+    // double every retry from here on.
     window.dispatchEvent(new Event('online'))
     document.dispatchEvent(new Event('visibilitychange'))
+    window.dispatchEvent(new Event('online'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchMock).toHaveBeenCalledTimes(parked + 1)
+
+    disconnect()
+  })
+
+  // Counted, not inferred. Asserting only that no fetch follows a disconnect
+  // would pass with the listeners still attached — `resume` bails on
+  // `stopped` anyway, so a leak would be invisible that way. What leaks
+  // across a mount/unmount cycle is the registration itself.
+  it('leaves no listener behind, across repeated mount/unmount cycles', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(errorResponse(503))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const live = new Map<string, number>()
+    for (const target of [window, document] as const) {
+      const add = target.addEventListener.bind(target)
+      const remove = target.removeEventListener.bind(target)
+      const count = (type: string, delta: number): void => {
+        if (type === 'online' || type === 'visibilitychange') {
+          live.set(type, (live.get(type) ?? 0) + delta)
+        }
+      }
+      vi.spyOn(target, 'addEventListener').mockImplementation(((
+        type: string,
+        listener: never,
+        options: never,
+      ) => {
+        count(type, 1)
+        return add(type, listener, options)
+      }) as never)
+      vi.spyOn(target, 'removeEventListener').mockImplementation(((
+        type: string,
+        listener: never,
+        options: never,
+      ) => {
+        count(type, -1)
+        return remove(type, listener, options)
+      }) as never)
+    }
+
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      const disconnect = connectEventStream(vi.fn())
+      await exhaustTheCap()
+      expect(Object.fromEntries(live)).toEqual({ online: 1, visibilitychange: 1 })
+      disconnect()
+      expect(Object.fromEntries(live)).toEqual({ online: 0, visibilitychange: 0 })
+    }
+
+    // And the re-arm itself is balanced: resuming detaches, parking again
+    // re-attaches exactly one of each.
+    const disconnect = connectEventStream(vi.fn())
+    await exhaustTheCap()
+    window.dispatchEvent(new Event('online'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(Object.fromEntries(live)).toEqual({ online: 0, visibilitychange: 0 })
+    await exhaustTheCap()
+    expect(Object.fromEntries(live)).toEqual({ online: 1, visibilitychange: 1 })
+
+    disconnect()
+    expect(Object.fromEntries(live)).toEqual({ online: 0, visibilitychange: 0 })
+
+    // Still inert too, which is what the old assertion covered.
+    window.dispatchEvent(new Event('online'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    const parked = fetchMock.mock.calls.length
     await vi.advanceTimersByTimeAsync(SSE_RETRY_DELAY_MS * 4)
     expect(fetchMock).toHaveBeenCalledTimes(parked)
   })

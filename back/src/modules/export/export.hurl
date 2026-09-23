@@ -5,9 +5,10 @@
 #   pnpm start           # in another terminal
 #   pnpm hurl            # reads ORGANIZER_EMAIL / ORGANIZER_PASSWORD from the environment
 #
-# Idempotent on its own: both routes are read-only, and step 0a accepts any
+# Idempotent on its own: both routes are read-only, step 0a accepts any
 # status (`HTTP *`) so a rerun against a db that already has that participant
-# still proceeds to the login that actually matters.
+# still proceeds to the login that actually matters, and the one write — the
+# formula-named team of 0e (#329) — is removed again in 3b.
 
 # 0a. Sign up + log in a participant.
 POST {{host}}/auth/signup
@@ -54,6 +55,15 @@ HTTP 403
 [Asserts]
 jsonpath "$.error" == "forbidden"
 
+# 0e. The participant names a team after a formula (#329, CWE-1236), read back
+# as text in step 3. `HTTP *` for the same reason as 0a: a rerun without
+# db:reset gets 409 name_taken, and the team is already there anyway.
+POST {{host}}/teams
+Authorization: Bearer {{participant_token}}
+Content-Type: application/json
+{ "name": "=1+1" }
+HTTP *
+
 # 1. Organizer -> 200 with every section of the bundle. A freshly seeded event
 # has no round, so the lists are legitimately empty here — which is the fourth
 # acceptance criterion ("a valid export with empty lists, not an error") read
@@ -81,7 +91,8 @@ header "Content-Type" contains "text/csv"
 header "Content-Disposition" contains "kumite-ranking-"
 body contains "posicao;time;pontos;tentativas;tempo_ms"
 
-# 3. The teams CSV.
+# 3. The teams CSV. The team from 0e comes back prefixed with an apostrophe
+# and quoted, so a spreadsheet shows the text `=1+1` instead of evaluating it.
 GET {{host}}/organizer/export.csv?kind=teams
 Authorization: Bearer {{organizer_token}}
 HTTP 200
@@ -89,6 +100,20 @@ HTTP 200
 header "Content-Type" contains "text/csv"
 header "Content-Disposition" contains "kumite-teams-"
 body contains "time;congelado;membro;email;universidade;papel"
+body contains "\"'=1+1\""
+
+# 3b. Remove the 0e team again. ranking.hurl asserts the exact team count of
+# GET /ranking, so a stray team here would break it; removal also frees the
+# name and leaves the participant teamless, which keeps 0e rerunnable.
+GET {{host}}/organizer/teams
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Captures]
+formula_team_id: jsonpath "$.teams[?(@.name == '=1+1')].id"
+
+DELETE {{host}}/organizer/teams/{{formula_team_id}}
+Authorization: Bearer {{organizer_token}}
+HTTP 204
 
 # 4. The submissions CSV.
 GET {{host}}/organizer/export.csv?kind=submissions

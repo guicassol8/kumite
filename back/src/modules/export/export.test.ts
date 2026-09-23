@@ -771,3 +771,148 @@ describe('buildExportCsv', () => {
     }
   })
 })
+
+// --- CSV formula injection (#329, CWE-1236) ---
+
+// `populatedExport` with free text an attacker controls: team 1 renamed to a
+// formula, round 1 renamed to one (the organizer's own text, which also lands
+// in the ranking header), and team 1's roster replaced by one member per
+// trigger character plus the mixed and mid-field cases.
+function hostileExport(): EventExport {
+  const data = populatedExport()
+  const TEAM = '=1+1'
+  const ROUND = '=Rodada'
+
+  for (const team of data.ranking.event.teams) {
+    if (team.teamId === 't1') team.teamName = TEAM
+    for (const round of team.rounds) if (round.roundId === 'round-1') round.roundName = ROUND
+  }
+  for (const round of data.ranking.rounds) {
+    if (round.roundId === 'round-1') round.roundName = ROUND
+    for (const team of round.teams) if (team.teamId === 't1') team.teamName = TEAM
+  }
+  const roundOne = data.rounds.find((round) => round.id === 'round-1')
+  if (roundOne) roundOne.name = ROUND
+  for (const row of data.submissions) {
+    if (row.teamId === 't1') row.teamName = TEAM
+    if (row.roundId === 'round-1') row.roundName = ROUND
+  }
+
+  const teamOne = data.teams.teams.find((team) => team.id === 't1')
+  if (teamOne) {
+    teamOne.name = TEAM
+    const member = (userId: string, name: string, email = `${userId}@edu.pucrs.br`) => ({
+      userId,
+      email,
+      name,
+      university: 'pucrs' as const,
+      role: 'participant' as const,
+    })
+    teamOne.members = [
+      member('m-plus', '+soma'),
+      member('m-minus', '-menos'),
+      member('m-at', '@arroba'),
+      member('m-tab', '\tTab'),
+      member('m-cr', '\rCR'),
+      member('m-quote', '=x"y'),
+      member('m-semi', '=1;2'),
+      member('m-mid', 'Time-Um'),
+      member('m-mid-eq', 'a=b', 'x@y.com'),
+    ]
+  }
+  return data
+}
+
+/** A minimal reader for this dialect (`;`, CRLF, `"` quoting with `""` as an
+ * inner quote), so the column-count criterion is checked by a parser that
+ * honours quotes rather than by splitting on `;`. */
+function parseCsv(csv: string): string[][] {
+  const text = csv.startsWith(BOM) ? csv.slice(BOM.length) : csv
+  const rows: string[][] = []
+  let row: string[] = []
+  let field = ''
+  let quoted = false
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (quoted) {
+      if (char === '"' && text[i + 1] === '"') {
+        field += '"'
+        i++
+      } else if (char === '"') quoted = false
+      else field += char
+    } else if (char === '"') quoted = true
+    else if (char === ';') {
+      row.push(field)
+      field = ''
+    } else if (char === '\r' && text[i + 1] === '\n') {
+      row.push(field)
+      rows.push(row)
+      row = []
+      field = ''
+      i++
+    } else field += char
+  }
+  if (field !== '' || row.length > 0) rows.push([...row, field])
+  return rows
+}
+
+describe('buildExportCsv — formula injection (#329)', () => {
+  it('prefixes a team name starting with = with an apostrophe and quotes it, in all three kinds', () => {
+    const data = hostileExport()
+
+    for (const kind of ['ranking', 'teams', 'submissions'] as const) {
+      const csv = buildExportCsv(data, kind)
+      expect(csv).toContain(`"'=1+1"`)
+      // No cell may start with the bare formula.
+      for (const row of parseCsv(csv)) expect(row).not.toContain('=1+1')
+    }
+  })
+
+  it('protects a round name in the ranking header and in the submissions round column', () => {
+    const data = hostileExport()
+
+    expect(lines(buildExportCsv(data, 'ranking'))[0]).toBe(
+      `posicao;time;pontos;tentativas;tempo_ms;"'=Rodada";"'=Rodada A";"'=Rodada B";Rodada 2;Rodada 2 A;Rodada 2 B;Rodada 2 C`,
+    )
+    expect(lines(buildExportCsv(data, 'submissions'))[1]).toBe(
+      `"'=1+1";"'=Rodada";A;p1;1;100;100;2026-09-01T10:05:00.000Z`,
+    )
+  })
+
+  it.each([
+    ['+', '+soma'],
+    ['-', '-menos'],
+    ['@', '@arroba'],
+    ['TAB', '\tTab'],
+    ['CR', '\rCR'],
+  ])('prefixes a field starting with %s', (_label, name) => {
+    expect(buildExportCsv(hostileExport(), 'teams')).toContain(`;"'${name}";`)
+  })
+
+  it('keeps quote doubling when a field both starts with a trigger and contains a quote', () => {
+    expect(buildExportCsv(hostileExport(), 'teams')).toContain(`;"'=x""y";`)
+  })
+
+  it('keeps delimiter quoting when a field both starts with a trigger and contains ;', () => {
+    const data = hostileExport()
+    expect(buildExportCsv(data, 'teams')).toContain(`;"'=1;2";`)
+
+    // A quote-aware parser sees the same column count on every line.
+    for (const kind of ['ranking', 'teams', 'submissions'] as const) {
+      const rows = parseCsv(buildExportCsv(data, kind))
+      const width = rows[0]?.length ?? 0
+      expect(width).toBeGreaterThan(0)
+      for (const row of rows) expect(row).toHaveLength(width)
+    }
+    const members = parseCsv(buildExportCsv(data, 'teams')).map((row) => row[2])
+    expect(members).toContain("'=1;2")
+    expect(members).toContain('\'=x"y')
+  })
+
+  it('leaves a trigger character in the middle of a field untouched', () => {
+    const csv = buildExportCsv(hostileExport(), 'teams')
+
+    expect(csv).toContain(';Time-Um;m-mid@edu.pucrs.br;pucrs;participant\r\n')
+    expect(csv).toContain(';a=b;x@y.com;pucrs;participant\r\n')
+  })
+})

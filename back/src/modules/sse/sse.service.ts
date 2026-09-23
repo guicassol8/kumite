@@ -14,7 +14,9 @@ import type { RankingUpdatedEvent, SseBusEvent, StateSyncEvent } from './sse.sch
 // Carries `SseBusEvent`, not `SseEvent`: besides the wire contract the bus
 // also moves internal control events that must never be written to a stream
 // (#274, see sse.schema.ts). Subscribers are handed the wider type on purpose
-// — the route has to narrow before it can write.
+// — the route has to narrow before it can write. And it is narrower than the
+// wire on the other side: `session.revoked` is per-connection and cannot be
+// published here (#291).
 export type SseBus = {
   subscribe: (fn: (event: SseBusEvent) => void) => () => void
   publish: (event: SseBusEvent) => void

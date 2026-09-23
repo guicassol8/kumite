@@ -33,6 +33,7 @@ import {
   RoundClosedEventSchema,
   RoundExtendedEventSchema,
   RoundOpenedEventSchema,
+  SessionRevokedEventSchema,
   SseEventSchema,
   StateSyncEventSchema,
 } from './sse.schema'
@@ -114,6 +115,18 @@ describe('sse.schema', () => {
   it('rejects the internal user.deactivated control event', () => {
     const event = { type: 'user.deactivated', userId: crypto.randomUUID() }
     expect(SseEventSchema.safeParse(event).success).toBe(false)
+  })
+
+  // #291: the one wire event that is per-connection. It carries nothing that
+  // identifies anyone — the connection it is written to already knows whose
+  // it is.
+  it('round-trips a session.revoked event', () => {
+    const serverTime = new Date()
+    const wire = JSON.parse(JSON.stringify({ type: 'session.revoked', serverTime }))
+    const parsed = SseEventSchema.parse(wire)
+    expect(parsed).toEqual({ type: 'session.revoked', serverTime })
+    expect(SessionRevokedEventSchema.safeParse(wire).success).toBe(true)
+    expect(Object.keys(parsed).sort()).toEqual(['serverTime', 'type'])
   })
 
   const eventRankingFixture = {
@@ -213,6 +226,22 @@ describe('sse.service', () => {
 
       expect(a).toHaveBeenCalledWith(event)
       expect(b).toHaveBeenCalledWith(event)
+    })
+
+    // #291: `session.revoked` is on the wire but is per-connection — published
+    // on the bus it would log out every connected client at once. Pinned in the
+    // type rather than at runtime: the bus stays a dumb fan-out.
+    it('does not accept session.revoked as a broadcast event', () => {
+      const bus = createSseBus()
+      const fn = vi.fn()
+      bus.subscribe(fn)
+
+      // @ts-expect-error — session.revoked is written per connection by the route, never broadcast
+      bus.publish({ type: 'session.revoked', serverTime: new Date() })
+
+      // The runtime still fans out whatever it is handed; the guarantee is the
+      // compile error above.
+      expect(fn).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -785,7 +814,17 @@ describe('GET /sse', () => {
     k.resolve('sseBus').publish({ type: 'user.deactivated', userId: user.id })
 
     // No heartbeat in between, and no frame carrying the control event: it is
-    // consumed by the handler, never written to the wire.
+    // consumed by the handler, never written to the wire. What IS written is
+    // the terminal `session.revoked` (#291), so the client stops instead of
+    // reading the clean end as a drop and reconnecting — and it names nobody.
+    const revoked = await frames.next()
+    expect(revoked).toContain('event: session.revoked')
+    const payload = JSON.parse(revoked.split('data: ')[1] ?? '')
+    expect(Object.keys(payload).sort()).toEqual(['serverTime', 'type'])
+    expect(revoked).not.toContain(user.id)
+    expect(revoked).not.toContain('user.deactivated')
+
+    // ...and only then does the stream end.
     await expect(frames.next()).rejects.toThrow('stream closed before a full SSE frame arrived')
   })
 
@@ -819,6 +858,7 @@ describe('GET /sse', () => {
     const next = await frames.next()
     expect(next).toContain('event: heartbeat')
     expect(next).not.toContain('user.deactivated')
+    expect(next).not.toContain('session.revoked')
 
     await frames.cancel()
   })
@@ -853,7 +893,9 @@ describe('GET /sse', () => {
     expect(await frames.next()).toContain('event: state.sync')
     expect(await frames.next()).toContain('event: ranking.updated')
 
-    // ...and then the stream ends, instead of staying open forever.
+    // ...then the terminal event (#291), after the snapshot and never before
+    // it, and then the stream ends instead of staying open forever.
+    expect(await frames.next()).toContain('event: session.revoked')
     await expect(frames.next()).rejects.toThrow('stream closed before a full SSE frame arrived')
   })
 })

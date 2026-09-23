@@ -47,7 +47,11 @@ subagent each instead of to a new chat. Same isolation, different boundary —
 - Hooks: PostToolUse auto-formats and runs `kata verify` on back edits; Stop
   runs the full gate ladder (typecheck → verify → tests) and blocks until
   green. The pre-commit (lefthook) runs format, typecheck and verify only —
-  the test suites run once, in the Stop hook and in CI (#288).
+  the test suites run once, in the Stop hook and in CI (#288). In cloud
+  sessions only, SessionStart prepares everything (Docker + Postgres,
+  install, `.env` files, migrate, seed) and exports `JWT_SECRET`, the CI
+  organizer and `BACK_NOTIFICATIONS_LOG`, so the full E2E runs with nothing
+  skipped, worktrees included (#333).
 - Worktrees: prefer the harness's own isolation — `EnterWorktree` for this
   session's task work, `isolation: "worktree"` when spawning subagents that
   edit files. Manual fallback:

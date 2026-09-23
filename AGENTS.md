@@ -39,6 +39,14 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
 - `pnpm format` — biome, single config at the root.
 - Everything: `pnpm check`. Browser E2E: `pnpm --filter @kumite/front e2e`
   (boots back+front itself; `docker compose up -d` first for db-backed flows).
+  Organizer flows need `ORGANIZER_EMAIL`/`ORGANIZER_PASSWORD` in the
+  environment plus `db:seed`, and the reset-password happy path needs
+  `BACK_NOTIFICATIONS_LOG`; without them those specs skip. Claude Code cloud
+  sessions get all of it from `.claude/hooks/session-start.sh`. That hook's
+  Postgres (5433) belongs to the main checkout: a worktree without its own
+  `DB_PORT` stack shares it, so one whose migrations differ from the main
+  checkout's needs its own stack (`docs/workflow.md` § Worktrees) — otherwise
+  each side's tests fail against the other's schema.
 
 ## Conventions
 

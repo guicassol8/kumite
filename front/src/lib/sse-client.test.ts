@@ -267,6 +267,36 @@ describe('connectEventStream — non-ok responses (#189)', () => {
     disconnect()
   })
 
+  // #291 baseline: before `session.revoked` existed, #326 already got a banned
+  // account to /login — but only through the side effect of the NEXT attempt:
+  // the stream ends cleanly, the loop reconnects after the base delay, and
+  // that reconnect's 401 drops the session. Pinned here so the improvement in
+  // the `session.revoked` block below is measured against a known floor.
+  it('drops the session on the 401 of the reconnect after a clean end, then stops', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okResponse([frame(stateSync)]))
+      .mockResolvedValue(errorResponse(401))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const onEvent = vi.fn()
+    const disconnect = connectEventStream(onEvent)
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onEvent).toHaveBeenCalledTimes(1)
+    expect(clearSession).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(SSE_RETRY_DELAY_MS)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(clearSession).toHaveBeenCalledTimes(1)
+    expect(clearSession).toHaveBeenCalledWith('expired')
+
+    await vi.advanceTimersByTimeAsync(SSE_RETRY_MAX_DELAY_MS * 2)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    disconnect()
+  })
+
   it('reports a 500 as an error and keeps retrying it', async () => {
     const fetchMock = vi.fn().mockResolvedValue(errorResponse(500))
     vi.stubGlobal('fetch', fetchMock)

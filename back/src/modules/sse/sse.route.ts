@@ -49,8 +49,15 @@ export const sseRoute = defineRoute({
       // `await new Promise` reads this before it ever waits, so that race ends
       // the stream instead of leaving it open forever.
       let closed = false
+      // Set only by a deactivation, never by a client hangup (`onAbort`): it is
+      // what tells the handler to write the terminal `session.revoked` (#291)
+      // once everything already queued has gone out. `endStream` itself stays
+      // synchronous — it runs inside the bus subscriber — so the write happens
+      // after the final `await new Promise` below instead of here.
+      let revoked = false
       const endStream = () => {
         closed = true
+        revoked = true
         unsubscribe()
         closeStream?.()
       }
@@ -108,6 +115,18 @@ export const sseRoute = defineRoute({
           resolve()
         })
       })
+
+      // After the snapshot and any drained buffer, so the order on the wire is
+      // always state.sync → … → session.revoked → end, even when the ban landed
+      // mid-snapshot. Without this frame the client cannot tell a revoked
+      // session from a dropped connection and reconnects just to be told 401.
+      if (revoked) {
+        try {
+          await write({ type: 'session.revoked', serverTime: new Date() })
+        } catch {
+          // The client may have hung up at the same moment — nothing to tell.
+        }
+      }
     })
   },
 })

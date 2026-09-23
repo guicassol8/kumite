@@ -1,6 +1,10 @@
 import { authFetch } from './api'
-import { authHeader } from './session'
-import { type SseEvent, SseEventSchema } from './sse-schema'
+import { authHeader, clearSession, getState } from './session'
+import { type SessionRevokedEvent, type SseEvent, SseEventSchema } from './sse-schema'
+
+// What the consumer sees: every wire event except the terminal one, which
+// this module handles itself (#291).
+export type StreamEvent = Exclude<SseEvent, SessionRevokedEvent>
 
 // Browser `EventSource` can't send an `Authorization` header, and this
 // channel is authenticated — so it's a hand-rolled fetch-based reader
@@ -35,20 +39,31 @@ function nextDelayMs(consecutiveFailures: number): number {
 // `type` field already discriminates the event, so only the `data:` line
 // is read here — the `event:` line sse.route.ts also sends is redundant
 // for parsing and safely ignored.
-function consumeFrames(buffer: string, onEvent: (event: SseEvent) => void): string {
+//
+// `revoked` is true once a `session.revoked` frame was read (#291): that frame
+// is never passed to `onEvent`, and nothing after it in the same chunk is
+// either — the stream is over.
+function consumeFrames(
+  buffer: string,
+  onEvent: (event: StreamEvent) => void,
+): { remainder: string; revoked: boolean } {
   const frames = buffer.split('\n\n')
   const remainder = frames.pop() ?? ''
   for (const frame of frames) {
     const dataLine = frame.split('\n').find((line) => line.startsWith('data:'))
     if (!dataLine) continue
+    let parsed: ReturnType<typeof SseEventSchema.safeParse>
     try {
-      const parsed = SseEventSchema.safeParse(JSON.parse(dataLine.slice('data:'.length).trim()))
-      if (parsed.success) onEvent(parsed.data)
+      parsed = SseEventSchema.safeParse(JSON.parse(dataLine.slice('data:'.length).trim()))
     } catch {
       // Malformed frame — skip it rather than crash the reader.
+      continue
     }
+    if (!parsed.success) continue
+    if (parsed.data.type === 'session.revoked') return { remainder: '', revoked: true }
+    onEvent(parsed.data)
   }
-  return remainder
+  return { remainder, revoked: false }
 }
 
 // 'error' (#189) is the stream reporting that it is NOT connected and knows
@@ -64,7 +79,7 @@ export type SseConnectionStatus = 'connecting' | 'open' | 'reconnecting' | 'erro
 // every later one, 'open' once the response body starts streaming, and
 // 'error' whenever an attempt is rejected or the cap runs out.
 export function connectEventStream(
-  onEvent: (event: SseEvent) => void,
+  onEvent: (event: StreamEvent) => void,
   onStatusChange?: (status: SseConnectionStatus) => void,
 ): () => void {
   let stopped = false
@@ -141,11 +156,30 @@ export function connectEventStream(
         onStatusChange?.('open')
         const decoder = new TextDecoder()
         let buffer = ''
+        // Two terminals, and only two: a 401/403 on the response (above) and
+        // a `session.revoked` frame in the body (#291) — the back writing it
+        // right before it ends the stream of a deactivated account. A stream
+        // that ends WITHOUT that frame is still a drop (a back restart, a
+        // proxy timeout) and falls through to the backoff below. Before the
+        // frame existed a ban looked exactly like that drop: "reconnecting"
+        // for SSE_RETRY_DELAY_MS, and /login only via the reconnect's 401.
         while (!stopped) {
           const { done, value } = await reader.read()
           if (done) break
           buffer += decoder.decode(value, { stream: true })
-          buffer = consumeFrames(buffer, onEvent)
+          const consumed = consumeFrames(buffer, onEvent)
+          buffer = consumed.remainder
+          if (consumed.revoked) {
+            void reader.cancel().catch(() => {})
+            onStatusChange?.('error')
+            // The same drop a 401 takes through `authFetch`, so the root
+            // sends the user to /login?notice=expired. Guarded like
+            // `attemptHydration`: a session already gone is not dropped (and
+            // redirected) twice. No backoff and no re-arm — the account is
+            // deactivated, another attempt would only be refused.
+            if (getState().status !== 'anonymous') clearSession('expired')
+            return
+          }
         }
       } catch {
         // Network error, abort, a missing body or a retryable status —

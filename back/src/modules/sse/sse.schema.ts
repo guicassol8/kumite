@@ -53,6 +53,17 @@ export const RankingUpdatedEventSchema = z.object({
   event: EventRankingSchema,
 })
 
+// The last frame of a stream whose account was deactivated (#291), written
+// right before the handler closes it. Without it a clean end looked exactly
+// like a network drop, so the client reconnected and only learned the truth
+// from that reconnect's 401. Per connection, never broadcast — see
+// `SseBroadcastEvent` below — and deliberately carrying nothing that
+// identifies the user: the connection it lands on already knows whose it is.
+export const SessionRevokedEventSchema = z.object({
+  type: z.literal('session.revoked'),
+  serverTime: z.coerce.date(),
+})
+
 export const SseEventSchema = z.discriminatedUnion('type', [
   StateSyncEventSchema,
   RoundOpenedEventSchema,
@@ -60,6 +71,7 @@ export const SseEventSchema = z.discriminatedUnion('type', [
   RoundClosedEventSchema,
   HeartbeatEventSchema,
   RankingUpdatedEventSchema,
+  SessionRevokedEventSchema,
 ])
 
 export type StateSyncEvent = z.infer<typeof StateSyncEventSchema>
@@ -68,6 +80,7 @@ export type RoundExtendedEvent = z.infer<typeof RoundExtendedEventSchema>
 export type RoundClosedEvent = z.infer<typeof RoundClosedEventSchema>
 export type HeartbeatEvent = z.infer<typeof HeartbeatEventSchema>
 export type RankingUpdatedEvent = z.infer<typeof RankingUpdatedEventSchema>
+export type SessionRevokedEvent = z.infer<typeof SessionRevokedEventSchema>
 export type SseEvent = z.infer<typeof SseEventSchema>
 
 // --- Internal control events (#274) ---
@@ -95,5 +108,13 @@ export type UserDeactivatedEvent = { type: 'user.deactivated'; userId: string }
 
 export type SseControlEvent = UserDeactivatedEvent
 
-/** Everything the bus carries: the wire contract plus the internal events. */
-export type SseBusEvent = SseEvent | SseControlEvent
+// The rule runs both ways (#291). `user.deactivated` is on the bus but never
+// on the wire; `session.revoked` is on the wire but never on the bus. It is
+// per-connection — the route writes it to the one stream it is ending — and a
+// `bus.publish` of it would reach every subscriber and log out every connected
+// client at once. Excluding it here makes that publish a type error.
+/** Wire events that fan out to every connection. */
+export type SseBroadcastEvent = Exclude<SseEvent, SessionRevokedEvent>
+
+/** Everything the bus carries: the broadcast wire events plus the internal ones. */
+export type SseBusEvent = SseBroadcastEvent | SseControlEvent

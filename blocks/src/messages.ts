@@ -12,6 +12,14 @@ export type BlockMessages = {
   solveTitle: string
   solveReturn: string
   solveTooltip: string
+  /**
+   * Label of the `kumite_input` block. Translated on purpose (#202): it changes
+   * with the UI language like every other block label (`resolver`→`solve`).
+   * The block's identity is its type, id and connection, never this text — a
+   * locale switch renames no variable, and the generated code always reads the
+   * `SOLUTION_PARAM_NAME` parameter whatever the label says. A label from
+   * another locale showing up *without* a language change is #183, not this.
+   */
   inputTitle: string
   inputTooltip: string
   categoryLogic: string

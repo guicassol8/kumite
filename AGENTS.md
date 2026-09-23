@@ -39,6 +39,10 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
 - `pnpm format` — biome, single config at the root.
 - Everything: `pnpm check`. Browser E2E: `pnpm --filter @kumite/front e2e`
   (boots back+front itself; `docker compose up -d` first for db-backed flows).
+  Organizer flows need `ORGANIZER_EMAIL`/`ORGANIZER_PASSWORD` in the
+  environment plus `db:seed`, and the reset-password happy path needs
+  `BACK_NOTIFICATIONS_LOG`; without them those specs skip. Claude Code cloud
+  sessions get all of it from `.claude/hooks/session-start.sh`.
 
 ## Conventions
 

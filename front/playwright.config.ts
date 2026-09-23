@@ -8,6 +8,13 @@ import { defineConfig } from '@playwright/test'
 // silently binding to a different port than the one this config points at.
 const backPort = process.env.PORT ?? '3000'
 const frontPort = process.env.FRONT_PORT ?? '5173'
+// reset-password.spec.ts reads the OTP from the back's stdout (the SES-less
+// console.log fallback), so when BACK_NOTIFICATIONS_LOG names a file the back
+// also tees its output there. Unset, the back boots exactly as before (#333).
+const notificationsLog = process.env.BACK_NOTIFICATIONS_LOG
+const backCommand = notificationsLog
+  ? `pnpm --filter @kumite/back dev 2>&1 | tee '${notificationsLog}'`
+  : 'pnpm --filter @kumite/back dev'
 
 export default defineConfig({
   testDir: './e2e',
@@ -33,7 +40,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'pnpm --filter @kumite/back dev',
+      command: backCommand,
       url: `http://localhost:${backPort}/health`,
       reuseExistingServer: true,
       cwd: '..',

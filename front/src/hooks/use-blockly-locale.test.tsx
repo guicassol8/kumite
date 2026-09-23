@@ -1,4 +1,4 @@
-import { ROOT_BLOCK_TYPE, type WorkspaceState } from '@kumite/blocks'
+import { INPUT_BLOCK_TYPE, ROOT_BLOCK_TYPE, type WorkspaceState } from '@kumite/blocks'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { createRef } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -19,6 +19,49 @@ const fixtureWithExtraBlock: WorkspaceState = {
   },
 }
 
+// #202: `soma ← entrada; retornar soma`, plus a hand-made variable called
+// `input` — the en label of the input block and the most confusing name here.
+const fixtureWithVariables: WorkspaceState = {
+  blocks: {
+    languageVersion: 0,
+    blocks: [
+      {
+        type: ROOT_BLOCK_TYPE,
+        id: 'kumiteSolveRoot',
+        x: 40,
+        y: 40,
+        inputs: {
+          BODY: {
+            block: {
+              type: 'variables_set',
+              id: 'guardaSoma',
+              fields: { VAR: { id: 'varSoma' } },
+              inputs: { VALUE: { block: { type: INPUT_BLOCK_TYPE, id: 'blocoEntrada' } } },
+            },
+          },
+          RETURN: {
+            block: { type: 'variables_get', id: 'leSoma', fields: { VAR: { id: 'varSoma' } } },
+          },
+        },
+      },
+    ],
+  },
+  variables: [
+    { name: 'soma', id: 'varSoma' },
+    { name: 'input', id: 'varInput' },
+  ],
+}
+
+function variables(handle: BlocklyWorkspaceHandle) {
+  const workspace = handle.getWorkspace()
+  if (!workspace) throw new Error('the workspace was not injected')
+  return workspace
+    .getVariableMap()
+    .getAllVariables()
+    .map((variable) => `${variable.getId()}=${variable.getName()}`)
+    .sort()
+}
+
 function fieldTexts(handle: BlocklyWorkspaceHandle, type: string) {
   const workspace = handle.getWorkspace()
   if (!workspace) throw new Error('the workspace was not injected')
@@ -28,7 +71,7 @@ function fieldTexts(handle: BlocklyWorkspaceHandle, type: string) {
     .map((field) => field.getText())
 }
 
-function renderHost() {
+function renderHost(initialState: WorkspaceState = fixtureWithExtraBlock) {
   const workspaceRef = createRef<BlocklyWorkspaceHandle>()
   function Host() {
     const { toolbox, onReady } = useBlocklyLocale(workspaceRef)
@@ -36,7 +79,7 @@ function renderHost() {
       <BlocklyWorkspace
         ref={workspaceRef}
         toolbox={toolbox}
-        initialState={fixtureWithExtraBlock}
+        initialState={initialState}
         onReady={onReady}
       />
     )
@@ -76,5 +119,29 @@ describe('useBlocklyLocale', () => {
     expect(fieldTexts(handle, ROOT_BLOCK_TYPE)).toEqual(expect.arrayContaining(['solve', 'return']))
     expect(handle.getWorkspace()?.getBlocksByType('math_number', false)).toHaveLength(1)
     expect(handle.serialize().blocks?.blocks).toHaveLength(2)
+  })
+
+  it('renames no variable when the language changes, only the input block label (#202)', async () => {
+    const { handle } = renderHost(fixtureWithVariables)
+    const before = handle.serialize()
+
+    expect(variables(handle)).toEqual(['varInput=input', 'varSoma=soma'])
+    expect(fieldTexts(handle, INPUT_BLOCK_TYPE)).toEqual(['entrada'])
+
+    await act(async () => {
+      await i18n.changeLanguage('en')
+    })
+
+    expect(handle.serialize()).toEqual(before)
+    expect(variables(handle)).toEqual(['varInput=input', 'varSoma=soma'])
+    expect(fieldTexts(handle, INPUT_BLOCK_TYPE)).toEqual(['input'])
+
+    await act(async () => {
+      await i18n.changeLanguage('es')
+    })
+
+    expect(handle.serialize()).toEqual(before)
+    expect(variables(handle)).toEqual(['varInput=input', 'varSoma=soma'])
+    expect(fieldTexts(handle, INPUT_BLOCK_TYPE)).toEqual(['entrada'])
   })
 })

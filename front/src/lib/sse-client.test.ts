@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const clearSession = vi.fn()
+// What `getState()` reports. The client reads it before dropping the session
+// on `session.revoked`, the same guard `attemptHydration` uses, so a session
+// something else already dropped is not dropped (and redirected) twice.
+const sessionState = { status: 'authenticated' as string }
 
 // `authHeader` returns a real token on purpose: `authFetch` (lib/api.ts) is
 // NOT mocked here, and it only drops the session on a 401 that carried our own
@@ -9,6 +13,7 @@ const clearSession = vi.fn()
 vi.mock('./session', () => ({
   authHeader: () => ({ Authorization: 'Bearer test-token' }),
   clearSession: (...args: unknown[]) => clearSession(...args),
+  getState: () => sessionState,
 }))
 
 import {
@@ -563,5 +568,109 @@ describe('connectEventStream — re-arming after the cap (#189)', () => {
     const parked = fetchMock.mock.calls.length
     await vi.advanceTimersByTimeAsync(SSE_RETRY_DELAY_MS * 4)
     expect(fetchMock).toHaveBeenCalledTimes(parked)
+  })
+})
+
+// #291: the back now ends a deactivated account's stream with an explicit
+// `session.revoked` frame. Before it, a clean end was indistinguishable from a
+// network drop: the loop showed "reconnecting" for SSE_RETRY_DELAY_MS and only
+// the reconnect's 401 got the user to /login (the baseline pinned above).
+describe('connectEventStream — session.revoked (#291)', () => {
+  const sessionRevoked = { type: 'session.revoked', serverTime: new Date().toISOString() }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    clearSession.mockClear()
+    sessionState.status = 'authenticated'
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  it('drops the session at once and never reconnects', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okResponse([frame(stateSync) + frame(sessionRevoked)]))
+      // Would be served if the loop wrongly came back: a 200 that ends cleanly
+      // keeps a broken client reconnecting instead of failing loudly.
+      .mockResolvedValue(okResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const onEvent = vi.fn()
+    const onStatusChange = vi.fn()
+    const disconnect = connectEventStream(onEvent, onStatusChange)
+
+    await vi.advanceTimersByTimeAsync(0)
+    // The terminal frame is the client's business, not the reducers'.
+    expect(onEvent).toHaveBeenCalledTimes(1)
+    expect(onEvent.mock.calls[0]?.[0]).toMatchObject({ type: 'state.sync' })
+    expect(clearSession).toHaveBeenCalledTimes(1)
+    expect(clearSession).toHaveBeenCalledWith('expired')
+    const statuses = onStatusChange.mock.calls.map((call) => call[0])
+    expect(statuses).toEqual(['connecting', 'open', 'error'])
+
+    await vi.advanceTimersByTimeAsync(SSE_RETRY_MAX_DELAY_MS * 2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(onStatusChange.mock.calls.map((call) => call[0])).toEqual(statuses)
+
+    // Terminal like a 401, not like the retry cap: the environment coming
+    // back must not re-arm a stream whose session is gone.
+    window.dispatchEvent(new Event('online'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.advanceTimersByTimeAsync(SSE_RETRY_DELAY_MS * 2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    disconnect()
+  })
+
+  it('stops at session.revoked even mid-chunk, ignoring anything after it', async () => {
+    const chunk = frame(stateSync) + frame(roundOpened) + frame(sessionRevoked) + frame(stateSync)
+    const fetchMock = vi.fn().mockResolvedValue(okResponse([chunk]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const onEvent = vi.fn()
+    const disconnect = connectEventStream(onEvent)
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(onEvent.mock.calls.map((call) => call[0].type)).toEqual(['state.sync', 'round.opened'])
+    expect(clearSession).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(SSE_RETRY_MAX_DELAY_MS * 2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    disconnect()
+  })
+
+  it('does not drop a session that is already anonymous a second time', async () => {
+    sessionState.status = 'anonymous'
+    const fetchMock = vi.fn().mockResolvedValue(okResponse([frame(sessionRevoked)]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const disconnect = connectEventStream(vi.fn())
+
+    await vi.advanceTimersByTimeAsync(SSE_RETRY_MAX_DELAY_MS)
+    expect(clearSession).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    disconnect()
+  })
+
+  // Criterion 3: only the explicit frame is terminal. A stream that simply
+  // ends is still a drop and is retried at the base delay.
+  it('still reconnects after a clean end without session.revoked', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse([frame(stateSync)]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const disconnect = connectEventStream(vi.fn())
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(SSE_RETRY_DELAY_MS)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(clearSession).not.toHaveBeenCalled()
+
+    disconnect()
   })
 })

@@ -96,6 +96,14 @@ export const RankingUpdatedEventSchema = z.object({
   event: EventRankingSchema,
 })
 
+// The last frame of a stream whose account was deactivated (#291). Consumed
+// by sse-client.ts itself — it stops the loop and drops the session — and
+// never handed to the reducers in use-event-stream.ts.
+export const SessionRevokedEventSchema = z.object({
+  type: z.literal('session.revoked'),
+  serverTime: z.coerce.date(),
+})
+
 export const SseEventSchema = z.discriminatedUnion('type', [
   StateSyncEventSchema,
   RoundOpenedEventSchema,
@@ -103,6 +111,7 @@ export const SseEventSchema = z.discriminatedUnion('type', [
   RoundClosedEventSchema,
   HeartbeatEventSchema,
   RankingUpdatedEventSchema,
+  SessionRevokedEventSchema,
 ])
 
 export type RankingProblemEntry = z.infer<typeof RankingProblemEntrySchema>
@@ -112,4 +121,5 @@ export type EventRankingRoundEntry = z.infer<typeof EventRankingRoundEntrySchema
 export type EventRankingTeam = z.infer<typeof EventRankingTeamSchema>
 export type EventRanking = z.infer<typeof EventRankingSchema>
 export type RankingUpdatedEvent = z.infer<typeof RankingUpdatedEventSchema>
+export type SessionRevokedEvent = z.infer<typeof SessionRevokedEventSchema>
 export type SseEvent = z.infer<typeof SseEventSchema>

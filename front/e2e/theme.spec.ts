@@ -47,9 +47,9 @@ function themeColorMeta(page: Page): Promise<string | null> {
 test.describe('the default theme, with the OS asking for dark', () => {
   test.use({ colorScheme: 'dark' })
 
-  // Acceptance (#234): no saved choice + a dark OS → `.dark` on the root. Read
-  // at DOMContentLoaded, so the class can only have come from `index.html`'s
-  // anti-flash script — no flash of paper on a dark system.
+  // Acceptance (#234): no saved choice + a dark OS → `.dark` on the root, end
+  // to end. The anti-flash script alone is pinned in the bundle-blocked
+  // describe below: DOMContentLoaded waits for the deferred module bundle.
   test('paints ink from the first paint, because the OS asked for dark', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     const classAtDomReady = await page.evaluate(() => document.documentElement.className)
@@ -66,8 +66,8 @@ test.describe('the default theme, with the OS asking for dark', () => {
     })
   })
 
-  // Acceptance (#234): the saved choice beats the OS — already at
-  // DOMContentLoaded, so the anti-flash script agrees with `theme.ts`.
+  // Acceptance (#234): the saved choice beats the OS, end to end (the script
+  // alone: the bundle-blocked describe below).
   test('stays paper when light is the saved choice', async ({ page }) => {
     await page.addInitScript(() => {
       try {
@@ -88,6 +88,56 @@ test.describe('the default theme, with the OS asking for dark', () => {
 
     await page.screenshot({ path: evidence234('03-claro-salvo-so-escuro'), fullPage: true })
   })
+})
+
+// The anti-flash script of `index.html`, alone. Reading the class at
+// DOMContentLoaded does NOT isolate it: the bundle is a module script, module
+// scripts are deferred, and DOMContentLoaded waits for them — so `main.tsx`'s
+// `applyTheme()` has already run by then and would mask a script that got the
+// rule wrong. Here the entry module is aborted, so the only code that can
+// touch `<html>` is the inline script, and every branch of the rule it
+// duplicates from `readTheme()` + `resolveTheme()` is pinned (#234).
+test.describe('the anti-flash script, with the bundle blocked', () => {
+  const cases: {
+    name: string
+    os: 'dark' | 'light'
+    saved: string | null | 'blocked'
+    dark: boolean
+  }[] = [
+    { name: 'nothing saved, dark OS', os: 'dark', saved: null, dark: true },
+    { name: 'nothing saved, light OS', os: 'light', saved: null, dark: false },
+    { name: 'light saved, dark OS', os: 'dark', saved: 'light', dark: false },
+    { name: 'dark saved, light OS', os: 'light', saved: 'dark', dark: true },
+    { name: 'system saved, dark OS', os: 'dark', saved: 'system', dark: true },
+    { name: 'a value that is not a theme, dark OS', os: 'dark', saved: 'sepia', dark: true },
+    { name: 'localStorage blocked, dark OS', os: 'dark', saved: 'blocked', dark: true },
+    { name: 'localStorage blocked, light OS', os: 'light', saved: 'blocked', dark: false },
+  ]
+
+  for (const { name, os, saved, dark } of cases) {
+    test(`${name} → ${dark ? 'dark' : 'light'}`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: os })
+      await page.route('**/src/main.tsx', (route) => route.abort())
+      await page.addInitScript((value) => {
+        if (value === 'blocked') {
+          Object.defineProperty(window, 'localStorage', {
+            get() {
+              throw new DOMException('blocked', 'SecurityError')
+            },
+          })
+        } else if (value !== null) {
+          localStorage.setItem('kumite:theme', value)
+        }
+      }, saved)
+
+      await page.goto('/', { waitUntil: 'domcontentloaded' })
+
+      // The bundle really did not run: nothing rendered into #root.
+      expect(await page.evaluate(() => document.getElementById('root')?.childElementCount)).toBe(0)
+      const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'))
+      expect(isDark).toBe(dark)
+    })
+  }
 })
 
 test.describe('the default theme, with the OS asking for light', () => {
@@ -143,10 +193,9 @@ test.describe('a saved dark choice', () => {
   test('is on the <html> before the bundle runs, with no flash of paper', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
 
-    // Read at DOMContentLoaded: the inline script has run, the module bundle
-    // has not finished. A class here can only have come from the anti-flash
-    // script of `index.html` (T5), which is the whole point of duplicating the
-    // storage key there.
+    // Read at DOMContentLoaded. That does not isolate the anti-flash script
+    // (the deferred module bundle has run by then too); the bundle-blocked
+    // describe above is what pins the script on its own (#234).
     const classAtDomReady = await page.evaluate(() => document.documentElement.className)
     expect(classAtDomReady).toContain('dark')
 

@@ -22,10 +22,13 @@ import {
 // handled by `roundSlot` (#150), which also closes this round again when the
 // test fails before step 05.
 const evidence = (name: string) => `e2e/evidence/7/${name}.png`
+// #206: the team's own best score while the round is still open.
+const evidence206 = (name: string) => `e2e/evidence/206/${name}.png`
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
 const participantEmail = `problem-e2e-participant-${stamp}@edu.pucrs.br`
+const teamlessEmail = `problem-e2e-teamless-${stamp}@edu.pucrs.br`
 const teamName = `Problem E2E ${stamp}`
 const roundName = `Rodada Problema E2E ${stamp}`
 
@@ -110,8 +113,11 @@ test.describe('problem screen (#7)', () => {
 
   test('loads the problem from the catalog, submits through the judge, and goes read-only once the round closes', async ({
     page,
+    browser,
     roundSlot,
   }) => {
+    // Two signups (the team member and, for #206, a teamless participant).
+    test.slow()
     const auth = await organizerAuthHeader()
     const problemId = await apiCreatePublishedProblem()
     const roundId = await createRound(auth, {
@@ -133,6 +139,13 @@ test.describe('problem screen (#7)', () => {
     await expect(page).toHaveURL(new RegExp(`/rounds/${roundId}$`))
     await page.screenshot({ path: evidence('01-rodada-aberta'), fullPage: true })
 
+    // #206: the team has not submitted yet, so the round list says so instead
+    // of the old "—" that could not tell "hidden" from "nothing yet".
+    const bestScoreCell = page.getByTestId(`round-problem-best-score-${problemId}`)
+    await expect(bestScoreCell).toHaveAttribute('data-state', 'none')
+    await expect(bestScoreCell).toHaveText(/Sem submissão/)
+    await page.screenshot({ path: evidence206('06-lista-da-rodada-sem-submissao'), fullPage: true })
+
     // 02 — the round's problem row links into the real problem screen (#7's
     // link back to #39's table).
     const row = page.getByTestId(`round-problem-${problemId}`)
@@ -142,6 +155,9 @@ test.describe('problem screen (#7)', () => {
     await expect(page.getByTestId('problem-statement-panel')).toContainText('Soma dos Pares')
     await expect(page.getByTestId('problem-example-0')).toContainText('6')
     await page.screenshot({ path: evidence('02-problema-carregado-do-catalogo'), fullPage: true })
+    await expect(page.getByTestId('problem-no-submission-badge')).toHaveText('Sem submissão')
+    await expect(page.getByTestId('problem-best-score-badge')).toHaveCount(0)
+    await page.screenshot({ path: evidence206('01-rodada-aberta-sem-submissao'), fullPage: true })
 
     // 03 — Executar runs the seeded (known-good) solution locally: all three
     // visible cases pass, independent of the server judge.
@@ -167,6 +183,49 @@ test.describe('problem screen (#7)', () => {
     await expect(page.getByTestId('problem-results-panel')).toBeVisible()
     await page.screenshot({ path: evidence('04-submissao-com-veredito'), fullPage: true })
 
+    // #206: the 201 refreshes the team's best in place — no reload — while
+    // the round is still open.
+    const bestBadge = page.getByTestId('problem-best-score-badge')
+    await expect(bestBadge).toHaveText(/Melhor do time: \d+/)
+    await expect(page.getByTestId('problem-no-submission-badge')).toHaveCount(0)
+    const bestScore = (await bestBadge.textContent())?.match(/\d+/)?.[0]
+    if (!bestScore) throw new Error('expected a number on the best score badge')
+    await page.screenshot({ path: evidence206('02-badge-apos-submeter'), fullPage: true })
+
+    // #206: back on the round list (client-side), the same number in the row.
+    await page.goBack()
+    await expect(page).toHaveURL(new RegExp(`/rounds/${roundId}$`))
+    await expect(bestScoreCell).toHaveAttribute('data-state', 'score')
+    await expect(bestScoreCell).toHaveText(new RegExp(`\\b${bestScore}$`))
+    await page.screenshot({ path: evidence206('03-lista-da-rodada-com-nota'), fullPage: true })
+
+    // #206: a participant with no team sees no team best — "—" on the list
+    // and no badge on the problem — and no error either.
+    const teamlessContext = await browser.newContext()
+    const teamlessPage = await teamlessContext.newPage()
+    try {
+      await signupThroughUi(teamlessPage, teamlessEmail)
+      await teamlessPage.goto(`/rounds/${roundId}`)
+      const teamlessCell = teamlessPage.getByTestId(`round-problem-best-score-${problemId}`)
+      await expect(teamlessCell).toHaveAttribute('data-state', 'unavailable')
+      await expect(teamlessCell).toHaveText(/—/)
+      await teamlessPage.screenshot({ path: evidence206('07-lista-sem-time'), fullPage: true })
+      await teamlessPage.getByTestId(`round-problem-${problemId}`).getByRole('link').click()
+      await expect(teamlessPage.getByTestId('problem-statement-panel')).toContainText(
+        'Soma dos Pares',
+      )
+      await expect(teamlessPage.getByTestId('problem-best-score-badge')).toHaveCount(0)
+      await expect(teamlessPage.getByTestId('problem-no-submission-badge')).toHaveCount(0)
+      await teamlessPage.screenshot({
+        path: evidence206('05-participante-sem-time'),
+        fullPage: true,
+      })
+    } finally {
+      await teamlessContext.close()
+    }
+    await page.goForward()
+    await expect(page).toHaveURL(new RegExp(`/problem/${problemId}$`))
+
     // 05 — closing the round and reloading flips the screen to the read-only
     // closed state, with the team's best score instead of a submit button.
     await closeRound(auth, roundId)
@@ -175,5 +234,12 @@ test.describe('problem screen (#7)', () => {
     await expect(page.getByTestId('problem-closed-best-score')).toBeVisible()
     await expect(page.getByTestId('problem-submit-button')).toHaveCount(0)
     await page.screenshot({ path: evidence('05-rodada-encerrada-somente-leitura'), fullPage: true })
+    // #206: closed is exactly as before — the notice carries the score, no badge.
+    await expect(page.getByTestId('problem-closed-best-score')).toContainText(bestScore)
+    await expect(page.getByTestId('problem-best-score-badge')).toHaveCount(0)
+    await page.screenshot({
+      path: evidence206('04-rodada-encerrada-sem-regressao'),
+      fullPage: true,
+    })
   })
 })

@@ -22,9 +22,10 @@ import { organizerAuthHeader } from './support/rounds'
 // recenter control are SVG painted with `fill`, which the meter skips (the
 // #218 palette is `check_tokens.py`'s job). The toolbox is NOT out, though:
 // its category labels are HTML that inherited `.dark`'s paper foreground over
-// Blockly's grey toolbox — 1.21:1, the one finding of this smoke, fixed in
-// `index.css` until #218's editor theme takes over. Hover/open-menu states are
-// out: this is the page at rest.
+// Blockly's grey toolbox — 1.21:1, the one finding of this smoke. #218's
+// editor theme now owns it: `toolboxForegroundColour` puts the labels on each
+// mode's --foreground over the --card toolbox, with no patch in `index.css`.
+// Hover/open-menu states are out: this is the page at rest.
 const evidence = (name: string) => `e2e/evidence/234/${name}.png`
 
 const DESKTOP = { width: 1280, height: 800 }

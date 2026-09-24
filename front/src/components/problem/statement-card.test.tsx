@@ -100,4 +100,33 @@ describe('StatementCard', () => {
 
     expect(screen.getByTestId('problem-statement-panel')).toBeDefined()
   })
+
+  describe('team best score badge (#206)', () => {
+    it('shows the team best score when given one', () => {
+      render(
+        <StatementCard
+          problem={problem()}
+          hasResults={false}
+          bestScore={{ kind: 'score', score: 70 }}
+        />,
+      )
+
+      expect(screen.getByTestId('problem-best-score-badge').textContent).toBe('Melhor do time: 70')
+      expect(screen.queryByTestId('problem-no-submission-badge')).toBeNull()
+    })
+
+    it('shows "no submissions" when the team never submitted', () => {
+      render(<StatementCard problem={problem()} hasResults={false} bestScore={{ kind: 'none' }} />)
+
+      expect(screen.getByTestId('problem-no-submission-badge').textContent).toBe('Sem submissão')
+      expect(screen.queryByTestId('problem-best-score-badge')).toBeNull()
+    })
+
+    it('shows no badge at all when there is no team best to speak of', () => {
+      render(<StatementCard problem={problem()} hasResults={false} />)
+
+      expect(screen.queryByTestId('problem-best-score-badge')).toBeNull()
+      expect(screen.queryByTestId('problem-no-submission-badge')).toBeNull()
+    })
+  })
 })

@@ -461,9 +461,10 @@ async function getBestScoresForTeam(
 
 // The participant read of a round (#39): a missing round or one still
 // 'draft' returns null — same "never announces itself" rule as
-// listParticipantRounds. bestScore stays null for every problem while the
-// round is open (mid-round, the participant doesn't need it yet, matching
-// getPublishedProblem) and only reflects real submissions once closed.
+// listParticipantRounds. bestScore is the caller's team best on each
+// problem, open or closed (#206: the team sees its own result mid-round,
+// matching getPublishedProblem); null when the team never submitted it or the
+// caller has no team.
 export async function getParticipantRound(
   db: Db,
   id: string,
@@ -501,15 +502,11 @@ export async function getParticipantRound(
     translationsByProblem.set(translation.problemId, list)
   }
 
+  const teamId = await findTeamIdForParticipant(db, userId)
   const bestScores =
-    round.status === 'closed'
-      ? await (async () => {
-          const teamId = await findTeamIdForParticipant(db, userId)
-          return teamId === null
-            ? new Map<string, number>()
-            : getBestScoresForTeam(db, teamId, problemIds, round.id)
-        })()
-      : new Map<string, number>()
+    teamId === null
+      ? new Map<string, number>()
+      : await getBestScoresForTeam(db, teamId, problemIds, round.id)
 
   return {
     id: round.id,

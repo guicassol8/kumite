@@ -13,6 +13,7 @@ import { CreateVariableDialog } from '@/components/blockly/create-variable-dialo
 import { ActionsBar } from '@/components/problem/actions-bar'
 import { ExampleResults, type ExampleResultsNotice } from '@/components/problem/example-results'
 import { ProblemPanels } from '@/components/problem/problem-panels'
+import type { TeamBestScore } from '@/components/problem/statement-card'
 import {
   type SubmissionResult,
   SubmissionResultPanel,
@@ -20,6 +21,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useBlocklyLocale } from '@/hooks/use-blockly-locale'
+import { useBlocklyTheme } from '@/hooks/use-blockly-theme'
 import { type ExampleRunState, useExampleRun } from '@/hooks/use-example-run'
 import { useRoundStream } from '@/hooks/use-round-stream'
 import { useWorkspaceAutoSave } from '@/hooks/use-workspace-autosave'
@@ -30,6 +32,7 @@ import { fetchProblem, ProblemNotFoundError, problemQueryKey } from '@/lib/probl
 import { positionLabel } from '@/lib/round-position'
 import { fetchRound, roundQueryKey } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
+import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/problem/$id')({
@@ -68,6 +71,7 @@ function ProblemScreen() {
   // dialog is open while it is set (#205).
   const [variableTarget, setVariableTarget] = useState<Blockly.WorkspaceSvg | null>(null)
   const { toolbox, onReady: onWorkspaceReady } = useBlocklyLocale(workspaceRef, setVariableTarget)
+  const blocklyTheme = useBlocklyTheme()
   const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(id)
 
   // Reads the app's single `/sse` connection instead of opening a second one
@@ -118,6 +122,13 @@ function ProblemScreen() {
     return entry ? positionLabel(entry.position) : undefined
   })()
 
+  // Whether the caller has a team tells "never submitted" (a badge saying so)
+  // apart from "no team best to speak of" (no badge) while the round is open
+  // (#206). Same key as /teams and /leaderboard, so it is usually cached.
+  // Decoration like the letter above: a failure drops the badge, nothing else.
+  const teams = useQuery({ queryKey: TEAMS_QUERY_KEY, queryFn: fetchTeams, retry: false })
+  const hasTeam = Boolean(teams.data?.myTeamId)
+
   const examples = problem.data?.examples ?? []
   const { state: runState, run } = useExampleRun(examples)
   const isRunning = runState.status === 'running'
@@ -167,7 +178,15 @@ function ProblemScreen() {
     try {
       const res = await submit.mutateAsync()
       if (res.status === 201) {
-        setVerdict(await res.json())
+        const result = await res.json()
+        setVerdict(result)
+        // The team's best may have just moved (#206): re-read it here and on
+        // the round list, without a reload. `placeholderData` above keeps the
+        // editor mounted through the refetch.
+        queryClient.invalidateQueries({ queryKey: problemQueryKey(id) })
+        if (problem.data?.roundId) {
+          queryClient.invalidateQueries({ queryKey: roundQueryKey(problem.data.roundId) })
+        }
         return
       }
       if (res.status === 429) {
@@ -247,6 +266,15 @@ function ProblemScreen() {
   }
 
   const isClosed = data.roundStatus === 'closed'
+  // Open round only: once closed, the closed notice below already carries
+  // the team's best (or its "never submitted" line), exactly as before #206.
+  const bestScore: TeamBestScore | undefined = isClosed
+    ? undefined
+    : data.bestSubmission
+      ? { kind: 'score', score: data.bestSubmission.score }
+      : hasTeam
+        ? { kind: 'none' }
+        : undefined
   // Drives both the results band and how much room the statement gives up
   // for it on the stacked (mobile) layout.
   const hasResults = runState.status !== 'idle' || verdict !== null
@@ -263,6 +291,7 @@ function ProblemScreen() {
       key={id}
       ref={workspaceRef}
       toolbox={toolbox}
+      theme={blocklyTheme}
       options={workspaceOptions}
       // A state saved before the root became undeletable may not have it,
       // and the toolbox never offers it back — re-seed instead of losing
@@ -378,6 +407,7 @@ function ProblemScreen() {
       <ProblemPanels
         problem={data}
         positionLabel={problemLetter}
+        bestScore={bestScore}
         hasResults={hasResults}
         closedNotice={closedNotice}
         submitBanner={

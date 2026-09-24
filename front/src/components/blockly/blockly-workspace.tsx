@@ -1,3 +1,4 @@
+import { KUMITE_CATEGORY_BAR_PX, kumiteGridOptions } from '@kumite/blocks'
 import * as Blockly from 'blockly'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -36,7 +37,17 @@ export type BlocklyWorkspaceProps = {
    * to the exact workspace Blockly is keeping.
    */
   onReady?: (workspace: Blockly.WorkspaceSvg) => void
+  /**
+   * The Blockly theme (`kumiteTheme` / `kumiteThemeDark` from `@kumite/blocks`).
+   * Applied at injection, then swapped in place with `setTheme` whenever it
+   * changes — the editor is never remounted and the blocks stay put (#218).
+   */
+  theme?: Blockly.Theme
 }
+
+// The coloured bar on each toolbox category row: 4px in the identity, 8px in
+// Blockly. A static on the class, so it is set once, before any toolbox renders.
+Blockly.ToolboxCategory.borderWidth = KUMITE_CATEGORY_BAR_PX
 
 const defaultOptions: Partial<Blockly.BlocklyOptions> = {
   // Blockly's own default is https://static.blockly.com/media/, which would put
@@ -48,7 +59,7 @@ const defaultOptions: Partial<Blockly.BlocklyOptions> = {
   renderer: 'zelos',
   trashcan: true,
   zoom: { controls: true, wheel: true, startScale: 0.9, minScale: 0.4, maxScale: 2 },
-  grid: { spacing: 20, length: 3, snap: true },
+  grid: { ...kumiteGridOptions },
   move: { scrollbars: true, drag: true, wheel: true },
 }
 
@@ -58,11 +69,15 @@ const defaultOptions: Partial<Blockly.BlocklyOptions> = {
  * driven through the imperative handle.
  */
 export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorkspaceProps>(
-  function BlocklyWorkspace({ toolbox, initialState, onChange, options, className, onReady }, ref) {
+  function BlocklyWorkspace(
+    { toolbox, initialState, onChange, options, className, onReady, theme },
+    ref,
+  ) {
     const { t } = useTranslation()
     const containerRef = useRef<HTMLDivElement>(null)
     const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
     const appliedToolboxRef = useRef(toolbox)
+    const appliedThemeRef = useRef(theme)
     const recenterControlRef = useRef<RecenterControl | null>(null)
     const recenterLabel = t('editor.recenter')
     const labelRef = useRef(recenterLabel)
@@ -70,21 +85,28 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
 
     // The workspace is injected once, so the injection effect reads the props
     // from here instead of depending on them.
-    const propsRef = useRef({ toolbox, initialState, onChange, options, onReady })
-    propsRef.current = { toolbox, initialState, onChange, options, onReady }
+    const propsRef = useRef({ toolbox, initialState, onChange, options, onReady, theme })
+    propsRef.current = { toolbox, initialState, onChange, options, onReady, theme }
 
     useEffect(() => {
       const container = containerRef.current
       if (!container) return
-      const { toolbox: injected, initialState: restored, options: overrides } = propsRef.current
+      const {
+        toolbox: injected,
+        initialState: restored,
+        options: overrides,
+        theme: injectedTheme,
+      } = propsRef.current
 
       const workspace = Blockly.inject(container, {
         ...defaultOptions,
         ...overrides,
         toolbox: injected,
+        ...(injectedTheme ? { theme: injectedTheme } : {}),
       })
       workspaceRef.current = workspace
       appliedToolboxRef.current = injected
+      appliedThemeRef.current = injectedTheme
       const recenterControl = new RecenterControl(workspace, labelRef.current)
       recenterControlRef.current = recenterControl
       propsRef.current.onReady?.(workspace)
@@ -152,6 +174,15 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       appliedToolboxRef.current = toolbox
       workspace.updateToolbox(toolbox)
     }, [toolbox])
+
+    // A new theme (light ↔ dark) swaps in place too: the ThemeManager restyles
+    // toolbox, flyout, canvas and scrollbars and re-renders the blocks.
+    useEffect(() => {
+      const workspace = workspaceRef.current
+      if (!workspace || !theme || appliedThemeRef.current === theme) return
+      appliedThemeRef.current = theme
+      workspace.setTheme(theme)
+    }, [theme])
 
     useImperativeHandle(
       ref,

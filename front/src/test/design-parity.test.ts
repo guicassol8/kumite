@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
+import { KUMITE_TOKENS } from '@kumite/blocks'
 import { describe, expect, it } from 'vitest'
 
 // `docs/design/tokens/tokens.css` is the identity's source of truth; the front
@@ -37,7 +38,11 @@ const COPIED_ICONS = [
   ['docs/design/logo/png/kumite-app-icon-1024.png', 'front/public/icons/app-icon-1024.png'],
 ] as const
 
-/** Blockly's palette (#218) is consumed by `@kumite/blocks`, not by the theme. */
+/**
+ * Blockly's palette (#218) is not copied into `index.css`: `@kumite/blocks`
+ * mirrors it in `KUMITE_TOKENS` (Blockly needs a parseable hex, not a `var()`),
+ * and the last describe below holds that mirror to tokens.css instead.
+ */
 const isBlockToken = (name: string) => name.startsWith('--block-')
 
 type Scope = 'light' | 'dark'
@@ -47,7 +52,10 @@ type Scope = 'light' | 'dark'
  * (see the note above); `.dark` is the other. Both files are flat — selector,
  * declarations, close — so a block scan is enough; no nesting to handle.
  */
-function readTokens(file: string): Record<Scope, Map<string, string>> {
+function readTokens(
+  file: string,
+  { blocks = false }: { blocks?: boolean } = {},
+): Record<Scope, Map<string, string>> {
   const css = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
   const scopes: Record<Scope, Map<string, string>> = { light: new Map(), dark: new Map() }
 
@@ -60,7 +68,7 @@ function readTokens(file: string): Record<Scope, Map<string, string>> {
     for (const declaration of (block[2] ?? '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
       const name = declaration[1] ?? ''
       const value = declaration[2] ?? ''
-      if (isBlockToken(name)) continue
+      if (!blocks && isBlockToken(name)) continue
       // Lowercased because hex is case-insensitive in CSS and biome normalizes
       // it — a difference in case is not drift.
       scopes[which].set(name, value.trim().replace(/\s+/g, ' ').toLowerCase())
@@ -95,6 +103,36 @@ describe('the icons copied into front/public', () => {
       const served = readFileSync(path.join(REPO_ROOT, copy))
 
       expect(served.equals(original)).toBe(true)
+    })
+  }
+})
+
+describe('the Blockly theme mirror in @kumite/blocks (#218)', () => {
+  const source = readTokens(TOKENS_CSS, { blocks: true })
+
+  /** Follows `var(--x)` within the scope first, then `:root` — `.dark --card: var(--background-2)`. */
+  function resolve(scope: Scope, name: string): string | undefined {
+    const value = source[scope].get(name) ?? source.light.get(name)
+    const reference = value?.match(/^var\((--[\w-]+)\)$/)?.[1]
+    return reference ? resolve(scope, reference) : value
+  }
+
+  const mirrors: [string, Scope, Record<string, string>][] = [
+    ['block', 'light', KUMITE_TOKENS.block],
+    ['light', 'light', KUMITE_TOKENS.light],
+    ['dark', 'dark', KUMITE_TOKENS.dark],
+  ]
+
+  for (const [key, scope, mirror] of mirrors) {
+    it(`KUMITE_TOKENS.${key} matches the ${scope} tokens of docs/design/tokens/tokens.css`, () => {
+      const drifted = Object.entries(mirror).flatMap(([name, actual]) => {
+        const expected = resolve(scope, name)
+        return actual.toLowerCase() === expected
+          ? []
+          : [`${name}: ${actual} — expected ${expected ?? '(missing in tokens.css)'}`]
+      })
+
+      expect(drifted).toEqual([])
     })
   }
 })

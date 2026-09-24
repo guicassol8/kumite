@@ -398,3 +398,40 @@ describe('the "soma dos pares" fixture', () => {
     expect(solve([1, 3, 5])).toBe(0)
   })
 })
+
+// Recorded on develop before the kumite theme (#218) moved the two kumite
+// blocks from `setColour` to `setStyle`: the theme is UI only, so the judge
+// must keep emitting byte-for-byte the same source.
+describe('generateSolution output is stable', () => {
+  it('somaDosPares', () => {
+    expect(generateSolution(somaDosPares)).toMatchInlineSnapshot(`
+      "var soma, numero;
+
+
+      function solve(input) {
+        soma = 0;
+        for (var numero_index in input) {
+          numero = input[numero_index];
+          if (numero % 2 == 0) {
+            soma = soma + numero;
+          }
+        }
+        return soma;
+      }
+      "
+    `)
+  })
+
+  it('comentarioComQuebra', () => {
+    expect(generateSolution(comentarioComQuebra)).toMatchInlineSnapshot(`
+      "
+
+
+      // sol throw 1 throw 2 throw 3
+      function solve(input) {
+        return 7;
+      }
+      "
+    `)
+  })
+})

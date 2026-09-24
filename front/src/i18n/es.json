@@ -314,6 +314,14 @@
         "message": "No se pudo cargar la configuración.",
         "retry": "Intentar de nuevo"
       },
+      "submissions": {
+        "heading": "Envíos",
+        "pausedLabel": "Pausar envíos",
+        "pausedDescription": "Mientras estén pausados, nadie puede enviar. El tiempo de la ronda sigue corriendo y Ejecutar sigue funcionando en el editor.",
+        "errors": {
+          "saveFailed": "No se pudo guardar. Intenta de nuevo."
+        }
+      },
       "teamRules": {
         "heading": "Reglas de equipo",
         "mixingLabel": "Bloquear la mezcla de universidades",
@@ -551,7 +559,11 @@
         "podiumEmpty": "Ningún equipo puntuó en esta ronda.",
         "podiumPoints": "{{score}} pts",
         "leaderboardCta": "Ver clasificación",
-        "none": "Aún no se ha creado ninguna ronda."
+        "none": "Aún no se ha creado ninguna ronda.",
+        "pauseCta": "Pausar envíos",
+        "resumeCta": "Reanudar envíos",
+        "pausedBadge": "Envíos pausados",
+        "pauseError": "No se pudo cambiar la pausa. Intenta de nuevo."
       },
       "shortcuts": {
         "title": "Accesos directos"
@@ -783,7 +795,8 @@
       "cooldown": "Espera antes de volver a enviar.",
       "race": "Algo cambió en esta ronda — recarga la página e intenta de nuevo.",
       "unexpected": "No se pudo enviar la solución. Intenta de nuevo.",
-      "dismiss": "Descartar"
+      "dismiss": "Descartar",
+      "paused": "La organización pausó los envíos. Espera a que se reanuden para enviar."
     },
     "closedRound": {
       "notice": "Esta ronda fue cerrada — el problema ahora es de solo lectura.",
@@ -837,7 +850,10 @@
       "hard": "Difícil"
     },
     "pointsBadge": "{{points}} pts",
-    "positionBadge": "Problema {{letter}}"
+    "positionBadge": "Problema {{letter}}",
+    "submissionsPaused": {
+      "notice": "La organización pausó los envíos. El tiempo sigue corriendo; aún puedes ejecutar los ejemplos."
+    }
   },
   "leaderboard": {
     "heading": "Marcador",

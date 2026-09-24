@@ -314,6 +314,14 @@
         "message": "Could not load the configuration.",
         "retry": "Try again"
       },
+      "submissions": {
+        "heading": "Submissions",
+        "pausedLabel": "Pause submissions",
+        "pausedDescription": "While paused, nobody can submit. The round timer keeps running and Run keeps working in the editor.",
+        "errors": {
+          "saveFailed": "Could not save. Please try again."
+        }
+      },
       "teamRules": {
         "heading": "Team rules",
         "mixingLabel": "Lock mixing universities",
@@ -551,7 +559,11 @@
         "podiumEmpty": "No team scored in this round.",
         "podiumPoints": "{{score}} pts",
         "leaderboardCta": "View leaderboard",
-        "none": "No round has been created yet."
+        "none": "No round has been created yet.",
+        "pauseCta": "Pause submissions",
+        "resumeCta": "Resume submissions",
+        "pausedBadge": "Submissions paused",
+        "pauseError": "Could not change the pause. Please try again."
       },
       "shortcuts": {
         "title": "Shortcuts"
@@ -783,7 +795,8 @@
       "cooldown": "Wait a moment before submitting again.",
       "race": "Something changed in this round — reload the page and try again.",
       "unexpected": "Could not submit your solution. Please try again.",
-      "dismiss": "Dismiss"
+      "dismiss": "Dismiss",
+      "paused": "Submissions are paused by the organizers. Wait for them to resume before submitting."
     },
     "closedRound": {
       "notice": "This round has closed — the problem is now read-only.",
@@ -837,7 +850,10 @@
       "hard": "Hard"
     },
     "pointsBadge": "{{points}} pts",
-    "positionBadge": "Problem {{letter}}"
+    "positionBadge": "Problem {{letter}}",
+    "submissionsPaused": {
+      "notice": "Submissions are paused by the organizers. The timer keeps running; you can still run the examples."
+    }
   },
   "leaderboard": {
     "heading": "Leaderboard",

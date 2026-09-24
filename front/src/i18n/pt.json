@@ -314,6 +314,14 @@
         "message": "Não foi possível carregar a configuração.",
         "retry": "Tentar novamente"
       },
+      "submissions": {
+        "heading": "Submissões",
+        "pausedLabel": "Pausar submissões",
+        "pausedDescription": "Enquanto pausadas, ninguém consegue submeter. O tempo da rodada continua correndo e o Executar segue funcionando no editor.",
+        "errors": {
+          "saveFailed": "Não foi possível salvar. Tente novamente."
+        }
+      },
       "teamRules": {
         "heading": "Regras de time",
         "mixingLabel": "Bloquear mistura de universidades",
@@ -551,7 +559,11 @@
         "podiumEmpty": "Nenhum time pontuou nesta rodada.",
         "podiumPoints": "{{score}} pts",
         "leaderboardCta": "Ver classificação",
-        "none": "Nenhuma rodada criada ainda."
+        "none": "Nenhuma rodada criada ainda.",
+        "pauseCta": "Pausar submissões",
+        "resumeCta": "Retomar submissões",
+        "pausedBadge": "Submissões pausadas",
+        "pauseError": "Não foi possível alterar a pausa. Tente novamente."
       },
       "shortcuts": {
         "title": "Atalhos"
@@ -783,7 +795,8 @@
       "cooldown": "Aguarde antes de submeter de novo.",
       "race": "Algo mudou nesta rodada — recarregue a página e tente de novo.",
       "unexpected": "Não foi possível enviar a submissão. Tente novamente.",
-      "dismiss": "Dispensar"
+      "dismiss": "Dispensar",
+      "paused": "As submissões estão pausadas pela organização. Aguarde a retomada para submeter."
     },
     "closedRound": {
       "notice": "Esta rodada foi encerrada — o problema agora é somente leitura.",
@@ -837,7 +850,10 @@
       "hard": "Difícil"
     },
     "pointsBadge": "{{points}} pts",
-    "positionBadge": "Problema {{letter}}"
+    "positionBadge": "Problema {{letter}}",
+    "submissionsPaused": {
+      "notice": "As submissões estão pausadas pela organização. O tempo continua correndo; você ainda pode executar os exemplos."
+    }
   },
   "leaderboard": {
     "heading": "Placar",

@@ -52,6 +52,20 @@ subagent each instead of to a new chat. Same isolation, different boundary —
   install, `.env` files, migrate, seed) and exports `JWT_SECRET`, the CI
   organizer and `BACK_NOTIFICATIONS_LOG`, so the full E2E runs with nothing
   skipped, worktrees included (#333).
+- Hooks in a worktree (#286): `$CLAUDE_PROJECT_DIR` is always the main
+  checkout, and it is the main checkout's copy of the hooks that runs — a
+  hook change only takes effect there after it merges and is pulled. So the
+  hooks never trust their own path: Stop gates the git toplevel of the
+  payload's `cwd`, PostToolUse the toplevel of the edited file (either one
+  only if it is a worktree of this repo; otherwise the main checkout, as
+  before). The ladder uses that tree's `back/.env` `DATABASE_URL`, else the
+  shared 5433 default. Stop blocks until the worktree has run `pnpm install`.
+  Each Stop run appends one line (root, DB source, decision — never the URL)
+  to `/tmp/kumite-stop-hook.log`: look there first on an `exit 143`.
+  `bash scripts/claude-hooks-smoke.sh` proves the behavior with throwaway
+  worktrees and a stub `pnpm`. Subagents with `isolation: "worktree"` fire
+  `SubagentStop`, not `Stop`, so the ladder does not gate their worktree —
+  the pre-commit and CI do.
 - Worktrees: prefer the harness's own isolation — `EnterWorktree` for this
   session's task work, `isolation: "worktree"` when spawning subagents that
   edit files. Manual fallback:

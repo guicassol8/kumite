@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
   api: {
-    organizer: { stats: { $get: vi.fn() } },
+    organizer: {
+      stats: { $get: vi.fn() },
+      'event-config': { $get: vi.fn(), $patch: vi.fn() },
+    },
     rounds: { ':id': { ranking: { $get: vi.fn() } } },
   },
 }))
@@ -27,6 +30,7 @@ import { routeTree } from '@/routeTree.gen'
 
 const mockedStatsGet = vi.mocked(api.organizer.stats.$get)
 const mockedRankingGet = vi.mocked(api.rounds[':id'].ranking.$get)
+const mockedConfigPatch = vi.mocked(api.organizer['event-config'].$patch)
 const sseUnsubscribe = vi.fn()
 
 function emitSse(event: SseEvent) {
@@ -102,6 +106,7 @@ function renderScreen() {
 beforeEach(() => {
   mockedStatsGet.mockReset()
   mockedRankingGet.mockReset()
+  mockedConfigPatch.mockReset()
   connectEventStream.mockReset()
   sseUnsubscribe.mockReset()
   connectEventStream.mockReturnValue(sseUnsubscribe)
@@ -114,6 +119,88 @@ afterEach(() => {
 })
 
 describe('organizer overview', () => {
+  // #285: the pause shortcut. The card reads the flag from the SSE stream —
+  // the organizer's own PATCH comes back to them as submissions.paused/resumed.
+  describe('submissions pause shortcut', () => {
+    function syncPaused(submissionsPaused: boolean, round: { id: string } | null) {
+      emitSse({
+        type: 'state.sync',
+        serverTime: new Date(),
+        round: round ? { id: round.id, closesAt: new Date(Date.now() + 60_000) } : null,
+        submissionsPaused,
+      })
+    }
+
+    it('offers Pause while a round runs and PATCHes the flag on', async () => {
+      mockedStatsGet.mockResolvedValue(
+        jsonResponse(200, stats({ round: { active: roundRef(), lastClosed: null } })),
+      )
+      mockedConfigPatch.mockResolvedValue(jsonResponse(200, {}))
+      renderScreen()
+
+      const toggle = await screen.findByTestId('overview-round-pause-toggle')
+      syncPaused(false, { id: 'r1' })
+      expect(toggle.textContent).toContain('Pausar submissões')
+      expect(screen.queryByTestId('overview-submissions-paused-badge')).toBeNull()
+
+      act(() => toggle.click())
+
+      await waitFor(() =>
+        expect(mockedConfigPatch).toHaveBeenCalledWith({ json: { submissionsPaused: true } }),
+      )
+    })
+
+    it('shows the badge and Resume while paused, and PATCHes the flag off', async () => {
+      mockedStatsGet.mockResolvedValue(
+        jsonResponse(200, stats({ round: { active: roundRef(), lastClosed: null } })),
+      )
+      mockedConfigPatch.mockResolvedValue(jsonResponse(200, {}))
+      renderScreen()
+
+      const toggle = await screen.findByTestId('overview-round-pause-toggle')
+      syncPaused(true, { id: 'r1' })
+
+      expect(screen.getByTestId('overview-submissions-paused-badge').textContent).toContain(
+        'Submissões pausadas',
+      )
+      expect(toggle.textContent).toContain('Retomar submissões')
+
+      act(() => toggle.click())
+      await waitFor(() =>
+        expect(mockedConfigPatch).toHaveBeenCalledWith({ json: { submissionsPaused: false } }),
+      )
+
+      emitSse({ type: 'submissions.resumed', serverTime: new Date() })
+      expect(screen.queryByTestId('overview-submissions-paused-badge')).toBeNull()
+    })
+
+    it('keeps the badge but drops the button when no round is open', async () => {
+      mockedStatsGet.mockResolvedValue(jsonResponse(200, stats()))
+      renderScreen()
+
+      await screen.findByTestId('overview-round-none')
+      syncPaused(true, null)
+
+      expect(screen.getByTestId('overview-submissions-paused-badge')).toBeDefined()
+      expect(screen.queryByTestId('overview-round-pause-toggle')).toBeNull()
+    })
+
+    it('shows an error when the toggle fails', async () => {
+      mockedStatsGet.mockResolvedValue(
+        jsonResponse(200, stats({ round: { active: roundRef(), lastClosed: null } })),
+      )
+      mockedConfigPatch.mockResolvedValue(jsonResponse(500, { error: 'internal' }))
+      renderScreen()
+
+      const toggle = await screen.findByTestId('overview-round-pause-toggle')
+      act(() => toggle.click())
+
+      expect((await screen.findByTestId('overview-round-pause-error')).textContent).toContain(
+        'Não foi possível alterar a pausa',
+      )
+    })
+  })
+
   it('shows signups per university, teams and submissions', async () => {
     mockedStatsGet.mockResolvedValue(jsonResponse(200, stats()))
 

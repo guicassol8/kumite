@@ -5,15 +5,19 @@ import { eventConfigTable } from '../../db/schema'
 
 import type { EventConfig, UpdateEventConfigBody } from './event-config.schema'
 
-// Table defaults (mixingLocked: false, maxTeamSize: 3) apply even before
-// db:seed has inserted the singleton event_config row.
+// Table defaults (mixingLocked: false, maxTeamSize: 3, submissionsPaused:
+// false) apply even before db:seed has inserted the singleton event_config row.
 export async function getEventConfig(
   db: Db,
-): Promise<{ mixingLocked: boolean; maxTeamSize: number }> {
+): Promise<{ mixingLocked: boolean; maxTeamSize: number; submissionsPaused: boolean }> {
   const [config] = await db.select().from(eventConfigTable).where(eq(eventConfigTable.id, 1))
   return config
-    ? { mixingLocked: config.mixingLocked, maxTeamSize: config.maxTeamSize }
-    : { mixingLocked: false, maxTeamSize: 3 }
+    ? {
+        mixingLocked: config.mixingLocked,
+        maxTeamSize: config.maxTeamSize,
+        submissionsPaused: config.submissionsPaused,
+      }
+    : { mixingLocked: false, maxTeamSize: 3, submissionsPaused: false }
 }
 
 // Same upsert-then-select shape as createTeam's onConflictDoNothing: the

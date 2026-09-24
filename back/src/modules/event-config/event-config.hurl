@@ -1,6 +1,6 @@
-# API E2E for the organizer event-config module (#48) — mixing lock and max
-# team size, guarded by requireUser + requireOrganizer (#27). Prereqs, in
-# order:
+# API E2E for the organizer event-config module (#48) — mixing lock, max
+# team size and the submissions pause (#285), guarded by requireUser +
+# requireOrganizer (#27). Prereqs, in order:
 #   docker compose up -d
 #   pnpm db:migrate
 #   pnpm db:seed         # seeds the PUCRS2026 code + the ORGANIZER_EMAIL/PASSWORD organizer,
@@ -64,11 +64,12 @@ jsonpath "$.error" == "forbidden"
 PATCH {{host}}/organizer/event-config
 Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
-{ "mixingLocked": false, "maxTeamSize": 3 }
+{ "mixingLocked": false, "maxTeamSize": 3, "submissionsPaused": false }
 HTTP 200
 [Asserts]
 jsonpath "$.mixingLocked" == false
 jsonpath "$.maxTeamSize" == 3
+jsonpath "$.submissionsPaused" == false
 
 # 1. GET -> reflects the current config, arranged just above.
 GET {{host}}/organizer/event-config
@@ -77,6 +78,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.mixingLocked" == false
 jsonpath "$.maxTeamSize" == 3
+jsonpath "$.submissionsPaused" == false
 
 # 2. PATCH mixingLocked only -> 200, reflects, maxTeamSize untouched.
 PATCH {{host}}/organizer/event-config
@@ -124,8 +126,9 @@ jsonpath "$.issues.body[0].path" == "maxTeamSize"
 PATCH {{host}}/organizer/event-config
 Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
-{ "mixingLocked": false, "maxTeamSize": 3 }
+{ "mixingLocked": false, "maxTeamSize": 3, "submissionsPaused": false }
 HTTP 200
 [Asserts]
 jsonpath "$.mixingLocked" == false
 jsonpath "$.maxTeamSize" == 3
+jsonpath "$.submissionsPaused" == false

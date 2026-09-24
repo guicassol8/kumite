@@ -220,6 +220,39 @@ HTTP 400
 [Asserts]
 jsonpath "$.error" == "field_value_not_allowed"
 
+# 4d. The organizer pauses submissions (#285) -> the valid workspace below is
+#     refused with 423 submissions_paused before any judging: the slot is
+#     released and no cooldown is armed. The organizer then resumes, and the happy path right after
+#     (step 5) proves the resume is immediate and that the refusal armed no
+#     cooldown — it would be a 429 otherwise.
+PATCH {{host}}/organizer/event-config
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "submissionsPaused": true }
+HTTP 200
+[Asserts]
+jsonpath "$.submissionsPaused" == true
+
+POST {{host}}/submissions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+{
+  "problemId": "{{problem_id}}",
+  "roundId": "{{round_id}}",
+  "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
+}
+HTTP 423
+[Asserts]
+jsonpath "$.error" == "submissions_paused"
+
+PATCH {{host}}/organizer/event-config
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "submissionsPaused": false }
+HTTP 200
+[Asserts]
+jsonpath "$.submissionsPaused" == false
+
 # 5. The happy path -> 201, full score, and the hidden case comes back as a
 #    bare ✓/✗: no expected, no actual, no ms.
 POST {{host}}/submissions

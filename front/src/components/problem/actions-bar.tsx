@@ -10,6 +10,9 @@ export type ActionsBarProps = {
   onClear: () => void
   isClosed: boolean
   isSubmitting: boolean
+  // The organizer paused submissions (#285): Submeter goes inert, Executar
+  // and Limpar keep working.
+  isPaused?: boolean
   onSubmit: () => void
   className?: string
 }
@@ -25,6 +28,7 @@ export function ActionsBar({
   onClear,
   isClosed,
   isSubmitting,
+  isPaused = false,
   onSubmit,
   className,
 }: ActionsBarProps) {
@@ -69,7 +73,7 @@ export function ActionsBar({
           type="button"
           className="ml-auto bg-brand text-brand-foreground shadow-none hover:bg-brand-hover"
           data-testid="problem-submit-button"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isPaused}
           onClick={onSubmit}
         >
           <Send aria-hidden="true" />

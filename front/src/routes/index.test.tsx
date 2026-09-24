@@ -228,6 +228,7 @@ describe('Home — round card (#40)', () => {
 
     emitSse({
       type: 'state.sync',
+      submissionsPaused: false,
       serverTime: new Date('2026-09-02T12:00:00.000Z'),
       round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
     })

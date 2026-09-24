@@ -73,6 +73,7 @@ function errorResponse(status: number) {
 
 const stateSync = {
   type: 'state.sync',
+  submissionsPaused: false,
   serverTime: new Date().toISOString(),
   round: null,
 }

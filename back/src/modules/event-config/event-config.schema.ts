@@ -5,6 +5,7 @@ export const EventConfigSchema = z.object({
   id: z.number(),
   mixingLocked: z.boolean(),
   maxTeamSize: z.number().int().positive(),
+  submissionsPaused: z.boolean(),
   updatedAt: z.coerce.date(),
 })
 
@@ -30,6 +31,9 @@ export const EVENT_MAX_TEAM_SIZE = 10
 export const UpdateEventConfigBodySchema = z.object({
   mixingLocked: z.boolean().optional(),
   maxTeamSize: z.number().int().positive().max(EVENT_MAX_TEAM_SIZE).optional(),
+  // Pauses POST /submissions without closing the round (#285). The route
+  // announces it on the SSE bus whenever the body carries it.
+  submissionsPaused: z.boolean().optional(),
 })
 
 export type UpdateEventConfigBody = z.infer<typeof UpdateEventConfigBodySchema>

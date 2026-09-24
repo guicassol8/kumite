@@ -27,6 +27,7 @@ export const createSubmissionRoute = defineRoute({
     201: SubmissionResultSchema,
     400: ErrorBodySchema,
     404: ErrorBodySchema,
+    423: ErrorBodySchema,
     429: ErrorBodySchema,
   },
   handler: async (c) => {
@@ -58,6 +59,12 @@ export const createSubmissionRoute = defineRoute({
         // The code and the message come straight from @kumite/blocks, already
         // localized — the route coins neither.
         return c.error(outcome.code, outcome.message, { status: 400 })
+      case 'submissions_paused':
+        // 423 Locked: the resource is fine, the organizer has it on hold
+        // (#285). The round and its timer keep going.
+        return c.error('submissions_paused', 'Submissions are paused by the organizer', {
+          status: 423,
+        })
       case 'throttled':
         return c.error(
           'submission_throttled',

@@ -29,12 +29,19 @@ import * as Blockly from 'blockly'
 import i18n from '@/i18n'
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
+import { connectEventStream } from '@/lib/sse-client'
+import type { SseEvent } from '@/lib/sse-schema'
 import { loadWorkspaceState, saveWorkspaceState } from '@/lib/workspace-storage'
 import { routeTree } from '@/routeTree.gen'
 
 const mockedGet = vi.mocked(api.problems[':id'].$get)
 const mockedRound = vi.mocked(api.rounds[':id'].$get)
 const mockedSubmit = vi.mocked(api.submissions.$post)
+
+function emitSse(event: SseEvent) {
+  const onEvent = vi.mocked(connectEventStream).mock.calls.at(-1)?.[0] as (e: SseEvent) => void
+  act(() => onEvent(event))
+}
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stubs
 function jsonResponse(status: number, body: unknown): any {
@@ -329,6 +336,72 @@ describe('ProblemScreen', () => {
     const banner = await screen.findByTestId('problem-submit-error-banner')
     expect(banner.textContent).not.toContain('Algo mudou')
     expect(banner.textContent).toContain('Não foi possível enviar')
+  })
+
+  // #285: the organizer's pause reaches the editor over SSE, no reload.
+  it('shows the paused banner and disables only Submeter while submissions are paused', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+
+    renderProblem()
+    await screen.findByTestId('problem-submit-button')
+    expect(screen.queryByTestId('problem-submissions-paused-banner')).toBeNull()
+
+    emitSse({ type: 'state.sync', serverTime: new Date(), round: null, submissionsPaused: true })
+
+    expect(screen.getByTestId('problem-submissions-paused-banner').textContent).toContain(
+      'pausadas',
+    )
+    expect((screen.getByTestId('problem-submit-button') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByTestId('problem-run-button') as HTMLButtonElement).disabled).toBe(false)
+
+    emitSse({ type: 'submissions.resumed', serverTime: new Date() })
+
+    expect(screen.queryByTestId('problem-submissions-paused-banner')).toBeNull()
+    expect((screen.getByTestId('problem-submit-button') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('explains the pause when a submit races it and comes back 423', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+    mockedSubmit.mockResolvedValue(
+      jsonResponse(423, { error: 'submissions_paused', message: 'Submissions are paused' }),
+    )
+
+    renderProblem()
+    await screen.findByTestId('problem-submit-button')
+    fireEvent.click(screen.getByTestId('problem-submit-button'))
+
+    const banner = await screen.findByTestId('problem-submit-error-banner')
+    expect(banner.textContent).toContain('pausadas pela organização')
+  })
+
+  it('drops the raced 423 banner once the pause itself arrives, and leaves nothing stale on resume', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+    mockedSubmit.mockResolvedValue(
+      jsonResponse(423, { error: 'submissions_paused', message: 'Submissions are paused' }),
+    )
+
+    renderProblem()
+    await screen.findByTestId('problem-submit-button')
+    fireEvent.click(screen.getByTestId('problem-submit-button'))
+    await screen.findByTestId('problem-submit-error-banner')
+
+    emitSse({ type: 'submissions.paused', serverTime: new Date() })
+    expect(screen.getByTestId('problem-submissions-paused-banner')).toBeDefined()
+    expect(screen.queryByTestId('problem-submit-error-banner')).toBeNull()
+
+    emitSse({ type: 'submissions.resumed', serverTime: new Date() })
+    expect(screen.queryByTestId('problem-submissions-paused-banner')).toBeNull()
+    expect(screen.queryByTestId('problem-submit-error-banner')).toBeNull()
+  })
+
+  it('does not show the paused banner on a closed round', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, participantProblem({ roundStatus: 'closed' })))
+
+    renderProblem()
+    await screen.findByTestId('problem-closed-notice')
+    emitSse({ type: 'submissions.paused', serverTime: new Date() })
+
+    expect(screen.queryByTestId('problem-submissions-paused-banner')).toBeNull()
   })
 
   it('shows the closed-round notice with the best score and no submit button', async () => {

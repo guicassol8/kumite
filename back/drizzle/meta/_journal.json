@@ -169,6 +169,13 @@
       "when": 1789869963399,
       "tag": "0023_backfill_team_name_whitespace",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790209149174,
+      "tag": "0024_sturdy_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

@@ -1,17 +1,19 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ExportMenu } from '@/components/organizer/export-menu'
 import { PANEL_EYEBROW } from '@/components/organizer/panel-table'
 import { RoundCountdown } from '@/components/round-countdown'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useRoundStream } from '@/hooks/use-round-stream'
 import { formatDate } from '@/i18n/format'
+import { EVENT_CONFIG_QUERY_KEY, setSubmissionsPaused } from '@/lib/event-config-query'
 import { fetchRoundRanking } from '@/lib/ranking-query'
 import { fetchOrganizerStats, ORGANIZER_STATS_QUERY_KEY } from '@/lib/stats-query'
 import { displayTeamName } from '@/lib/team-name'
@@ -46,6 +48,19 @@ function OrganizerOverviewScreen() {
   })
 
   const eventStream = useRoundStream()
+
+  // #285: the pause state comes from the stream, not a query — the PATCH is
+  // announced back to every client, the organizer included, so the button
+  // flips when the server says so. No confirmation, by the user's call.
+  const [pauseError, setPauseError] = useState<string | undefined>(undefined)
+  const togglePause = useMutation({
+    mutationFn: setSubmissionsPaused,
+    onSuccess: (ok) => {
+      setPauseError(ok ? undefined : t('organizer.overview.round.pauseError'))
+      queryClient.invalidateQueries({ queryKey: EVENT_CONFIG_QUERY_KEY })
+    },
+    onError: () => setPauseError(t('organizer.overview.round.pauseError')),
+  })
   // A round opening or closing changes both the numbers and which round the
   // card is about, so the podium query goes stale with them; a scored
   // submission (ranking.updated) only changes the numbers. Both are shared
@@ -199,11 +214,20 @@ function OrganizerOverviewScreen() {
             <Card data-testid="overview-round-card" className={cn(activeRound && 'border-brand')}>
               <CardHeader className="flex flex-row items-start justify-between gap-2">
                 <CardTitle className={CARD_TITLE}>{t('organizer.overview.round.title')}</CardTitle>
-                {eventStream.status !== 'open' && (
-                  <Badge variant="outline" data-testid="overview-stream-status">
-                    {t('organizer.overview.round.streamOffline')}
-                  </Badge>
-                )}
+                <div className="flex flex-wrap justify-end gap-2">
+                  {/* Shown whenever the flag is on, round or not (#285): a
+                      pause left on carries over to the next round. */}
+                  {eventStream.submissionsPaused && (
+                    <Badge variant="warning" data-testid="overview-submissions-paused-badge">
+                      {t('organizer.overview.round.pausedBadge')}
+                    </Badge>
+                  )}
+                  {eventStream.status !== 'open' && (
+                    <Badge variant="outline" data-testid="overview-stream-status">
+                      {t('organizer.overview.round.streamOffline')}
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="flex flex-col items-start gap-2">
                 {activeRound && closesAt ? (
@@ -252,7 +276,28 @@ function OrganizerOverviewScreen() {
                     >
                       <Link to="/leaderboard">{t('organizer.overview.round.leaderboardCta')}</Link>
                     </Button>
+                    {activeRound && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={eventStream.submissionsPaused ? 'default' : 'outline'}
+                        data-testid="overview-round-pause-toggle"
+                        disabled={togglePause.isPending}
+                        onClick={() => togglePause.mutate(!eventStream.submissionsPaused)}
+                      >
+                        {t(
+                          eventStream.submissionsPaused
+                            ? 'organizer.overview.round.resumeCta'
+                            : 'organizer.overview.round.pauseCta',
+                        )}
+                      </Button>
+                    )}
                   </div>
+                )}
+                {pauseError && (
+                  <Alert variant="destructive" data-testid="overview-round-pause-error">
+                    <AlertDescription>{pauseError}</AlertDescription>
+                  </Alert>
                 )}
               </CardContent>
             </Card>

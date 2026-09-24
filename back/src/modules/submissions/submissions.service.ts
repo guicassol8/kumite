@@ -5,6 +5,7 @@ import { SUBMISSION_COOLDOWN_MS } from '../../config'
 import type { Db } from '../../db/client'
 import { problemsTable, submissionsTable, teamMembersTable, teamsTable } from '../../db/schema'
 
+import { getEventConfig } from '../event-config/event-config.service'
 import type { CodegenErrorCode, JudgeCaseResult, JudgeOutcome } from '../judge/judge.schema'
 import { generateJudgeSource, runJudge } from '../judge/judge.service'
 import type { TestCase } from '../problems/problems.schema'
@@ -226,6 +227,7 @@ export type SubmitOutcome =
       blockType?: string
     }
   | { ok: false; error: 'throttled'; reason: 'in_flight' | 'cooldown'; retryAfterMs: number }
+  | { ok: false; error: 'submissions_paused' }
 
 export async function findTeamIdForUser(db: Db, userId: string): Promise<string | null> {
   const [membership] = await db
@@ -250,8 +252,14 @@ async function countAttempts(db: Db, identity: SubmitIdentity, problemId: string
 }
 
 /**
- * The whole judging pipeline: throttle → problem → codegen → sandbox →
+ * The whole judging pipeline: throttle → pause → problem → codegen → sandbox →
  * score → persist → verdict.
+ *
+ * The organizer's pause (#285) is the first check inside the claimed slot.
+ * The claim itself stays synchronous and first, so two concurrent requests
+ * from one team keep a deterministic winner; a paused refusal releases the
+ * slot and, like a 404, arms no cooldown — the first attempt after a resume
+ * goes straight through.
  *
  * The identity's slot is claimed before anything else and released in a
  * `finally`, so a crash can never leave a participant locked out. The 5s
@@ -272,6 +280,9 @@ export async function submitSolution(
   // exactly what it claimed (#176).
   let judgingRoundId: string | null = null
   try {
+    const { submissionsPaused } = await getEventConfig(db)
+    if (submissionsPaused) return { ok: false, error: 'submissions_paused' }
+
     // Straight at the table, not problems.service.getProblem: the translation
     // join is irrelevant here and `status = 'published'` is part of the rule —
     // an unpublished problem is a 404, never a hint that a draft exists.

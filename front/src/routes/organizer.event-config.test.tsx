@@ -54,6 +54,7 @@ function eventConfig(overrides: Record<string, unknown> = {}) {
     id: 1,
     mixingLocked: false,
     maxTeamSize: 3,
+    submissionsPaused: false,
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }
@@ -253,6 +254,50 @@ describe('OrganizerEventConfigScreen', () => {
     expect(screen.getByTestId('event-config-mixing-switch').getAttribute('aria-checked')).toBe(
       'false',
     )
+  })
+
+  // #285: no confirmation dialog on purpose — the pause is reversible with
+  // the same click, unlike the mixing lock above.
+  it('reflects the submissions pause from the GET and toggles it with one PATCH', async () => {
+    mockedConfigGet.mockResolvedValueOnce(jsonResponse(200, eventConfig()))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+    mockedConfigPatch.mockResolvedValue(jsonResponse(200, eventConfig({ submissionsPaused: true })))
+    renderScreen()
+
+    const toggle = await screen.findByTestId('event-config-submissions-paused-switch')
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig({ submissionsPaused: true })))
+    fireEvent.click(toggle)
+
+    await waitFor(() =>
+      expect(mockedConfigPatch).toHaveBeenCalledWith({ json: { submissionsPaused: true } }),
+    )
+    expect(screen.queryByTestId('event-config-mixing-confirm')).toBeNull()
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('event-config-submissions-paused-switch').getAttribute('aria-checked'),
+      ).toBe('true'),
+    )
+    expect(screen.queryByTestId('event-config-submissions-paused-error')).toBeNull()
+  })
+
+  it('shows an error when the pause toggle fails to save', async () => {
+    mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig({ submissionsPaused: true })))
+    mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+    mockedConfigPatch.mockResolvedValue(jsonResponse(500, { error: 'internal' }))
+    renderScreen()
+
+    const toggle = await screen.findByTestId('event-config-submissions-paused-switch')
+    await waitFor(() => expect(toggle.getAttribute('aria-checked')).toBe('true'))
+    fireEvent.click(toggle)
+
+    await waitFor(() =>
+      expect(mockedConfigPatch).toHaveBeenCalledWith({ json: { submissionsPaused: false } }),
+    )
+    expect(
+      (await screen.findByTestId('event-config-submissions-paused-error')).textContent,
+    ).toContain('Não foi possível salvar')
   })
 
   it('edits an event code and reflects the saved value', async () => {

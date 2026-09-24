@@ -47,20 +47,18 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { readFieldIssues } from '@/lib/api-issues'
+import {
+  EVENT_CONFIG_QUERY_KEY,
+  fetchEventConfig,
+  setSubmissionsPaused,
+} from '@/lib/event-config-query'
 import { MAX_TEAM_SIZE_MAX } from '@/lib/field-limits'
 
 export const Route = createFileRoute('/organizer/event-config')({
   component: OrganizerEventConfigScreen,
 })
 
-const EVENT_CONFIG_QUERY_KEY = ['organizer-event-config']
 const EVENT_CODES_QUERY_KEY = ['organizer-event-codes']
-
-async function fetchEventConfig() {
-  const res = await api.organizer['event-config'].$get()
-  if (!res.ok) throw new Error('failed to load event config')
-  return res.json()
-}
 
 async function fetchEventCodes() {
   const res = await api.organizer['event-codes'].$get()
@@ -91,6 +89,17 @@ function OrganizerEventConfigScreen() {
       >
         {t('organizer.eventConfig.heading')}
       </h2>
+
+      {config.data && (
+        <Card data-testid="event-config-submissions-card">
+          <CardHeader>
+            <CardTitle>{t('organizer.eventConfig.submissions.heading')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SubmissionsPauseSection eventConfig={config.data} />
+          </CardContent>
+        </Card>
+      )}
 
       <Card data-testid="event-config-team-rules-card">
         <CardHeader>
@@ -151,6 +160,51 @@ function OrganizerEventConfigScreen() {
 }
 
 type EventConfig = Awaited<ReturnType<typeof fetchEventConfig>>
+
+// #285: flips on the click, no confirmation — unlike the mixing lock, the
+// pause is undone by the same switch and loses nothing while it is on.
+function SubmissionsPauseSection({ eventConfig }: { eventConfig: EventConfig }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [error, setError] = useState<string | undefined>(undefined)
+
+  const updatePaused = useMutation({
+    mutationFn: setSubmissionsPaused,
+    onSuccess: (ok) => {
+      setError(ok ? undefined : t('organizer.eventConfig.submissions.errors.saveFailed'))
+      queryClient.invalidateQueries({ queryKey: EVENT_CONFIG_QUERY_KEY })
+    },
+    onError: () => setError(t('organizer.eventConfig.submissions.errors.saveFailed')),
+  })
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="event-config-submissions-paused-switch" className={PANEL_FIELD_LABEL}>
+            {t('organizer.eventConfig.submissions.pausedLabel')}
+          </Label>
+          <p className="text-muted-foreground text-sm">
+            {t('organizer.eventConfig.submissions.pausedDescription')}
+          </p>
+        </div>
+        <Switch
+          id="event-config-submissions-paused-switch"
+          data-testid="event-config-submissions-paused-switch"
+          checked={eventConfig.submissionsPaused}
+          disabled={updatePaused.isPending}
+          onCheckedChange={(next) => updatePaused.mutate(next)}
+        />
+      </div>
+
+      {error && (
+        <Alert variant="destructive" data-testid="event-config-submissions-paused-error">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
+  )
+}
 
 function TeamRulesSection({ eventConfig }: { eventConfig: EventConfig }) {
   const { t } = useTranslation()

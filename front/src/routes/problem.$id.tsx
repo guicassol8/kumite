@@ -120,6 +120,16 @@ function ProblemScreen() {
   const [verdict, setVerdict] = useState<SubmissionResult | null>(null)
   const [submitBanner, setSubmitBanner] = useState<SubmitBanner | null>(null)
 
+  // #285: a 423 that raced the pause is stale the moment the stream catches
+  // up — the paused notice takes over while it lasts, and after a resume the
+  // error would contradict the re-enabled Submeter.
+  useEffect(() => {
+    void eventStream.submissionsPaused
+    setSubmitBanner((banner) =>
+      banner && 'key' in banner && banner.key === 'problem.submitError.paused' ? null : banner,
+    )
+  }, [eventStream.submissionsPaused])
+
   // Bumped by every fresh run and every fresh verdict — the desktop layout
   // (#203, T8) uses it to reopen a results band the participant collapsed
   // earlier. `hasResults` itself only flips false→true once per screen, so it
@@ -157,6 +167,12 @@ function ProblemScreen() {
       }
       if (res.status === 429) {
         setSubmitBanner({ key: 'problem.submitError.cooldown' })
+        return
+      }
+      if (res.status === 423) {
+        // Paused by the organizer (#285) between the SSE event and the click;
+        // the paused banner above usually beats this to it.
+        setSubmitBanner({ key: 'problem.submitError.paused' })
         return
       }
       if (res.status === 400) {
@@ -285,6 +301,16 @@ function ProblemScreen() {
     </Alert>
   )
 
+  // #285: only while the round is still open — a closed round already says
+  // so, and its Submeter is gone. The timer is not touched.
+  const isPaused = !isClosed && eventStream.submissionsPaused
+  const pausedNotice = isPaused && (
+    <Alert className="shrink-0" data-testid="problem-submissions-paused-banner">
+      <Info />
+      <AlertDescription>{t('problem.submissionsPaused.notice')}</AlertDescription>
+    </Alert>
+  )
+
   const submitBannerAlert = submitBanner && (
     <Alert
       variant="destructive"
@@ -335,6 +361,7 @@ function ProblemScreen() {
       }}
       isClosed={isClosed}
       isSubmitting={submit.isPending}
+      isPaused={isPaused}
       onSubmit={() => void handleSubmit()}
     />
   )
@@ -346,7 +373,12 @@ function ProblemScreen() {
         positionLabel={problemLetter}
         hasResults={hasResults}
         closedNotice={closedNotice}
-        submitBanner={submitBannerAlert}
+        submitBanner={
+          <>
+            {pausedNotice}
+            {submitBannerAlert}
+          </>
+        }
         editor={blocklyWorkspace}
         results={hasResults ? resultsContent : undefined}
         actionsBar={actionsBar}

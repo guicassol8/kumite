@@ -208,6 +208,10 @@ export const eventConfigTable = pgTable(
     id: smallint('id').primaryKey().default(1),
     mixingLocked: boolean('mixing_locked').notNull().default(false),
     maxTeamSize: integer('max_team_size').notNull().default(3),
+    // Organizer's brake during a live round (#285): blocks POST /submissions
+    // with a 423 while the timer keeps running. Survives a round close on
+    // purpose — it stays on until the organizer turns it off.
+    submissionsPaused: boolean('submissions_paused').notNull().default(false),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [check('event_config_singleton', sql`${table.id} = 1`)],

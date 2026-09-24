@@ -15,6 +15,8 @@ vi.mock('@/lib/api', () => ({
       ':id': { $get: vi.fn() },
     },
     submissions: { $post: vi.fn() },
+    // Whether the caller has a team decides the "no submissions" badge (#206).
+    teams: { $get: vi.fn() },
   },
 }))
 
@@ -37,6 +39,7 @@ import { routeTree } from '@/routeTree.gen'
 const mockedGet = vi.mocked(api.problems[':id'].$get)
 const mockedRound = vi.mocked(api.rounds[':id'].$get)
 const mockedSubmit = vi.mocked(api.submissions.$post)
+const mockedTeams = vi.mocked(api.teams.$get)
 
 function emitSse(event: SseEvent) {
   const onEvent = vi.mocked(connectEventStream).mock.calls.at(-1)?.[0] as (e: SseEvent) => void
@@ -45,7 +48,11 @@ function emitSse(event: SseEvent) {
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stubs
 function jsonResponse(status: number, body: unknown): any {
-  return { status, json: async () => body }
+  return { status, ok: status >= 200 && status < 300, json: async () => body }
+}
+
+function withTeam() {
+  mockedTeams.mockResolvedValue(jsonResponse(200, { myTeamId: 't1', teams: [] }))
 }
 
 const fakeUser: SessionUser = {
@@ -149,6 +156,8 @@ beforeEach(() => {
   mockedGet.mockReset()
   mockedRound.mockReset()
   mockedSubmit.mockReset()
+  mockedTeams.mockReset()
+  mockedTeams.mockResolvedValue(jsonResponse(200, { myTeamId: null, teams: [] }))
   // The default for every test that does not care about the letter: a round
   // that simply has no entry for this problem, so no badge and no unhandled
   // rejection either.
@@ -650,6 +659,116 @@ describe('ProblemScreen', () => {
       await waitFor(() => expect(mockedRound).toHaveBeenCalled())
       expect(screen.queryByTestId('problem-position-badge')).toBeNull()
       expect(screen.getByTestId('problem-submit-button')).toBeDefined()
+    })
+  })
+
+  describe('the team best score while the round is open (#206)', () => {
+    const verdict201 = {
+      submissionId: 's1',
+      attemptNumber: 1,
+      score: 20,
+      maxScore: 20,
+      cases: [{ hidden: false, index: 0, outcome: 'passed', expected: 6, actual: 6, ms: 3 }],
+    }
+
+    it('shows the team best score badge', async () => {
+      withTeam()
+      mockedGet.mockResolvedValue(
+        jsonResponse(
+          200,
+          participantProblem({
+            bestSubmission: { score: 7, achievedAt: '2026-09-02T12:05:00.000Z', attempts: 1 },
+          }),
+        ),
+      )
+
+      renderProblem()
+
+      expect((await screen.findByTestId('problem-best-score-badge')).textContent).toContain('7')
+      expect(screen.queryByTestId('problem-no-submission-badge')).toBeNull()
+    })
+
+    it('shows the "no submissions" badge when the team never submitted', async () => {
+      withTeam()
+      mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+
+      renderProblem()
+
+      expect(await screen.findByTestId('problem-no-submission-badge')).toBeDefined()
+      expect(screen.queryByTestId('problem-best-score-badge')).toBeNull()
+    })
+
+    it('shows no badge to a participant without a team', async () => {
+      mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+
+      renderProblem()
+
+      expect(await screen.findByTestId('problem-statement-panel')).toBeDefined()
+      await waitFor(() => expect(mockedTeams).toHaveBeenCalled())
+      expect(screen.queryByTestId('problem-best-score-badge')).toBeNull()
+      expect(screen.queryByTestId('problem-no-submission-badge')).toBeNull()
+    })
+
+    it('shows no badge on a closed round, where the notice keeps the score as before', async () => {
+      withTeam()
+      mockedGet.mockResolvedValue(
+        jsonResponse(
+          200,
+          participantProblem({
+            roundStatus: 'closed',
+            roundId: null,
+            bestSubmission: { score: 8, achievedAt: '2026-09-02T13:00:00.000Z', attempts: 2 },
+          }),
+        ),
+      )
+
+      renderProblem()
+
+      expect((await screen.findByTestId('problem-closed-best-score')).textContent).toContain('8')
+      await waitFor(() => expect(mockedTeams).toHaveBeenCalled())
+      expect(screen.queryByTestId('problem-best-score-badge')).toBeNull()
+      expect(screen.queryByTestId('problem-no-submission-badge')).toBeNull()
+    })
+
+    it('shows no "no submissions" badge on a closed round the team never submitted', async () => {
+      withTeam()
+      mockedGet.mockResolvedValue(
+        jsonResponse(
+          200,
+          participantProblem({ roundStatus: 'closed', roundId: null, bestSubmission: null }),
+        ),
+      )
+
+      renderProblem()
+
+      expect(await screen.findByTestId('problem-closed-never-submitted')).toBeDefined()
+      await waitFor(() => expect(mockedTeams).toHaveBeenCalled())
+      expect(screen.queryByTestId('problem-no-submission-badge')).toBeNull()
+    })
+
+    it('refetches the problem after a 201 and shows the new best without a reload', async () => {
+      withTeam()
+      mockedGet.mockResolvedValueOnce(jsonResponse(200, participantProblem()))
+      mockedGet.mockResolvedValue(
+        jsonResponse(
+          200,
+          participantProblem({
+            bestSubmission: { score: 20, achievedAt: '2026-09-02T12:10:00.000Z', attempts: 1 },
+          }),
+        ),
+      )
+      mockedSubmit.mockResolvedValue(jsonResponse(201, verdict201))
+
+      renderProblem()
+      expect(await screen.findByTestId('problem-no-submission-badge')).toBeDefined()
+      const roundCallsBefore = mockedRound.mock.calls.length
+
+      fireEvent.click(screen.getByTestId('problem-submit-button'))
+
+      expect((await screen.findByTestId('problem-best-score-badge')).textContent).toContain('20')
+      expect(mockedGet).toHaveBeenCalledTimes(2)
+      await waitFor(() => expect(mockedRound.mock.calls.length).toBeGreaterThan(roundCallsBefore))
+      expect(screen.getByTestId('problem-verdict-panel')).toBeDefined()
     })
   })
 })

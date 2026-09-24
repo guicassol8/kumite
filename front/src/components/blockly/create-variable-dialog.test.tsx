@@ -98,6 +98,20 @@ describe('CreateVariableDialog', () => {
     expect(names()).toEqual([])
   })
 
+  it("holds Blockly's ephemeral focus while open, so the flyout stays open behind it", () => {
+    const giveBack = vi.fn()
+    const take = vi.spyOn(Blockly.getFocusManager(), 'takeEphemeralFocus').mockReturnValue(giveBack)
+    const { rerender, onClose } = renderDialog()
+
+    expect(take).toHaveBeenCalledWith(screen.getByTestId('create-variable-dialog'))
+    expect(giveBack).not.toHaveBeenCalled()
+
+    rerender(<CreateVariableDialog workspace={null} onClose={onClose} />)
+
+    expect(giveBack).toHaveBeenCalledOnce()
+    take.mockRestore()
+  })
+
   it('creates the normalized variable and closes on a valid name', () => {
     const { onClose } = renderDialog()
 

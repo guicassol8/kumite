@@ -80,6 +80,53 @@ describe('RecenterControl', () => {
     expect(button().querySelector('title')?.textContent).toBe('Center the solution')
   })
 
+  describe('position', () => {
+    // A 360px-wide view with no scrollbars in the way; the other components
+    // (trashcan, zoom column) arrive as the rects Blockly already placed.
+    function metrics(height: number) {
+      return {
+        viewMetrics: { height, width: 360, top: 0, left: 0 },
+        absoluteMetrics: { top: 0, left: 0 },
+        toolboxMetrics: { height: 0, width: 0, position: Blockly.utils.toolbox.Position.LEFT },
+        flyoutMetrics: { height: 0, width: 0, position: Blockly.utils.toolbox.Position.LEFT },
+      } as unknown as Blockly.MetricsManager.UiMetrics
+    }
+    const rect = (top: number, bottom: number, left: number, right: number) =>
+      new Blockly.utils.Rect(top, bottom, left, right)
+
+    function placed() {
+      const box = control.getBoundingRectangle()
+      return { top: box.top, bottom: box.bottom, left: box.left, right: box.right }
+    }
+
+    beforeEach(() => {
+      // No scrollbars: the corner is then exactly MARGIN (20px) from the edges.
+      vi.spyOn(workspace, 'scrollbar', 'get').mockReturnValue(null)
+    })
+
+    it('stacks right above the column when the view is tall enough', () => {
+      const column = [rect(500, 580, 293, 340), rect(371, 480, 308, 340)]
+
+      control.position(metrics(600), column)
+
+      expect(placed()).toEqual({ top: 319, bottom: 351, left: 308, right: 340 })
+      expect(button().getAttribute('transform')).toBe('translate(308,319)')
+    })
+
+    it('sits beside the column, inside the view, when the column fills its height', () => {
+      const column = [rect(116, 160, 293, 340), rect(-13, 96, 308, 340)]
+      // Something placed elsewhere (e.g. along the toolbox) is not the column.
+      const elsewhere = rect(0, 180, 0, 40)
+
+      control.position(metrics(180), [elsewhere, ...column])
+
+      const box = placed()
+      expect(box.top).toBeGreaterThanOrEqual(0)
+      expect(box.bottom).toBeLessThanOrEqual(180)
+      expect(box.right).toBe(273)
+    })
+  })
+
   it('removes itself from the workspace on dispose', () => {
     control.dispose()
 

@@ -137,7 +137,24 @@ export class RecenterControl implements Blockly.IPositionable {
       corner.vertical === Blockly.uiPosition.verticalPosition.TOP
         ? Blockly.uiPosition.bumpDirection.DOWN
         : Blockly.uiPosition.bumpDirection.UP
-    const placed = Blockly.uiPosition.bumpPositionRect(start, MARGIN, direction, savedPositions)
+    let placed = Blockly.uiPosition.bumpPositionRect(start, MARGIN, direction, savedPositions)
+
+    // A short editor (the stacked phone layout) has no room above the zoom
+    // column: stacking there would push the button out of the view. Sit
+    // beside the column instead, in the same corner.
+    const viewTop = metrics.absoluteMetrics.top
+    const viewBottom = viewTop + metrics.viewMetrics.height
+    if (placed.top < viewTop || placed.bottom > viewBottom) {
+      const column = savedPositions.filter(
+        (rect) => rect.right > start.left && rect.left < start.right,
+      )
+      const columnEdge =
+        corner.horizontal === Blockly.uiPosition.horizontalPosition.RIGHT
+          ? Math.min(start.left, ...column.map((rect) => rect.left)) - MARGIN - SIZE
+          : Math.max(start.right, ...column.map((rect) => rect.right)) + MARGIN
+      placed = new Blockly.utils.Rect(start.top, start.bottom, columnEdge, columnEdge + SIZE)
+    }
+
     this.top = placed.top
     this.left = placed.left
     this.group.setAttribute('transform', `translate(${this.left},${this.top})`)

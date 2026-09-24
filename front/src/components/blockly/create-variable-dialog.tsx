@@ -1,5 +1,5 @@
-import type * as Blockly from 'blockly'
-import { type FormEvent, useEffect, useId, useState } from 'react'
+import * as Blockly from 'blockly'
+import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -36,12 +36,28 @@ export function CreateVariableDialog({ workspace, onClose }: CreateVariableDialo
   const [name, setName] = useState('')
   const [error, setError] = useState<ErrorMessage | null>(null)
 
+  const contentRef = useRef<HTMLDivElement>(null)
+  // Focus moving into this dialog is, to Blockly, the editor losing focus —
+  // and it closes the open flyout on that. Blockly's own prompt avoids it by
+  // taking *ephemeral* focus for as long as it is open; so does this one.
+  const giveBackFocusRef = useRef<Blockly.ReturnEphemeralFocus | null>(null)
+  const giveBackFocus = useCallback(() => {
+    const giveBack = giveBackFocusRef.current
+    giveBackFocusRef.current = null
+    giveBack?.()
+  }, [])
+
   // Every opening starts over: empty input, no stale error.
   useEffect(() => {
-    if (!workspace) return
+    if (!workspace) {
+      giveBackFocus()
+      return
+    }
     setName('')
     setError(null)
-  }, [workspace])
+  }, [workspace, giveBackFocus])
+
+  useEffect(() => giveBackFocus, [giveBackFocus])
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -66,7 +82,21 @@ export function CreateVariableDialog({ workspace, onClose }: CreateVariableDialo
         if (!open) onClose()
       }}
     >
-      <DialogContent data-testid="create-variable-dialog" showCloseButton={false}>
+      <DialogContent
+        ref={contentRef}
+        data-testid="create-variable-dialog"
+        showCloseButton={false}
+        onOpenAutoFocus={() => {
+          // Not prevented: Radix still moves focus on to the input.
+          if (contentRef.current && !giveBackFocusRef.current) {
+            giveBackFocusRef.current = Blockly.getFocusManager().takeEphemeralFocus(
+              contentRef.current,
+            )
+          }
+        }}
+        // Blockly puts focus back where it was (the flyout) on give-back.
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="font-display font-semibold text-2xl">
             {t('editor.createVariable.title')}
@@ -79,8 +109,9 @@ export function CreateVariableDialog({ workspace, onClose }: CreateVariableDialo
               id={inputId}
               data-testid="create-variable-input"
               className="h-11"
+              // No autoFocus: Radix focuses this first field itself, and an
+              // input already focused would skip onOpenAutoFocus above.
               autoComplete="off"
-              autoFocus
               value={name}
               aria-invalid={error !== null}
               onChange={(event) => {

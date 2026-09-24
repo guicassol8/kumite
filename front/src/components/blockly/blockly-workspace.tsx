@@ -180,7 +180,11 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
         ref={containerRef}
         aria-label={t('editor.workspaceLabel')}
         data-testid="blockly-workspace"
-        className={cn('h-full w-full', className)}
+        // `isolate`: Blockly's toolbox (z-index 70) and scrollbars (30) would
+        // otherwise compete with the page and paint over the app's dialogs
+        // (z-50), e.g. "Criar variável" (#205). Blockly's dropdowns and
+        // widgets live on <body>, outside this box, and are unaffected.
+        className={cn('isolate h-full w-full', className)}
       />
     )
   },

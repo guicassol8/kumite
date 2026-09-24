@@ -84,6 +84,12 @@ describe('BlocklyWorkspace', () => {
     expect(pathToMedia).toBe('/blockly-media/')
   })
 
+  it("scopes Blockly's z-indexes to its own stacking context, under the app's dialogs (#205)", () => {
+    renderWorkspace()
+
+    expect(screen.getByTestId('blockly-workspace').classList).toContain('isolate')
+  })
+
   it('labels the workspace for screen readers', () => {
     renderWorkspace()
 

@@ -1,0 +1,1 @@
+ALTER TABLE "event_config" ADD COLUMN "submissions_paused" boolean DEFAULT false NOT NULL;

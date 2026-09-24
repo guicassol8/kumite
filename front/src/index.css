@@ -181,4 +181,14 @@
   svg[display='none'] {
     display: none;
   }
+
+  /* O toolbox do Blockly ainda usa o fundo cinza-claro do tema padrão do
+     Blockly nos dois modos (o tema kumite do editor é a #218), mas o rótulo
+     das categorias não tem cor própria: herdava o --foreground papel do
+     .dark e caía para 1,21:1 (#234, smoke escuro). No escuro,
+     --primary-foreground é a tinta (#1C1716): o rótulo fica igual ao do
+     claro. A #218 substitui isto pelo componentStyles do tema. */
+  .dark .blocklyToolbox {
+    color: var(--primary-foreground);
+  }
 }

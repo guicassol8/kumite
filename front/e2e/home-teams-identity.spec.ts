@@ -384,7 +384,7 @@ test.describe('home and teams identity (#222)', () => {
     await page.route(`${BACK_URL}/sse`, (route) =>
       route.fulfill({
         contentType: 'text/event-stream',
-        body: `data: ${JSON.stringify({ type: 'state.sync', serverTime: new Date().toISOString(), round: null })}\n\n`,
+        body: `data: ${JSON.stringify({ type: 'state.sync', serverTime: new Date().toISOString(), round: null, submissionsPaused: false })}\n\n`,
       }),
     )
     await page.setViewportSize({ width: 1280, height: 800 })

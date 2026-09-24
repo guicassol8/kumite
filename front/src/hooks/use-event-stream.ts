@@ -17,6 +17,9 @@ export type EventStreamState = {
   status: SseConnectionStatus
   roundChangedAt: Date | null
   rankingUpdatedAt: Date | null
+  // The organizer's pause on submissions (#285): from `state.sync` on every
+  // (re)connect, then from `submissions.paused` / `submissions.resumed`.
+  submissionsPaused: boolean
 }
 
 type LeaderboardStreamData = {
@@ -56,6 +59,7 @@ const INITIAL_STATE: EventStreamState = {
   status: 'connecting',
   roundChangedAt: null,
   rankingUpdatedAt: null,
+  submissionsPaused: false,
 }
 
 const INITIAL_LEADERBOARD: LeaderboardStreamData = {
@@ -134,6 +138,15 @@ export function useEventStream(
             ...prev,
             currentRoundId: event.round?.id ?? null,
             closesAt: event.round?.closesAt ?? null,
+            serverTime: event.serverTime,
+            submissionsPaused: event.submissionsPaused,
+          }))
+          return
+        case 'submissions.paused':
+        case 'submissions.resumed':
+          setState((prev) => ({
+            ...prev,
+            submissionsPaused: event.type === 'submissions.paused',
             serverTime: event.serverTime,
           }))
           return

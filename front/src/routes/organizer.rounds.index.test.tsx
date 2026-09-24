@@ -257,6 +257,7 @@ describe('OrganizerRoundsList', () => {
     act(() => {
       emitSse({
         type: 'state.sync',
+        submissionsPaused: false,
         round: { id: 'r1', closesAt: new Date('2026-01-01T00:30:00.000Z') },
         serverTime: new Date('2026-01-01T00:00:00.000Z'),
       })

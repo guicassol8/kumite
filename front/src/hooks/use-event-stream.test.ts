@@ -59,6 +59,7 @@ describe('useEventStream', () => {
       type: 'state.sync',
       serverTime,
       round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
+      submissionsPaused: false,
     })
 
     // Since #274 the same connection also feeds the leaderboard's reducer,
@@ -72,8 +73,36 @@ describe('useEventStream', () => {
       status: 'connecting',
       roundChangedAt: null,
       rankingUpdatedAt: null,
+      submissionsPaused: false,
     })
     expect(leaderboard.activeRoundId).toBe('r1')
+  })
+
+  // #285: the pause flag rides state.sync and the two toggle events, without
+  // touching the round or the leaderboard.
+  it('tracks submissionsPaused from state.sync and the pause/resume events', () => {
+    setSession(fakeUser, 'tok-1')
+    const { result } = renderHook(() => useEventStream())
+    expect(result.current.submissionsPaused).toBe(false)
+
+    emit({
+      type: 'state.sync',
+      serverTime: new Date(),
+      round: { id: 'r1', closesAt: new Date() },
+      submissionsPaused: true,
+    })
+    expect(result.current.submissionsPaused).toBe(true)
+
+    emit({ type: 'submissions.resumed', serverTime: new Date() })
+    expect(result.current.submissionsPaused).toBe(false)
+    expect(result.current.currentRoundId).toBe('r1')
+
+    emit({ type: 'submissions.paused', serverTime: new Date() })
+    expect(result.current.submissionsPaused).toBe(true)
+    // Idempotent: a repeat changes nothing.
+    emit({ type: 'submissions.paused', serverTime: new Date() })
+    expect(result.current.submissionsPaused).toBe(true)
+    expect(result.current.leaderboard.activeRoundId).toBe('r1')
   })
 
   it('round.opened sets the current round and calls onRoundChange', () => {
@@ -231,6 +260,7 @@ describe('useEventStream', () => {
     const syncTime = new Date('2026-09-02T12:00:00.000Z')
     emit({
       type: 'state.sync',
+      submissionsPaused: false,
       serverTime: syncTime,
       round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
     })

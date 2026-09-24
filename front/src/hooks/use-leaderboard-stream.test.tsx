@@ -165,12 +165,13 @@ describe('useLeaderboardStream', () => {
 
     emit({
       type: 'state.sync',
+      submissionsPaused: false,
       serverTime: new Date(),
       round: { id: 'r1', closesAt: new Date('2026-09-05T13:00:00.000Z') },
     })
     expect(result.current.activeRoundId).toBe('r1')
 
-    emit({ type: 'state.sync', serverTime: new Date(), round: null })
+    emit({ type: 'state.sync', serverTime: new Date(), round: null, submissionsPaused: false })
     expect(result.current.activeRoundId).toBeNull()
   })
 
@@ -254,12 +255,13 @@ describe('useLeaderboardStream', () => {
 
     emit({
       type: 'state.sync',
+      submissionsPaused: false,
       serverTime: new Date(),
       round: { id: 'r1', closesAt: new Date('2026-09-05T13:00:00.000Z') },
     })
     expect(result.current.closesAt).toEqual(new Date('2026-09-05T13:00:00.000Z'))
 
-    emit({ type: 'state.sync', serverTime: new Date(), round: null })
+    emit({ type: 'state.sync', serverTime: new Date(), round: null, submissionsPaused: false })
     expect(result.current.closesAt).toBeNull()
   })
 

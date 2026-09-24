@@ -149,6 +149,7 @@ describe('RoundDetailScreen', () => {
 
     emitSse({
       type: 'state.sync',
+      submissionsPaused: false,
       serverTime: new Date('2026-09-02T12:10:00.000Z'),
       round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
     })
@@ -289,6 +290,7 @@ describe('RoundDetailScreen', () => {
 
     emitSse({
       type: 'state.sync',
+      submissionsPaused: false,
       serverTime: new Date('2026-09-02T12:10:00.000Z'),
       round: { id: 'r1', closesAt: new Date('2026-09-02T12:30:00.000Z') },
     })

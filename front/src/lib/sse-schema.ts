@@ -14,6 +14,8 @@ export const StateSyncEventSchema = z.object({
   type: z.literal('state.sync'),
   serverTime: z.coerce.date(),
   round: RoundRefSchema.nullable(),
+  // Whether the organizer paused submissions (#285).
+  submissionsPaused: z.boolean(),
 })
 
 export const RoundOpenedEventSchema = z.object({
@@ -34,6 +36,18 @@ export const RoundClosedEventSchema = z.object({
   type: z.literal('round.closed'),
   serverTime: z.coerce.date(),
   roundId: z.string(),
+})
+
+// The organizer paused or resumed submissions (#285). May repeat the current
+// value — the reducer applies it idempotently.
+export const SubmissionsPausedEventSchema = z.object({
+  type: z.literal('submissions.paused'),
+  serverTime: z.coerce.date(),
+})
+
+export const SubmissionsResumedEventSchema = z.object({
+  type: z.literal('submissions.resumed'),
+  serverTime: z.coerce.date(),
 })
 
 export const HeartbeatEventSchema = z.object({
@@ -109,6 +123,8 @@ export const SseEventSchema = z.discriminatedUnion('type', [
   RoundOpenedEventSchema,
   RoundExtendedEventSchema,
   RoundClosedEventSchema,
+  SubmissionsPausedEventSchema,
+  SubmissionsResumedEventSchema,
   HeartbeatEventSchema,
   RankingUpdatedEventSchema,
   SessionRevokedEventSchema,

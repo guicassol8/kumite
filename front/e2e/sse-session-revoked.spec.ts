@@ -51,7 +51,7 @@ test.describe('session.revoked on /sse (#291)', () => {
         status: 200,
         contentType: 'text/event-stream',
         body:
-          sseFrame({ type: 'state.sync', serverTime, round: null }) +
+          sseFrame({ type: 'state.sync', serverTime, round: null, submissionsPaused: false }) +
           sseFrame({ type: 'session.revoked', serverTime }),
       })
     })

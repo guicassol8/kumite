@@ -181,14 +181,43 @@
   svg[display='none'] {
     display: none;
   }
+}
 
-  /* O toolbox do Blockly ainda usa o fundo cinza-claro do tema padrão do
-     Blockly nos dois modos (o tema kumite do editor é a #218), mas o rótulo
-     das categorias não tem cor própria: herdava o --foreground papel do
-     .dark e caía para 1,21:1 (#234, smoke escuro). No escuro,
-     --primary-foreground é a tinta (#1C1716): o rótulo fica igual ao do
-     claro. A #218 substitui isto pelo componentStyles do tema. */
-  .dark .blocklyToolbox {
-    color: var(--primary-foreground);
-  }
+/* Tema kumite do editor (#218). As cores de bloco, toolbox, flyout, canvas e
+   scrollbar vêm do tema Blockly em @kumite/blocks (componentStyles — inclusive
+   o rótulo das categorias, que antes era um remendo aqui, #234). Estas regras
+   cobrem só o que o tema não alcança.
+
+   FORA de @layer de propósito: o Blockly injeta o CSS dele sem layer, e estilo
+   sem layer vence qualquer @layer, seja qual for a especificidade. */
+
+/* A cor da grade é opção de `inject`, não do tema: `setTheme` não a troca. O
+   `stroke` do Blockly é atributo de apresentação e perde para CSS, então a
+   grade segue o --border do modo sem JS. */
+.blocklySvg pattern[id^='blocklyGridPattern'] line {
+  stroke: var(--border);
+}
+
+/* O zelos pinta todo `.blocklyText` de branco; o resolver leva texto papel
+   (identity § 6), igual nos dois modos. `setStyle` põe o nome do estilo como
+   classe no grupo do bloco; o `>` impede que a regra vaze para os blocos
+   aninhados dentro do resolver. */
+.kumite_root_blocks > .blocklyLabelField > .blocklyText {
+  fill: var(--chrome-foreground);
+}
+
+/* Zoom e lixeira são sprites escuros: somem sobre o canvas escuro. Invertidos
+   no escuro; as opacidades 0,4/0,8 do Blockly ficam. (Os círculos de 32px das
+   pranchas são a #340.) */
+.dark .blocklyZoom image,
+.dark .blocklyTrash image {
+  filter: invert(1);
+}
+
+/* Hairline entre toolbox, flyout e canvas. */
+.blocklyToolbox {
+  border-inline-end: 1px solid var(--border);
+}
+.blocklyFlyoutBackground {
+  stroke: var(--border);
 }

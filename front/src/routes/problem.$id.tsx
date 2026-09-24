@@ -21,6 +21,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useBlocklyLocale } from '@/hooks/use-blockly-locale'
+import { useBlocklyTheme } from '@/hooks/use-blockly-theme'
 import { type ExampleRunState, useExampleRun } from '@/hooks/use-example-run'
 import { useRoundStream } from '@/hooks/use-round-stream'
 import { useWorkspaceAutoSave } from '@/hooks/use-workspace-autosave'
@@ -70,6 +71,7 @@ function ProblemScreen() {
   // dialog is open while it is set (#205).
   const [variableTarget, setVariableTarget] = useState<Blockly.WorkspaceSvg | null>(null)
   const { toolbox, onReady: onWorkspaceReady } = useBlocklyLocale(workspaceRef, setVariableTarget)
+  const blocklyTheme = useBlocklyTheme()
   const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(id)
 
   // Reads the app's single `/sse` connection instead of opening a second one
@@ -289,6 +291,7 @@ function ProblemScreen() {
       key={id}
       ref={workspaceRef}
       toolbox={toolbox}
+      theme={blocklyTheme}
       options={workspaceOptions}
       // A state saved before the root became undeletable may not have it,
       // and the toolbox never offers it back — re-seed instead of losing

@@ -862,6 +862,8 @@
     },
     "pointsBadge": "{{points}} pts",
     "positionBadge": "Problem {{letter}}",
+    "bestScoreBadge": "Team best: {{score}}",
+    "noSubmissionBadge": "No submissions yet",
     "submissionsPaused": {
       "notice": "Submissions are paused by the organizers. The timer keeps running; you can still run the examples."
     }
@@ -953,7 +955,8 @@
       "hard": "Hard"
     },
     "bestScore": {
-      "hidden": "—"
+      "unavailable": "—",
+      "none": "No submissions"
     },
     "connection": {
       "reconnecting": "Connection lost — reconnecting..."

@@ -265,8 +265,9 @@ HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
 
-# 9a-d. The closed round -> 200, with both problems, nobody's submitted so
-# bestScore is null, and the default (pt) locale title.
+# 9a-d. The closed round -> 200, with both problems, bestScore null (this
+# participant has no team and nobody submitted; open or closed, a team sees
+# its own best, #206), and the default (pt) locale title.
 GET {{host}}/rounds/{{round_id}}
 Authorization: Bearer {{participant_token}}
 HTTP 200

@@ -290,6 +290,37 @@ HTTP 429
 [Asserts]
 jsonpath "$.error" == "submission_throttled"
 
+# 6b. The team sees its own best while the round is still open (#206): the
+#     participant read of the problem and of the round both carry the 100
+#     from step 5. The teamless participant still gets null, with no error.
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{token}}
+HTTP 200
+[Asserts]
+jsonpath "$.roundStatus" == "open"
+jsonpath "$.bestSubmission.score" == 100
+jsonpath "$.bestSubmission.attempts" == 1
+
+GET {{host}}/rounds/{{round_id}}
+Authorization: Bearer {{token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "open"
+jsonpath "$.problems[0].bestScore" == 100
+
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{noteam_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.roundStatus" == "open"
+jsonpath "$.bestSubmission" == null
+
+GET {{host}}/rounds/{{round_id}}
+Authorization: Bearer {{noteam_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.problems[0].bestScore" == null
+
 # 7. No token -> 401 from the auth middleware, before anything else runs.
 POST {{host}}/submissions
 Content-Type: application/json

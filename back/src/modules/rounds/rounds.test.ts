@@ -886,7 +886,7 @@ describe('rounds.service', () => {
       expect(await getParticipantRound(db, created.round.id, 'pt', user.id)).toBeNull()
     })
 
-    it('reports every problem with bestScore null while the round is open, even with an existing submission', async () => {
+    it('reports the team best score while the round is open', async () => {
       const user = await insertUser()
       const team = await insertTeamFor(user.id)
       const problem = await insertPublishedProblemWithTranslations()
@@ -903,6 +903,67 @@ describe('rounds.service', () => {
       const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
 
       expect(detail?.status).toBe('open')
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({ problemId: problem.id, bestScore: 7 }),
+      ])
+    })
+
+    it('reflects a better submission sent while the round is open', async () => {
+      const user = await insertUser()
+      const team = await insertTeamFor(user.id)
+      const problem = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      await insertSubmission(opened.round.id, team.id, user.id, problem.id, 3, 1)
+      await insertSubmission(opened.round.id, team.id, user.id, problem.id, 8, 2)
+
+      const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
+
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({ problemId: problem.id, bestScore: 8 }),
+      ])
+    })
+
+    it('reports bestScore null while open when the team never submitted', async () => {
+      const user = await insertUser()
+      await insertTeamFor(user.id)
+      const problem = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+
+      const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
+
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({ problemId: problem.id, bestScore: null }),
+      ])
+    })
+
+    it('reports bestScore null while open when the user has no team at all', async () => {
+      const user = await insertUser()
+      const problem = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+
+      const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
+
       expect(detail?.problems).toEqual([
         expect.objectContaining({ problemId: problem.id, bestScore: null }),
       ])

@@ -161,8 +161,8 @@ export const ParticipantProblemSchema = z.object({
   // only, no more submissions); populated when it's the currently open round.
   roundId: z.string().nullable(),
   roundStatus: z.enum(['open', 'closed']),
-  // The team's best submission once the round is closed, null if it never
-  // submitted; always null while the round is open (no query performed then).
+  // The team's best submission in this round, open or closed (#206); null
+  // when the team never submitted it or the caller has no team.
   bestSubmission: BestSubmissionSchema.nullable(),
 })
 

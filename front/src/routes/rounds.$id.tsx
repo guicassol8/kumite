@@ -14,6 +14,7 @@ import { DIFFICULTY_BADGE_STYLE } from '@/lib/difficulty-badge'
 import { positionLabel } from '@/lib/round-position'
 import { fetchRound, RoundNotFoundError, roundQueryKey } from '@/lib/rounds-query'
 import { requireAuth } from '@/lib/route-guards'
+import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 import { cn } from '@/lib/utils'
 
 const GRID_COLS = 'md:grid-cols-[3rem_1fr_8rem_5rem_10rem]'
@@ -25,6 +26,17 @@ export const Route = createFileRoute('/rounds/$id')({
 
 function toApiLocale(language: string): 'pt' | 'es' | 'en' {
   return language === 'es' || language === 'en' ? language : 'pt'
+}
+
+// What the best-score cell shows (#206): the team's number, "no submissions"
+// when the caller has a team that never submitted the problem, or "—" when
+// there is no team best to speak of (no team, organizer, or GET /teams not
+// answered yet / failed).
+type BestScoreState = 'score' | 'none' | 'unavailable'
+
+function bestScoreState(score: number | null, hasTeam: boolean): BestScoreState {
+  if (score !== null) return 'score'
+  return hasTeam ? 'none' : 'unavailable'
 }
 
 function RoundDetailScreen() {
@@ -50,6 +62,11 @@ function RoundDetailScreen() {
     queryKey: [...roundQueryKey(id), locale],
     queryFn: () => fetchRound(id, locale),
   })
+
+  // Only decorates the best-score cell: whether the caller has a team decides
+  // "no submissions" vs "—". A failure never becomes an error state here.
+  const teams = useQuery({ queryKey: TEAMS_QUERY_KEY, queryFn: fetchTeams, retry: false })
+  const hasTeam = Boolean(teams.data?.myTeamId)
 
   // Shows the "just closed" notice the instant the query's own status flips
   // open -> closed while mounted, never on a cold load of an already-closed
@@ -256,17 +273,44 @@ function RoundDetailScreen() {
                     <span className="sr-only md:hidden">{t('roundDetail.columns.points')}: </span>
                     {problem.points}
                   </span>
-                  <span role="cell" className="tabular-nums">
-                    <span className="sr-only md:hidden">
-                      {t('roundDetail.columns.bestScore')}:{' '}
-                    </span>
-                    {problem.bestScore ?? t('roundDetail.bestScore.hidden')}
-                  </span>
+                  <BestScoreCell
+                    problemId={problem.problemId}
+                    score={problem.bestScore}
+                    hasTeam={hasTeam}
+                  />
                 </div>
               ))}
           </div>
         </div>
       )}
     </main>
+  )
+}
+
+function BestScoreCell({
+  problemId,
+  score,
+  hasTeam,
+}: {
+  problemId: string
+  score: number | null
+  hasTeam: boolean
+}) {
+  const { t } = useTranslation()
+  const state = bestScoreState(score, hasTeam)
+  return (
+    <span
+      role="cell"
+      data-testid={`round-problem-best-score-${problemId}`}
+      data-state={state}
+      className={cn('tabular-nums', state !== 'score' && 'text-muted-foreground')}
+    >
+      <span className="sr-only md:hidden">{t('roundDetail.columns.bestScore')}: </span>
+      {state === 'score'
+        ? score
+        : state === 'none'
+          ? t('roundDetail.bestScore.none')
+          : t('roundDetail.bestScore.unavailable')}
+    </span>
   )
 }

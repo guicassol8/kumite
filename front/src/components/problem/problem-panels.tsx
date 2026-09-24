@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { type PanelImperativeHandle, useDefaultLayout } from 'react-resizable-panels'
 
 import { ResultsPanel, ResultsToggle } from '@/components/problem/results-band'
-import { StatementCard } from '@/components/problem/statement-card'
+import { StatementCard, type TeamBestScore } from '@/components/problem/statement-card'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
 import { useMediaQuery } from '@/hooks/use-media-query'
@@ -19,6 +19,8 @@ export type ProblemPanelsProps = {
   problem: Problem
   /** The problem's letter in the round it was opened from (#219, T4). */
   positionLabel?: string
+  /** The team's best while the round is open (#206); absent = no badge. */
+  bestScore?: TeamBestScore
   hasResults: boolean
   closedNotice?: ReactNode
   submitBanner?: ReactNode
@@ -46,6 +48,7 @@ const DESKTOP_QUERY = '(min-width: 768px)'
 export function ProblemPanels({
   problem,
   positionLabel,
+  bestScore,
   hasResults,
   closedNotice,
   submitBanner,
@@ -59,7 +62,12 @@ export function ProblemPanels({
   if (!isDesktop) {
     return (
       <>
-        <StatementCard problem={problem} positionLabel={positionLabel} hasResults={hasResults} />
+        <StatementCard
+          problem={problem}
+          positionLabel={positionLabel}
+          bestScore={bestScore}
+          hasResults={hasResults}
+        />
         <div
           data-testid="problem-workspace-panel"
           className="flex min-h-0 min-w-0 grow basis-0 flex-col gap-4"
@@ -100,6 +108,7 @@ export function ProblemPanels({
     <DesktopPanels
       problem={problem}
       positionLabel={positionLabel}
+      bestScore={bestScore}
       hasResults={hasResults}
       closedNotice={closedNotice}
       submitBanner={submitBanner}
@@ -114,6 +123,7 @@ export function ProblemPanels({
 function DesktopPanels({
   problem,
   positionLabel,
+  bestScore,
   hasResults,
   closedNotice,
   submitBanner,
@@ -197,6 +207,7 @@ function DesktopPanels({
           <StatementCard
             problem={problem}
             positionLabel={positionLabel}
+            bestScore={bestScore}
             hasResults={hasResults}
             fitContainer
             headerAction={

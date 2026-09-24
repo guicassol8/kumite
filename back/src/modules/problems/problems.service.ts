@@ -113,6 +113,13 @@ export async function getPublishedProblem(
     .filter((testCase) => !testCase.hidden)
     .map((testCase) => ({ input: testCase.input, expected: testCase.expected }))
 
+  const teamId = await findTeamIdForUser(db, userId)
+  // The team's own best, open or closed (#206). Scored inside access.roundId,
+  // not across every round that ever used this problem (#176) — that round's
+  // leaderboard shows exactly the same number.
+  const bestSubmission =
+    teamId === null ? null : await getBestSubmission(db, teamId, id, access.roundId)
+
   if (access.status === 'open') {
     return {
       id: problem.id,
@@ -124,16 +131,9 @@ export async function getPublishedProblem(
       examples,
       roundId: access.roundId,
       roundStatus: 'open',
-      // Mid-round, the participant doesn't need their best score yet.
-      bestSubmission: null,
+      bestSubmission,
     }
   }
-
-  const teamId = await findTeamIdForUser(db, userId)
-  // Scored inside access.roundId, not across every round that ever used this
-  // problem (#176) — that round's leaderboard shows exactly the same number.
-  const bestSubmission =
-    teamId === null ? null : await getBestSubmission(db, teamId, id, access.roundId)
 
   return {
     id: problem.id,

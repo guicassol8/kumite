@@ -10,6 +10,14 @@ import { cn } from '@/lib/utils'
 
 type Problem = Awaited<ReturnType<typeof fetchProblem>>
 
+/**
+ * The team's best score on this problem while the round is open (#206):
+ * `score` once it submitted, `none` when it has a team that never did.
+ * Absent means there is no team best to speak of (no team, or the round is
+ * closed, where the closed notice already carries it) — no badge then.
+ */
+export type TeamBestScore = { kind: 'score'; score: number } | { kind: 'none' }
+
 export type StatementCardProps = {
   problem: Problem
   hasResults: boolean
@@ -27,6 +35,7 @@ export type StatementCardProps = {
   fitContainer?: boolean
   /** Rendered next to the title — the desktop layout's collapse button. */
   headerAction?: ReactNode
+  bestScore?: TeamBestScore
 }
 
 /** `undefined` has no JSON form, and an example may legitimately expect it. */
@@ -41,6 +50,7 @@ export function StatementCard({
   positionLabel,
   fitContainer,
   headerAction,
+  bestScore,
 }: StatementCardProps) {
   const { t } = useTranslation()
   const difficulty = DIFFICULTY_BADGE_STYLE[problem.difficulty]
@@ -81,6 +91,20 @@ export function StatementCard({
             {positionLabel && (
               <Badge data-testid="problem-position-badge" variant="outline">
                 {t('problem.positionBadge', { letter: positionLabel })}
+              </Badge>
+            )}
+            {bestScore?.kind === 'score' && (
+              <Badge data-testid="problem-best-score-badge" variant="outline">
+                {t('problem.bestScoreBadge', { score: bestScore.score })}
+              </Badge>
+            )}
+            {bestScore?.kind === 'none' && (
+              <Badge
+                data-testid="problem-no-submission-badge"
+                variant="outline"
+                className="text-muted-foreground"
+              >
+                {t('problem.noSubmissionBadge')}
               </Badge>
             )}
           </div>

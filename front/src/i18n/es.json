@@ -862,6 +862,8 @@
     },
     "pointsBadge": "{{points}} pts",
     "positionBadge": "Problema {{letter}}",
+    "bestScoreBadge": "Mejor del equipo: {{score}}",
+    "noSubmissionBadge": "Sin envíos",
     "submissionsPaused": {
       "notice": "La organización pausó los envíos. El tiempo sigue corriendo; aún puedes ejecutar los ejemplos."
     }
@@ -953,7 +955,8 @@
       "hard": "Difícil"
     },
     "bestScore": {
-      "hidden": "—"
+      "unavailable": "—",
+      "none": "Sin envíos"
     },
     "connection": {
       "reconnecting": "Conexión perdida — reconectando..."

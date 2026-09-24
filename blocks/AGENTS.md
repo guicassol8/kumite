@@ -32,6 +32,7 @@ Node headless). The one sanctioned runtime cross-package dependency
 | `src/contract.ts` | `solve` / `input` — the only import-free module, so a Web Worker can take it via `@kumite/blocks/contract` without dragging Blockly along |
 | `src/messages.ts` | pt/es/en labels, category names, error texts |
 | `src/blocks.ts` | `kumite_solve` / `kumite_input` + their JS generators |
+| `src/theme.ts` | `kumiteTheme` / `kumiteThemeDark`, the grid options and the token mirror (`KUMITE_TOKENS`, checked against `tokens.css` by the front's design-parity test) |
 | `src/toolbox.ts` | curated categories, derived `allowedBlockTypes`, empty workspace |
 | `src/errors.ts` | `BlocksError` and its discriminating `code` |
 | `src/generate.ts` | `generateSolution` — validate, then emit `solve(input)` |

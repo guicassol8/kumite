@@ -7,6 +7,7 @@ import { javascriptGenerator, Order } from 'blockly/javascript'
 import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
 import { deniedFieldValues } from './denied'
 import { type BlockLocale, DEFAULT_LOCALE, messagesFor } from './messages'
+import { INPUT_BLOCK_STYLE, ROOT_BLOCK_STYLE } from './theme'
 
 export const ROOT_BLOCK_TYPE = 'kumite_solve'
 export const INPUT_BLOCK_TYPE = 'kumite_input'
@@ -100,7 +101,7 @@ export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
       // dragging to the trash. The block stays movable on purpose.
       // Uniqueness is the editor's side: `maxInstances` on `Blockly.inject`.
       this.setDeletable(false)
-      this.setColour(230)
+      this.setStyle(ROOT_BLOCK_STYLE)
       this.setTooltip(messages.solveTooltip)
     },
   }
@@ -109,7 +110,7 @@ export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
     init(this: Blockly.Block) {
       this.appendDummyInput().appendField(messages.inputTitle)
       this.setOutput(true)
-      this.setColour(330)
+      this.setStyle(INPUT_BLOCK_STYLE)
       this.setTooltip(messages.inputTooltip)
     },
   }

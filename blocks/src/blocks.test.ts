@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { defineKumiteBlocks, INPUT_BLOCK_TYPE, ROOT_BLOCK_TYPE } from './blocks'
 import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
 import { messagesFor } from './messages'
+import { INPUT_BLOCK_STYLE, ROOT_BLOCK_STYLE } from './theme'
 
 function labelsOf(block: Blockly.Block): string[] {
   return block.inputList.flatMap((input) => input.fieldRow).map((field) => field.getText())
@@ -77,6 +78,13 @@ describe('defineKumiteBlocks', () => {
       expect(block.outputConnection).not.toBeNull()
       expect(block.previousConnection).toBeNull()
     })
+  })
+
+  it('declares the kumite theme styles on kumite_solve and kumite_input (#218)', () => {
+    defineKumiteBlocks()
+
+    withBlock(ROOT_BLOCK_TYPE, (block) => expect(block.getStyleName()).toBe(ROOT_BLOCK_STYLE))
+    withBlock(INPUT_BLOCK_TYPE, (block) => expect(block.getStyleName()).toBe(INPUT_BLOCK_STYLE))
   })
 
   it('labels the blocks in the requested locale', () => {

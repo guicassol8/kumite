@@ -16,6 +16,16 @@ export {
   messagesFor,
 } from './messages'
 export {
+  INPUT_BLOCK_STYLE,
+  KUMITE_CATEGORY_BAR_PX,
+  KUMITE_TOKENS,
+  type KumiteBlockToken,
+  kumiteGridOptions,
+  kumiteTheme,
+  kumiteThemeDark,
+  ROOT_BLOCK_STYLE,
+} from './theme'
+export {
   allowedBlockTypes,
   buildToolbox,
   CREATE_VARIABLE_BUTTON_KEY,

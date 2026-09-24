@@ -51,6 +51,7 @@ const publishedProblem = {
   points: 10,
   difficulty: 'easy',
   status: 'published',
+  visibility: 'round',
   testCaseCount: 2,
   translations: [{ locale: 'pt', title: 'Soma' }],
 }

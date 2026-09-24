@@ -1,6 +1,7 @@
 import { somaDosPares } from '@kumite/blocks'
 import { expect, type Page, test } from '@playwright/test'
 
+import { editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -70,15 +71,15 @@ test.describe('/problem/$id — painéis colapsáveis e redimensionáveis no des
 
   test('colapsar, redimensionar, persistir e sobreviver à troca de layout', async ({ page }) => {
     // Two collapses, a handful of drags, a reload and a breakpoint crossing —
-    // comfortably past the 30s default.
-    test.setTimeout(180_000)
+    // comfortably past the 30s default — on top of two editor mounts.
+    test.setTimeout(editorTestTimeout(2, 180_000))
     await page.setViewportSize({ width: 1280, height: 800 })
 
     const canvas = page.getByTestId('blockly-workspace')
     const svg = canvas.locator('svg.blocklySvg')
 
     await page.goto(`/problem/${problemId}`)
-    await expect(svg).toBeVisible()
+    await expectBlocklyInjected(page)
 
     // Aceite 4: `blockly-workspace.tsx:102`'s ResizeObserver already keeps
     // Blockly's own measurements in sync with the container — this locks
@@ -224,7 +225,7 @@ test.describe('/problem/$id — painéis colapsáveis e redimensionáveis no des
     const statementRefWidthBeforeReload = await boxOf(page, 'problem-h')
 
     await page.reload()
-    await expect(svg).toBeVisible()
+    await expectBlocklyInjected(page)
     await expect(page.getByTestId('problem-statement-rail')).toBeVisible()
     // The Card stays mounted at 0 width when collapsed (T7) — it never
     // disappears from the DOM, only the rail being visible signals collapse.

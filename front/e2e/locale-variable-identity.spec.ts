@@ -1,6 +1,7 @@
 import type { WorkspaceState } from '@kumite/blocks'
 import { expect, test } from '@playwright/test'
 
+import { editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -81,6 +82,8 @@ test.describe('a language switch renames no variable (#202)', () => {
   test('the input block is relabeled and every variable keeps its name across pt → en → es and a reload', async ({
     page,
   }) => {
+    // Two editor mounts: the first visit and the reload in step 04.
+    test.setTimeout(editorTestTimeout(2))
     const host = page.getByTestId('blockly-workspace')
     const toolbox = page.locator('.blocklyToolbox')
     // The main workspace only: the flyout is a workspace too, with its own
@@ -102,7 +105,7 @@ test.describe('a language switch renames no variable (#202)', () => {
     // 01 — pt: the input block says `entrada`, the variables are `soma` and
     // `input`.
     await page.goto(`/problem/${problemId}`)
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     await expectVariablesIntact('Variáveis', 'entrada')
     await page.screenshot({ path: evidence('01-pt-entrada-e-variaveis') })
 
@@ -122,7 +125,7 @@ test.describe('a language switch renames no variable (#202)', () => {
     // 04 — a reload in es restores the autosave, still with the same names.
     await page.waitForTimeout(600)
     await page.reload()
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     await expectVariablesIntact('Variables', 'entrada')
     await page.screenshot({ path: evidence('04-es-restaurado-do-autosave') })
   })

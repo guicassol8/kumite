@@ -1,5 +1,6 @@
 import { somaDosPares } from '@kumite/blocks'
 
+import { editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   seedParticipant,
   seedParticipantToken,
@@ -69,7 +70,8 @@ async function setPaused(auth: AuthHeader, paused: boolean): Promise<void> {
 
 test.describe('submissions pause (#285)', () => {
   test.skip(!ORGANIZER_EMAIL || !ORGANIZER_PASSWORD, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
-  test.setTimeout(120_000)
+  // Two browser contexts, a pause and a resume, on top of one editor mount.
+  test.setTimeout(editorTestTimeout(1, 120_000))
 
   test('pausing reaches the open editor live, keeps the timer and Run going, and resuming accepts at once', async ({
     browser,
@@ -113,12 +115,10 @@ test.describe('submissions pause (#285)', () => {
       await roundSlot.open(auth, roundId)
 
       await participantPage.goto(`/problem/${problemId}`)
+      await expectBlocklyInjected(participantPage)
       await expect(participantPage.getByTestId('problem-statement-panel')).toContainText(
         'Soma dos Pares',
       )
-      await expect(
-        participantPage.getByTestId('blockly-workspace').locator('svg.blocklySvg'),
-      ).toBeVisible()
       await expect(participantPage.getByTestId('problem-submit-button')).toBeEnabled()
 
       // 01 — the organizer pauses from the live round card.

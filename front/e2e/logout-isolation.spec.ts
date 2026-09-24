@@ -1,6 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 
-import { dragBlockFromFlyout } from './support/blockly'
+import { dragBlockFromFlyout, editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   BACK_URL,
   EDITOR_FIXTURE_TIMEOUT_MS,
@@ -80,14 +80,14 @@ test.describe('what survives a logout in the same browser (#175)', () => {
   }
 
   test('the next account does not inherit the previous one saved blocks (#2)', async ({ page }) => {
-    // Two logins and two Blockly injections in one test; the 30s default is a
-    // budget for neither (every editor spec raises it the same way).
-    test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS * 2)
+    // Two Blockly injections (one per account) plus the two logins.
+    test.setTimeout(editorTestTimeout(2))
     const host = page.getByTestId('blockly-workspace')
 
     // Aluno 1 builds something and lets the debounced auto-save land.
     await loginFromCold(page, alunoUmEmail, 'Aluno 1')
     await page.goto(`/problem/${problemId}`)
+    await expectBlocklyInjected(page)
     await dragBlockFromFlyout(page, 'Matemática')
     await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(2)
     await page.waitForTimeout(600)
@@ -99,11 +99,7 @@ test.describe('what survives a logout in the same browser (#175)', () => {
     // block on the canvas must be the root one `withRootBlock` seeds.
     await loginWithoutReload(page, alunoDoisEmail, 'Aluno 2')
     await page.goto(`/problem/${problemId}`)
-    // Injecting Blockly a second time in the same run can outlast the 30s
-    // `expect` default on a cold dev server (its module graph is transformed
-    // on demand); waiting longer here is cheaper than a flake that looks like
-    // the very leak under test.
-    await expect(host.locator('svg.blocklySvg')).toBeVisible({ timeout: 60_000 })
+    await expectBlocklyInjected(page)
     await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
     await page.screenshot({ path: evidence('03-aluno2-canvas-vazio') })
   })

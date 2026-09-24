@@ -1,6 +1,7 @@
 import { somaDosPares } from '@kumite/blocks'
 import type { Page } from '@playwright/test'
 
+import { EDITOR_TEST_TIMEOUT_MS, editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   participantIdOf,
@@ -85,6 +86,7 @@ const VIEWPORTS = [
 ] as const
 
 test.describe('/problem/$id — barra ancorada, rodada encerrada (#155)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string
@@ -109,7 +111,7 @@ test.describe('/problem/$id — barra ancorada, rodada encerrada (#155)', () => 
     }) => {
       await page.setViewportSize(size)
       await page.goto(`/problem/${problemId}`)
-      await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+      await expectBlocklyInjected(page)
 
       // Acceptance #3: the closed-round notice stays anchored above the canvas,
       // Executar and Limpar stay, Enviar is gone.
@@ -178,7 +180,7 @@ test.describe('/problem/$id — barra ancorada, rodada encerrada (#155)', () => 
   test('rola dentro da faixa, nunca a página, quando o espaço aperta', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(`/problem/${problemId}`)
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
 
     await page.getByTestId('problem-run-button').click()
     await expect(page.getByTestId('problem-results-band')).toBeVisible()
@@ -209,7 +211,7 @@ test.describe('/problem/$id — barra ancorada, rodada encerrada (#155)', () => 
   test('mantém a faixa utilizável numa tela baixa (360x640)', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 })
     await page.goto(`/problem/${problemId}`)
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
 
     await page.getByTestId('problem-run-button').click()
     await expect(page.getByTestId('problem-results-band')).toBeVisible()
@@ -233,6 +235,7 @@ test.describe('/problem/$id — barra ancorada, rodada encerrada (#155)', () => 
 })
 
 test.describe('/problem/$id — barra ancorada, rodada aberta (#155)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   const PASSWORD = 'supersecret'
@@ -322,8 +325,9 @@ test.describe('/problem/$id — barra ancorada, rodada aberta (#155)', () => {
   })
 
   test('mantém Enviar, o veredito e o banner de erro ancorados', async ({ page, roundSlot }) => {
-    // Judging three cases in a real sandbox, plus the open retries.
-    test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
+    // Judging three cases in a real sandbox, plus the open retries, on top of
+    // the injection budget.
+    test.setTimeout(editorTestTimeout(1, 60_000))
     const auth = await organizerAuthHeader()
     await roundSlot.open(auth, roundId)
 
@@ -331,7 +335,7 @@ test.describe('/problem/$id — barra ancorada, rodada aberta (#155)', () => {
     await seedWorkspace(page, participantId, problemId, somaDosPares)
     await page.setViewportSize({ width: 1280, height: 720 })
     await page.goto(`/problem/${problemId}`)
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
 
     // Acceptance #2: Enviar lives in the same anchored bar, inside the viewport.
     await expect(

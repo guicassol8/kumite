@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { EDITOR_TEST_TIMEOUT_MS, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -61,6 +62,7 @@ test.use({ viewport: { width: 1280, height: 600 } })
 const SCROLLING_CATEGORY = 'Laços'
 
 test.describe('the flyout scrollbar leaves no ghost behind (#204)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string
@@ -83,7 +85,7 @@ test.describe('the flyout scrollbar leaves no ghost behind (#204)', () => {
     const ghost = page.locator('.blocklyToolboxFlyout + .blocklyFlyoutScrollbar')
 
     await page.goto(`/problem/${problemId}`)
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
 
     // AC4 — open: the flyout overflows and its scrollbar is on screen. This is
     // also the precondition for everything below: a hidden bar here would mean
@@ -130,7 +132,7 @@ test.describe('the flyout scrollbar leaves no ghost behind (#204)', () => {
       )
 
     await page.goto(`/problem/${problemId}`)
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     // The two bars of the main canvas, and nothing else.
     const baseline = await paintedHandles()
     expect(baseline).toBe(2)
@@ -158,7 +160,7 @@ test.describe('the flyout scrollbar leaves no ghost behind (#204)', () => {
     const injection = page.locator('.injectionDiv')
 
     await page.goto(`/problem/${problemId}`)
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     await toolbox.getByRole('treeitem', { name: SCROLLING_CATEGORY }).click()
     await expect(flyout).toBeVisible()
     await toolbox.getByRole('treeitem', { name: SCROLLING_CATEGORY }).click()

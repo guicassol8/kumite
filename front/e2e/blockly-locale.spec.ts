@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test'
 
-import { dragBlockFromFlyout } from './support/blockly'
+import {
+  dragBlockFromFlyout,
+  EDITOR_TEST_TIMEOUT_MS,
+  expectBlocklyInjected,
+} from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -16,6 +20,7 @@ import {
 const evidence = (name: string) => `e2e/evidence/57/${name}.png`
 
 test.describe('browser detected as Spanish (es-MX)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.use({ locale: 'es-MX' })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
@@ -41,7 +46,7 @@ test.describe('browser detected as Spanish (es-MX)', () => {
     // 01 — a Spanish-language visitor sees the toolbox and the root block in
     // Spanish.
     await page.goto(`/problem/${problemId}`)
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     await expect(toolbox.getByRole('treeitem', { name: 'Bucles' })).toBeVisible()
     await expect(toolbox.getByRole('treeitem', { name: 'Matemáticas' })).toBeVisible()
     await expect(host.getByText('resolver', { exact: true })).toBeVisible()

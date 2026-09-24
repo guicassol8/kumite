@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 
+import { EDITOR_TEST_TIMEOUT_MS, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -44,6 +45,7 @@ async function dragBlockFromCategory(page: Page, category: string) {
 }
 
 test.describe('the root block and native blocks (#4)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string
@@ -68,7 +70,7 @@ test.describe('the root block and native blocks (#4)', () => {
     // 01 — the native Blockly blocks are translated by the official locale pack:
     // "repita … vezes", not "repeat … times".
     await page.goto(`/problem/${problemId}`)
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     await toolbox.getByRole('treeitem', { name: 'Laços' }).click()
     await expect(flyout.getByText('repita').first()).toBeVisible()
     await expect(flyout.getByText('vezes').first()).toBeVisible()
@@ -116,7 +118,7 @@ test.describe('the root block and native blocks (#4)', () => {
     // 05 — "Criar variável..." exists (the static category Blockly would build
     // has no such button), and both variables end up offered in the flyout.
     await page.goto(`/problem/${problemId}`)
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
 
     // Clicking a category toggles its flyout, so the category is opened once and
     // both variables are created from the flyout that stays open — which is also
@@ -168,7 +170,7 @@ test.describe('the root block and native blocks (#4)', () => {
     await page.goto(`/problem/${problemId}`)
     const host = page.getByTestId('blockly-workspace')
 
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     await expect(page.locator(ROOT)).toHaveCount(1)
     await expect(page.locator('[data-id="salvoSemRaiz"]')).toHaveCount(1)
     await expect(host.getByText('42')).toBeVisible()

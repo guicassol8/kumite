@@ -1,6 +1,7 @@
 import { emptyWorkspaceState, ROOT_BLOCK_TYPE, somaDosPares } from '@kumite/blocks'
 import { expect, type Page, test } from '@playwright/test'
 
+import { EDITOR_TEST_TIMEOUT_MS, editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -102,6 +103,7 @@ const removeFromNumber = {
 }
 
 test.describe('running examples locally (#5)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string
@@ -129,7 +131,7 @@ test.describe('running examples locally (#5)', () => {
 
   async function runAndWait(page: Page) {
     await page.goto(`/problem/${problemId}`)
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     await page.getByTestId('problem-run-button').click()
     await expect(page.getByTestId('problem-results-panel')).toBeVisible()
   }
@@ -173,8 +175,8 @@ test.describe('running examples locally (#5)', () => {
   })
 
   test('an infinite loop is aborted by the timeout, case by case', async ({ page }) => {
-    // Three cases × 2s of timeout, plus the page boot.
-    test.setTimeout(60_000)
+    // Three cases × 2s of timeout, on top of the injection budget.
+    test.setTimeout(editorTestTimeout(1, 60_000))
     await seedWorkspace(page, infiniteLoop)
 
     // 03 — the button is disabled while it runs, and each case comes back as a

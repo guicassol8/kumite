@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { EDITOR_TEST_TIMEOUT_MS, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -16,6 +17,7 @@ const evidence = (name: string) => `e2e/evidence/16/${name}.png`
 const categories = ['Lógica', 'Laços', 'Matemática', 'Texto', 'Listas', 'Variáveis']
 
 test.describe('the curated toolbox (#16)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string
@@ -36,7 +38,7 @@ test.describe('the curated toolbox (#16)', () => {
 
     // 01 — the six curated categories, and only those.
     await page.goto(`/problem/${problemId}`)
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     for (const category of categories) {
       await expect(toolbox.getByRole('treeitem', { name: category })).toBeVisible()
     }

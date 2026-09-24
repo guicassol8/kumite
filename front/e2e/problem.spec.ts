@@ -144,6 +144,7 @@ test.describe('problem screen (#7)', () => {
     const bestScoreCell = page.getByTestId(`round-problem-best-score-${problemId}`)
     await expect(bestScoreCell).toHaveAttribute('data-state', 'none')
     await expect(bestScoreCell).toHaveText(/Sem submissão/)
+    await page.screenshot({ path: evidence206('06-lista-da-rodada-sem-submissao'), fullPage: true })
 
     // 02 — the round's problem row links into the real problem screen (#7's
     // link back to #39's table).
@@ -208,6 +209,7 @@ test.describe('problem screen (#7)', () => {
       const teamlessCell = teamlessPage.getByTestId(`round-problem-best-score-${problemId}`)
       await expect(teamlessCell).toHaveAttribute('data-state', 'unavailable')
       await expect(teamlessCell).toHaveText(/—/)
+      await teamlessPage.screenshot({ path: evidence206('07-lista-sem-time'), fullPage: true })
       await teamlessPage.getByTestId(`round-problem-${problemId}`).getByRole('link').click()
       await expect(teamlessPage.getByTestId('problem-statement-panel')).toContainText(
         'Soma dos Pares',

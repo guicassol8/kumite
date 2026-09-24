@@ -22,8 +22,15 @@ function toBlockLocale(language: string): BlockLocale {
  * injects rather than to this hook's own effect timing (see that prop's doc
  * for why: React StrictMode's dev-only double-mount can otherwise leave the
  * registration on an instance Blockly has already disposed).
+ *
+ * `onCreateVariable` is what the flyout's "create variable" button calls
+ * (#205). It is read through a ref, so both registrations — on ready and on
+ * a language switch — always reach the latest one.
  */
-export function useBlocklyLocale(workspaceRef: RefObject<BlocklyWorkspaceHandle | null>): {
+export function useBlocklyLocale(
+  workspaceRef: RefObject<BlocklyWorkspaceHandle | null>,
+  onCreateVariable: (target: Blockly.WorkspaceSvg) => void,
+): {
   toolbox: Blockly.utils.toolbox.ToolboxDefinition
   onReady: (workspace: Blockly.WorkspaceSvg) => void
 } {
@@ -33,10 +40,19 @@ export function useBlocklyLocale(workspaceRef: RefObject<BlocklyWorkspaceHandle 
   const appliedLocaleRef = useRef(locale)
   const localeRef = useRef(locale)
   localeRef.current = locale
+  const onCreateVariableRef = useRef(onCreateVariable)
+  onCreateVariableRef.current = onCreateVariable
 
-  const onReady = useCallback((workspace: Blockly.WorkspaceSvg) => {
-    registerVariablesFlyout(workspace, localeRef.current)
+  const createVariable = useCallback((target: Blockly.WorkspaceSvg) => {
+    onCreateVariableRef.current(target)
   }, [])
+
+  const onReady = useCallback(
+    (workspace: Blockly.WorkspaceSvg) => {
+      registerVariablesFlyout(workspace, localeRef.current, createVariable)
+    },
+    [createVariable],
+  )
 
   useEffect(() => {
     if (appliedLocaleRef.current === locale) return
@@ -47,7 +63,7 @@ export function useBlocklyLocale(workspaceRef: RefObject<BlocklyWorkspaceHandle 
     const handle = workspaceRef.current
     if (!handle) return
     const workspace = handle.getWorkspace()
-    if (workspace) registerVariablesFlyout(workspace, locale)
+    if (workspace) registerVariablesFlyout(workspace, locale, createVariable)
 
     const state = handle.serialize()
     Blockly.Events.disable()
@@ -57,7 +73,7 @@ export function useBlocklyLocale(workspaceRef: RefObject<BlocklyWorkspaceHandle 
     } finally {
       Blockly.Events.enable()
     }
-  }, [locale, workspaceRef])
+  }, [locale, workspaceRef, createVariable])
 
   return { toolbox, onReady }
 }

@@ -1,7 +1,13 @@
-import { INPUT_BLOCK_TYPE, ROOT_BLOCK_TYPE, type WorkspaceState } from '@kumite/blocks'
+import {
+  CREATE_VARIABLE_BUTTON_KEY,
+  INPUT_BLOCK_TYPE,
+  ROOT_BLOCK_TYPE,
+  type WorkspaceState,
+} from '@kumite/blocks'
 import { act, cleanup, render, screen } from '@testing-library/react'
+import type * as Blockly from 'blockly'
 import { createRef } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
@@ -71,10 +77,13 @@ function fieldTexts(handle: BlocklyWorkspaceHandle, type: string) {
     .map((field) => field.getText())
 }
 
-function renderHost(initialState: WorkspaceState = fixtureWithExtraBlock) {
+function renderHost(
+  initialState: WorkspaceState = fixtureWithExtraBlock,
+  onCreateVariable: (target: Blockly.WorkspaceSvg) => void = () => {},
+) {
   const workspaceRef = createRef<BlocklyWorkspaceHandle>()
   function Host() {
-    const { toolbox, onReady } = useBlocklyLocale(workspaceRef)
+    const { toolbox, onReady } = useBlocklyLocale(workspaceRef, onCreateVariable)
     return (
       <BlocklyWorkspace
         ref={workspaceRef}
@@ -119,6 +128,24 @@ describe('useBlocklyLocale', () => {
     expect(fieldTexts(handle, ROOT_BLOCK_TYPE)).toEqual(expect.arrayContaining(['solve', 'return']))
     expect(handle.getWorkspace()?.getBlocksByType('math_number', false)).toHaveLength(1)
     expect(handle.serialize().blocks?.blocks).toHaveLength(2)
+  })
+
+  it("routes the create-variable button to the caller's handler, also after a language switch (#205)", async () => {
+    const onCreateVariable = vi.fn()
+    const { handle } = renderHost(fixtureWithExtraBlock, onCreateVariable)
+    const workspace = handle.getWorkspace()
+    if (!workspace) throw new Error('the workspace was not injected')
+    const button = { getTargetWorkspace: () => workspace } as unknown as Blockly.FlyoutButton
+
+    workspace.getButtonCallback(CREATE_VARIABLE_BUTTON_KEY)?.(button)
+    expect(onCreateVariable).toHaveBeenLastCalledWith(workspace)
+
+    await act(async () => {
+      await i18n.changeLanguage('en')
+    })
+    workspace.getButtonCallback(CREATE_VARIABLE_BUTTON_KEY)?.(button)
+
+    expect(onCreateVariable).toHaveBeenCalledTimes(2)
   })
 
   it('renames no variable when the language changes, only the input block label (#202)', async () => {

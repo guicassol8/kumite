@@ -55,10 +55,15 @@ export const workspaceOptions: Partial<Blockly.BlocklyOptions> = {
  * contents and the "create variable" button both live on the workspace, not on
  * the toolbox definition, so this runs once per injected workspace (and again
  * whenever the locale changes, to relabel the flyout).
+ *
+ * The button opens the app's own dialog through `onCreateVariable` instead of
+ * `Blockly.Variables.createVariableButtonHandler` (#205): Blockly's prompt
+ * cannot refuse an empty or duplicate name inside itself.
  */
 export function registerVariablesFlyout(
   workspace: Blockly.WorkspaceSvg | null | undefined,
   locale: BlockLocale,
+  onCreateVariable: (target: Blockly.WorkspaceSvg) => void,
 ): void {
   if (!workspace) return
 
@@ -66,6 +71,6 @@ export function registerVariablesFlyout(
     variablesFlyout(target, locale),
   )
   workspace.registerButtonCallback(CREATE_VARIABLE_BUTTON_KEY, (button) => {
-    Blockly.Variables.createVariableButtonHandler(button.getTargetWorkspace())
+    onCreateVariable(button.getTargetWorkspace())
   })
 }

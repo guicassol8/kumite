@@ -118,9 +118,10 @@ test.describe('problem screen (#7)', () => {
     roundSlot,
   }) => {
     // Two signups (the team member and, for #206, a teamless participant) and
-    // a real judge run, on top of two editor mounts: the row link into the
-    // problem and the reload once the round closes.
-    test.setTimeout(editorTestTimeout(2, 90_000))
+    // a real judge run, on top of three editor mounts: the row link into the
+    // problem, the teamless participant's row link and the reload once the
+    // round closes.
+    test.setTimeout(editorTestTimeout(3, 90_000))
     const auth = await organizerAuthHeader()
     const problemId = await apiCreatePublishedProblem()
     const roundId = await createRound(auth, {
@@ -214,6 +215,7 @@ test.describe('problem screen (#7)', () => {
       await expect(teamlessCell).toHaveText(/—/)
       await teamlessPage.screenshot({ path: evidence206('07-lista-sem-time'), fullPage: true })
       await teamlessPage.getByTestId(`round-problem-${problemId}`).getByRole('link').click()
+      await expectBlocklyInjected(teamlessPage)
       await expect(teamlessPage.getByTestId('problem-statement-panel')).toContainText(
         'Soma dos Pares',
       )

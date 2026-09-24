@@ -167,4 +167,23 @@ describe('ProblemPanels', () => {
   // does not count, or a window resize would overwrite the participant's
   // choice too). jsdom cannot drive that gesture; e2e/problem-panels.spec.ts
   // (T10) is where the write path is actually exercised, across a reload.
+
+  it.each([
+    ['stacked', false],
+    ['desktop', true],
+  ])('forwards the team best score to the statement card in the %s layout (#206)', (_, desktop) => {
+    setMatchMediaMatches(DESKTOP_QUERY, desktop)
+
+    render(
+      <ProblemPanels
+        problem={problem}
+        bestScore={{ kind: 'score', score: 5 }}
+        hasResults={false}
+        editor={<div data-testid="fake-editor" />}
+        actionsBar={<div data-testid="fake-actions" />}
+      />,
+    )
+
+    expect(screen.getByTestId('problem-best-score-badge').textContent).toContain('5')
+  })
 })

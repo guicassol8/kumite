@@ -1,4 +1,11 @@
-import { buildToolbox, defineKumiteBlocks } from '@kumite/blocks'
+import {
+  buildToolbox,
+  defineKumiteBlocks,
+  KUMITE_CATEGORY_BAR_PX,
+  kumiteGridOptions,
+  kumiteTheme,
+  kumiteThemeDark,
+} from '@kumite/blocks'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import * as Blockly from 'blockly'
 import { createRef, StrictMode } from 'react'
@@ -256,5 +263,78 @@ describe('BlocklyWorkspace', () => {
     expect(handle.serialize().blocks.blocks[0].type).toBe('math_number')
     await flushBlocklyEvents()
     expect(onChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('BlocklyWorkspace theme (#218)', () => {
+  it('injects with the theme it got by prop', () => {
+    const { handle } = renderWorkspace({ theme: kumiteTheme })
+
+    expect(handle.getWorkspace()?.getTheme().name).toBe('kumite')
+  })
+
+  it('injects the kumite grid, snap included', () => {
+    const { handle } = renderWorkspace({ theme: kumiteTheme })
+
+    expect(handle.getWorkspace()?.options.gridOptions).toMatchObject(kumiteGridOptions)
+  })
+
+  it('narrows the toolbox category bar to the kumite width', () => {
+    expect(Blockly.ToolboxCategory.borderWidth).toBe(KUMITE_CATEGORY_BAR_PX)
+  })
+
+  it('swaps the theme in place, keeping the same workspace and its blocks', () => {
+    const ref = createRef<BlocklyWorkspaceHandle>()
+    const { rerender } = render(
+      <BlocklyWorkspace ref={ref} toolbox={toolbox} theme={kumiteTheme} initialState={fixture} />,
+    )
+    const before = ref.current?.getWorkspace()
+    const saved = ref.current?.serialize()
+
+    rerender(
+      <BlocklyWorkspace
+        ref={ref}
+        toolbox={toolbox}
+        theme={kumiteThemeDark}
+        initialState={fixture}
+      />,
+    )
+
+    const after = ref.current?.getWorkspace()
+    expect(after).toBe(before)
+    expect(after?.getTheme().name).toBe('kumite-dark')
+    expect(ref.current?.serialize()).toEqual(saved)
+  })
+
+  it('does not re-apply a theme that did not change', () => {
+    const ref = createRef<BlocklyWorkspaceHandle>()
+    const { rerender } = render(
+      <BlocklyWorkspace ref={ref} toolbox={toolbox} theme={kumiteTheme} />,
+    )
+    const workspace = ref.current?.getWorkspace()
+    if (!workspace) throw new Error('no workspace')
+    const setTheme = vi.spyOn(workspace, 'setTheme')
+
+    rerender(<BlocklyWorkspace ref={ref} toolbox={toolbox} theme={kumiteTheme} />)
+
+    expect(setTheme).not.toHaveBeenCalled()
+  })
+
+  it('applies the theme to the surviving workspace under StrictMode', () => {
+    const ref = createRef<BlocklyWorkspaceHandle>()
+    const { rerender } = render(
+      <StrictMode>
+        <BlocklyWorkspace ref={ref} toolbox={toolbox} theme={kumiteTheme} />
+      </StrictMode>,
+    )
+    expect(ref.current?.getWorkspace()?.getTheme().name).toBe('kumite')
+
+    rerender(
+      <StrictMode>
+        <BlocklyWorkspace ref={ref} toolbox={toolbox} theme={kumiteThemeDark} />
+      </StrictMode>,
+    )
+
+    expect(ref.current?.getWorkspace()?.getTheme().name).toBe('kumite-dark')
   })
 })

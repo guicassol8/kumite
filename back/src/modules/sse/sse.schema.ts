@@ -16,6 +16,9 @@ export const StateSyncEventSchema = z.object({
   type: z.literal('state.sync'),
   serverTime: z.coerce.date(),
   round: RoundRefSchema.nullable(),
+  // Whether the organizer paused submissions (#285). In the snapshot so a
+  // client that (re)connects mid-pause knows it without waiting on a toggle.
+  submissionsPaused: z.boolean(),
 })
 
 export const RoundOpenedEventSchema = z.object({
@@ -36,6 +39,20 @@ export const RoundClosedEventSchema = z.object({
   type: z.literal('round.closed'),
   serverTime: z.coerce.date(),
   roundId: z.string(),
+})
+
+// The organizer paused or resumed submissions (#285). Published on every
+// PATCH /organizer/event-config that carries `submissionsPaused`, even when
+// the value did not change — consumers apply it idempotently. The round and
+// its timer are untouched either way.
+export const SubmissionsPausedEventSchema = z.object({
+  type: z.literal('submissions.paused'),
+  serverTime: z.coerce.date(),
+})
+
+export const SubmissionsResumedEventSchema = z.object({
+  type: z.literal('submissions.resumed'),
+  serverTime: z.coerce.date(),
 })
 
 export const HeartbeatEventSchema = z.object({
@@ -69,6 +86,8 @@ export const SseEventSchema = z.discriminatedUnion('type', [
   RoundOpenedEventSchema,
   RoundExtendedEventSchema,
   RoundClosedEventSchema,
+  SubmissionsPausedEventSchema,
+  SubmissionsResumedEventSchema,
   HeartbeatEventSchema,
   RankingUpdatedEventSchema,
   SessionRevokedEventSchema,
@@ -78,6 +97,8 @@ export type StateSyncEvent = z.infer<typeof StateSyncEventSchema>
 export type RoundOpenedEvent = z.infer<typeof RoundOpenedEventSchema>
 export type RoundExtendedEvent = z.infer<typeof RoundExtendedEventSchema>
 export type RoundClosedEvent = z.infer<typeof RoundClosedEventSchema>
+export type SubmissionsPausedEvent = z.infer<typeof SubmissionsPausedEventSchema>
+export type SubmissionsResumedEvent = z.infer<typeof SubmissionsResumedEventSchema>
 export type HeartbeatEvent = z.infer<typeof HeartbeatEventSchema>
 export type RankingUpdatedEvent = z.infer<typeof RankingUpdatedEventSchema>
 export type SessionRevokedEvent = z.infer<typeof SessionRevokedEventSchema>

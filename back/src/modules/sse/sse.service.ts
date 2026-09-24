@@ -1,5 +1,6 @@
 import { JUDGE_TIMEOUT_MS } from '../../config'
 import type { Db } from '../../db/client'
+import { getEventConfig } from '../event-config/event-config.service'
 import { getEventRanking, getRoundRanking } from '../ranking/ranking.service'
 import {
   clearPendingRoundClosure,
@@ -40,11 +41,12 @@ export function createSseBus(): SseBus {
 }
 
 export async function buildStateSyncEvent(db: Db): Promise<StateSyncEvent> {
-  const round = await findOpenRound(db)
+  const [round, { submissionsPaused }] = await Promise.all([findOpenRound(db), getEventConfig(db)])
   return {
     type: 'state.sync',
     serverTime: new Date(),
     round: round ? { id: round.id, closesAt: round.closesAt } : null,
+    submissionsPaused,
   }
 }
 
@@ -68,6 +70,18 @@ export function publishRoundExtended(bus: SseBus, round: { id: string; closesAt:
 
 export function publishRoundClosed(bus: SseBus, round: { id: string }) {
   bus.publish({ type: 'round.closed', serverTime: new Date(), roundId: round.id })
+}
+
+/**
+ * Announces the organizer's pause toggle to every connected client (#285).
+ * Published by `updateEventConfigRoute`, not the service, for the same reason
+ * as the round helpers above: services stay pure and the bus is the route's.
+ */
+export function publishSubmissionsPaused(bus: SseBus, paused: boolean) {
+  bus.publish({
+    type: paused ? 'submissions.paused' : 'submissions.resumed',
+    serverTime: new Date(),
+  })
 }
 
 /**

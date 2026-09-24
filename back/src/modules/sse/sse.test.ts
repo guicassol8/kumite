@@ -7,6 +7,7 @@ import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
 import { k } from '../../context'
 import { createDb } from '../../db/client'
 import {
+  eventConfigTable,
   problemsTable,
   roundProblemsTable,
   roundsTable,
@@ -36,6 +37,8 @@ import {
   SessionRevokedEventSchema,
   SseEventSchema,
   StateSyncEventSchema,
+  SubmissionsPausedEventSchema,
+  SubmissionsResumedEventSchema,
 } from './sse.schema'
 import {
   announceClosedRounds,
@@ -46,6 +49,7 @@ import {
   publishRoundClosed,
   publishRoundExtended,
   publishRoundOpened,
+  publishSubmissionsPaused,
   publishUserDeactivated,
   ROUND_CLOSE_ANNOUNCE_MAX_WAIT_MS,
   runExpiryTick,
@@ -58,15 +62,40 @@ describe('sse.schema', () => {
       type: 'state.sync' as const,
       serverTime: new Date(),
       round: { id: 'r1', closesAt: new Date() },
+      submissionsPaused: false,
     }
     expect(StateSyncEventSchema.safeParse(event).success).toBe(true)
     expect(SseEventSchema.safeParse(event).success).toBe(true)
   })
 
   it('round-trips a state.sync event with no open round', () => {
-    const event = { type: 'state.sync' as const, serverTime: new Date(), round: null }
+    const event = {
+      type: 'state.sync' as const,
+      serverTime: new Date(),
+      round: null,
+      submissionsPaused: true,
+    }
     expect(StateSyncEventSchema.safeParse(event).success).toBe(true)
     expect(SseEventSchema.safeParse(event).success).toBe(true)
+  })
+
+  // #285: the pause flag is part of the snapshot, so a client that reconnects
+  // mid-pause learns it without waiting for the next toggle.
+  it('rejects a state.sync event without submissionsPaused', () => {
+    const event = { type: 'state.sync' as const, serverTime: new Date(), round: null }
+    expect(StateSyncEventSchema.safeParse(event).success).toBe(false)
+  })
+
+  it('round-trips the submissions.paused / submissions.resumed events', () => {
+    const serverTime = new Date()
+    for (const [type, schema] of [
+      ['submissions.paused', SubmissionsPausedEventSchema],
+      ['submissions.resumed', SubmissionsResumedEventSchema],
+    ] as const) {
+      const wire = JSON.parse(JSON.stringify({ type, serverTime }))
+      expect(schema.safeParse(wire).success).toBe(true)
+      expect(SseEventSchema.parse(wire)).toEqual({ type, serverTime })
+    }
   })
 
   it('round-trips a round.opened event', () => {
@@ -279,6 +308,24 @@ describe('sse.service', () => {
 
       expect(fn).toHaveBeenCalledWith({ type: 'user.deactivated', userId: 'u1' })
     })
+
+    it('publishes submissions.paused or submissions.resumed from the flag (#285)', () => {
+      const bus = createSseBus()
+      const fn = vi.fn()
+      bus.subscribe(fn)
+
+      publishSubmissionsPaused(bus, true)
+      publishSubmissionsPaused(bus, false)
+
+      expect(fn).toHaveBeenNthCalledWith(1, {
+        type: 'submissions.paused',
+        serverTime: expect.any(Date),
+      })
+      expect(fn).toHaveBeenNthCalledWith(2, {
+        type: 'submissions.resumed',
+        serverTime: expect.any(Date),
+      })
+    })
   })
 
   describe('against a real db', () => {
@@ -288,7 +335,7 @@ describe('sse.service', () => {
       judging.rounds.clear()
       resetPendingRoundClosures()
       await db.execute(
-        sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemsTable}, ${teamsTable}, ${usersTable} restart identity cascade`,
+        sql`truncate table ${submissionsTable}, ${roundProblemsTable}, ${roundsTable}, ${problemsTable}, ${teamsTable}, ${usersTable}, ${eventConfigTable} restart identity cascade`,
       )
     })
 
@@ -320,6 +367,16 @@ describe('sse.service', () => {
       it('carries a null round when nothing is open', async () => {
         const event = await buildStateSyncEvent(db)
         expect(event.round).toBeNull()
+      })
+
+      it('carries the submissions pause flag (#285)', async () => {
+        expect((await buildStateSyncEvent(db)).submissionsPaused).toBe(false)
+
+        await db.insert(eventConfigTable).values({ id: 1, submissionsPaused: true })
+        expect((await buildStateSyncEvent(db)).submissionsPaused).toBe(true)
+
+        await db.update(eventConfigTable).set({ submissionsPaused: false })
+        expect((await buildStateSyncEvent(db)).submissionsPaused).toBe(false)
       })
     })
 

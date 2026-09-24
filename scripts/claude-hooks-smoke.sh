@@ -21,7 +21,8 @@
 # the host worktree only when that patch exists and is not applied yet (the
 # hook change travels as a patch the user applies by hand — #286).
 # `--unpatched` skips the patch and tests HEAD's hooks as they are, to show
-# the red.
+# the red. Uncommitted edits under .claude/hooks are never what runs, so the
+# script refuses to start while there are any: commit, then smoke.
 #
 # Usage: bash scripts/claude-hooks-smoke.sh [--unpatched]
 set -uo pipefail
@@ -65,6 +66,14 @@ cleanup() {
 trap cleanup EXIT
 
 hooks_before="$(git -C "$repo" status --porcelain -- .claude/hooks)"
+
+# The worktrees are cut from HEAD, so uncommitted hook edits (say, the patch
+# just applied by hand) would silently not be what runs: commit them first.
+if [ -n "$hooks_before" ]; then
+  echo "claude-hooks-smoke: .claude/hooks has uncommitted changes, but this smoke tests HEAD's hooks — commit them first:" >&2
+  echo "$hooks_before" >&2
+  exit 2
+fi
 
 git -C "$repo" worktree add --detach -q "$host" HEAD || exit 1
 git -C "$repo" worktree add --detach -q "$session" HEAD || exit 1

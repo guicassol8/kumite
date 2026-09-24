@@ -21,6 +21,15 @@ const BLOCK = {
   root: 'rgb(42, 37, 35)', // --block-root #2A2523
   input: 'rgb(221, 40, 36)', // --block-input #DD2824
 }
+// The six toolbox rows (pt labels) and their bar colour.
+const CATEGORY_BARS: [string, string][] = [
+  ['Lógica', BLOCK.logic],
+  ['Laços', 'rgb(41, 134, 70)'], // --block-loops #298646
+  ['Matemática', 'rgb(107, 100, 186)'], // --block-math #6B64BA
+  ['Texto', 'rgb(0, 130, 130)'], // --block-text #008282
+  ['Listas', 'rgb(142, 87, 165)'], // --block-lists #8E57A5
+  ['Variáveis', BLOCK.variables],
+]
 const ROOT_TEXT = 'rgb(243, 241, 239)' // --chrome-foreground #F3F1EF
 const LIGHT = {
   canvas: 'rgb(242, 240, 236)', // --background-2 #F2F0EC
@@ -106,18 +115,15 @@ test.describe('the kumite Blockly theme', () => {
       await dragBlockFromFlyout(page, 'Lógica')
       await expect.poll(() => blockFill(page, 'logic_blocks')).toBe(BLOCK.logic)
 
-      // Category bars: 4px, in the category's token.
-      const logicRow = page
-        .locator('.blocklyToolbox')
-        .getByRole('treeitem', { name: 'Lógica' })
-        .locator('.blocklyToolboxCategory')
-      expect(await computed(logicRow, 'border-left-color')).toBe(BLOCK.logic)
-      expect(await computed(logicRow, 'border-left-width')).toBe('4px')
-      const variablesRow = page
-        .locator('.blocklyToolbox')
-        .getByRole('treeitem', { name: 'Variáveis' })
-        .locator('.blocklyToolboxCategory')
-      expect(await computed(variablesRow, 'border-left-color')).toBe(BLOCK.variables)
+      // Category bars: every one of the six, 4px, in its own --block-* token.
+      for (const [name, colour] of CATEGORY_BARS) {
+        const row = page
+          .locator('.blocklyToolbox')
+          .getByRole('treeitem', { name })
+          .locator('.blocklyToolboxCategory')
+        expect(await computed(row, 'border-left-color'), name).toBe(colour)
+        expect(await computed(row, 'border-left-width'), name).toBe('4px')
+      }
 
       // Chrome on paper.
       expect(await chrome(page)).toEqual({

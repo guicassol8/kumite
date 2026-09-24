@@ -120,6 +120,16 @@ function ProblemScreen() {
   const [verdict, setVerdict] = useState<SubmissionResult | null>(null)
   const [submitBanner, setSubmitBanner] = useState<SubmitBanner | null>(null)
 
+  // #285: a 423 that raced the pause is stale the moment the stream catches
+  // up — the paused notice takes over while it lasts, and after a resume the
+  // error would contradict the re-enabled Submeter.
+  useEffect(() => {
+    void eventStream.submissionsPaused
+    setSubmitBanner((banner) =>
+      banner && 'key' in banner && banner.key === 'problem.submitError.paused' ? null : banner,
+    )
+  }, [eventStream.submissionsPaused])
+
   // Bumped by every fresh run and every fresh verdict — the desktop layout
   // (#203, T8) uses it to reopen a results band the participant collapsed
   // earlier. `hasResults` itself only flips false→true once per screen, so it

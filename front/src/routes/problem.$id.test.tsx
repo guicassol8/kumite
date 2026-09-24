@@ -374,6 +374,26 @@ describe('ProblemScreen', () => {
     expect(banner.textContent).toContain('pausadas pela organização')
   })
 
+  it('drops the raced 423 banner once the pause itself arrives, and leaves nothing stale on resume', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+    mockedSubmit.mockResolvedValue(
+      jsonResponse(423, { error: 'submissions_paused', message: 'Submissions are paused' }),
+    )
+
+    renderProblem()
+    await screen.findByTestId('problem-submit-button')
+    fireEvent.click(screen.getByTestId('problem-submit-button'))
+    await screen.findByTestId('problem-submit-error-banner')
+
+    emitSse({ type: 'submissions.paused', serverTime: new Date() })
+    expect(screen.getByTestId('problem-submissions-paused-banner')).toBeDefined()
+    expect(screen.queryByTestId('problem-submit-error-banner')).toBeNull()
+
+    emitSse({ type: 'submissions.resumed', serverTime: new Date() })
+    expect(screen.queryByTestId('problem-submissions-paused-banner')).toBeNull()
+    expect(screen.queryByTestId('problem-submit-error-banner')).toBeNull()
+  })
+
   it('does not show the paused banner on a closed round', async () => {
     mockedGet.mockResolvedValue(jsonResponse(200, participantProblem({ roundStatus: 'closed' })))
 

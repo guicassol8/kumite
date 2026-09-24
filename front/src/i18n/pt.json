@@ -862,6 +862,8 @@
     },
     "pointsBadge": "{{points}} pts",
     "positionBadge": "Problema {{letter}}",
+    "bestScoreBadge": "Melhor do time: {{score}}",
+    "noSubmissionBadge": "Sem submissão",
     "submissionsPaused": {
       "notice": "As submissões estão pausadas pela organização. O tempo continua correndo; você ainda pode executar os exemplos."
     }
@@ -953,7 +955,8 @@
       "hard": "Difícil"
     },
     "bestScore": {
-      "hidden": "—"
+      "unavailable": "—",
+      "none": "Sem submissão"
     },
     "connection": {
       "reconnecting": "Conexão perdida — reconectando..."

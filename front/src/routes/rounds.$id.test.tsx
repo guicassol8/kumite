@@ -8,6 +8,7 @@ vi.mock('@/lib/api', () => ({
     rounds: Object.assign(vi.fn(), {
       ':id': { $get: vi.fn() },
     }),
+    teams: { $get: vi.fn() },
   },
 }))
 
@@ -25,6 +26,7 @@ import type { SseEvent } from '@/lib/sse-schema'
 import { routeTree } from '@/routeTree.gen'
 
 const mockedGet = vi.mocked(api.rounds[':id'].$get)
+const mockedTeamsGet = vi.mocked(api.teams.$get)
 const sseUnsubscribe = vi.fn()
 
 // Since #274 this screen reads the app-wide connection opened by
@@ -42,7 +44,13 @@ function emitStatus(status: SseConnectionStatus) {
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stubs
 function jsonResponse(status: number, body: unknown): any {
-  return { status, json: async () => body }
+  return { status, ok: status >= 200 && status < 300, json: async () => body }
+}
+
+// GET /teams tells the screen whether the caller has a team (#206): with one,
+// a null bestScore means "no submissions"; without, it is just unavailable.
+function withTeam() {
+  mockedTeamsGet.mockResolvedValue(jsonResponse(200, { myTeamId: 't1', teams: [] }))
 }
 
 const fakeUser: SessionUser = {
@@ -97,6 +105,8 @@ function renderRound(
 
 beforeEach(() => {
   mockedGet.mockReset()
+  mockedTeamsGet.mockReset()
+  mockedTeamsGet.mockResolvedValue(jsonResponse(200, { myTeamId: null, teams: [] }))
   connectEventStream.mockReset()
   connectEventStream.mockReturnValue(sseUnsubscribe)
   sseUnsubscribe.mockClear()
@@ -135,7 +145,7 @@ describe('RoundDetailScreen', () => {
     expect(await screen.findByTestId('round-detail-not-found')).toBeDefined()
   })
 
-  it('hides every score and shows the live countdown for an open round tracked by the event stream', async () => {
+  it('shows the unavailable placeholder to a teamless participant and the live countdown for an open round tracked by the event stream', async () => {
     mockedGet.mockResolvedValue(jsonResponse(200, roundDetail()))
 
     renderRound()
@@ -161,7 +171,7 @@ describe('RoundDetailScreen', () => {
     )
   })
 
-  it('shows the real best score, or the placeholder for a never-submitted problem, once closed', async () => {
+  it('shows the real best score once closed, and the unavailable placeholder to a teamless participant', async () => {
     mockedGet.mockResolvedValue(
       jsonResponse(
         200,
@@ -202,6 +212,98 @@ describe('RoundDetailScreen', () => {
     expect(screen.getByTestId('round-problem-p2').querySelector('a')?.getAttribute('href')).toBe(
       '/problem/p2',
     )
+  })
+
+  describe('best score (#206)', () => {
+    function twoProblems(status: 'open' | 'closed') {
+      return roundDetail({
+        status,
+        closedAt: status === 'closed' ? '2026-09-02T13:00:00.000Z' : null,
+        problems: [
+          {
+            problemId: 'p1',
+            position: 0,
+            title: 'Soma',
+            difficulty: 'easy',
+            points: 10,
+            bestScore: 8,
+          },
+          {
+            problemId: 'p2',
+            position: 1,
+            title: 'Produto',
+            difficulty: 'medium',
+            points: 20,
+            bestScore: null,
+          },
+        ],
+      })
+    }
+
+    it('shows the team best score while the round is open', async () => {
+      withTeam()
+      mockedGet.mockResolvedValue(jsonResponse(200, twoProblems('open')))
+
+      renderRound()
+
+      const cell = await screen.findByTestId('round-problem-best-score-p1')
+      expect(cell.textContent).toContain('8')
+      expect(cell.getAttribute('data-state')).toBe('score')
+    })
+
+    it('shows "no submissions" for a problem the team never submitted', async () => {
+      withTeam()
+      mockedGet.mockResolvedValue(jsonResponse(200, twoProblems('open')))
+
+      renderRound()
+
+      await waitFor(() =>
+        expect(screen.getByTestId('round-problem-best-score-p2').getAttribute('data-state')).toBe(
+          'none',
+        ),
+      )
+      expect(screen.getByTestId('round-problem-best-score-p2').textContent).toContain(
+        'Sem submissão',
+      )
+    })
+
+    it('shows "no submissions" on a closed round too when the team has one', async () => {
+      withTeam()
+      mockedGet.mockResolvedValue(jsonResponse(200, twoProblems('closed')))
+
+      renderRound()
+
+      await waitFor(() =>
+        expect(screen.getByTestId('round-problem-best-score-p2').getAttribute('data-state')).toBe(
+          'none',
+        ),
+      )
+      expect(screen.getByTestId('round-problem-best-score-p1').textContent).toContain('8')
+    })
+
+    it('shows the unavailable placeholder when the participant has no team', async () => {
+      mockedGet.mockResolvedValue(jsonResponse(200, twoProblems('open')))
+
+      renderRound()
+
+      const cell = await screen.findByTestId('round-problem-best-score-p2')
+      await waitFor(() => expect(mockedTeamsGet).toHaveBeenCalled())
+      expect(cell.getAttribute('data-state')).toBe('unavailable')
+      expect(cell.textContent).toContain('—')
+    })
+
+    it('falls back to the unavailable placeholder, with no error state, when GET /teams fails', async () => {
+      mockedTeamsGet.mockResolvedValue(jsonResponse(500, { error: 'boom' }))
+      mockedGet.mockResolvedValue(jsonResponse(200, twoProblems('open')))
+
+      renderRound()
+
+      const cell = await screen.findByTestId('round-problem-best-score-p2')
+      await waitFor(() => expect(mockedTeamsGet).toHaveBeenCalled())
+      expect(cell.getAttribute('data-state')).toBe('unavailable')
+      expect(screen.getByTestId('round-problem-best-score-p1').textContent).toContain('8')
+      expect(screen.queryByTestId('round-detail-load-error')).toBeNull()
+    })
   })
 
   it('shows and hides the connection indicator as the event stream status changes', async () => {

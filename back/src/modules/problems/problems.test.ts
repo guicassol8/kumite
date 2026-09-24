@@ -800,7 +800,7 @@ describe('problems.service', () => {
       expect(await getPublishedProblem(db, id, 'pt', user.id)).toBeNull()
     })
 
-    it('reports the open round with no bestSubmission query', async () => {
+    it('reports bestSubmission null on the open round when the user has no team', async () => {
       const { id, roundId } = await publishSample()
       const user = await insertUser()
 
@@ -808,6 +808,42 @@ describe('problems.service', () => {
 
       expect(problem?.roundStatus).toBe('open')
       expect(problem?.roundId).toBe(roundId)
+      expect(problem?.bestSubmission).toBeNull()
+    })
+
+    it('reports the team best submission while the round is open', async () => {
+      const { id, roundId } = await publishSample()
+      const user = await insertUser()
+      const team = await insertTeamMember(user.id)
+      const achievedAt = new Date('2026-08-31T12:00:00.000Z')
+      await db.insert(submissionsTable).values({
+        problemId: id,
+        roundId,
+        userId: user.id,
+        teamId: team.id,
+        workspace: {},
+        generatedCode: '',
+        caseResults: [],
+        score: 60,
+        attemptNumber: 1,
+        acceptedAt: achievedAt,
+      })
+
+      const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+      expect(problem?.roundStatus).toBe('open')
+      expect(problem?.roundId).toBe(roundId)
+      expect(problem?.bestSubmission).toEqual({ score: 60, achievedAt, attempts: 1 })
+    })
+
+    it('reports bestSubmission null on the open round when the team never submitted', async () => {
+      const { id } = await publishSample()
+      const user = await insertUser()
+      await insertTeamMember(user.id)
+
+      const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+      expect(problem?.roundStatus).toBe('open')
       expect(problem?.bestSubmission).toBeNull()
     })
 

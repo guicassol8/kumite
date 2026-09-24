@@ -134,9 +134,8 @@ export const ParticipantRoundProblemSchema = z.object({
   title: z.string(),
   difficulty: DifficultySchema,
   points: z.number().int(),
-  // The team's best score on this problem. Null while the round is open (the
-  // participant doesn't need it yet, same rule as getPublishedProblem) and
-  // once the round is closed, null only when the team never submitted.
+  // The team's best score on this problem, open or closed (#206). Null when
+  // the team never submitted it or the caller has no team.
   bestScore: z.number().int().nullable(),
 })
 

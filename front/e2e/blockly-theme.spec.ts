@@ -1,6 +1,11 @@
 import { expect, type Locator, type Page, test } from '@playwright/test'
 
-import { dragBlockFromFlyout } from './support/blockly'
+import {
+  dragBlockFromFlyout,
+  EDITOR_TEST_TIMEOUT_MS,
+  editorTestTimeout,
+  expectBlocklyInjected,
+} from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -72,9 +77,7 @@ function blockFill(page: Page, style: string): Promise<string> {
 
 async function openEditor(page: Page, problemId: string) {
   await page.goto(`/problem/${problemId}`)
-  await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible({
-    timeout: 60_000,
-  })
+  await expectBlocklyInjected(page)
   await expect(page.locator(TOP_BLOCKS).first()).toBeVisible()
 }
 
@@ -95,7 +98,7 @@ test.describe('the kumite Blockly theme', () => {
     test('paints the identity, then swaps to dark live and keeps it across a language switch', async ({
       page,
     }) => {
-      test.setTimeout(120_000)
+      test.setTimeout(editorTestTimeout(1, 120_000))
       await seedParticipantToken(page, participantToken)
       await openEditor(page, problemId)
 
@@ -177,6 +180,7 @@ test.describe('the kumite Blockly theme', () => {
     test.use({ colorScheme: 'dark', viewport: { width: 390, height: 844 } })
 
     test('opens already in the dark editor theme', async ({ page }) => {
+      test.setTimeout(EDITOR_TEST_TIMEOUT_MS)
       await seedParticipantToken(page, participantToken)
       await openEditor(page, problemId)
 

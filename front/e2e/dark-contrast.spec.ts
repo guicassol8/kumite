@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 
+import { EDITOR_TEST_TIMEOUT_MS, expectBlocklyInjected } from './support/blockly'
 import { isViolation, sampleContrast, settle } from './support/contrast'
 import {
   BACK_URL,
@@ -87,7 +88,7 @@ const ROUTES: RouteCase[] = [
     as: 'problem',
     needsOrganizer: true,
     ready: async (page) => {
-      await expect(page.locator('svg.blocklySvg')).toBeVisible()
+      await expectBlocklyInjected(page)
     },
   },
   {
@@ -109,6 +110,9 @@ function tokenFor(route: RouteCase): string {
 }
 
 async function openRoute(page: Page, route: RouteCase): Promise<void> {
+  // Only the editor route waits for a Blockly injection, so only its tests
+  // get the editor budget; every other route keeps the 30s default.
+  if (route.as === 'problem') test.setTimeout(EDITOR_TEST_TIMEOUT_MS)
   await seedParticipantToken(page, tokenFor(route))
   await page.goto(route.path())
   await route.ready(page)

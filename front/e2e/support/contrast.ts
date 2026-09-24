@@ -145,7 +145,7 @@ type Sample = {
  * - skipped: disabled controls (exempt under WCAG 1.4.3), `aria-hidden`
  *   text, anything ≤ 1px (the `sr-only` pattern), text drawn inside an
  *   `<svg>` (it paints with `fill`, not `color`), and whatever `exclude`
- *   names — the Blockly canvas, which runs its own theme.
+ *   names (a region a spec deliberately leaves to another guard).
  *
  * The background is composed like `measure()` does, from the ancestor chain,
  * with each ancestor's `opacity` folded into the layers it paints and the

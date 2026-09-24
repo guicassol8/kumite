@@ -262,7 +262,8 @@ jsonpath "$.points" == 100
 
 # 10d. Participant read in es -> Spanish title and statement, only the
 # visible case (no `hidden` key anywhere, no trace of the hidden expected (4)),
-# and the round now reported as open with no bestSubmission query performed.
+# and the round now reported as open; bestSubmission is null because this
+# participant has no team (a team sees its own best mid-round, #206).
 GET {{host}}/problems/{{problem_id}}?locale=es
 Authorization: Bearer {{participant_token}}
 HTTP 200

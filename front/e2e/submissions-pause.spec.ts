@@ -128,9 +128,14 @@ test.describe('submissions pause (#285)', () => {
       await toggle.click()
       await expect(organizerPage.getByTestId('overview-submissions-paused-badge')).toBeVisible()
       await expect(toggle).toHaveText('Retomar submissões')
+      // The SSE flip can beat the PATCH response; wait for the mutation to
+      // settle so the capture shows the button as the organizer will use it.
+      await expect(toggle).toBeEnabled()
+      await organizerPage.mouse.move(0, 0)
       await organizerPage.screenshot({
         path: evidence('01-organizer-card-pausado'),
         fullPage: true,
+        animations: 'disabled',
       })
 
       // 02 — the participant's editor learns it over SSE, no reload: banner
@@ -142,7 +147,11 @@ test.describe('submissions pause (#285)', () => {
       await participantPage.getByTestId('problem-run-button').click()
       await expect(participantPage.getByTestId('problem-results-summary')).toHaveText('3/3 casos')
       await expect(countdown).not.toHaveText(before ?? '', { timeout: 5_000 })
-      await participantPage.screenshot({ path: evidence('02-editor-pausado'), fullPage: true })
+      await participantPage.screenshot({
+        path: evidence('02-editor-pausado'),
+        fullPage: true,
+        animations: 'disabled',
+      })
 
       // 03 — the organizer resumes; the banner goes away live and the next
       // submission is judged straight away (no cooldown left by the pause).
@@ -159,7 +168,11 @@ test.describe('submissions pause (#285)', () => {
           'passed',
         )
       }
-      await participantPage.screenshot({ path: evidence('03-editor-retomado'), fullPage: true })
+      await participantPage.screenshot({
+        path: evidence('03-editor-retomado'),
+        fullPage: true,
+        animations: 'disabled',
+      })
 
       // 04 — the same flag, from /organizer/event-config: off, on, off.
       await organizerPage.goto('/organizer/event-config')
@@ -171,13 +184,16 @@ test.describe('submissions pause (#285)', () => {
       await organizerPage.screenshot({
         path: evidence('04-event-config-toggle-ligado'),
         fullPage: true,
+        animations: 'disabled',
       })
       await configSwitch.click()
       await expect(configSwitch).toHaveAttribute('aria-checked', 'false')
       await expect(participantPage.getByTestId('problem-submissions-paused-banner')).toHaveCount(0)
+      await organizerPage.mouse.move(0, 0)
       await organizerPage.screenshot({
         path: evidence('05-event-config-toggle-desligado'),
         fullPage: true,
+        animations: 'disabled',
       })
     } finally {
       await setPaused(auth, false)

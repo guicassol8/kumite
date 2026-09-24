@@ -10,6 +10,11 @@ export type BlocklyWorkspaceHandle = {
   serialize(): WorkspaceState
   deserialize(state: WorkspaceState): void
   clear(): void
+  /**
+   * Centers the view on the content, keeping the zoom and every block where
+   * it is (#205). A viewport change only — never reported through onChange.
+   */
+  recenter(): void
   /** Escape hatch for the tasks that drive Blockly directly (root block, codegen). */
   getWorkspace(): Blockly.WorkspaceSvg | null
 }
@@ -99,8 +104,21 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       // The window may never change size while the container does (the editor
       // layout collapsing on mobile, a panel opening) — observe the box, not
       // the viewport, or Blockly keeps its stale size and clips blocks.
-      const observer = new ResizeObserver(() => {
+      //
+      // #205: the first time the box has a real size, center the *view* on
+      // the content (the seeded root, or the restored autosave) — never move
+      // the blocks. Not at injection: the container can still be 0x0 there
+      // (stacked mobile column, panels measuring themselves). Later resizes
+      // leave the view alone, the participant may have scrolled on purpose.
+      // The flag lives in this effect, so each mount starts over.
+      let centered = false
+      const observer = new ResizeObserver((entries) => {
         Blockly.svgResize(workspace)
+        if (centered) return
+        const box = entries[entries.length - 1]?.contentRect
+        if (!box || box.width <= 0 || box.height <= 0) return
+        centered = true
+        workspace.scrollCenter()
       })
       observer.observe(container)
 
@@ -133,6 +151,9 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
         },
         clear: () => {
           workspaceRef.current?.clear()
+        },
+        recenter: () => {
+          workspaceRef.current?.scrollCenter()
         },
         getWorkspace: () => workspaceRef.current,
       }),

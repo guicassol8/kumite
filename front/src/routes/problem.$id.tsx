@@ -362,6 +362,8 @@ function ProblemScreen() {
         // dragged in), so "clear" resets to it rather than to nothing — an
         // empty workspace would leave no way back in.
         workspaceRef.current?.deserialize(emptyWorkspaceState)
+        // Back to the same state as a fresh editor, so the same view (#205).
+        workspaceRef.current?.recenter()
         clearSaved()
       }}
       isClosed={isClosed}

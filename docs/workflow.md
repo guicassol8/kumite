@@ -173,21 +173,20 @@ fine" or "just docs nearby."
   opening/updating the PR, unless successful hooks already ran the same
   checks for the same revision. During implementation use focused checks;
   repeat the full ladder only after changes or failures justify it.
-- **E2E in CI.** The `e2e` job in `ci.yml` runs the **whole** Playwright
-  suite (`pnpm --filter @kumite/front e2e`) on every push to every PR and on
-  push to `main`. It has its own Postgres, the same throwaway organizer as
-  the `hurl` job and a `BACK_NOTIFICATIONS_LOG` path, so the organizer and
-  real-OTP specs run instead of skipping. It needs no secret. In CI only,
-  a failing spec gets one retry: one that passes on the retry is reported
-  as **flaky** in the report and in the PR annotations, but it does not fail
-  the job. The HTML report, the traces and screenshots of failures and the
-  back's log are uploaded as the `playwright-report` artifact (kept 14
-  days) whenever the job was not cancelled. The suite does not run in the
-  pre-commit or in the Stop hook. So "existing e2e green" on a PR means
-  **the `e2e` check is green**. Look at its flaky count too. Known flakes:
-  #338 (`header-logout-contrast.spec.ts`) and #246 (the 30 s expect timeout
-  under memory pressure). The retry keeps them from failing the gate, but
-  it does not fix them.
+- **E2E in CI — not yet.** CI does **not** run Playwright today: the `e2e`
+  job for `ci.yml` is written but not applied, because it needs an edit to
+  a protected config (`.github/workflows/`), tracked in #295. Until it
+  lands, "existing e2e green" on a PR is proven by running the **whole**
+  suite locally (`pnpm --filter @kumite/front e2e`, with the organizer env,
+  `db:seed` and `BACK_NOTIFICATIONS_LOG` so nothing skips) and recording
+  the numbers in the Evidence. `front/playwright.config.ts` already carries
+  the CI settings: run with `CI=1` to reproduce them locally — one retry
+  (a spec that passes on the retry is reported as **flaky**), `forbidOnly`,
+  the HTML + GitHub reporters, trace on first retry and screenshots of
+  failures. The suite does not run in the pre-commit or in the Stop hook.
+  Known flakes: #338 (`header-logout-contrast.spec.ts`) and #246 (the 30 s
+  expect timeout under memory pressure) — name them in the Evidence when
+  they fail; they are not fixed by a retry.
 
 ## Branches, commits, PRs
 

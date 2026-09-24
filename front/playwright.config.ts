@@ -15,7 +15,8 @@ const notificationsLog = process.env.BACK_NOTIFICATIONS_LOG
 const backCommand = notificationsLog
   ? `pnpm --filter @kumite/back dev 2>&1 | tee '${notificationsLog}'`
   : 'pnpm --filter @kumite/back dev'
-// GitHub Actions sets CI=true for the `e2e` job in ci.yml (#295).
+// GitHub Actions sets CI=true. The `e2e` job these settings are for is not
+// in ci.yml yet (#295); `CI=1` locally reproduces its reporter/retry behaviour.
 const isCI = !!process.env.CI
 
 export default defineConfig({
@@ -40,7 +41,7 @@ export default defineConfig({
   // flakes (#338, #246) stay open and are fixed there, not hidden here.
   retries: isCI ? 1 : 0,
   // Local runs keep Playwright's default `list`; CI adds the HTML report the
-  // workflow uploads as an artifact and inline annotations on the PR.
+  // planned `e2e` job uploads as an artifact and inline annotations on the PR.
   reporter: isCI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${frontPort}`,

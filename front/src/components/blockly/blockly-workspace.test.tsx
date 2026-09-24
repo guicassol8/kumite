@@ -1,10 +1,10 @@
 import { buildToolbox, defineKumiteBlocks } from '@kumite/blocks'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import * as Blockly from 'blockly'
 import { createRef, StrictMode } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import '@/i18n'
+import i18n from '@/i18n'
 import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
@@ -166,6 +166,21 @@ describe('BlocklyWorkspace', () => {
 
     cleanup()
     expect(observer.disconnect).toHaveBeenCalled()
+  })
+
+  it('adds a recenter control, relabelled when the language changes (#205)', async () => {
+    renderWorkspace()
+    const control = screen.getByTestId('editor-recenter')
+
+    expect(control.getAttribute('aria-label')).toBe('Centralizar a solução')
+
+    await act(async () => {
+      await i18n.changeLanguage('en')
+    })
+    expect(control.getAttribute('aria-label')).toBe('Center the solution')
+    await act(async () => {
+      await i18n.changeLanguage('pt')
+    })
   })
 
   describe('centering the view (#205)', () => {

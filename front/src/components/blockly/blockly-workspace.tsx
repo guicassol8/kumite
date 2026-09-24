@@ -2,6 +2,7 @@ import * as Blockly from 'blockly'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { RecenterControl } from '@/lib/blockly-recenter-control'
 import { cn } from '@/lib/utils'
 
 export type WorkspaceState = ReturnType<typeof Blockly.serialization.workspaces.save>
@@ -62,6 +63,10 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
     const containerRef = useRef<HTMLDivElement>(null)
     const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
     const appliedToolboxRef = useRef(toolbox)
+    const recenterControlRef = useRef<RecenterControl | null>(null)
+    const recenterLabel = t('editor.recenter')
+    const labelRef = useRef(recenterLabel)
+    labelRef.current = recenterLabel
 
     // The workspace is injected once, so the injection effect reads the props
     // from here instead of depending on them.
@@ -80,6 +85,8 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       })
       workspaceRef.current = workspace
       appliedToolboxRef.current = injected
+      const recenterControl = new RecenterControl(workspace, labelRef.current)
+      recenterControlRef.current = recenterControl
       propsRef.current.onReady?.(workspace)
 
       // Restoring a saved workspace is not a user edit: suppress the events
@@ -125,10 +132,18 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       return () => {
         observer.disconnect()
         workspace.removeChangeListener(listener)
+        recenterControl.dispose()
+        recenterControlRef.current = null
         workspace.dispose()
         workspaceRef.current = null
       }
     }, [])
+
+    // The recenter control lives in Blockly's svg, outside React: relabel it
+    // by hand on a language switch.
+    useEffect(() => {
+      recenterControlRef.current?.setLabel(recenterLabel)
+    }, [recenterLabel])
 
     // A new toolbox swaps in place — the blocks already on the canvas stay.
     useEffect(() => {

@@ -114,6 +114,7 @@
   },
   "editor": {
     "workspaceLabel": "Área de bloques",
+    "recenter": "Centrar la solución",
     "createVariable": {
       "title": "Crear variable",
       "label": "Nombre de la variable",

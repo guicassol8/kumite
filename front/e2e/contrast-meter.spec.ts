@@ -112,6 +112,38 @@ test.describe('the contrast meter (#234)', () => {
     expect(violations[0]).toMatchObject({ testid: 'faint-icon', required: 3 })
   })
 
+  test('measures what a text field shows: its value, or its placeholder when empty', async ({
+    page,
+  }) => {
+    // Neither is a text node, so the text sweep alone never sees a field —
+    // a faint placeholder would pass blind.
+    await mount(
+      page,
+      `<input data-testid="faint-placeholder" placeholder="seu time" style="color:#000" />
+       <input data-testid="ok-value" value="Time Azul" style="color:#595959" />
+       <input data-testid="faint-value" value="Time Rosa" style="color:#ccc" />
+       <textarea data-testid="ok-textarea" placeholder="descreva" style="color:#000"></textarea>
+       <style>[data-testid="faint-placeholder"]::placeholder{color:#ccc;opacity:1}
+              [data-testid="ok-textarea"]::placeholder{color:#595959;opacity:1}</style>`,
+    )
+
+    const violations = await findContrastViolations(page)
+
+    expect(violations.map((v) => v.testid).sort()).toEqual(['faint-placeholder', 'faint-value'])
+    expect(violations.find((v) => v.testid === 'faint-placeholder')?.text).toBe('seu time')
+  })
+
+  test('leaves non-text inputs and disabled fields alone', async ({ page }) => {
+    await mount(
+      page,
+      `<input type="checkbox" style="color:#eee" />
+       <input type="hidden" value="segredo" />
+       <input disabled placeholder="desligado" style="color:#eee" />`,
+    )
+
+    expect(await findContrastViolations(page)).toEqual([])
+  })
+
   test('fails loudly when an ancestor paints a background image', async ({ page }) => {
     await mount(
       page,

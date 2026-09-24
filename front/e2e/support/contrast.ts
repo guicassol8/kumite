@@ -142,6 +142,8 @@ type Sample = {
  *   ≥ 18.66px at weight ≥ 700);
  * - every icon-only `button`/`a` (no visible text of its own), its SVG's
  *   stroke — or fill — at 3:1, the "interface component" bar;
+ * - every text field (`input` of a text type, `textarea`, native `select`):
+ *   its value, or its placeholder while empty, at the text bars above;
  * - skipped: disabled controls (exempt under WCAG 1.4.3), `aria-hidden`
  *   text, anything ≤ 1px (the `sr-only` pattern), text drawn inside an
  *   `<svg>` (it paints with `fill`, not `color`), and whatever `exclude`
@@ -284,6 +286,41 @@ export async function sampleContrast(
       const ink = style.stroke && style.stroke !== 'none' ? style.stroke : style.fill
       if (!ink || ink === 'none' || ink.startsWith('url(')) continue
       sample(svg, '[icon]', ink, true, true)
+    }
+
+    // 3 — text fields: what they show is neither a text node nor an icon, so
+    // the two sweeps above never see it. The value when there is one, else
+    // the placeholder (WCAG holds it to 1.4.3 like any other text).
+    const TEXT_INPUTS = new Set(['', 'text', 'email', 'password', 'search', 'tel', 'url', 'number'])
+    for (const field of document.querySelectorAll('input, textarea, select')) {
+      if (field.closest(skipSelector) || field.closest(disabledSelector)) continue
+      if (field instanceof HTMLInputElement && !TEXT_INPUTS.has(field.type)) continue
+      if (!visible(field)) continue
+      const box = field.getBoundingClientRect()
+      if (box.width <= 1 || box.height <= 1) continue
+      const style = getComputedStyle(field)
+      const size = Number.parseFloat(style.fontSize)
+      const weight = Number.parseInt(style.fontWeight, 10) || 400
+      const large = size >= 24 || (size >= 18.66 && weight >= 700)
+      const shown =
+        field instanceof HTMLSelectElement
+          ? (field.selectedOptions[0]?.textContent ?? '')
+          : (field as HTMLInputElement | HTMLTextAreaElement).value
+      if (shown.trim()) {
+        const label =
+          field instanceof HTMLInputElement && field.type === 'password' ? '[password]' : shown
+        sample(field, label.trim().slice(0, 60), style.color, large, false)
+        continue
+      }
+      const placeholder = field.getAttribute('placeholder')?.trim()
+      if (!placeholder) continue
+      sample(
+        field,
+        placeholder.slice(0, 60),
+        getComputedStyle(field, '::placeholder').color,
+        large,
+        false,
+      )
     }
 
     return samples

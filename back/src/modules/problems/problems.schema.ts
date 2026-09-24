@@ -9,6 +9,9 @@ import { BestSubmissionSchema } from '../submissions/submissions.schema'
 // Mirrors the `problems`/`problem_translations` drizzle tables (db/schema.ts).
 export const DifficultySchema = z.enum(['easy', 'medium', 'hard'])
 export const ProblemStatusSchema = z.enum(['draft', 'published', 'archived'])
+// Where a problem lives (#209): 'round' is the competition; 'practice' is read
+// outside any round, never enters one and is never submitted.
+export const ProblemVisibilitySchema = z.enum(['round', 'practice'])
 
 export const TestCaseSchema = z.object({
   input: JsonValueSchema,
@@ -21,6 +24,7 @@ export const ProblemSchema = z.object({
   points: z.number().int(),
   difficulty: DifficultySchema,
   status: ProblemStatusSchema,
+  visibility: ProblemVisibilitySchema,
   testCases: z.array(TestCaseSchema),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -37,6 +41,7 @@ export const ProblemTranslationSchema = z.object({
 
 export type Difficulty = z.infer<typeof DifficultySchema>
 export type ProblemStatus = z.infer<typeof ProblemStatusSchema>
+export type ProblemVisibility = z.infer<typeof ProblemVisibilitySchema>
 export type TestCase = z.infer<typeof TestCaseSchema>
 export type Problem = z.infer<typeof ProblemSchema>
 export type ProblemTranslation = z.infer<typeof ProblemTranslationSchema>
@@ -63,6 +68,8 @@ export const PROBLEM_POINTS_MAX = 10_000
 export const CreateProblemBodySchema = z.object({
   difficulty: DifficultySchema,
   points: z.number().int().positive().max(PROBLEM_POINTS_MAX).optional(),
+  // Absent means 'round' (#209): the competition stays the default audience.
+  visibility: ProblemVisibilitySchema.optional(),
 })
 
 export const ProblemIdParamsSchema = z.object({
@@ -81,6 +88,7 @@ export const UpdateProblemBodySchema = z
     points: z.number().int().positive().max(PROBLEM_POINTS_MAX).optional(),
     testCases: z.array(TestCaseSchema).optional(),
     translations: z.array(TranslationInputSchema).optional(),
+    visibility: ProblemVisibilitySchema.optional(),
   })
   .superRefine((body, ctx) => {
     if (!body.translations) return
@@ -102,6 +110,7 @@ export const ProblemDetailSchema = z.object({
   points: z.number().int(),
   difficulty: DifficultySchema,
   status: ProblemStatusSchema,
+  visibility: ProblemVisibilitySchema,
   testCases: z.array(TestCaseSchema),
   translations: z.array(
     z.object({ locale: LocaleSchema, title: z.string(), statementMd: z.string() }),
@@ -115,6 +124,7 @@ export const ProblemSummarySchema = z.object({
   points: z.number().int(),
   difficulty: DifficultySchema,
   status: ProblemStatusSchema,
+  visibility: ProblemVisibilitySchema,
   testCaseCount: z.number().int(),
   translations: z.array(z.object({ locale: LocaleSchema, title: z.string() })),
 })
@@ -157,10 +167,12 @@ export const ParticipantProblemSchema = z.object({
   title: z.string(),
   statementMd: z.string(),
   examples: z.array(ExampleCaseSchema),
+  visibility: ProblemVisibilitySchema,
   // Round access (#37): null/'closed' when the problem's round has ended (read
   // only, no more submissions); populated when it's the currently open round.
+  // A practice problem (#209) has no round at all: null/'none'.
   roundId: z.string().nullable(),
-  roundStatus: z.enum(['open', 'closed']),
+  roundStatus: z.enum(['open', 'closed', 'none']),
   // The team's best submission in this round, open or closed (#206); null
   // when the team never submitted it or the caller has no team.
   bestSubmission: BestSubmissionSchema.nullable(),
@@ -170,3 +182,23 @@ export type ParticipantProblemParams = z.infer<typeof ParticipantProblemParamsSc
 export type ParticipantProblemQuery = z.infer<typeof ParticipantProblemQuerySchema>
 export type ExampleCase = z.infer<typeof ExampleCaseSchema>
 export type ParticipantProblem = z.infer<typeof ParticipantProblemSchema>
+
+// --- Practice catalog DTOs (#209) ---
+
+export const PracticeProblemListQuerySchema = z.object({
+  locale: LocaleSchema.default('pt'),
+})
+
+// A listing, not a read: no statement, no examples, and never a test case.
+export const PracticeProblemSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  difficulty: DifficultySchema,
+  // The locale actually served — a missing translation falls back to pt.
+  locale: LocaleSchema,
+})
+
+export const PracticeProblemListSchema = z.array(PracticeProblemSummarySchema)
+
+export type PracticeProblemListQuery = z.infer<typeof PracticeProblemListQuerySchema>
+export type PracticeProblemSummary = z.infer<typeof PracticeProblemSummarySchema>

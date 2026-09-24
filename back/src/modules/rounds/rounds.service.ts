@@ -153,14 +153,34 @@ export async function findOpenRound(db: Db): Promise<RoundRow | null> {
 
 // A missing id and a not-published one are reported identically: a draft
 // problem never announces itself to the round-building flow (same rule as
-// the participant read in problems.service.ts).
+// the participant read in problems.service.ts). A practice problem (#209) is
+// not eligible either — it never enters round_problems, which is what keeps
+// it out of the ranking, the stats and the export by construction.
 async function hasOnlyPublishedProblems(db: Db, problemIds: string[]): Promise<boolean> {
   if (problemIds.length === 0) return true
   const rows = await db
     .select({ id: problemsTable.id })
     .from(problemsTable)
-    .where(and(inArray(problemsTable.id, problemIds), eq(problemsTable.status, 'published')))
+    .where(
+      and(
+        inArray(problemsTable.id, problemIds),
+        eq(problemsTable.status, 'published'),
+        eq(problemsTable.visibility, 'round'),
+      ),
+    )
   return rows.length === problemIds.length
+}
+
+// Any round at all — draft, open or closed (#209). A problem that ever sat in
+// a round carries history (submissions, ranking, export) that must not turn
+// into practice underneath it.
+export async function isProblemInAnyRound(db: Db, problemId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ roundId: roundProblemsTable.roundId })
+    .from(roundProblemsTable)
+    .where(eq(roundProblemsTable.problemId, problemId))
+    .limit(1)
+  return row !== undefined
 }
 
 export type CreateRoundResult =

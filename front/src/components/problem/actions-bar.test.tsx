@@ -17,6 +17,7 @@ function renderBar(overrides: Partial<Parameters<typeof ActionsBar>[0]> = {}) {
     onClear: vi.fn(),
     isClosed: false,
     isSubmitting: false,
+    isPaused: false,
     onSubmit: vi.fn(),
     ...overrides,
   }
@@ -30,6 +31,15 @@ afterEach(() => {
 })
 
 describe('ActionsBar', () => {
+  // #285: a pause disables Submeter only — Executar and Limpar keep working.
+  it('disables only Submeter while submissions are paused', () => {
+    renderBar({ isPaused: true })
+
+    expect((screen.getByTestId('problem-submit-button') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByTestId('problem-run-button') as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByTestId('problem-clear-button') as HTMLButtonElement).disabled).toBe(false)
+  })
+
   it('makes Submeter the only button filled in brand red', () => {
     renderBar()
 

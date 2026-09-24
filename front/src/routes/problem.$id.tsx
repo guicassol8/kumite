@@ -159,6 +159,12 @@ function ProblemScreen() {
         setSubmitBanner({ key: 'problem.submitError.cooldown' })
         return
       }
+      if (res.status === 423) {
+        // Paused by the organizer (#285) between the SSE event and the click;
+        // the paused banner above usually beats this to it.
+        setSubmitBanner({ key: 'problem.submitError.paused' })
+        return
+      }
       if (res.status === 400) {
         const body = await res.json().catch(() => null)
         setSubmitBanner(
@@ -285,6 +291,16 @@ function ProblemScreen() {
     </Alert>
   )
 
+  // #285: only while the round is still open — a closed round already says
+  // so, and its Submeter is gone. The timer is not touched.
+  const isPaused = !isClosed && eventStream.submissionsPaused
+  const pausedNotice = isPaused && (
+    <Alert className="shrink-0" data-testid="problem-submissions-paused-banner">
+      <Info />
+      <AlertDescription>{t('problem.submissionsPaused.notice')}</AlertDescription>
+    </Alert>
+  )
+
   const submitBannerAlert = submitBanner && (
     <Alert
       variant="destructive"
@@ -335,6 +351,7 @@ function ProblemScreen() {
       }}
       isClosed={isClosed}
       isSubmitting={submit.isPending}
+      isPaused={isPaused}
       onSubmit={() => void handleSubmit()}
     />
   )
@@ -346,7 +363,12 @@ function ProblemScreen() {
         positionLabel={problemLetter}
         hasResults={hasResults}
         closedNotice={closedNotice}
-        submitBanner={submitBannerAlert}
+        submitBanner={
+          <>
+            {pausedNotice}
+            {submitBannerAlert}
+          </>
+        }
         editor={blocklyWorkspace}
         results={hasResults ? resultsContent : undefined}
         actionsBar={actionsBar}

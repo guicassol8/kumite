@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { setMatchMediaMatches } from '@/test/match-media-jsdom'
+import { setPresentationActive } from './presentation-mode'
 import {
   applyTheme,
+  DARK_SCHEME_QUERY,
+  readResolvedTheme,
   readTheme,
   resolveTheme,
   setTheme,
   subscribe,
   THEME_STORAGE_KEY,
+  watchSystemTheme,
 } from './theme'
 
 function themeColor(): string | null {
@@ -28,23 +33,70 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  // The matchMedia shim's registry is global: leave the OS on light for the
+  // next test, whatever this one flipped it to.
+  setMatchMediaMatches(DARK_SCHEME_QUERY, false)
+  setPresentationActive(false)
 })
 
 describe('the theme store', () => {
-  it('stays light with no choice saved, even when the OS asks for dark', () => {
-    // The whole point of the #214 freeze: `system` resolves to light until
-    // #234 turns `prefers-color-scheme` back on, so a dark OS must not win.
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
-    )
+  it('follows a dark OS when no choice is saved', () => {
+    setMatchMediaMatches(DARK_SCHEME_QUERY, true)
 
     expect(readTheme()).toBe('system')
+    expect(resolveTheme('system')).toBe('dark')
+
+    applyTheme()
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    expect(themeColor()).toBe('#0e0c0b')
+  })
+
+  it('follows a light OS when no choice is saved', () => {
+    setMatchMediaMatches(DARK_SCHEME_QUERY, false)
+
     expect(resolveTheme('system')).toBe('light')
 
     applyTheme()
 
     expect(document.documentElement.classList.contains('dark')).toBe(false)
+  })
+
+  it('lets a saved light choice win over a dark OS', () => {
+    setMatchMediaMatches(DARK_SCHEME_QUERY, true)
+    localStorage.setItem(THEME_STORAGE_KEY, 'light')
+
+    applyTheme()
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(readResolvedTheme()).toBe('light')
+  })
+
+  it('lets a saved dark choice win over a light OS', () => {
+    setMatchMediaMatches(DARK_SCHEME_QUERY, false)
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark')
+
+    applyTheme()
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    expect(readResolvedTheme()).toBe('dark')
+  })
+
+  it('treats a stored value that is not a theme as system, following the OS', () => {
+    setMatchMediaMatches(DARK_SCHEME_QUERY, true)
+    localStorage.setItem(THEME_STORAGE_KEY, 'sepia')
+
+    applyTheme()
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+  })
+
+  it('falls back to light where matchMedia does not exist', () => {
+    vi.stubGlobal('matchMedia', undefined)
+
+    expect(resolveTheme('system')).toBe('light')
+
+    vi.unstubAllGlobals()
   })
 
   it('puts the dark class on <html> when dark is the saved choice', () => {
@@ -57,7 +109,7 @@ describe('the theme store', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
 
-  it('falls back to light when the stored value is not a theme', () => {
+  it('falls back to system (light OS) when the stored value is not a theme', () => {
     localStorage.setItem(THEME_STORAGE_KEY, 'sepia')
 
     expect(readTheme()).toBe('system')
@@ -110,5 +162,60 @@ describe('the theme store', () => {
 
     expect(() => setTheme('dark')).not.toThrow()
     expect(document.documentElement.classList.contains('dark')).toBe(true)
+  })
+})
+
+describe('following the OS live', () => {
+  let stopWatching: () => void = () => undefined
+
+  beforeEach(() => {
+    stopWatching = watchSystemTheme()
+  })
+
+  afterEach(() => stopWatching())
+
+  it('repaints when the OS switches and nothing is saved', () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribe(listener)
+
+    setMatchMediaMatches(DARK_SCHEME_QUERY, true)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    expect(themeColor()).toBe('#0e0c0b')
+    expect(readResolvedTheme()).toBe('dark')
+    expect(listener).toHaveBeenCalled()
+
+    setMatchMediaMatches(DARK_SCHEME_QUERY, false)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(themeColor()).toBe('#1c1716')
+    unsubscribe()
+  })
+
+  it('leaves a saved light choice alone when the OS goes dark', () => {
+    setTheme('light')
+
+    setMatchMediaMatches(DARK_SCHEME_QUERY, true)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+    expect(readResolvedTheme()).toBe('light')
+  })
+
+  it('does not undo the telão forced dark when the OS goes light', () => {
+    setMatchMediaMatches(DARK_SCHEME_QUERY, true)
+    setPresentationActive(true)
+    document.documentElement.classList.add('dark')
+
+    setMatchMediaMatches(DARK_SCHEME_QUERY, false)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+  })
+
+  it('stops listening once the returned cleanup runs', () => {
+    stopWatching()
+
+    setMatchMediaMatches(DARK_SCHEME_QUERY, true)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
   })
 })

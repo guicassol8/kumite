@@ -48,17 +48,29 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       // Anti-flash: roda antes do primeiro paint, entao antes do bundle. Sem
-      // ele, quem escolheu escuro leva um lampejo de papel a cada F5.
+      // ele, quem escolheu escuro (ou tem o SO em escuro) leva um lampejo de
+      // papel a cada F5.
       //
       // A chave e a regra sao as mesmas de src/lib/theme.ts (que nao pode ser
-      // importado aqui: e um modulo, e modulo e deferido). Mudou uma, muda a
-      // outra — e2e/theme.spec.ts e o guarda dessa duplicacao.
+      // importado aqui: e um modulo, e modulo e deferido): a escolha salva
+      // vence; sem ela — ou com um valor que nao e tema — vale o
+      // prefers-color-scheme do SO. Mudou uma, muda a outra — e2e/theme.spec.ts
+      // e o guarda dessa duplicacao.
+      var saved = null
       try {
-        if (localStorage.getItem('kumite:theme') === 'dark') {
+        saved = localStorage.getItem('kumite:theme')
+      } catch {
+        // localStorage bloqueado (aba anonima, cookies desligados): segue o SO.
+      }
+      try {
+        if (
+          saved === 'dark' ||
+          (saved !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
+        ) {
           document.documentElement.classList.add('dark')
         }
       } catch {
-        // localStorage bloqueado (aba anonima, cookies desligados): claro.
+        // sem matchMedia: claro.
       }
     </script>
   </head>

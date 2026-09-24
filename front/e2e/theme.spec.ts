@@ -6,7 +6,12 @@ import { ORGANIZER_NAME } from './support/rounds'
 // cannot see: `index.html`'s anti-flash script (jsdom never runs it), whether a
 // font actually loaded from our own origin, and whether the icons are really
 // served. Doubles as the PR's visual evidence.
+//
+// #234 turned `prefers-color-scheme` back on: with no saved choice the theme
+// follows the OS (and follows it live), a saved choice still wins. Those
+// guards write their evidence to `evidence/234/`; the #216 ones stay put.
 const evidence = (name: string) => `e2e/evidence/216/${name}.png`
+const evidence234 = (name: string) => `e2e/evidence/234/${name}.png`
 
 const BACK_URL = `http://localhost:${process.env.PORT ?? '3000'}`
 const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL ?? ''
@@ -42,22 +47,83 @@ function themeColorMeta(page: Page): Promise<string | null> {
 test.describe('the default theme, with the OS asking for dark', () => {
   test.use({ colorScheme: 'dark' })
 
-  // Acceptance: the default is light even on a dark system. `system` resolves
-  // to light while the redesign epic (#214) is open — #234 is what turns
-  // `prefers-color-scheme` back on, and this test is what will change with it.
-  test('still paints paper, because nobody chose dark', async ({ page }) => {
+  // Acceptance (#234): no saved choice + a dark OS → `.dark` on the root. Read
+  // at DOMContentLoaded, so the class can only have come from `index.html`'s
+  // anti-flash script — no flash of paper on a dark system.
+  test('paints ink from the first paint, because the OS asked for dark', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    const classAtDomReady = await page.evaluate(() => document.documentElement.className)
+    expect(classAtDomReady).toContain('dark')
+
+    await expect(page.getByTestId('app-header')).toBeVisible()
+    expect(await backgroundOfBody(page)).toBe(INK_SURFACE)
+    expect(await themeColorMeta(page)).toBe(CHROME_DARK)
+
+    await page.screenshot({ path: evidence234('01-so-escuro-sem-escolha'), fullPage: true })
+    await page.screenshot({
+      path: evidence234('02-so-escuro-header'),
+      clip: await headerClip(page),
+    })
+  })
+
+  // Acceptance (#234): the saved choice beats the OS — already at
+  // DOMContentLoaded, so the anti-flash script agrees with `theme.ts`.
+  test('stays paper when light is the saved choice', async ({ page }) => {
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('kumite:theme', 'light')
+      } catch {
+        // nothing to do: the assertions below would fail loudly anyway
+      }
+    })
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    const classAtDomReady = await page.evaluate(() => document.documentElement.className)
+    expect(classAtDomReady).not.toContain('dark')
+
+    await expect(page.getByTestId('app-header')).toBeVisible()
+    await expect(page.locator('html')).not.toHaveClass(/dark/)
+    expect(await backgroundOfBody(page)).toBe(PAPER)
+    expect(await themeColorMeta(page)).toBe(CHROME_LIGHT)
+
+    await page.screenshot({ path: evidence234('03-claro-salvo-so-escuro'), fullPage: true })
+  })
+})
+
+test.describe('the default theme, with the OS asking for light', () => {
+  test.use({ colorScheme: 'light' })
+
+  // Acceptance (#234): no saved choice + a light OS → light.
+  test('paints paper', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByTestId('app-header')).toBeVisible()
 
     await expect(page.locator('html')).not.toHaveClass(/dark/)
     expect(await backgroundOfBody(page)).toBe(PAPER)
     expect(await themeColorMeta(page)).toBe(CHROME_LIGHT)
+  })
 
-    await page.screenshot({ path: evidence('01-so-escuro-tela-clara'), fullPage: true })
-    await page.screenshot({
-      path: evidence('02-header-lockup-claro'),
-      clip: await headerClip(page),
-    })
+  // With nothing saved, switching the OS theme with the tab open switches the
+  // app's, with no reload — and the toggle's label follows, so it never
+  // offers the mode already on screen.
+  test('follows the OS live while nothing is saved', async ({ page }) => {
+    await page.goto('/')
+    const toggle = page.getByTestId('header-theme-toggle')
+    await expect(toggle).toBeVisible()
+    const lightLabel = await toggle.getAttribute('aria-label')
+
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await expect(page.locator('html')).toHaveClass(/dark/)
+    await expect.poll(() => backgroundOfBody(page)).toBe(INK_SURFACE)
+    expect(await themeColorMeta(page)).toBe(CHROME_DARK)
+    await expect(toggle).not.toHaveAttribute('aria-label', lightLabel ?? '')
+    await page.screenshot({ path: evidence234('04-troca-ao-vivo-escuro'), fullPage: true })
+
+    await page.emulateMedia({ colorScheme: 'light' })
+    await expect(page.locator('html')).not.toHaveClass(/dark/)
+    await expect.poll(() => backgroundOfBody(page)).toBe(PAPER)
+    await expect(toggle).toHaveAttribute('aria-label', lightLabel ?? '')
+    await page.screenshot({ path: evidence234('05-troca-ao-vivo-claro'), fullPage: true })
   })
 })
 

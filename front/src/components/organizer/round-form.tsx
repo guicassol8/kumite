@@ -48,7 +48,11 @@ async function fetchPublishedProblems() {
   const res = await api.organizer.problems.$get()
   if (!res.ok) throw new Error('failed to load problems')
   const problems = await res.json()
-  return problems.filter((problem) => problem.status === 'published')
+  // A practice problem (#209) is published but never eligible for a round —
+  // the back refuses it with invalid_problem_ids, so it is not offered here.
+  return problems.filter(
+    (problem) => problem.status === 'published' && problem.visibility === 'round',
+  )
 }
 
 /**

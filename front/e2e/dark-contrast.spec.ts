@@ -179,9 +179,19 @@ test.describe('the main routes on a dark OS, nothing saved (#234)', () => {
         }
 
         const nn = String(index + 10)
+        // The sweep covers the whole page; the picture stops at three screens.
+        // Uncapped, a leaderboard grown by every earlier run's teams came out
+        // as a 14 MB PNG at phone width.
+        const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight)
         await page.screenshot({
           path: evidence(`${nn}-${route.slug}-escuro${viewport.label}`),
           fullPage: true,
+          clip: {
+            x: 0,
+            y: 0,
+            width: viewport.size.width,
+            height: Math.min(pageHeight, viewport.size.height * 3),
+          },
         })
       })
     }

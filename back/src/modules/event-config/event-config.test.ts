@@ -1,8 +1,13 @@
+import { signJwt } from '@katajs-framework/core/jwt'
 import { sql } from 'drizzle-orm'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { app } from '../../app'
+import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
+import { k } from '../../context'
 import { createDb } from '../../db/client'
-import { eventConfigTable } from '../../db/schema'
+import { eventConfigTable, usersTable } from '../../db/schema'
+import { createUser } from '../users/users.service'
 
 import { getEventConfig, getOrCreateEventConfig, updateEventConfig } from './event-config.service'
 
@@ -88,5 +93,76 @@ describe('event-config submissionsPaused (#285)', () => {
     await updateEventConfig(db, { submissionsPaused: true })
     const updated = await updateEventConfig(db, { maxTeamSize: 5 })
     expect(updated.submissionsPaused).toBe(true)
+  })
+})
+
+// #285: the route, not the service, announces the toggle — same shape as
+// users.route.ts publishing user.deactivated. The publish is synchronous with
+// the PATCH, so connected clients hear about it well inside one heartbeat.
+describe('PATCH /organizer/event-config — sse side effect (#285)', () => {
+  async function organizerToken() {
+    const organizer = await createUser(db, {
+      email: `organizer-${crypto.randomUUID()}@example.com`,
+      name: 'Org',
+      passwordHash: 'hash',
+      role: 'organizer',
+      university: 'pucrs',
+    })
+    if (!organizer) throw new Error('expected fixture')
+    return signJwt(
+      { role: organizer.role, university: organizer.university },
+      { secret: JWT_SECRET, subject: organizer.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+    )
+  }
+
+  async function patch(body: unknown) {
+    const token = await organizerToken()
+    return app.request('/organizer/event-config', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  beforeEach(async () => {
+    await db.execute(sql`truncate table ${usersTable} restart identity cascade`)
+  })
+
+  it('pausing answers 200 with the flag on and publishes submissions.paused', async () => {
+    const fn = vi.fn()
+    const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+    const res = await patch({ submissionsPaused: true })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ submissionsPaused: true })
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(fn).toHaveBeenCalledWith({ type: 'submissions.paused', serverTime: expect.any(Date) })
+    unsubscribe()
+  })
+
+  it('resuming publishes submissions.resumed', async () => {
+    await updateEventConfig(db, { submissionsPaused: true })
+    const fn = vi.fn()
+    const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+    const res = await patch({ submissionsPaused: false })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ submissionsPaused: false })
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(fn).toHaveBeenCalledWith({ type: 'submissions.resumed', serverTime: expect.any(Date) })
+    unsubscribe()
+  })
+
+  it('a PATCH without submissionsPaused publishes nothing', async () => {
+    const fn = vi.fn()
+    const unsubscribe = k.resolve('sseBus').subscribe(fn)
+
+    const res = await patch({ maxTeamSize: 4 })
+
+    expect(res.status).toBe(200)
+    expect(fn).not.toHaveBeenCalled()
+    unsubscribe()
   })
 })

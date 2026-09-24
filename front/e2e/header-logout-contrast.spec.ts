@@ -1,5 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test'
 
+import { contrastRatio, measure, settle } from './support/contrast'
+
 // #271 — the Sair button used to be a paper slab on the charcoal chrome, with
 // a nearly-white label on it: measured 1.0814:1 at rest and 1.3062:1 on hover
 // in the light theme, where AA asks for 4.5:1. The jsdom guard in
@@ -26,8 +28,6 @@ const AA_CONTRAST = 4.5
 const PASSWORD = 'supersecret'
 const stamp = Date.now().toString().slice(-6)
 
-type Rgb = [number, number, number]
-
 /** The header's own box, so the button fills the shot instead of a few pixels. */
 async function headerClip(page: Page) {
   const box = await page.getByTestId('app-header').boundingBox()
@@ -48,102 +48,9 @@ async function signUpParticipant(page: Page, email: string) {
   await expect(page).toHaveURL(/\/$/)
 }
 
-/**
- * The label's colour and the colour a viewer actually sees behind it — the
- * Acceptance's "fundo efetivo do botão".
- *
- * Reading `backgroundColor` off the button alone is not enough: the fix makes
- * it `bg-transparent`, so what shows through is the chrome, and the hover veil
- * is a `chrome-foreground/10` film over it. The ancestor chain is therefore
- * painted onto a 1×1 canvas, outermost first, exactly as the compositor
- * stacks it.
- *
- * The canvas is also the parser, deliberately. `getComputedStyle` does not
- * always answer in `rgb()`: Tailwind's alpha modifier (`/10`) and any colour
- * sampled during a transition come back as `oklab(0.959 0.001 0.003 / 0.1)`,
- * and reading that with a `[\d.]+` regex yields `rgb(0.959, 0.001, 0.003)` —
- * an almost-black that is nowhere near the paper it describes. Handing the
- * string to `fillStyle` uses the browser's own colour parser instead, and
- * because the stack is opaque by the time it is read, `getImageData` gives
- * back exact sRGB bytes.
- */
-function measure(locator: Locator): Promise<{ text: Rgb; background: Rgb }> {
-  return locator.evaluate((el) => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 1
-    canvas.height = 1
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })
-    if (!ctx) throw new Error('no 2d context to measure colours with')
-
-    // An unparseable value leaves `fillStyle` at whatever it was, so it is
-    // reset to fully transparent first: a value the browser rejects then
-    // paints nothing instead of silently repainting the previous layer.
-    const paint = (value: string) => {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0)'
-      ctx.fillStyle = value
-      ctx.fillRect(0, 0, 1, 1)
-    }
-
-    const read = (): Rgb => {
-      const pixel = ctx.getImageData(0, 0, 1, 1).data
-      return [pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0]
-    }
-
-    const layers: string[] = []
-    for (let node: Element | null = el; node; node = node.parentElement) {
-      layers.push(getComputedStyle(node).backgroundColor)
-    }
-    layers.reverse()
-
-    // Under everything there is the browser canvas, which is painted white.
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, 1, 1)
-    for (const layer of layers) paint(layer)
-    const background = read()
-
-    // The label on top of that stack: opaque text lands on its own colour,
-    // and a translucent one composites the way it is actually seen.
-    paint(getComputedStyle(el).color)
-    const text = read()
-
-    return { text, background }
-  })
-}
-
-/**
- * Lets every running CSS transition finish before a colour is read.
- *
- * The button carries `transition-all` and the theme toggle repaints the page,
- * so a `getComputedStyle` fired straight after a hover or a theme switch
- * samples a colour mid-fade — a value that belongs to no state a user ever
- * sees settle. That artifact is not hypothetical: it is what made this spec's
- * first red/green run report a broken dark theme, when what it had sampled
- * was the light palette still fading out. Keyframe animations are left alone
- * — a looping one never finishes.
- */
-async function settle(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const transitions = document
-      .getAnimations()
-      .filter((animation) => animation instanceof CSSTransition)
-    await Promise.all(transitions.map((animation) => animation.finished.catch(() => undefined)))
-  })
-}
-
-/** WCAG 2.x relative luminance of an sRGB colour. */
-function relativeLuminance([r, g, b]: Rgb): number {
-  const channel = (value: number) => {
-    const c = value / 255
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
-  }
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
-}
-
-function contrastRatio(a: Rgb, b: Rgb): number {
-  const first = relativeLuminance(a)
-  const second = relativeLuminance(b)
-  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05)
-}
+// `measure()` (ancestor-chain compositing on a 1×1 canvas), `settle()` (let
+// transitions finish before reading a colour) and the WCAG maths live in
+// `support/contrast.ts` since #234, shared with the dark smoke.
 
 /** The settled ratio between a button's label and what is really behind it. */
 async function labelContrast(page: Page, locator: Locator): Promise<number> {

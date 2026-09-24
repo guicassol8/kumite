@@ -1,4 +1,9 @@
-import { messagesFor, ROOT_BLOCK_TYPE, VARIABLES_CATEGORY_KEY } from '@kumite/blocks'
+import {
+  CREATE_VARIABLE_BUTTON_KEY,
+  messagesFor,
+  ROOT_BLOCK_TYPE,
+  VARIABLES_CATEGORY_KEY,
+} from '@kumite/blocks'
 import * as Blockly from 'blockly'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -71,21 +76,39 @@ describe('blockly-setup', () => {
   it('registers the variables flyout and the create-variable button', () => {
     const workspace = spyWorkspace()
 
-    registerVariablesFlyout(workspace as unknown as Blockly.WorkspaceSvg, 'pt')
+    registerVariablesFlyout(workspace as unknown as Blockly.WorkspaceSvg, 'pt', vi.fn())
 
     expect(workspace.registerToolboxCategoryCallback).toHaveBeenCalledWith(
       VARIABLES_CATEGORY_KEY,
       expect.any(Function),
     )
     expect(workspace.registerButtonCallback).toHaveBeenCalledWith(
-      expect.any(String),
+      CREATE_VARIABLE_BUTTON_KEY,
       expect.any(Function),
     )
   })
 
+  it("hands the create-variable button to the app's dialog, never to Blockly's prompt (#205)", () => {
+    const workspace = spyWorkspace()
+    const onCreateVariable = vi.fn()
+    const blocklyHandler = vi.spyOn(Blockly.Variables, 'createVariableButtonHandler')
+    const blocklyPrompt = vi.spyOn(Blockly.dialog, 'prompt')
+    registerVariablesFlyout(workspace as unknown as Blockly.WorkspaceSvg, 'pt', onCreateVariable)
+    const callback = workspace.registerButtonCallback.mock.calls[0]?.[1]
+    const target = { id: 'target' } as unknown as Blockly.WorkspaceSvg
+
+    callback({ getTargetWorkspace: () => target })
+
+    expect(onCreateVariable).toHaveBeenCalledWith(target)
+    expect(blocklyHandler).not.toHaveBeenCalled()
+    expect(blocklyPrompt).not.toHaveBeenCalled()
+    blocklyHandler.mockRestore()
+    blocklyPrompt.mockRestore()
+  })
+
   it('registers a category callback that builds the flyout for the given locale', () => {
     const workspace = spyWorkspace()
-    registerVariablesFlyout(workspace as unknown as Blockly.WorkspaceSvg, 'es')
+    registerVariablesFlyout(workspace as unknown as Blockly.WorkspaceSvg, 'es', vi.fn())
     const callback = workspace.registerToolboxCategoryCallback.mock.calls[0]?.[1]
 
     const target = new Blockly.Workspace()
@@ -101,6 +124,6 @@ describe('blockly-setup', () => {
   })
 
   it('does nothing when the workspace is not mounted yet', () => {
-    expect(() => registerVariablesFlyout(null, 'pt')).not.toThrow()
+    expect(() => registerVariablesFlyout(null, 'pt', vi.fn())).not.toThrow()
   })
 })

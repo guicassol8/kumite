@@ -1,6 +1,7 @@
 import { emptyWorkspaceState, withRootBlock } from '@kumite/blocks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import type * as Blockly from 'blockly'
 import { Info, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -8,6 +9,7 @@ import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
 } from '@/components/blockly/blockly-workspace'
+import { CreateVariableDialog } from '@/components/blockly/create-variable-dialog'
 import { ActionsBar } from '@/components/problem/actions-bar'
 import { ExampleResults, type ExampleResultsNotice } from '@/components/problem/example-results'
 import { ProblemPanels } from '@/components/problem/problem-panels'
@@ -62,7 +64,10 @@ function ProblemScreen() {
   const lang = i18n.resolvedLanguage ?? i18n.language
 
   const workspaceRef = useRef<BlocklyWorkspaceHandle>(null)
-  const { toolbox, onReady: onWorkspaceReady } = useBlocklyLocale(workspaceRef)
+  // The workspace whose "Criar variável..." button was pressed; the app's
+  // dialog is open while it is set (#205).
+  const [variableTarget, setVariableTarget] = useState<Blockly.WorkspaceSvg | null>(null)
+  const { toolbox, onReady: onWorkspaceReady } = useBlocklyLocale(workspaceRef, setVariableTarget)
   const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(id)
 
   // Reads the app's single `/sse` connection instead of opening a second one
@@ -357,6 +362,8 @@ function ProblemScreen() {
         // dragged in), so "clear" resets to it rather than to nothing — an
         // empty workspace would leave no way back in.
         workspaceRef.current?.deserialize(emptyWorkspaceState)
+        // Back to the same state as a fresh editor, so the same view (#205).
+        workspaceRef.current?.recenter()
         clearSaved()
       }}
       isClosed={isClosed}
@@ -384,6 +391,8 @@ function ProblemScreen() {
         actionsBar={actionsBar}
         resultsVersion={resultsVersion}
       />
+      {/* Outside the panels, so both layouts share one dialog. */}
+      <CreateVariableDialog workspace={variableTarget} onClose={() => setVariableTarget(null)} />
     </main>
   )
 }

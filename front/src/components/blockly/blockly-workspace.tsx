@@ -2,6 +2,7 @@ import * as Blockly from 'blockly'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { RecenterControl } from '@/lib/blockly-recenter-control'
 import { cn } from '@/lib/utils'
 
 export type WorkspaceState = ReturnType<typeof Blockly.serialization.workspaces.save>
@@ -10,6 +11,11 @@ export type BlocklyWorkspaceHandle = {
   serialize(): WorkspaceState
   deserialize(state: WorkspaceState): void
   clear(): void
+  /**
+   * Centers the view on the content, keeping the zoom and every block where
+   * it is (#205). A viewport change only — never reported through onChange.
+   */
+  recenter(): void
   /** Escape hatch for the tasks that drive Blockly directly (root block, codegen). */
   getWorkspace(): Blockly.WorkspaceSvg | null
 }
@@ -57,6 +63,10 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
     const containerRef = useRef<HTMLDivElement>(null)
     const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
     const appliedToolboxRef = useRef(toolbox)
+    const recenterControlRef = useRef<RecenterControl | null>(null)
+    const recenterLabel = t('editor.recenter')
+    const labelRef = useRef(recenterLabel)
+    labelRef.current = recenterLabel
 
     // The workspace is injected once, so the injection effect reads the props
     // from here instead of depending on them.
@@ -75,6 +85,8 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       })
       workspaceRef.current = workspace
       appliedToolboxRef.current = injected
+      const recenterControl = new RecenterControl(workspace, labelRef.current)
+      recenterControlRef.current = recenterControl
       propsRef.current.onReady?.(workspace)
 
       // Restoring a saved workspace is not a user edit: suppress the events
@@ -99,18 +111,39 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       // The window may never change size while the container does (the editor
       // layout collapsing on mobile, a panel opening) — observe the box, not
       // the viewport, or Blockly keeps its stale size and clips blocks.
-      const observer = new ResizeObserver(() => {
+      //
+      // #205: the first time the box has a real size, center the *view* on
+      // the content (the seeded root, or the restored autosave) — never move
+      // the blocks. Not at injection: the container can still be 0x0 there
+      // (stacked mobile column, panels measuring themselves). Later resizes
+      // leave the view alone, the participant may have scrolled on purpose.
+      // The flag lives in this effect, so each mount starts over.
+      let centered = false
+      const observer = new ResizeObserver((entries) => {
         Blockly.svgResize(workspace)
+        if (centered) return
+        const box = entries[entries.length - 1]?.contentRect
+        if (!box || box.width <= 0 || box.height <= 0) return
+        centered = true
+        workspace.scrollCenter()
       })
       observer.observe(container)
 
       return () => {
         observer.disconnect()
         workspace.removeChangeListener(listener)
+        recenterControl.dispose()
+        recenterControlRef.current = null
         workspace.dispose()
         workspaceRef.current = null
       }
     }, [])
+
+    // The recenter control lives in Blockly's svg, outside React: relabel it
+    // by hand on a language switch.
+    useEffect(() => {
+      recenterControlRef.current?.setLabel(recenterLabel)
+    }, [recenterLabel])
 
     // A new toolbox swaps in place — the blocks already on the canvas stay.
     useEffect(() => {
@@ -134,6 +167,9 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
         clear: () => {
           workspaceRef.current?.clear()
         },
+        recenter: () => {
+          workspaceRef.current?.scrollCenter()
+        },
         getWorkspace: () => workspaceRef.current,
       }),
       [],
@@ -144,7 +180,11 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
         ref={containerRef}
         aria-label={t('editor.workspaceLabel')}
         data-testid="blockly-workspace"
-        className={cn('h-full w-full', className)}
+        // `isolate`: Blockly's toolbox (z-index 70) and scrollbars (30) would
+        // otherwise compete with the page and paint over the app's dialogs
+        // (z-50), e.g. "Criar variável" (#205). Blockly's dropdowns and
+        // widgets live on <body>, outside this box, and are unaffected.
+        className={cn('isolate h-full w-full', className)}
       />
     )
   },

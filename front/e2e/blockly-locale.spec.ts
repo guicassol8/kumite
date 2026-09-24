@@ -44,8 +44,8 @@ test.describe('browser detected as Spanish (es-MX)', () => {
     await expect(host.locator('svg.blocklySvg')).toBeVisible()
     await expect(toolbox.getByRole('treeitem', { name: 'Bucles' })).toBeVisible()
     await expect(toolbox.getByRole('treeitem', { name: 'Matemáticas' })).toBeVisible()
-    await expect(host.getByText('resolver')).toBeVisible()
-    await expect(host.getByText('devolver')).toBeVisible()
+    await expect(host.getByText('resolver', { exact: true })).toBeVisible()
+    await expect(host.getByText('devolver', { exact: true })).toBeVisible()
     await page.screenshot({ path: evidence('01-toolbox-y-bloque-raiz-en-espanol') })
 
     // 02 — a block placed while in Spanish is on the canvas, ready to prove it
@@ -59,8 +59,8 @@ test.describe('browser detected as Spanish (es-MX)', () => {
     await page.getByTestId('language-option-en').click()
     await expect(toolbox.getByRole('treeitem', { name: 'Loops' })).toBeVisible()
     await expect(toolbox.getByRole('treeitem', { name: 'Math' })).toBeVisible()
-    await expect(host.getByText('solve')).toBeVisible()
-    await expect(host.getByText('return')).toBeVisible()
+    await expect(host.getByText('solve', { exact: true })).toBeVisible()
+    await expect(host.getByText('return', { exact: true })).toBeVisible()
     await expect(draggedBlock).toBeVisible()
     await page.screenshot({ path: evidence('03-cambiado-a-ingles-preserva-el-bloque') })
   })

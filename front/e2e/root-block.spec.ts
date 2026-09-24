@@ -128,11 +128,11 @@ test.describe('the root block and native blocks (#4)', () => {
       await expect(createButton).toBeVisible()
       await createButton.click()
 
-      // Blockly 13 prompts through its own <dialog>, not window.prompt.
-      const dialog = page.locator('dialog.blocklyDialog')
+      // The app's own dialog (#205), not Blockly's prompt.
+      const dialog = page.getByTestId('create-variable-dialog')
       await expect(dialog).toBeVisible()
-      await dialog.locator('.blocklyDialogInput').fill(name)
-      await dialog.locator('.blocklyDialogConfirmButton').click()
+      await page.getByTestId('create-variable-input').fill(name)
+      await page.getByTestId('create-variable-confirm').click()
       await expect(dialog).toBeHidden()
     }
 

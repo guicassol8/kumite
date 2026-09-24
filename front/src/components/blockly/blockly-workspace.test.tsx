@@ -1,9 +1,10 @@
 import { buildToolbox, defineKumiteBlocks } from '@kumite/blocks'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import * as Blockly from 'blockly'
 import { createRef, StrictMode } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import '@/i18n'
+import i18n from '@/i18n'
 import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
@@ -81,6 +82,12 @@ describe('BlocklyWorkspace', () => {
     })
 
     expect(pathToMedia).toBe('/blockly-media/')
+  })
+
+  it("scopes Blockly's z-indexes to its own stacking context, under the app's dialogs (#205)", () => {
+    renderWorkspace()
+
+    expect(screen.getByTestId('blockly-workspace').classList).toContain('isolate')
   })
 
   it('labels the workspace for screen readers', () => {
@@ -165,6 +172,81 @@ describe('BlocklyWorkspace', () => {
 
     cleanup()
     expect(observer.disconnect).toHaveBeenCalled()
+  })
+
+  it('adds a recenter control, relabelled when the language changes (#205)', async () => {
+    renderWorkspace()
+    const control = screen.getByTestId('editor-recenter')
+
+    expect(control.getAttribute('aria-label')).toBe('Centralizar a solução')
+
+    await act(async () => {
+      await i18n.changeLanguage('en')
+    })
+    expect(control.getAttribute('aria-label')).toBe('Center the solution')
+    await act(async () => {
+      await i18n.changeLanguage('pt')
+    })
+  })
+
+  describe('centering the view (#205)', () => {
+    function resizeEntry(width: number, height: number) {
+      return [{ contentRect: { width, height } }] as unknown as ResizeObserverEntry[]
+    }
+
+    function setup() {
+      RecordingResizeObserver.instances = []
+      vi.stubGlobal('ResizeObserver', RecordingResizeObserver)
+      const scrollCenter = vi.spyOn(Blockly.WorkspaceSvg.prototype, 'scrollCenter')
+      const onChange = vi.fn()
+      const { handle } = renderWorkspace({ initialState: fixture, onChange })
+      const host = screen.getByTestId('blockly-workspace')
+      const observer = RecordingResizeObserver.instances.find((it) => it.targets.includes(host))
+      if (!observer) throw new Error('the container is not observed for resizes')
+      const resize = (width: number, height: number) =>
+        observer.callback(resizeEntry(width, height), observer as unknown as ResizeObserver)
+      return { handle, scrollCenter, onChange, resize }
+    }
+
+    it('does not center while the container has no size yet', () => {
+      const { scrollCenter, resize } = setup()
+
+      resize(0, 0)
+
+      expect(scrollCenter).not.toHaveBeenCalled()
+    })
+
+    it('centers once, on the first resize with a real box, and not on later resizes', () => {
+      const { scrollCenter, resize } = setup()
+
+      resize(0, 0)
+      resize(800, 600)
+      expect(scrollCenter).toHaveBeenCalledOnce()
+
+      resize(640, 600)
+      expect(scrollCenter).toHaveBeenCalledOnce()
+    })
+
+    it('recenters on demand through the handle', () => {
+      const { handle, scrollCenter, resize } = setup()
+      resize(800, 600)
+
+      handle.recenter()
+
+      expect(scrollCenter).toHaveBeenCalledTimes(2)
+    })
+
+    it('never reports centering as a change nor moves the blocks', async () => {
+      const { handle, onChange, resize } = setup()
+      const before = handle.serialize()
+
+      resize(800, 600)
+      handle.recenter()
+      await flushBlocklyEvents()
+
+      expect(onChange).not.toHaveBeenCalled()
+      expect(handle.serialize()).toEqual(before)
+    })
   })
 
   it('applies initialState on mount without reporting it as a change', async () => {

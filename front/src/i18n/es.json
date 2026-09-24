@@ -113,7 +113,18 @@
     }
   },
   "editor": {
-    "workspaceLabel": "Área de bloques"
+    "workspaceLabel": "Área de bloques",
+    "recenter": "Centrar la solución",
+    "createVariable": {
+      "title": "Crear variable",
+      "label": "Nombre de la variable",
+      "confirm": "Crear",
+      "cancel": "Cancelar",
+      "errors": {
+        "empty": "Dale un nombre a la variable.",
+        "duplicate": "Ya existe una variable llamada \"{{name}}\"."
+      }
+    }
   },
   "organizer": {
     "heading": "Área del organizador",

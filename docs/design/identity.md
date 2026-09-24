@@ -286,10 +286,12 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   conectando) **mais rótulo curto** ("Conectado", "Sem conexão", "Conectando"),
   porque a §3 proíbe cor como única pista; e símbolo de 16 px +
   "PUCRS × Mérida 2026". No celular o rodapé empilha.
-- **Modo de cor**: claro por padrão; escuro completo (`.dark`) por **escolha
-  do usuário**, persistida em `localStorage`. Seguir `prefers-color-scheme`
-  quando o usuário ainda não escolheu é trabalho da #234 — até lá, o padrão é
-  claro para todo mundo. O telão força escuro.
+- **Modo de cor**: claro e escuro completo (`.dark`). Enquanto não há escolha
+  salva, o padrão segue `prefers-color-scheme` — e acompanha a troca ao vivo,
+  com a aba aberta. A escolha do usuário (o toggle do header), persistida em
+  `localStorage`, vence a preferência do sistema. O telão força escuro. O
+  escuro é coberto por um smoke de contraste AA nas rotas principais
+  (`front/e2e/dark-contrast.spec.ts`, #234).
 - **Foco**: borda de 1 px em `ring` mais um halo de 3 px em `ring/50` — é o
   que os primitivos do shadcn já fazem
   (`focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50`).

@@ -7,7 +7,12 @@
  * `index.html`, que precisa rodar antes do primeiro paint e portanto antes
  * deste módulo existir. `e2e/theme.spec.ts` é o guarda dessa duplicação.
  */
+import { isPresentationActive } from './presentation-mode'
+
 export const THEME_STORAGE_KEY = 'kumite:theme'
+
+/** A preferência do SO que `system` segue (docs/design/identity.md § Modo de cor). */
+export const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)'
 
 export type ThemeChoice = 'light' | 'dark' | 'system'
 export type ResolvedTheme = 'light' | 'dark'
@@ -44,18 +49,28 @@ export function readTheme(): ThemeChoice {
 }
 
 /**
- * `system` resolve para claro DE PROPÓSITO enquanto o epic #214 estiver
- * aberto: as telas são desenhadas no claro primeiro, e um visitante com o SO
- * em escuro veria o redesign pela metade. Quem religa o
- * `prefers-color-scheme` é a #234 — não "conserte" isso aqui por engano.
+ * A escolha salva vence; sem ela (`system`), vale o `prefers-color-scheme`
+ * do SO. Sem `matchMedia` (ambiente sem layout), cai no claro — o mesmo
+ * padrão de `use-media-query.ts`.
  */
 export function resolveTheme(choice: ThemeChoice): ResolvedTheme {
-  return choice === 'dark' ? 'dark' : 'light'
+  if (choice !== 'system') return choice
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'light'
+  return window.matchMedia(DARK_SCHEME_QUERY).matches ? 'dark' : 'light'
+}
+
+/**
+ * O modo que a escolha atual resolve agora. É um snapshot próprio para o
+ * `useSyncExternalStore`: quando só o SO troca, a escolha continua `system`
+ * e um snapshot da escolha não re-renderizaria ninguém.
+ */
+export function readResolvedTheme(): ResolvedTheme {
+  return resolveTheme(readTheme())
 }
 
 /** Aplica no DOM o que `readTheme()` disser: a classe e a meta, nada mais. */
 export function applyTheme(): void {
-  const resolved = resolveTheme(readTheme())
+  const resolved = readResolvedTheme()
   document.documentElement.classList.toggle('dark', resolved === 'dark')
   document
     .querySelector('meta[name="theme-color"]')
@@ -70,7 +85,31 @@ export function setTheme(choice: ThemeChoice): void {
     // Ver inMemoryChoice: a troca vale para esta aba mesmo sem persistir.
   }
   applyTheme()
+  notify()
+}
+
+function notify(): void {
   for (const listener of listeners) listener()
+}
+
+/**
+ * Acompanha a troca de tema do SO ao vivo, com a aba aberta. Só repinta
+ * quando a escolha é `system` — uma escolha salva vence o SO — e nunca
+ * durante o telão, cujo escuro forçado vence tudo (o telão chama
+ * `applyTheme()` ao sair). Os assinantes são avisados sempre, para o
+ * `resolvedTheme` do `useTheme` não ficar velho. Devolve o cleanup.
+ */
+export function watchSystemTheme(): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return () => undefined
+  }
+  const query = window.matchMedia(DARK_SCHEME_QUERY)
+  const onChange = () => {
+    if (readTheme() === 'system' && !isPresentationActive()) applyTheme()
+    notify()
+  }
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
 }
 
 export function subscribe(listener: () => void): () => void {

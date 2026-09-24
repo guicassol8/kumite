@@ -2,8 +2,8 @@ import { useSyncExternalStore } from 'react'
 
 import {
   type ResolvedTheme,
+  readResolvedTheme,
   readTheme,
-  resolveTheme,
   setTheme,
   subscribe,
   type ThemeChoice,
@@ -15,5 +15,8 @@ export function useTheme(): {
   setTheme: (choice: ThemeChoice) => void
 } {
   const theme = useSyncExternalStore(subscribe, readTheme)
-  return { theme, resolvedTheme: resolveTheme(theme), setTheme }
+  // Snapshot à parte: com a escolha em `system`, uma troca só do SO muda o
+  // modo resolvido sem mudar a escolha.
+  const resolvedTheme = useSyncExternalStore(subscribe, readResolvedTheme)
+  return { theme, resolvedTheme, setTheme }
 }

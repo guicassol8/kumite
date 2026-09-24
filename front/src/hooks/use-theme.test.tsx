@@ -1,7 +1,8 @@
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { setTheme, THEME_STORAGE_KEY } from '@/lib/theme'
+import { DARK_SCHEME_QUERY, setTheme, THEME_STORAGE_KEY, watchSystemTheme } from '@/lib/theme'
+import { setMatchMediaMatches } from '@/test/match-media-jsdom'
 import { useTheme } from './use-theme'
 
 function Probe() {
@@ -20,7 +21,10 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  setMatchMediaMatches(DARK_SCHEME_QUERY, false)
+})
 
 describe('useTheme', () => {
   it('reports the saved choice and what it resolves to', () => {
@@ -49,5 +53,16 @@ describe('useTheme', () => {
 
     expect(screen.getByTestId('probe').textContent).toBe('dark:dark')
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark')
+  })
+
+  it('re-renders the resolved theme when only the OS preference changes', () => {
+    const stopWatching = watchSystemTheme()
+    render(<Probe />)
+    expect(screen.getByTestId('probe').textContent).toBe('system:light')
+
+    act(() => setMatchMediaMatches(DARK_SCHEME_QUERY, true))
+
+    expect(screen.getByTestId('probe').textContent).toBe('system:dark')
+    stopWatching()
   })
 })

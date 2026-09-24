@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test'
 
-import { dragBlockFromFlyout } from './support/blockly'
+import {
+  dragBlockFromFlyout,
+  EDITOR_TEST_TIMEOUT_MS,
+  editorTestTimeout,
+  expectBlocklyInjected,
+} from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -31,22 +36,27 @@ test.describe('the workspace auto-save (#6)', () => {
   test('the workspace auto-saves per problem, restores on reopen, and Limpar blocos resets it', async ({
     page,
   }) => {
+    // Four editor mounts: the first visit, a reload, the reopen, a reload.
+    test.setTimeout(editorTestTimeout(4))
     const host = page.getByTestId('blockly-workspace')
     const draggedBlock = host.locator('g.blocklyDraggable:visible').first()
 
     // 01 — a dragged block survives a reload of the same screen (auto-saved,
     // debounced, then read back).
     await page.goto(`/problem/${problemId}`)
+    await expectBlocklyInjected(page)
     await dragBlockFromFlyout(page, 'Matemática')
     await expect(draggedBlock).toBeVisible()
     await page.waitForTimeout(600)
     await page.reload()
+    await expectBlocklyInjected(page)
     await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
     await page.screenshot({ path: evidence('01-persisted-across-reload') })
 
     // 02 — navigating away and back restores the same saved blocks.
     await page.goto('/')
     await page.goto(`/problem/${problemId}`)
+    await expectBlocklyInjected(page)
     await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
     await page.screenshot({ path: evidence('02-restored-on-reopen') })
 
@@ -57,6 +67,7 @@ test.describe('the workspace auto-save (#6)', () => {
     await page.getByTestId('problem-clear-button').click()
     await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
     await page.reload()
+    await expectBlocklyInjected(page)
     await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
     await page.screenshot({ path: evidence('03-cleared-and-stays-empty') })
   })
@@ -64,6 +75,7 @@ test.describe('the workspace auto-save (#6)', () => {
   test('the workspace still mounts and accepts blocks when its saved state is unreadable', async ({
     page,
   }) => {
+    test.setTimeout(EDITOR_TEST_TIMEOUT_MS)
     const host = page.getByTestId('blockly-workspace')
 
     // 04 — the persistence layer throwing on every access must not crash the
@@ -104,7 +116,7 @@ test.describe('the workspace auto-save (#6)', () => {
       Object.defineProperty(window, 'localStorage', { configurable: true, get: () => stub })
     })
     await page.goto(`/problem/${problemId}`)
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     await dragBlockFromFlyout(page, 'Matemática')
     await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
     await page.screenshot({ path: evidence('04-localstorage-unavailable') })

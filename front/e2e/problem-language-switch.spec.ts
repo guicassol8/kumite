@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { dragBlockFromFlyout } from './support/blockly'
+import { dragBlockFromFlyout, editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -39,29 +39,18 @@ test.describe('switching the language inside the editor (#178)', () => {
   }) => {
     // Four screenshots, two auto-save debounces, three Blockly re-renders and a
     // full reload do not fit the 30s default — this one walkthrough is the
-    // whole acceptance criteria list of #178.
-    test.setTimeout(150_000)
+    // whole acceptance criteria list of #178. Two editor mounts: the first
+    // visit and the reload in step 04.
+    test.setTimeout(editorTestTimeout(2))
 
     const host = page.getByTestId('blockly-workspace')
     const blocks = host.locator('g.blocklyDraggable:visible')
     const statement = page.getByTestId('problem-statement-panel')
 
-    // Waiting for Blockly to be injected is the one step that outgrows the 30s
-    // `expect` default in the config: it covers the cold problem query plus the
-    // injection itself, and on a machine that is swapping the renderer stalls
-    // with the screen still on `problem-loading`. Raising the test budget above
-    // does nothing on its own — each assertion is capped separately — so the
-    // two waits on the canvas get the budget explicitly (same shape as
-    // leaderboard.spec.ts and leaderboard-offline-fallback.spec.ts). Nothing is
-    // asserted less strictly, it is only waited for longer.
-    const INJECTION_TIMEOUT_MS = 60_000
-
     // 01 — a solution built in Portuguese: the seeded root block plus the one
     // dragged from the toolbox.
     await page.goto(`/problem/${problemId}`)
-    await expect(host.locator('svg.blocklySvg')).toBeVisible({
-      timeout: INJECTION_TIMEOUT_MS,
-    })
+    await expectBlocklyInjected(page)
     await expect(statement).toContainText('Soma dos Pares')
     await dragBlockFromFlyout(page, 'Matemática')
     await expect(blocks).toHaveCount(2)
@@ -88,9 +77,7 @@ test.describe('switching the language inside the editor (#178)', () => {
     // workspace, not the one from page load: a reload brings both blocks back.
     await page.waitForTimeout(600)
     await page.reload()
-    await expect(host.locator('svg.blocklySvg')).toBeVisible({
-      timeout: INJECTION_TIMEOUT_MS,
-    })
+    await expectBlocklyInjected(page)
     await expect(blocks).toHaveCount(2)
     await page.screenshot({ path: evidence('04-persistido-apos-reload') })
   })

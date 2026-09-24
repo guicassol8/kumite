@@ -1,6 +1,7 @@
 import { somaDosPares } from '@kumite/blocks'
 import type { Page } from '@playwright/test'
 
+import { editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   seedParticipant,
   seedParticipantToken,
@@ -119,7 +120,7 @@ test.describe('problem screen identity (#219)', () => {
 
   async function openEditor(page: Page, problemId: string): Promise<void> {
     await page.goto(`/problem/${problemId}`)
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
   }
 
   /** A genuine pointer drag on a #203 separator — the same gesture
@@ -208,7 +209,8 @@ test.describe('problem screen identity (#219)', () => {
     page,
     roundSlot,
   }) => {
-    test.setTimeout(180_000)
+    // Four editor mounts (openEditor below) on top of the judge runs.
+    test.setTimeout(editorTestTimeout(4, 180_000))
     const auth = await organizerAuthHeader()
     await seedParticipantToken(page, participantToken)
     await seedWorkspace(page, mediumProblemId, somaDosPares)

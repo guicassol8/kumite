@@ -25,8 +25,10 @@ export default defineConfig({
   // — the single open-round slot is global, and a leftover would otherwise
   // 409 every spec that needs to open one (#150).
   globalSetup: './e2e/support/global-setup.ts',
-  // Injecting Blockly is the slowest thing every spec blocks on, and the 5s
-  // default only holds on an idle machine.
+  // The 5s default only holds on an idle machine. Waiting for Blockly to
+  // inject is the exception that outgrows even this: it has its own budget in
+  // `expectBlocklyInjected` (e2e/support/blockly.ts), with the test budget
+  // derived from it — raise that, never this ceiling (#246).
   expect: { timeout: 30_000 },
   // Every worker is a Chromium holding a Blockly workspace — hundreds of MB
   // each. The default (half the cores) outgrows a small machine, and once it
@@ -38,7 +40,7 @@ export default defineConfig({
   forbidOnly: isCI,
   // #295: one retry in CI only. A spec that passes on retry is reported as
   // flaky (html + GitHub annotations) instead of failing the gate; the known
-  // flakes (#338, #246) stay open and are fixed there, not hidden here.
+  // flake (#338) stays open and is fixed there, not hidden here.
   retries: isCI ? 1 : 0,
   // Local runs keep Playwright's default `list`; CI adds the HTML report the
   // planned `e2e` job uploads as an artifact and inline annotations on the PR.

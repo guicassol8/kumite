@@ -184,9 +184,10 @@ fine" or "just docs nearby."
   (a spec that passes on the retry is reported as **flaky**), `forbidOnly`,
   the HTML + GitHub reporters, trace on first retry and screenshots of
   failures. The suite does not run in the pre-commit or in the Stop hook.
-  Known flakes: #338 (`header-logout-contrast.spec.ts`) and #246 (the 30 s
-  expect timeout under memory pressure) — name them in the Evidence when
-  they fail; they are not fixed by a retry.
+  Known flake: #338 (`header-logout-contrast.spec.ts`) — name it in the
+  Evidence when it fails; it is not fixed by a retry. Editor specs wait for
+  Blockly through `expectBlocklyInjected` (`front/e2e/support/blockly.ts`),
+  which carries the injection budget and checks the test's own (#246).
 
 ## Branches, commits, PRs
 

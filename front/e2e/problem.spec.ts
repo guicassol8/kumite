@@ -1,6 +1,7 @@
 import { somaDosPares } from '@kumite/blocks'
 import type { Page } from '@playwright/test'
 
+import { editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import { participantIdOf, workspaceStorageKey } from './support/editor-fixture'
 
 import {
@@ -116,8 +117,11 @@ test.describe('problem screen (#7)', () => {
     browser,
     roundSlot,
   }) => {
-    // Two signups (the team member and, for #206, a teamless participant).
-    test.slow()
+    // Two signups (the team member and, for #206, a teamless participant) and
+    // a real judge run, on top of three editor mounts: the row link into the
+    // problem, the teamless participant's row link and the reload once the
+    // round closes.
+    test.setTimeout(editorTestTimeout(3, 90_000))
     const auth = await organizerAuthHeader()
     const problemId = await apiCreatePublishedProblem()
     const roundId = await createRound(auth, {
@@ -152,6 +156,7 @@ test.describe('problem screen (#7)', () => {
     await expect(row).toContainText('Soma dos Pares')
     await row.getByRole('link').click()
     await expect(page).toHaveURL(new RegExp(`/problem/${problemId}$`))
+    await expectBlocklyInjected(page)
     await expect(page.getByTestId('problem-statement-panel')).toContainText('Soma dos Pares')
     await expect(page.getByTestId('problem-example-0')).toContainText('6')
     await page.screenshot({ path: evidence('02-problema-carregado-do-catalogo'), fullPage: true })
@@ -161,7 +166,6 @@ test.describe('problem screen (#7)', () => {
 
     // 03 — Executar runs the seeded (known-good) solution locally: all three
     // visible cases pass, independent of the server judge.
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
     await page.getByTestId('problem-run-button').click()
     const localSummary = page.getByTestId('problem-results-summary')
     await expect(localSummary).toHaveText('3/3 casos')
@@ -211,6 +215,7 @@ test.describe('problem screen (#7)', () => {
       await expect(teamlessCell).toHaveText(/—/)
       await teamlessPage.screenshot({ path: evidence206('07-lista-sem-time'), fullPage: true })
       await teamlessPage.getByTestId(`round-problem-${problemId}`).getByRole('link').click()
+      await expectBlocklyInjected(teamlessPage)
       await expect(teamlessPage.getByTestId('problem-statement-panel')).toContainText(
         'Soma dos Pares',
       )
@@ -230,6 +235,7 @@ test.describe('problem screen (#7)', () => {
     // closed state, with the team's best score instead of a submit button.
     await closeRound(auth, roundId)
     await page.reload()
+    await expectBlocklyInjected(page)
     await expect(page.getByTestId('problem-closed-notice')).toBeVisible()
     await expect(page.getByTestId('problem-closed-best-score')).toBeVisible()
     await expect(page.getByTestId('problem-submit-button')).toHaveCount(0)

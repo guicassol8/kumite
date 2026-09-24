@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 
+import { EDITOR_TEST_TIMEOUT_MS, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -74,7 +75,7 @@ function translateOf(transform: string | null) {
 
 async function openEditor(page: Page, problemId: string) {
   await page.goto(`/problem/${problemId}`)
-  await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+  await expectBlocklyInjected(page)
   await expect(page.locator(TOP_BLOCKS).first()).toBeVisible()
 }
 
@@ -93,6 +94,7 @@ function flyoutVariable(page: Page, name: string) {
 }
 
 test.describe('editor polish (#205)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string

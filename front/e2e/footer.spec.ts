@@ -1,3 +1,4 @@
+import { editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   BACK_URL,
   createRound,
@@ -159,6 +160,9 @@ test.describe('problem editor coexists with the footer (#144 T4)', () => {
   }
 
   test('keeps header, editor and footer inside one viewport', async ({ page, roundSlot }) => {
+    // A signup and a wait for the single open-round slot, on top of one
+    // editor mount.
+    test.setTimeout(editorTestTimeout(1, 60_000))
     const auth = await organizerAuthHeader()
     const created = await api('/organizer/problems', {
       method: 'POST',
@@ -214,8 +218,8 @@ test.describe('problem editor coexists with the footer (#144 T4)', () => {
     // 09 — the editor screen: statement, Blockly canvas, header and footer all
     // laid out inside the viewport, with nothing overlapping.
     await page.goto(`/problem/${problemId}`)
+    await expectBlocklyInjected(page)
     await expect(page.getByTestId('problem-statement-panel')).toContainText('Soma dos Pares')
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
     await expect(page.getByTestId('app-footer')).toBeVisible()
 
     const viewport = page.viewportSize()

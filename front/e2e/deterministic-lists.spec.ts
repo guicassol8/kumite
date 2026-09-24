@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { EDITOR_TEST_TIMEOUT_MS, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -50,6 +51,7 @@ function workspaceWith(where: string) {
 }
 
 test.describe('deterministic list blocks (#182)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string
@@ -76,7 +78,7 @@ test.describe('deterministic list blocks (#182)', () => {
 
     await page.goto(`/problem/${problemId}`)
     const host = page.getByTestId('blockly-workspace')
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
 
     // 01 — the block is on the canvas, reading the first item of the list.
     const block = page.locator(LIST_BLOCK)
@@ -116,7 +118,7 @@ test.describe('deterministic list blocks (#182)', () => {
 
     await page.goto(`/problem/${problemId}`)
     const host = page.getByTestId('blockly-workspace')
-    await expect(host.locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
 
     // 03 — the block survived the load, with the indexed mode instead of the
     // random one, and nothing on screen is shouting about it.

@@ -1,6 +1,7 @@
 import { raizDesabilitada } from '@kumite/blocks'
 import { expect, test } from '@playwright/test'
 
+import { EDITOR_TEST_TIMEOUT_MS, expectBlocklyInjected } from './support/blockly'
 import {
   EDITOR_FIXTURE_TIMEOUT_MS,
   hasOrganizerCredentials,
@@ -20,6 +21,7 @@ import {
 const evidence = (name: string) => `e2e/evidence/181/${name}.png`
 
 test.describe('generator guards (#181)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
   test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
 
   let problemId: string
@@ -45,7 +47,7 @@ test.describe('generator guards (#181)', () => {
     )
 
     await page.goto(`/problem/${problemId}`)
-    await expect(page.getByTestId('blockly-workspace').locator('svg.blocklySvg')).toBeVisible()
+    await expectBlocklyInjected(page)
     await page.getByTestId('problem-run-button').click()
 
     // 01 — the refusal names the cause, no case list and no phantom results.

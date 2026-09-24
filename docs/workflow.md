@@ -173,6 +173,20 @@ fine" or "just docs nearby."
   opening/updating the PR, unless successful hooks already ran the same
   checks for the same revision. During implementation use focused checks;
   repeat the full ladder only after changes or failures justify it.
+- **E2E in CI — not yet.** CI does **not** run Playwright today: the `e2e`
+  job for `ci.yml` is written but not applied, because it needs an edit to
+  a protected config (`.github/workflows/`), tracked in #295. Until it
+  lands, "existing e2e green" on a PR is proven by running the **whole**
+  suite locally (`pnpm --filter @kumite/front e2e`, with the organizer env,
+  `db:seed` and `BACK_NOTIFICATIONS_LOG` so nothing skips) and recording
+  the numbers in the Evidence. `front/playwright.config.ts` already carries
+  the CI settings: run with `CI=1` to reproduce them locally — one retry
+  (a spec that passes on the retry is reported as **flaky**), `forbidOnly`,
+  the HTML + GitHub reporters, trace on first retry and screenshots of
+  failures. The suite does not run in the pre-commit or in the Stop hook.
+  Known flakes: #338 (`header-logout-contrast.spec.ts`) and #246 (the 30 s
+  expect timeout under memory pressure) — name them in the Evidence when
+  they fail; they are not fixed by a retry.
 
 ## Branches, commits, PRs
 

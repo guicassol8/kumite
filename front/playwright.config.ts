@@ -15,6 +15,9 @@ const notificationsLog = process.env.BACK_NOTIFICATIONS_LOG
 const backCommand = notificationsLog
   ? `pnpm --filter @kumite/back dev 2>&1 | tee '${notificationsLog}'`
   : 'pnpm --filter @kumite/back dev'
+// GitHub Actions sets CI=true. The `e2e` job these settings are for is not
+// in ci.yml yet (#295); `CI=1` locally reproduces its reporter/retry behaviour.
+const isCI = !!process.env.CI
 
 export default defineConfig({
   testDir: './e2e',
@@ -31,12 +34,25 @@ export default defineConfig({
   // then fails on a different spec every run, with no error to show for it.
   // Two is a floor that keeps the suite honest, not a cure for a full machine.
   workers: 2,
+  // A stray `test.only` would silently shrink the CI gate to one spec.
+  forbidOnly: isCI,
+  // #295: one retry in CI only. A spec that passes on retry is reported as
+  // flaky (html + GitHub annotations) instead of failing the gate; the known
+  // flakes (#338, #246) stay open and are fixed there, not hidden here.
+  retries: isCI ? 1 : 0,
+  // Local runs keep Playwright's default `list`; CI adds the HTML report the
+  // planned `e2e` job uploads as an artifact and inline annotations on the PR.
+  reporter: isCI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${frontPort}`,
     // Browser-language detection (#56) reads navigator.language. Pin it to
     // PT so every pre-existing spec keeps its PT-language assertions;
     // language-selector.spec.ts overrides this per describe block.
     locale: 'pt-BR',
+    // Failure diagnostics for the uploaded report. Without retries (local runs)
+    // there is no first retry, so no trace is ever recorded there.
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
   },
   webServer: [
     {

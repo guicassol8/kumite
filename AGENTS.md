@@ -47,6 +47,8 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
   `DB_PORT` stack shares it, so one whose migrations differ from the main
   checkout's needs its own stack (`docs/workflow.md` § Worktrees) — otherwise
   each side's tests fail against the other's schema.
+- CI does **not** run the Browser E2E yet (#295): run the full suite locally
+  — `docs/workflow.md` § Gate ladder.
 
 ## Conventions
 

@@ -252,12 +252,14 @@ async function countAttempts(db: Db, identity: SubmitIdentity, problemId: string
 }
 
 /**
- * The whole judging pipeline: pause → throttle → problem → codegen → sandbox →
+ * The whole judging pipeline: throttle → pause → problem → codegen → sandbox →
  * score → persist → verdict.
  *
- * The organizer's pause (#285) is checked first of all, before the slot is
- * claimed: a paused submission neither holds the identity in flight nor arms
- * a cooldown, so the first attempt after a resume goes straight through.
+ * The organizer's pause (#285) is the first check inside the claimed slot.
+ * The claim itself stays synchronous and first, so two concurrent requests
+ * from one team keep a deterministic winner; a paused refusal releases the
+ * slot and, like a 404, arms no cooldown — the first attempt after a resume
+ * goes straight through.
  *
  * The identity's slot is claimed before anything else and released in a
  * `finally`, so a crash can never leave a participant locked out. The 5s
@@ -269,9 +271,6 @@ export async function submitSolution(
   identity: SubmitIdentity,
   body: SubmitSolutionBody,
 ): Promise<SubmitOutcome> {
-  const { submissionsPaused } = await getEventConfig(db)
-  if (submissionsPaused) return { ok: false, error: 'submissions_paused' }
-
   const identityKey = `team:${identity.teamId}`
   const denial = acquireSubmissionSlot(identityKey)
   if (denial) return { ok: false, error: 'throttled', ...denial }
@@ -281,6 +280,9 @@ export async function submitSolution(
   // exactly what it claimed (#176).
   let judgingRoundId: string | null = null
   try {
+    const { submissionsPaused } = await getEventConfig(db)
+    if (submissionsPaused) return { ok: false, error: 'submissions_paused' }
+
     // Straight at the table, not problems.service.getProblem: the translation
     // join is irrelevant here and `status = 'published'` is part of the rule —
     // an unpublished problem is a 404, never a hint that a draft exists.

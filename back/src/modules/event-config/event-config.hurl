@@ -1,6 +1,6 @@
 # API E2E for the organizer event-config module (#48) — mixing lock, max
-# team size and the submissions pause (#285), guarded by requireUser + requireOrganizer (#27). Prereqs, in
-# order:
+# team size and the submissions pause (#285), guarded by requireUser +
+# requireOrganizer (#27). Prereqs, in order:
 #   docker compose up -d
 #   pnpm db:migrate
 #   pnpm db:seed         # seeds the PUCRS2026 code + the ORGANIZER_EMAIL/PASSWORD organizer,

@@ -221,8 +221,8 @@ HTTP 400
 jsonpath "$.error" == "field_value_not_allowed"
 
 # 4d. The organizer pauses submissions (#285) -> the valid workspace below is
-#     refused with 423 submissions_paused, before the throttle: no slot, no
-#     cooldown. The organizer then resumes, and the happy path right after
+#     refused with 423 submissions_paused before any judging: the slot is
+#     released and no cooldown is armed. The organizer then resumes, and the happy path right after
 #     (step 5) proves the resume is immediate and that the refusal armed no
 #     cooldown — it would be a 429 otherwise.
 PATCH {{host}}/organizer/event-config

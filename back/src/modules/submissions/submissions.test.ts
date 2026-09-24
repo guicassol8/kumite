@@ -1417,9 +1417,9 @@ describe('submitSolution tiebreak survives a slow judge', () => {
   )
 })
 
-// #285: the organizer's pause refuses before anything else — no slot claimed,
-// no cooldown armed, no row written — and lifting it lets the very next
-// submission through.
+// #285: the organizer's pause refuses before any real work — the slot is
+// released at once, no cooldown armed, no row written — and lifting it lets
+// the very next submission through.
 describe('submitSolution while submissions are paused (#285)', () => {
   beforeEach(async () => {
     resetSubmissionThrottle()
@@ -1431,7 +1431,7 @@ describe('submitSolution while submissions are paused (#285)', () => {
   })
 
   it(
-    'refuses with submissions_paused, claims no slot and persists nothing; resuming accepts at once',
+    'refuses with submissions_paused, leaves no slot held and persists nothing; resuming accepts at once',
     async () => {
       const problem = await insertPublishedProblem(solvableCases)
       const { user, team } = await insertTeamMember()

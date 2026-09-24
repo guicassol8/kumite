@@ -8,6 +8,8 @@ import {
   ParticipantProblemParamsSchema,
   ParticipantProblemQuerySchema,
   ParticipantProblemSchema,
+  PracticeProblemListQuerySchema,
+  PracticeProblemListSchema,
   ProblemDetailSchema,
   ProblemIdParamsSchema,
   ProblemSummaryListSchema,
@@ -18,6 +20,7 @@ import {
   createProblem,
   getProblem,
   getPublishedProblem,
+  listPracticeProblems,
   listProblems,
   publishProblem,
   updateProblem,
@@ -67,7 +70,12 @@ export const updateProblemRoute = defineRoute({
   path: '/organizer/problems/:id',
   use: [requireUser, requirePasswordUpToDate, requireOrganizer],
   input: { params: ProblemIdParamsSchema, body: UpdateProblemBodySchema },
-  output: { 200: ProblemDetailSchema, 404: ErrorBodySchema, 409: ErrorBodySchema },
+  output: {
+    200: ProblemDetailSchema,
+    400: ErrorBodySchema,
+    404: ErrorBodySchema,
+    409: ErrorBodySchema,
+  },
   handler: async (c) => {
     const result = await updateProblem(c.get('db'), c.input.params.id, c.input.body)
     if (result.ok) return c.json(result.problem, 200)
@@ -81,6 +89,14 @@ export const updateProblemRoute = defineRoute({
           `Cannot change ${result.fields.join(' and ')} while the problem is in an open round`,
           { status: 409 },
         )
+      case 'problem_in_round':
+        return c.error(
+          'problem_in_round',
+          'Cannot make a problem practice once it has been in a round',
+          { status: 409 },
+        )
+      case 'missing_test_cases':
+        return c.error('missing_test_cases', reasonMessage(result.reason), { status: 400 })
     }
   },
 })
@@ -161,4 +177,15 @@ export const getParticipantProblemRoute = defineRoute({
     if (!problem) return c.error('not_found', 'Problem not found', { status: 404 })
     return problem
   },
+})
+
+// The practice catalog (#209). Any authenticated participant, team or not:
+// practice lives outside the competition, so nothing here asks for one.
+export const listPracticeProblemsRoute = defineRoute({
+  method: 'GET',
+  path: '/practice/problems',
+  use: [requireUser, requirePasswordUpToDate],
+  input: { query: PracticeProblemListQuerySchema },
+  output: PracticeProblemListSchema,
+  handler: async (c) => listPracticeProblems(c.get('db'), c.input.query.locale),
 })

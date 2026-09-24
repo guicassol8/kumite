@@ -55,6 +55,11 @@ export const createSubmissionRoute = defineRoute({
         return c.error('not_found', 'Problem not found', { status: 404 })
       case 'no_active_round':
         return c.error('no_active_round', 'No active round with this problem', { status: 404 })
+      case 'practice_not_submittable':
+        // #209: a practice problem is run in the browser, never judged.
+        return c.error('practice_not_submittable', 'Practice problems cannot be submitted', {
+          status: 400,
+        })
       case 'codegen_rejected':
         // The code and the message come straight from @kumite/blocks, already
         // localized — the route coins neither.

@@ -21,6 +21,9 @@ export const roleEnum = pgEnum('role', ['participant', 'organizer'])
 export const universityEnum = pgEnum('university', ['pucrs', 'merida'])
 export const difficultyEnum = pgEnum('difficulty', ['easy', 'medium', 'hard'])
 export const problemStatusEnum = pgEnum('problem_status', ['draft', 'published', 'archived'])
+// Where a problem lives (#209): 'round' is the competition, 'practice' is
+// readable outside any round and never enters one.
+export const problemVisibilityEnum = pgEnum('problem_visibility', ['round', 'practice'])
 export const localeEnum = pgEnum('locale', ['pt', 'es', 'en'])
 export const roundStatusEnum = pgEnum('round_status', ['draft', 'open', 'closed'])
 export const submissionCaseStatusEnum = pgEnum('submission_case_status', [
@@ -145,6 +148,7 @@ export const problemsTable = pgTable('problems', {
   points: integer('points').notNull().default(100),
   difficulty: difficultyEnum('difficulty').notNull(),
   status: problemStatusEnum('status').notNull(),
+  visibility: problemVisibilityEnum('visibility').notNull().default('round'),
   testCases: jsonb('test_cases').notNull().default([]).$type<TestCase[]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

@@ -12,12 +12,15 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
-import { closeRound, createRound, openRound } from '../rounds/rounds.service'
+import { closeRound, createRound, openRound, updateRound } from '../rounds/rounds.service'
 import type { ProblemDetail, TestCase } from './problems.schema'
 import {
+  CreateProblemBodySchema,
   ParticipantProblemParamsSchema,
   ParticipantProblemQuerySchema,
   ParticipantProblemSchema,
+  PracticeProblemListQuerySchema,
+  PracticeProblemSummarySchema,
   TestCaseSchema,
   UpdateProblemBodySchema,
 } from './problems.schema'
@@ -29,6 +32,7 @@ import {
   evaluateTestCaseCoverage,
   getProblem,
   getPublishedProblem,
+  listPracticeProblems,
   listProblems,
   publishProblem,
   testCasesEqual,
@@ -161,6 +165,7 @@ describe('ParticipantProblemSchema', () => {
       title: 'Soma',
       statementMd: 'Some dois números.',
       examples: [{ input: [1, 2], expected: 3, hidden: true }],
+      visibility: 'round',
       roundId: null,
       roundStatus: 'closed',
       bestSubmission: null,
@@ -179,6 +184,7 @@ describe('ParticipantProblemSchema', () => {
       title: 'Soma',
       statementMd: 'Some dois números.',
       examples: [],
+      visibility: 'round',
       roundId: '9f3f1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
       roundStatus: 'open',
       bestSubmission: { score: 80, achievedAt: new Date().toISOString(), attempts: 2 },
@@ -186,6 +192,62 @@ describe('ParticipantProblemSchema', () => {
 
     expect(parsed.roundStatus).toBe('open')
     expect(parsed.bestSubmission).toMatchObject({ score: 80, attempts: 2 })
+  })
+
+  it('accepts a practice problem with no round at all (#209)', () => {
+    const parsed = ParticipantProblemSchema.parse({
+      id: '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+      points: 100,
+      difficulty: 'easy',
+      locale: 'pt',
+      title: 'Soma',
+      statementMd: 'Some dois números.',
+      examples: [],
+      visibility: 'practice',
+      roundId: null,
+      roundStatus: 'none',
+      bestSubmission: null,
+    })
+
+    expect(parsed.visibility).toBe('practice')
+    expect(parsed.roundStatus).toBe('none')
+  })
+})
+
+describe('problem visibility DTOs (#209)', () => {
+  it('lets CreateProblemBody omit visibility and accepts both values', () => {
+    expect(CreateProblemBodySchema.parse({ difficulty: 'easy' }).visibility).toBeUndefined()
+    expect(
+      CreateProblemBodySchema.parse({ difficulty: 'easy', visibility: 'practice' }).visibility,
+    ).toBe('practice')
+  })
+
+  it('rejects an unknown visibility on create and update', () => {
+    expect(
+      CreateProblemBodySchema.safeParse({ difficulty: 'easy', visibility: 'secret' }).success,
+    ).toBe(false)
+    expect(UpdateProblemBodySchema.safeParse({ visibility: 'secret' }).success).toBe(false)
+  })
+
+  it('accepts visibility on update', () => {
+    expect(UpdateProblemBodySchema.parse({ visibility: 'round' }).visibility).toBe('round')
+  })
+
+  it('defaults the practice list locale to pt', () => {
+    expect(PracticeProblemListQuerySchema.parse({})).toEqual({ locale: 'pt' })
+    expect(PracticeProblemListQuerySchema.safeParse({ locale: 'fr' }).success).toBe(false)
+  })
+
+  it('keeps a practice list item to id, title, difficulty and locale', () => {
+    const parsed = PracticeProblemSummarySchema.parse({
+      id: '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+      title: 'Soma',
+      difficulty: 'easy',
+      locale: 'pt',
+      testCases: [{ input: 1, expected: 1, hidden: true }],
+    })
+
+    expect(Object.keys(parsed).sort()).toEqual(['difficulty', 'id', 'locale', 'title'])
   })
 })
 
@@ -221,6 +283,23 @@ describe('evaluateTestCaseCoverage', () => {
   it('returns missing_both when there are no test cases', () => {
     expect(evaluateTestCaseCoverage([])).toBe('missing_both')
   })
+
+  // #209 (A1): practice has no Submeter, so nothing ever reads a hidden case.
+  it('asks only for a visible case on a practice problem', () => {
+    expect(evaluateTestCaseCoverage([{ input: 1, expected: 1, hidden: false }], 'practice')).toBe(
+      'ok',
+    )
+    expect(evaluateTestCaseCoverage([{ input: 1, expected: 1, hidden: true }], 'practice')).toBe(
+      'missing_visible',
+    )
+    expect(evaluateTestCaseCoverage([], 'practice')).toBe('missing_visible')
+  })
+
+  it('keeps asking for both on a round problem', () => {
+    expect(evaluateTestCaseCoverage([{ input: 1, expected: 1, hidden: false }], 'round')).toBe(
+      'missing_hidden',
+    )
+  })
 })
 
 // Runs against the real dockerized Postgres (docker compose up -d) — the
@@ -245,6 +324,17 @@ describe('problems and problem_translations tables', () => {
       .returning()
 
     expect(problem?.points).toBe(100)
+  })
+
+  // #209: every row that predates the column, and every insert that does not
+  // name it, is a competition problem — nothing about the competition moves.
+  it('defaults visibility to round when not provided', async () => {
+    const [problem] = await db
+      .insert(problemsTable)
+      .values({ difficulty: 'easy', status: 'draft' })
+      .returning()
+
+    expect(problem?.visibility).toBe('round')
   })
 
   it('rejects a second translation with the same problem_id and locale', async () => {
@@ -900,6 +990,361 @@ describe('problems.service', () => {
 
       expect(problem?.roundStatus).toBe('closed')
       expect(problem?.bestSubmission).toBeNull()
+    })
+  })
+
+  // --- #209: practice visibility ---
+  describe('practice visibility', () => {
+    const translations = [
+      { locale: 'pt' as const, title: 'Soma', statementMd: 'Some dois números.' },
+      { locale: 'es' as const, title: 'Suma', statementMd: 'Suma dos números.' },
+      { locale: 'en' as const, title: 'Sum', statementMd: 'Sum two numbers.' },
+    ]
+    const secretExpected = 'RESPOSTA-OCULTA-PRATICA'
+
+    const publishedPractice = async (difficulty: 'easy' | 'medium' | 'hard' = 'easy') => {
+      const problem = await createProblem(db, { difficulty, visibility: 'practice' })
+      expectUpdated(
+        await updateProblem(db, problem.id, {
+          translations,
+          testCases: [{ input: [1, 2], expected: 3, hidden: false }],
+        }),
+      )
+      const published = await publishProblem(db, problem.id)
+      if (!published.ok) throw new Error(`expected practice to publish, got '${published.error}'`)
+      return problem.id
+    }
+
+    const publishedRound = async () => {
+      const problem = await createProblem(db, { difficulty: 'easy' })
+      expectUpdated(
+        await updateProblem(db, problem.id, { translations, testCases: [visibleCase, hiddenCase] }),
+      )
+      const published = await publishProblem(db, problem.id)
+      if (!published.ok) throw new Error('expected round problem to publish')
+      return problem.id
+    }
+
+    const insertUser = async () => {
+      const [user] = await db
+        .insert(usersTable)
+        .values({
+          email: `practice-${crypto.randomUUID()}@edu.pucrs.br`,
+          passwordHash: 'hash',
+          role: 'participant',
+          university: 'pucrs',
+        })
+        .returning()
+      if (!user) throw new Error('expected a user fixture')
+      return user
+    }
+
+    describe('organizer CRUD', () => {
+      it('creates a round problem by default and a practice one when asked', async () => {
+        const plain = await createProblem(db, { difficulty: 'easy' })
+        const practice = await createProblem(db, { difficulty: 'easy', visibility: 'practice' })
+
+        expect(plain.visibility).toBe('round')
+        expect(practice.visibility).toBe('practice')
+        expect((await getProblem(db, practice.id))?.visibility).toBe('practice')
+      })
+
+      it('lists the visibility of every problem', async () => {
+        const practice = await createProblem(db, { difficulty: 'easy', visibility: 'practice' })
+        const plain = await createProblem(db, { difficulty: 'easy' })
+
+        const summaries = await listProblems(db)
+
+        expect(summaries.find((p) => p.id === practice.id)?.visibility).toBe('practice')
+        expect(summaries.find((p) => p.id === plain.id)?.visibility).toBe('round')
+      })
+
+      it('publishes a practice problem with only a visible case', async () => {
+        const id = await publishedPractice()
+        expect((await getProblem(db, id))?.status).toBe('published')
+      })
+
+      it('still refuses a round problem with only a visible case', async () => {
+        const problem = await createProblem(db, { difficulty: 'easy' })
+        await updateProblem(db, problem.id, { translations, testCases: [visibleCase] })
+
+        expect(await publishProblem(db, problem.id)).toEqual({
+          ok: false,
+          error: 'missing_test_cases',
+          reason: 'missing_hidden',
+        })
+      })
+
+      it('refuses a practice problem with only a hidden case', async () => {
+        const problem = await createProblem(db, { difficulty: 'easy', visibility: 'practice' })
+        await updateProblem(db, problem.id, { translations, testCases: [hiddenCase] })
+
+        expect(await publishProblem(db, problem.id)).toEqual({
+          ok: false,
+          error: 'missing_test_cases',
+          reason: 'missing_visible',
+        })
+      })
+
+      it('switches round to practice when the problem is in no round', async () => {
+        const id = await publishedRound()
+
+        const updated = expectUpdated(await updateProblem(db, id, { visibility: 'practice' }))
+
+        expect(updated.visibility).toBe('practice')
+      })
+
+      it('refuses round to practice while the problem sits in a draft round', async () => {
+        const id = await publishedRound()
+        const created = await createRound(db, { name: 'R', durationMinutes: 30, problemIds: [id] })
+        if (!created.ok) throw new Error('expected the round to be created')
+
+        expect(await updateProblem(db, id, { visibility: 'practice' })).toEqual({
+          ok: false,
+          error: 'problem_in_round',
+        })
+        expect((await getProblem(db, id))?.visibility).toBe('round')
+      })
+
+      it('refuses round to practice while the problem sits in a closed round', async () => {
+        const id = await publishedRound()
+        const created = await createRound(db, { name: 'R', durationMinutes: 30, problemIds: [id] })
+        if (!created.ok) throw new Error('expected the round to be created')
+        const opened = await openRound(db, created.round.id)
+        if (!opened.ok) throw new Error('expected the round to open')
+        const closed = await closeRound(db, created.round.id)
+        if (!closed.ok) throw new Error('expected the round to close')
+
+        expect(await updateProblem(db, id, { visibility: 'practice' })).toEqual({
+          ok: false,
+          error: 'problem_in_round',
+        })
+      })
+
+      it('writes nothing else when the visibility switch is refused', async () => {
+        const id = await publishedRound()
+        const created = await createRound(db, { name: 'R', durationMinutes: 30, problemIds: [id] })
+        if (!created.ok) throw new Error('expected the round to be created')
+
+        await updateProblem(db, id, { visibility: 'practice', difficulty: 'hard' })
+
+        expect((await getProblem(db, id))?.difficulty).toBe('easy')
+      })
+
+      it('lets an unchanged visibility through on a problem in a round', async () => {
+        const id = await publishedRound()
+        const created = await createRound(db, { name: 'R', durationMinutes: 30, problemIds: [id] })
+        if (!created.ok) throw new Error('expected the round to be created')
+
+        const updated = expectUpdated(
+          await updateProblem(db, id, { visibility: 'round', difficulty: 'hard' }),
+        )
+
+        expect(updated.difficulty).toBe('hard')
+      })
+
+      it('refuses practice to round on a published problem with no hidden case', async () => {
+        const id = await publishedPractice()
+
+        expect(await updateProblem(db, id, { visibility: 'round' })).toEqual({
+          ok: false,
+          error: 'missing_test_cases',
+          reason: 'missing_hidden',
+        })
+        expect((await getProblem(db, id))?.visibility).toBe('practice')
+      })
+
+      it('judges practice to round against the test cases sent in the same patch', async () => {
+        const id = await publishedPractice()
+
+        const updated = expectUpdated(
+          await updateProblem(db, id, {
+            visibility: 'round',
+            testCases: [visibleCase, hiddenCase],
+          }),
+        )
+
+        expect(updated.visibility).toBe('round')
+      })
+
+      it('lets practice to round through on a draft with no hidden case', async () => {
+        const problem = await createProblem(db, { difficulty: 'easy', visibility: 'practice' })
+
+        const updated = expectUpdated(await updateProblem(db, problem.id, { visibility: 'round' }))
+
+        expect(updated.visibility).toBe('round')
+      })
+    })
+
+    describe('rounds', () => {
+      it('refuses a practice problem in createRound, inserting nothing', async () => {
+        const id = await publishedPractice()
+
+        const result = await createRound(db, { name: 'R', durationMinutes: 30, problemIds: [id] })
+
+        expect(result).toEqual({ ok: false, error: 'invalid_problem_ids' })
+        expect(await db.select().from(roundProblemsTable)).toEqual([])
+        expect(await db.select().from(roundsTable)).toEqual([])
+      })
+
+      it('refuses a practice problem in updateRound, keeping the old list', async () => {
+        const practiceId = await publishedPractice()
+        const roundProblemId = await publishedRound()
+        const created = await createRound(db, {
+          name: 'R',
+          durationMinutes: 30,
+          problemIds: [roundProblemId],
+        })
+        if (!created.ok) throw new Error('expected the round to be created')
+
+        const result = await updateRound(db, created.round.id, {
+          problemIds: [roundProblemId, practiceId],
+        })
+
+        expect(result).toEqual({ ok: false, error: 'invalid_problem_ids' })
+        const rows = await db.select().from(roundProblemsTable)
+        expect(rows.map((row) => row.problemId)).toEqual([roundProblemId])
+      })
+    })
+
+    describe('participant read', () => {
+      it('serves a published practice problem with no round in existence', async () => {
+        const id = await publishedPractice()
+        const user = await insertUser()
+
+        const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+        expect(problem).toEqual({
+          id,
+          points: 100,
+          difficulty: 'easy',
+          locale: 'pt',
+          title: 'Soma',
+          statementMd: 'Some dois números.',
+          examples: [{ input: [1, 2], expected: 3 }],
+          visibility: 'practice',
+          roundId: null,
+          roundStatus: 'none',
+          bestSubmission: null,
+        })
+      })
+
+      it('serves it just the same to a participant with a team', async () => {
+        const id = await publishedPractice()
+        const user = await insertUser()
+        const [team] = await db.insert(teamsTable).values({ name: 'Time P' }).returning()
+        if (!team) throw new Error('expected a team fixture')
+        await db.insert(teamMembersTable).values({ userId: user.id, teamId: team.id })
+
+        const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+        expect(problem?.roundStatus).toBe('none')
+        expect(problem?.bestSubmission).toBeNull()
+      })
+
+      it('serves the requested locale', async () => {
+        const id = await publishedPractice()
+        const user = await insertUser()
+
+        expect((await getPublishedProblem(db, id, 'es', user.id))?.title).toBe('Suma')
+        expect((await getPublishedProblem(db, id, 'en', user.id))?.title).toBe('Sum')
+      })
+
+      it('never leaks a hidden case a practice problem happens to carry', async () => {
+        const problem = await createProblem(db, { difficulty: 'easy', visibility: 'practice' })
+        await updateProblem(db, problem.id, {
+          translations,
+          testCases: [
+            { input: [1, 2], expected: 3, hidden: false },
+            { input: [9, 9], expected: secretExpected, hidden: true },
+          ],
+        })
+        const published = await publishProblem(db, problem.id)
+        if (!published.ok) throw new Error('expected practice to publish')
+        const user = await insertUser()
+
+        const read = await getPublishedProblem(db, problem.id, 'pt', user.id)
+
+        expect(read?.examples).toEqual([{ input: [1, 2], expected: 3 }])
+        expect(JSON.stringify(read)).not.toContain(secretExpected)
+      })
+
+      it('treats a draft or archived practice problem as nonexistent', async () => {
+        const draft = await createProblem(db, { difficulty: 'easy', visibility: 'practice' })
+        await updateProblem(db, draft.id, { translations })
+        const archived = await publishedPractice()
+        await archiveProblem(db, archived)
+        const user = await insertUser()
+
+        expect(await getPublishedProblem(db, draft.id, 'pt', user.id)).toBeNull()
+        expect(await getPublishedProblem(db, archived, 'pt', user.id)).toBeNull()
+      })
+
+      it('reports visibility round on a competition problem', async () => {
+        const id = await publishedRound()
+        const created = await createRound(db, { name: 'R', durationMinutes: 30, problemIds: [id] })
+        if (!created.ok) throw new Error('expected the round to be created')
+        const opened = await openRound(db, created.round.id)
+        if (!opened.ok) throw new Error('expected the round to open')
+        const user = await insertUser()
+
+        expect((await getPublishedProblem(db, id, 'pt', user.id))?.visibility).toBe('round')
+      })
+    })
+
+    describe('listPracticeProblems', () => {
+      it('lists only published practice problems', async () => {
+        const practice = await publishedPractice()
+        await publishedRound()
+        await createProblem(db, { difficulty: 'easy', visibility: 'practice' })
+        const archived = await publishedPractice()
+        await archiveProblem(db, archived)
+
+        const list = await listPracticeProblems(db, 'pt')
+
+        expect(list).toEqual([{ id: practice, title: 'Soma', difficulty: 'easy', locale: 'pt' }])
+      })
+
+      it('serves each title in the requested locale, falling back to pt', async () => {
+        const id = await publishedPractice()
+        await db
+          .delete(problemTranslationsTable)
+          .where(
+            and(
+              eq(problemTranslationsTable.problemId, id),
+              eq(problemTranslationsTable.locale, 'en'),
+            ),
+          )
+
+        expect((await listPracticeProblems(db, 'es'))[0]).toMatchObject({
+          title: 'Suma',
+          locale: 'es',
+        })
+        expect((await listPracticeProblems(db, 'en'))[0]).toMatchObject({
+          title: 'Soma',
+          locale: 'pt',
+        })
+      })
+
+      it('orders by difficulty, then creation time', async () => {
+        const hard = await publishedPractice('hard')
+        const easyLater = await publishedPractice('easy')
+        const easyEarlier = await publishedPractice('easy')
+        const medium = await publishedPractice('medium')
+        await db
+          .update(problemsTable)
+          .set({ createdAt: new Date('2026-01-01T00:00:00.000Z') })
+          .where(eq(problemsTable.id, easyEarlier))
+
+        const list = await listPracticeProblems(db, 'pt')
+
+        expect(list.map((p) => p.id)).toEqual([easyEarlier, easyLater, medium, hard])
+      })
+
+      it('answers an empty list when there is no practice problem', async () => {
+        await publishedRound()
+        expect(await listPracticeProblems(db, 'pt')).toEqual([])
+      })
     })
   })
 })

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 
 import type { Db } from '../../db/client'
 import { problemsTable, problemTranslationsTable } from '../../db/schema'
@@ -6,14 +6,16 @@ import { canonicalJson } from '../../lib/json'
 import type { Locale } from '../../lib/locale'
 import { LocaleSchema } from '../../lib/locale'
 
-import { getProblemRoundAccess } from '../rounds/rounds.service'
+import { getProblemRoundAccess, isProblemInAnyRound } from '../rounds/rounds.service'
 import { findTeamIdForUser, getBestSubmission } from '../submissions/submissions.service'
 
 import type {
   CreateProblemBody,
   ParticipantProblem,
+  PracticeProblemSummary,
   ProblemDetail,
   ProblemSummary,
+  ProblemVisibility,
   TestCase,
   UpdateProblemBody,
 } from './problems.schema'
@@ -25,9 +27,15 @@ export function computeMissingLocales(locales: Locale[]): Locale[] {
 
 export type TestCaseCoverage = 'ok' | 'missing_visible' | 'missing_hidden' | 'missing_both'
 
-export function evaluateTestCaseCoverage(testCases: TestCase[]): TestCaseCoverage {
+// A practice problem (#209) has no Submeter, so no hidden case is ever read:
+// it only needs a visible one for Executar. Hidden cases stay allowed.
+export function evaluateTestCaseCoverage(
+  testCases: TestCase[],
+  visibility: ProblemVisibility = 'round',
+): TestCaseCoverage {
   const hasVisible = testCases.some((testCase) => !testCase.hidden)
   const hasHidden = testCases.some((testCase) => testCase.hidden)
+  if (visibility === 'practice') return hasVisible ? 'ok' : 'missing_visible'
   if (hasVisible && hasHidden) return 'ok'
   if (!hasVisible && !hasHidden) return 'missing_both'
   return hasVisible ? 'missing_hidden' : 'missing_visible'
@@ -42,6 +50,7 @@ function toDetail(problem: ProblemRow, translations: TranslationRow[]): ProblemD
     points: problem.points,
     difficulty: problem.difficulty,
     status: problem.status,
+    visibility: problem.visibility,
     testCases: problem.testCases,
     translations: translations.map((t) => ({
       locale: t.locale,
@@ -60,6 +69,7 @@ export async function createProblem(db: Db, input: CreateProblemBody): Promise<P
       difficulty: input.difficulty,
       status: 'draft',
       ...(input.points !== undefined ? { points: input.points } : {}),
+      ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
     })
     .returning()
   if (!problem) throw new Error('expected problem to be inserted')
@@ -104,14 +114,32 @@ export async function getPublishedProblem(
     translations.find((t) => t.locale === locale) ?? translations.find((t) => t.locale === 'pt')
   if (!translation) return null
 
+  const examples = problem.testCases
+    .filter((testCase) => !testCase.hidden)
+    .map((testCase) => ({ input: testCase.input, expected: testCase.expected }))
+
+  // Practice (#209): readable by any participant, team or not, with no round
+  // ever existing — and nothing round-shaped to report.
+  if (problem.visibility === 'practice') {
+    return {
+      id: problem.id,
+      points: problem.points,
+      difficulty: problem.difficulty,
+      locale: translation.locale,
+      title: translation.title,
+      statementMd: translation.statementMd,
+      examples,
+      visibility: 'practice',
+      roundId: null,
+      roundStatus: 'none',
+      bestSubmission: null,
+    }
+  }
+
   // Round access (#37): never in a round, or only in a draft one, is the same
   // 404 as an unpublished problem — neither announces itself.
   const access = await getProblemRoundAccess(db, id)
   if (access.status === 'none') return null
-
-  const examples = problem.testCases
-    .filter((testCase) => !testCase.hidden)
-    .map((testCase) => ({ input: testCase.input, expected: testCase.expected }))
 
   const teamId = await findTeamIdForUser(db, userId)
   // The team's own best, open or closed (#206). Scored inside access.roundId,
@@ -129,6 +157,7 @@ export async function getPublishedProblem(
       title: translation.title,
       statementMd: translation.statementMd,
       examples,
+      visibility: 'round',
       roundId: access.roundId,
       roundStatus: 'open',
       bestSubmission,
@@ -143,6 +172,7 @@ export async function getPublishedProblem(
     title: translation.title,
     statementMd: translation.statementMd,
     examples,
+    visibility: 'round',
     roundId: null,
     roundStatus: 'closed',
     bestSubmission,
@@ -167,12 +197,53 @@ export async function listProblems(db: Db): Promise<ProblemSummary[]> {
     points: problem.points,
     difficulty: problem.difficulty,
     status: problem.status,
+    visibility: problem.visibility,
     testCaseCount: problem.testCases.length,
     translations: (translationsByProblem.get(problem.id) ?? []).map((t) => ({
       locale: t.locale,
       title: t.title,
     })),
   }))
+}
+
+// The practice catalog (#209): published practice problems only, in a stable
+// order — difficulty (enum order: easy → medium → hard), then creation, then
+// id as the last tie-break. pt is the fallback title, as in the single read.
+export async function listPracticeProblems(
+  db: Db,
+  locale: Locale,
+): Promise<PracticeProblemSummary[]> {
+  const problems = await db
+    .select({ id: problemsTable.id, difficulty: problemsTable.difficulty })
+    .from(problemsTable)
+    .where(and(eq(problemsTable.status, 'published'), eq(problemsTable.visibility, 'practice')))
+    .orderBy(asc(problemsTable.difficulty), asc(problemsTable.createdAt), asc(problemsTable.id))
+  if (problems.length === 0) return []
+
+  const translations = await db
+    .select()
+    .from(problemTranslationsTable)
+    .where(
+      inArray(
+        problemTranslationsTable.problemId,
+        problems.map((problem) => problem.id),
+      ),
+    )
+
+  return problems.flatMap((problem) => {
+    const own = translations.filter((t) => t.problemId === problem.id)
+    const translation = own.find((t) => t.locale === locale) ?? own.find((t) => t.locale === 'pt')
+    // Same rule as getPublishedProblem: no pt either means nothing to show.
+    if (!translation) return []
+    return [
+      {
+        id: problem.id,
+        title: translation.title,
+        difficulty: problem.difficulty,
+        locale: translation.locale,
+      },
+    ]
+  })
 }
 
 /**
@@ -210,6 +281,8 @@ export type UpdateProblemResult =
   | { ok: true; problem: ProblemDetail }
   | { ok: false; error: 'not_found' }
   | { ok: false; error: 'problem_in_open_round'; fields: ScoringField[] }
+  | { ok: false; error: 'problem_in_round' }
+  | { ok: false; error: 'missing_test_cases'; reason: Exclude<TestCaseCoverage, 'ok'> }
 
 export async function updateProblem(
   db: Db,
@@ -218,6 +291,22 @@ export async function updateProblem(
 ): Promise<UpdateProblemResult> {
   const [existing] = await db.select().from(problemsTable).where(eq(problemsTable.id, id))
   if (!existing) return { ok: false, error: 'not_found' }
+
+  // Visibility switch (#209, A2). Allowed in any status, behind two locks —
+  // both judged before anything is written.
+  if (input.visibility !== undefined && input.visibility !== existing.visibility) {
+    // round → practice: a problem that sat in any round keeps its history.
+    if (input.visibility === 'practice' && (await isProblemInAnyRound(db, id))) {
+      return { ok: false, error: 'problem_in_round' }
+    }
+    // practice → round on a published problem: the competition's publish
+    // invariant (a hidden case to score against) has to hold already, judged
+    // against the cases this same patch leaves behind.
+    if (input.visibility === 'round' && existing.status === 'published') {
+      const coverage = evaluateTestCaseCoverage(input.testCases ?? existing.testCases, 'round')
+      if (coverage !== 'ok') return { ok: false, error: 'missing_test_cases', reason: coverage }
+    }
+  }
 
   // Compares values, never mere presence: the organizer's form rebuilds the
   // whole patch body on every save (front/src/lib/problem-form.ts), so a guard
@@ -242,6 +331,7 @@ export async function updateProblem(
   if (input.difficulty !== undefined) patch.difficulty = input.difficulty
   if (input.points !== undefined) patch.points = input.points
   if (input.testCases !== undefined) patch.testCases = input.testCases
+  if (input.visibility !== undefined) patch.visibility = input.visibility
   if (Object.keys(patch).length > 0) {
     await db
       .update(problemsTable)
@@ -292,7 +382,7 @@ export async function publishProblem(db: Db, id: string): Promise<PublishResult>
     return { ok: false, error: 'incomplete_translations', missingLocales }
   }
 
-  const coverage = evaluateTestCaseCoverage(problem.testCases)
+  const coverage = evaluateTestCaseCoverage(problem.testCases, problem.visibility)
   if (coverage !== 'ok') return { ok: false, error: 'missing_test_cases', reason: coverage }
 
   if (problem.status !== 'published') {

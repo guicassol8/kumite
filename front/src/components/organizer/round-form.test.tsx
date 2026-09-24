@@ -28,6 +28,7 @@ const problemA = {
   points: 10,
   difficulty: 'easy',
   status: 'published',
+  visibility: 'round',
   testCaseCount: 2,
   translations: [{ locale: 'pt', title: 'Soma' }],
 }
@@ -37,6 +38,7 @@ const problemB = {
   points: 20,
   difficulty: 'hard',
   status: 'published',
+  visibility: 'round',
   testCaseCount: 4,
   translations: [{ locale: 'pt', title: 'Ordenação' }],
 }
@@ -46,8 +48,21 @@ const draftProblem = {
   points: 5,
   difficulty: 'medium',
   status: 'draft',
+  visibility: 'round',
   testCaseCount: 0,
   translations: [{ locale: 'pt', title: 'Rascunho' }],
+}
+
+// #209: published, but practice — never eligible for a round (the back
+// answers invalid_problem_ids), so the selector must not offer it.
+const practiceProblem = {
+  id: 'p4',
+  points: 100,
+  difficulty: 'easy',
+  status: 'published',
+  visibility: 'practice',
+  testCaseCount: 1,
+  translations: [{ locale: 'pt', title: 'Prática' }],
 }
 
 function emptyValues(): RoundFormValues {
@@ -67,7 +82,9 @@ function renderForm(props: Partial<React.ComponentProps<typeof RoundForm>> = {})
 
 beforeEach(() => {
   mockedList.mockReset()
-  mockedList.mockResolvedValue(jsonResponse(200, [problemA, problemB, draftProblem]))
+  mockedList.mockResolvedValue(
+    jsonResponse(200, [problemA, problemB, draftProblem, practiceProblem]),
+  )
 })
 
 afterEach(cleanup)
@@ -85,6 +102,13 @@ describe('RoundForm', () => {
       (screen.getByTestId('round-form-problem-p2-checkbox') as HTMLButtonElement).dataset.state,
     ).toBe('checked')
     expect(screen.queryByTestId('round-form-problem-p3')).toBeNull()
+  })
+
+  it('never offers a published practice problem (#209)', async () => {
+    renderForm()
+
+    await waitFor(() => expect(screen.getByTestId('round-form-problem-p1')).toBeDefined())
+    expect(screen.queryByTestId('round-form-problem-p4')).toBeNull()
   })
 
   it('toggling a checkbox adds it to the tail of problemIds and removes it on uncheck', async () => {

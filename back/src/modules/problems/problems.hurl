@@ -403,3 +403,149 @@ Authorization: Bearer {{organizer_token}}
 HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
+
+# --- Practice visibility (#209) ---
+# A practice problem lives outside the competition: readable with no round,
+# listed in its own catalog, never placed in a round, never submitted.
+# Asserted by id, never by count: the hurl database accumulates state across
+# files.
+
+# P1. The organizer creates a practice problem.
+POST {{host}}/organizer/problems
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "difficulty": "easy", "visibility": "practice" }
+HTTP 201
+[Captures]
+practice_id: jsonpath "$.id"
+[Asserts]
+jsonpath "$.visibility" == "practice"
+jsonpath "$.status" == "draft"
+
+# P2. Three translations and a single visible case — no hidden one.
+PATCH {{host}}/organizer/problems/{{practice_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{
+  "translations": [
+    { "locale": "pt", "title": "Prática: dobro", "statementMd": "Devolva o dobro." },
+    { "locale": "es", "title": "Práctica: doble", "statementMd": "Devuelve el doble." },
+    { "locale": "en", "title": "Practice: double", "statementMd": "Return the double." }
+  ],
+  "testCases": [ { "input": 2, "expected": 4, "hidden": false } ]
+}
+HTTP 200
+
+# P3. Publish -> succeeds: practice needs only a visible case (no Submeter).
+POST {{host}}/organizer/problems/{{practice_id}}/publish
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "published"
+jsonpath "$.visibility" == "practice"
+
+# P4. The teamless participant reads it with no round involved.
+GET {{host}}/problems/{{practice_id}}?locale=es
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.id" == "{{practice_id}}"
+jsonpath "$.visibility" == "practice"
+jsonpath "$.locale" == "es"
+jsonpath "$.title" == "Práctica: doble"
+jsonpath "$.roundId" == null
+jsonpath "$.roundStatus" == "none"
+jsonpath "$.bestSubmission" == null
+jsonpath "$.examples" count == 1
+jsonpath "$.examples[0].expected" == 4
+jsonpath "$..hidden" not exists
+
+# P5. No token -> 401, like every participant route.
+GET {{host}}/problems/{{practice_id}}
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
+# P6. A published round problem, in no round, to prove the catalog does not
+# leak competition problems.
+POST {{host}}/organizer/problems
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "difficulty": "medium" }
+HTTP 201
+[Captures]
+round_problem_id: jsonpath "$.id"
+[Asserts]
+jsonpath "$.visibility" == "round"
+
+PATCH {{host}}/organizer/problems/{{round_problem_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{
+  "translations": [
+    { "locale": "pt", "title": "Rodada: triplo", "statementMd": "Devolva o triplo." },
+    { "locale": "es", "title": "Ronda: triple", "statementMd": "Devuelve el triple." },
+    { "locale": "en", "title": "Round: triple", "statementMd": "Return the triple." }
+  ],
+  "testCases": [
+    { "input": 2, "expected": 6, "hidden": false },
+    { "input": 3, "expected": 9, "hidden": true }
+  ]
+}
+HTTP 200
+
+POST {{host}}/organizer/problems/{{round_problem_id}}/publish
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+
+# P7. The practice catalog in es: the practice problem with its es title, and
+# neither the published round problem nor this file's first problem.
+GET {{host}}/practice/problems?locale=es
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$[?(@.id=='{{practice_id}}')].title" == "Práctica: doble"
+jsonpath "$[?(@.id=='{{practice_id}}')].locale" == "es"
+jsonpath "$[?(@.id=='{{practice_id}}')].difficulty" == "easy"
+jsonpath "$[?(@.id=='{{round_problem_id}}')]" not exists
+jsonpath "$[?(@.id=='{{problem_id}}')]" not exists
+jsonpath "$..testCases" not exists
+jsonpath "$..statementMd" not exists
+
+# P8. The catalog is a participant route too: no token -> 401.
+GET {{host}}/practice/problems
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
+# P9. A practice problem is never eligible for a round -> the same 400 a
+# draft problem gets.
+POST {{host}}/organizer/rounds
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "name": "Practice Leak Round", "durationMinutes": 30, "problemIds": ["{{practice_id}}"] }
+HTTP 400
+[Asserts]
+jsonpath "$.error" == "invalid_problem_ids"
+
+# P10. A problem that has been in a round (this file's first one, still in its
+# closed round) cannot become practice: its history stays competition.
+PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "visibility": "practice" }
+HTTP 409
+[Asserts]
+jsonpath "$.error" == "problem_in_round"
+
+# P11. practice -> round on a published problem with no hidden case -> 400.
+PATCH {{host}}/organizer/problems/{{practice_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "visibility": "round" }
+HTTP 400
+[Asserts]
+jsonpath "$.error" == "missing_test_cases"
+
+# The submission refusal for practice (400 practice_not_submittable) lives in
+# submissions.hurl § 3c: it needs a team, which would leak into ranking.hurl.

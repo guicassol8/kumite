@@ -166,6 +166,49 @@ HTTP 404
 [Asserts]
 jsonpath "$.error" == "no_active_round"
 
+# 3c. A published practice problem (#209) -> 400 practice_not_submittable,
+#     even with a team and the open round's id: practice has no Submeter.
+#     Refused before the round lookup, codegen or sandbox, so — like the 404s
+#     above — nothing is stored and no cooldown is armed. Lives here rather
+#     than in problems.hurl because submitting needs a team, and a team
+#     created there would land in ranking.hurl's global leaderboard.
+POST {{host}}/organizer/problems
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "difficulty": "easy", "visibility": "practice" }
+HTTP 201
+[Captures]
+practice_id: jsonpath "$.id"
+
+PATCH {{host}}/organizer/problems/{{practice_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{
+  "translations": [
+    { "locale": "pt", "title": "Prática: eco", "statementMd": "Devolva a entrada." },
+    { "locale": "es", "title": "Práctica: eco", "statementMd": "Devuelve la entrada." },
+    { "locale": "en", "title": "Practice: echo", "statementMd": "Return the input." }
+  ],
+  "testCases": [ { "input": 7, "expected": 7, "hidden": false } ]
+}
+HTTP 200
+
+POST {{host}}/organizer/problems/{{practice_id}}/publish
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+
+POST {{host}}/submissions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+{
+  "problemId": "{{practice_id}}",
+  "roundId": "{{round_id}}",
+  "workspace": { "blocks": { "languageVersion": 0, "blocks": [{ "type": "kumite_solve", "id": "raiz", "inputs": { "RETURN": { "block": { "type": "kumite_input", "id": "entrada" } } } }] } }
+}
+HTTP 400
+[Asserts]
+jsonpath "$.error" == "practice_not_submittable"
+
 # 4. A workspace with no root block -> 400 from codegen, message already
 #    localized by @kumite/blocks. Still nothing executed, still no cooldown.
 POST {{host}}/submissions

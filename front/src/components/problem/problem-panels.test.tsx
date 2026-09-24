@@ -16,6 +16,7 @@ const problem = {
   statementMd: 'Some os pares.',
   examples: [{ input: [1, 2, 3, 4], expected: 6 }],
   roundId: 'r1',
+  visibility: 'round' as const,
   roundStatus: 'open' as const,
   bestSubmission: null,
 }

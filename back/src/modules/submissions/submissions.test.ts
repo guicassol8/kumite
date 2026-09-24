@@ -918,6 +918,36 @@ describe('submitSolution', () => {
     expect(outcome).toEqual({ ok: false, error: 'problem_not_found' })
   })
 
+  // #209: practice has no Submeter. Refused before any round lookup, codegen
+  // or sandbox — nothing recorded, and no cooldown armed either.
+  it('refuses a practice problem without recording anything or arming the cooldown', async () => {
+    const [problem] = await db
+      .insert(problemsTable)
+      .values({
+        difficulty: 'easy',
+        status: 'published',
+        visibility: 'practice',
+        testCases: solvableCases,
+      })
+      .returning()
+    const { user, team } = await insertTeamMember()
+    const submit = () =>
+      submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        {
+          problemId: problem?.id ?? '',
+          roundId: '00000000-0000-0000-0000-000000000000',
+          workspace: solutionWorkspace,
+        },
+      )
+
+    expect(await submit()).toEqual({ ok: false, error: 'practice_not_submittable' })
+    // A second immediate try gets the same refusal, not a 429.
+    expect(await submit()).toEqual({ ok: false, error: 'practice_not_submittable' })
+    expect(await db.select().from(submissionsTable)).toEqual([])
+  })
+
   it(
     'refuses a workspace codegen rejects, runs nothing and burns no cooldown',
     async () => {

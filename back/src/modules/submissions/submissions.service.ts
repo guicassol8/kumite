@@ -219,6 +219,7 @@ export type SubmitOutcome =
   | { ok: true; result: SubmissionResult }
   | { ok: false; error: 'problem_not_found' }
   | { ok: false; error: 'no_active_round' }
+  | { ok: false; error: 'practice_not_submittable' }
   | {
       ok: false
       error: 'codegen_rejected'
@@ -252,8 +253,8 @@ async function countAttempts(db: Db, identity: SubmitIdentity, problemId: string
 }
 
 /**
- * The whole judging pipeline: throttle → pause → problem → codegen → sandbox →
- * score → persist → verdict.
+ * The whole judging pipeline: throttle → pause → problem → practice refusal →
+ * round → codegen → sandbox → score → persist → verdict.
  *
  * The organizer's pause (#285) is the first check inside the claimed slot.
  * The claim itself stays synchronous and first, so two concurrent requests
@@ -291,6 +292,11 @@ export async function submitSolution(
       .from(problemsTable)
       .where(and(eq(problemsTable.id, body.problemId), eq(problemsTable.status, 'published')))
     if (!problem) return { ok: false, error: 'problem_not_found' }
+
+    // Practice (#209) has no Submeter: refused before the round lookup, so the
+    // answer is this validation error rather than a misleading no_active_round.
+    // Nothing runs, so — like a 404 — no cooldown is armed.
+    if (problem.visibility === 'practice') return { ok: false, error: 'practice_not_submittable' }
 
     // The client's timer is never the authority (#37): re-checked here,
     // against the round actually open right now, on every submission.

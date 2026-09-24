@@ -5,6 +5,7 @@ import { SUBMISSION_COOLDOWN_MS } from '../../config'
 import type { Db } from '../../db/client'
 import { problemsTable, submissionsTable, teamMembersTable, teamsTable } from '../../db/schema'
 
+import { getEventConfig } from '../event-config/event-config.service'
 import type { CodegenErrorCode, JudgeCaseResult, JudgeOutcome } from '../judge/judge.schema'
 import { generateJudgeSource, runJudge } from '../judge/judge.service'
 import type { TestCase } from '../problems/problems.schema'
@@ -226,6 +227,7 @@ export type SubmitOutcome =
       blockType?: string
     }
   | { ok: false; error: 'throttled'; reason: 'in_flight' | 'cooldown'; retryAfterMs: number }
+  | { ok: false; error: 'submissions_paused' }
 
 export async function findTeamIdForUser(db: Db, userId: string): Promise<string | null> {
   const [membership] = await db
@@ -250,8 +252,12 @@ async function countAttempts(db: Db, identity: SubmitIdentity, problemId: string
 }
 
 /**
- * The whole judging pipeline: throttle → problem → codegen → sandbox →
+ * The whole judging pipeline: pause → throttle → problem → codegen → sandbox →
  * score → persist → verdict.
+ *
+ * The organizer's pause (#285) is checked first of all, before the slot is
+ * claimed: a paused submission neither holds the identity in flight nor arms
+ * a cooldown, so the first attempt after a resume goes straight through.
  *
  * The identity's slot is claimed before anything else and released in a
  * `finally`, so a crash can never leave a participant locked out. The 5s
@@ -263,6 +269,9 @@ export async function submitSolution(
   identity: SubmitIdentity,
   body: SubmitSolutionBody,
 ): Promise<SubmitOutcome> {
+  const { submissionsPaused } = await getEventConfig(db)
+  if (submissionsPaused) return { ok: false, error: 'submissions_paused' }
+
   const identityKey = `team:${identity.teamId}`
   const denial = acquireSubmissionSlot(identityKey)
   if (denial) return { ok: false, error: 'throttled', ...denial }

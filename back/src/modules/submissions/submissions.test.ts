@@ -10,6 +10,7 @@ import { JWT_SECRET, SUBMISSION_COOLDOWN_MS, TOKEN_TTL_SECONDS } from '../../con
 import { k } from '../../context'
 import { createDb } from '../../db/client'
 import {
+  eventConfigTable,
   problemsTable,
   problemTranslationsTable,
   roundProblemsTable,
@@ -20,6 +21,7 @@ import {
   usersTable,
 } from '../../db/schema'
 
+import { getEventConfig, updateEventConfig } from '../event-config/event-config.service'
 import type { JudgeCaseResult } from '../judge/judge.schema'
 import { WorkspaceSchema } from '../judge/judge.schema'
 import type { TestCase } from '../problems/problems.schema'
@@ -1413,4 +1415,75 @@ describe('submitSolution tiebreak survives a slow judge', () => {
     },
     JUDGED_TEST_TIMEOUT_MS,
   )
+})
+
+// #285: the organizer's pause refuses before anything else — no slot claimed,
+// no cooldown armed, no row written — and lifting it lets the very next
+// submission through.
+describe('submitSolution while submissions are paused (#285)', () => {
+  beforeEach(async () => {
+    resetSubmissionThrottle()
+    await db.execute(sql`truncate table ${eventConfigTable} restart identity cascade`)
+  })
+
+  afterAll(async () => {
+    await db.execute(sql`truncate table ${eventConfigTable} restart identity cascade`)
+  })
+
+  it(
+    'refuses with submissions_paused, claims no slot and persists nothing; resuming accepts at once',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const identity = { userId: user.id, teamId: team.id }
+      const body = { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace }
+      await updateEventConfig(db, { submissionsPaused: true })
+
+      const refused = await submitSolution(db, identity, body)
+
+      expect(refused).toEqual({ ok: false, error: 'submissions_paused' })
+      expect(await db.select().from(submissionsTable)).toHaveLength(0)
+      // Neither in flight nor cooling down: the slot is free right away.
+      expect(acquireSubmissionSlot(`team:${team.id}`)).toBeNull()
+      releaseSubmissionSlot(`team:${team.id}`, false)
+
+      await updateEventConfig(db, { submissionsPaused: false })
+      const accepted = expectSubmitted(await submitSolution(db, identity, body))
+      expect(accepted).toMatchObject({ score: 100, attemptNumber: 1 })
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it('POST /submissions answers 423 submissions_paused', async () => {
+    const problem = await insertPublishedProblem(solvableCases)
+    const { user } = await insertTeamMember()
+    const token = await signJwt(
+      { role: 'participant', university: 'pucrs' },
+      { secret: JWT_SECRET, subject: user.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+    )
+    await updateEventConfig(db, { submissionsPaused: true })
+
+    const res = await app.request('/submissions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        problemId: problem.id,
+        roundId: problem.roundId,
+        workspace: solutionWorkspace,
+      }),
+    })
+
+    expect(res.status).toBe(423)
+    expect(await res.json()).toMatchObject({ error: 'submissions_paused' })
+  })
+
+  it('closing the round while paused closes normally and keeps the flag on', async () => {
+    const problem = await insertPublishedProblem(solvableCases)
+    await updateEventConfig(db, { submissionsPaused: true })
+
+    const closed = await closeRound(db, problem.roundId)
+
+    expect(closed.ok).toBe(true)
+    expect((await getEventConfig(db)).submissionsPaused).toBe(true)
+  })
 })

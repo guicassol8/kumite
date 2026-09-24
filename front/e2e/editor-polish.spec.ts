@@ -268,6 +268,86 @@ test.describe('editor polish (#205)', () => {
     await page.screenshot({ path: evidence('08-cancelado') })
   })
 
+  test('"Limpar" recenters, also with the statement collapsed (#203)', async ({ page }) => {
+    await openEditor(page, problemId)
+    await page.getByTestId('problem-statement-collapse').click()
+    await expect(page.getByTestId('problem-statement-rail')).toBeVisible()
+    // The wider editor still has the control inside it.
+    const recenter = page.getByTestId('editor-recenter')
+    await expect(recenter).toBeInViewport({ ratio: 1 })
+
+    const host = await page.getByTestId('blockly-workspace').boundingBox()
+    if (!host) throw new Error('the workspace has no box')
+    const grab = { x: host.x + host.width - 140, y: host.y + 60 }
+    await page.mouse.move(grab.x, grab.y)
+    await page.mouse.down()
+    await page.mouse.move(grab.x - 300, grab.y + 250, { steps: 10 })
+    await page.mouse.up()
+
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.getByTestId('problem-clear-button').click()
+    await expect(page.locator(TOP_BLOCKS)).toHaveCount(1)
+    await expectCentered(page)
+    await page.screenshot({ path: evidence('11-limpar-centralizado') })
+  })
+
+  test("Blockly's context menu and field dropdown still paint above the editor", async ({
+    page,
+  }) => {
+    // The editor box is `isolate` so Blockly's toolbox stays under the app's
+    // dialogs; Blockly's menus live on <body> and must stay on top.
+    await openEditor(page, problemId)
+    const onTopOf = (selector: string, x: number, y: number) =>
+      page.evaluate(
+        ([s, px, py]) =>
+          !!document.elementFromPoint(px as number, py as number)?.closest(s as string),
+        [selector, x, y],
+      )
+
+    await openCreateVariable(page)
+    await page.getByTestId('create-variable-input').fill('abc')
+    await page.getByTestId('create-variable-input').press('Enter')
+    await expect(page.getByTestId('create-variable-dialog')).toBeHidden()
+    // The flyout stays open after the dialog gives focus back.
+    await expect(flyoutVariable(page, 'abc').first()).toBeVisible()
+
+    // Drag a variable block from the flyout onto the canvas.
+    const before = await page.locator(TOP_BLOCKS).count()
+    const source = page
+      .locator('.blocklyFlyout .blocklyDraggable')
+      .filter({ hasText: 'abc' })
+      .last()
+    const from = await source.boundingBox()
+    const host = await page.getByTestId('blockly-workspace').boundingBox()
+    if (!from || !host) throw new Error('the flyout block or the workspace has no box')
+    await page.mouse.move(from.x + 8, from.y + from.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(host.x + host.width - 200, host.y + host.height - 80, { steps: 12 })
+    await page.mouse.up()
+    await expect(page.locator(TOP_BLOCKS)).toHaveCount(before + 1)
+
+    // Its variable dropdown (Blockly's DropDownDiv) is on top.
+    await page.locator(TOP_BLOCKS).last().locator('.blocklyDropdownText').click()
+    const dropdown = page.locator('.blocklyDropDownDiv')
+    await expect(dropdown).toBeVisible()
+    const menu = await dropdown.boundingBox()
+    if (!menu) throw new Error('the dropdown has no box')
+    expect(
+      await onTopOf('.blocklyDropDownDiv', menu.x + menu.width / 2, menu.y + menu.height / 2),
+    ).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect(dropdown).toBeHidden()
+
+    // The canvas context menu (Blockly's WidgetDiv) is on top too.
+    await page.mouse.click(host.x + host.width - 360, host.y + 40, { button: 'right' })
+    const context = page.locator('.blocklyContextMenu')
+    await expect(context).toBeVisible()
+    const box = await context.boundingBox()
+    if (!box) throw new Error('the context menu has no box')
+    expect(await onTopOf('.blocklyContextMenu', box.x + 10, box.y + 10)).toBe(true)
+    await page.screenshot({ path: evidence('12-menus-acima') })
+  })
+
   test.describe('in English, dark theme', () => {
     test.use({ colorScheme: 'dark' })
 

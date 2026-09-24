@@ -115,7 +115,7 @@ export type ContrastViolation = {
   text: string
   /** The nearest `data-testid` up the tree, to find it in the code. */
   testid: string | null
-  /** Rounded to two decimals; `NaN` when `unmeasurable`. */
+  /** WCAG ratio, full precision; `NaN` when `unmeasurable`. */
   ratio: number
   required: number
   text_rgb?: Rgb
@@ -155,6 +155,24 @@ type Sample = {
  * unmeasurable, and that is reported as a violation rather than passed.
  */
 export async function findContrastViolations(
+  page: Page,
+  options: { exclude?: string[] } = {},
+): Promise<ContrastViolation[]> {
+  const pairs = await sampleContrast(page, options)
+  return pairs.filter(isViolation)
+}
+
+/** Below its AA bar, or impossible to measure — either way, not a pass. */
+export function isViolation(pair: ContrastViolation): boolean {
+  return Boolean(pair.unmeasurable) || pair.ratio < pair.required
+}
+
+/**
+ * Every pair the sweep of `findContrastViolations` measures, passing or not —
+ * so a spec can prove the sweep saw the page at all (an empty violation list
+ * from an empty sample would prove nothing) and report its tightest pair.
+ */
+export async function sampleContrast(
   page: Page,
   options: { exclude?: string[] } = {},
 ): Promise<ContrastViolation[]> {
@@ -271,30 +289,18 @@ export async function findContrastViolations(
     return samples
   }, options.exclude ?? [])
 
-  const violations: ContrastViolation[] = []
-  for (const s of samples) {
+  return samples.map((s): ContrastViolation => {
     const required = s.large ? AA_LARGE : AA_NORMAL
     if (s.unmeasurable || !s.fg || !s.bg) {
-      violations.push({
-        text: s.text,
-        testid: s.testid,
-        ratio: Number.NaN,
-        required,
-        unmeasurable: true,
-      })
-      continue
+      return { text: s.text, testid: s.testid, ratio: Number.NaN, required, unmeasurable: true }
     }
-    const ratio = contrastRatio(s.fg, s.bg)
-    if (ratio < required) {
-      violations.push({
-        text: s.text,
-        testid: s.testid,
-        ratio: Math.round(ratio * 100) / 100,
-        required,
-        text_rgb: s.fg,
-        background_rgb: s.bg,
-      })
+    return {
+      text: s.text,
+      testid: s.testid,
+      ratio: contrastRatio(s.fg, s.bg),
+      required,
+      text_rgb: s.fg,
+      background_rgb: s.bg,
     }
-  }
-  return violations
+  })
 }

@@ -86,7 +86,11 @@ function PracticeListScreen() {
                 >
                   {problem.title}
                 </Link>
-                <Badge variant={difficulty.variant} className={difficulty.className}>
+                <Badge
+                  data-testid={`practice-problem-difficulty-${problem.id}`}
+                  variant={difficulty.variant}
+                  className={difficulty.className}
+                >
                   {t(`problem.difficulty.${problem.difficulty}`)}
                 </Badge>
               </li>

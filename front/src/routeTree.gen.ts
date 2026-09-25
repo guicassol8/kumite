@@ -22,6 +22,8 @@ import { Route as OrganizerIndexRouteImport } from './routes/organizer.index'
 import { Route as OrganizerEventConfigRouteImport } from './routes/organizer.event-config'
 import { Route as OrganizerTeamsRouteImport } from './routes/organizer.teams'
 import { Route as OrganizerUsersRouteImport } from './routes/organizer.users'
+import { Route as PracticeIndexRouteImport } from './routes/practice.index'
+import { Route as PracticeIdRouteImport } from './routes/practice.$id'
 import { Route as ProblemIdRouteImport } from './routes/problem.$id'
 import { Route as RoundsIdRouteImport } from './routes/rounds.$id'
 import { Route as OrganizerProblemsIndexRouteImport } from './routes/organizer.problems.index'
@@ -96,6 +98,16 @@ const OrganizerUsersRoute = OrganizerUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => OrganizerRoute,
 } as any)
+const PracticeIndexRoute = PracticeIndexRouteImport.update({
+  id: '/practice/',
+  path: '/practice/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PracticeIdRoute = PracticeIdRouteImport.update({
+  id: '/practice/$id',
+  path: '/practice/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProblemIdRoute = ProblemIdRouteImport.update({
   id: '/problem/$id',
   path: '/problem/$id',
@@ -150,9 +162,11 @@ export interface FileRoutesByFullPath {
   '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/organizer/teams': typeof OrganizerTeamsRoute
   '/organizer/users': typeof OrganizerUsersRoute
+  '/practice/$id': typeof PracticeIdRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/': typeof OrganizerIndexRoute
+  '/practice/': typeof PracticeIndexRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
   '/organizer/rounds/new': typeof OrganizerRoundsNewRoute
   '/organizer/problems/': typeof OrganizerProblemsIndexRoute
@@ -172,9 +186,11 @@ export interface FileRoutesByTo {
   '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/organizer/teams': typeof OrganizerTeamsRoute
   '/organizer/users': typeof OrganizerUsersRoute
+  '/practice/$id': typeof PracticeIdRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer': typeof OrganizerIndexRoute
+  '/practice': typeof PracticeIndexRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
   '/organizer/rounds/new': typeof OrganizerRoundsNewRoute
   '/organizer/problems': typeof OrganizerProblemsIndexRoute
@@ -196,9 +212,11 @@ export interface FileRoutesById {
   '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/organizer/teams': typeof OrganizerTeamsRoute
   '/organizer/users': typeof OrganizerUsersRoute
+  '/practice/$id': typeof PracticeIdRoute
   '/problem/$id': typeof ProblemIdRoute
   '/rounds/$id': typeof RoundsIdRoute
   '/organizer/': typeof OrganizerIndexRoute
+  '/practice/': typeof PracticeIndexRoute
   '/organizer/problems/new': typeof OrganizerProblemsNewRoute
   '/organizer/rounds/new': typeof OrganizerRoundsNewRoute
   '/organizer/problems/': typeof OrganizerProblemsIndexRoute
@@ -221,9 +239,11 @@ export interface FileRouteTypes {
     | '/organizer/event-config'
     | '/organizer/teams'
     | '/organizer/users'
+    | '/practice/$id'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/'
+    | '/practice/'
     | '/organizer/problems/new'
     | '/organizer/rounds/new'
     | '/organizer/problems/'
@@ -243,9 +263,11 @@ export interface FileRouteTypes {
     | '/organizer/event-config'
     | '/organizer/teams'
     | '/organizer/users'
+    | '/practice/$id'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer'
+    | '/practice'
     | '/organizer/problems/new'
     | '/organizer/rounds/new'
     | '/organizer/problems'
@@ -266,9 +288,11 @@ export interface FileRouteTypes {
     | '/organizer/event-config'
     | '/organizer/teams'
     | '/organizer/users'
+    | '/practice/$id'
     | '/problem/$id'
     | '/rounds/$id'
     | '/organizer/'
+    | '/practice/'
     | '/organizer/problems/new'
     | '/organizer/rounds/new'
     | '/organizer/problems/'
@@ -287,8 +311,10 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   TeamsRoute: typeof TeamsRoute
   DevErrorProbeRoute: typeof DevErrorProbeRoute
+  PracticeIdRoute: typeof PracticeIdRoute
   ProblemIdRoute: typeof ProblemIdRoute
   RoundsIdRoute: typeof RoundsIdRoute
+  PracticeIndexRoute: typeof PracticeIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -383,6 +409,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/organizer/users'
       preLoaderRoute: typeof OrganizerUsersRouteImport
       parentRoute: typeof OrganizerRoute
+    }
+    '/practice/': {
+      id: '/practice/'
+      path: '/practice'
+      fullPath: '/practice/'
+      preLoaderRoute: typeof PracticeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/practice/$id': {
+      id: '/practice/$id'
+      path: '/practice/$id'
+      fullPath: '/practice/$id'
+      preLoaderRoute: typeof PracticeIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/problem/$id': {
       id: '/problem/$id'
@@ -483,8 +523,10 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   TeamsRoute: TeamsRoute,
   DevErrorProbeRoute: DevErrorProbeRoute,
+  PracticeIdRoute: PracticeIdRoute,
   ProblemIdRoute: ProblemIdRoute,
   RoundsIdRoute: RoundsIdRoute,
+  PracticeIndexRoute: PracticeIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

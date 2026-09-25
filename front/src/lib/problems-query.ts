@@ -19,3 +19,14 @@ export async function fetchProblem(id: string, locale: 'pt' | 'es' | 'en') {
   if (res.status !== 200) throw new Error('failed to load problem')
   return res.json()
 }
+
+/** The practice catalog (#211) — per locale, since titles come translated. */
+export function practiceProblemsQueryKey(locale: 'pt' | 'es' | 'en') {
+  return ['practice-problems', locale]
+}
+
+export async function fetchPracticeProblems(locale: 'pt' | 'es' | 'en') {
+  const res = await api.practice.problems.$get({ query: { locale } })
+  if (res.status !== 200) throw new Error('failed to load practice problems')
+  return res.json()
+}

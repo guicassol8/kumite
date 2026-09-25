@@ -235,8 +235,9 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   (#217) constrói estes elementos e nenhum outro.
 
   **Header, desktop (≥ 768 px)**, da esquerda para a direita: lockup (símbolo
-  24 px + wordmark); navegação (Times, Placar e, para o organizador,
-  Organizador); chip da rodada ao vivo (ponto + nome da rodada + timer) em
+  24 px + wordmark); navegação (Times, Placar, Prática e, para o organizador,
+  Organizador — a Prática entrou pela #211, épico #208, e aparece com ou sem
+  rodada aberta); chip da rodada ao vivo (ponto + nome da rodada + timer) em
   `brand-on-chrome`; **ícone de reportar bug** — traço de 2 px em grade 24, sem
   rótulo, com nome acessível ("Reportar um problema"), abrindo o formulário de
   bug; **gatilho do menu do usuário** — nome truncado (com reticências) mais um
@@ -274,9 +275,9 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   abaixo.
 
   **Header, celular (< 768 px)**: lockup + controle de idioma + botão de menu.
-  O botão abre um **painel de menu** com navegação, bloco do usuário (nome e
-  e-mail), chip da rodada, tema, reportar bug e Sair. É esse painel que fecha o
-  #186; o FAB de reportar bug não existe em largura nenhuma. O **idioma não
+  O botão abre um **painel de menu** com navegação (incluindo Prática, #211),
+  bloco do usuário (nome e e-mail), chip da rodada, tema, reportar bug e Sair.
+  É esse painel que fecha o #186; o FAB de reportar bug não existe em largura nenhuma. O **idioma não
   entra no painel**: fica no header em toda largura, porque é a única
   preferência que precisa ser alcançável sem abrir menu nenhum — inclusive
   deslogado, por quem não consegue ler a interface no idioma em que ela abriu.

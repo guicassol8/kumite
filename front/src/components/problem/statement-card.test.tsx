@@ -19,6 +19,7 @@ function problem(overrides: Partial<Problem> = {}): Problem {
       { input: [1, 2, 3, 4], expected: 6 },
       { input: [5, 7, 9], expected: 0 },
     ],
+    visibility: 'round',
     roundId: 'r1',
     roundStatus: 'open',
     bestSubmission: null,
@@ -62,6 +63,20 @@ describe('StatementCard', () => {
     render(<StatementCard problem={problem({ points: 100 })} hasResults={false} />)
 
     expect(screen.getByTestId('problem-points-badge').textContent).toBe('100 pts')
+  })
+
+  // #211: practice does not score, so "N pts" would contradict it — the
+  // difficulty stays.
+  it('drops the points badge on a practice problem, keeping the difficulty', () => {
+    render(
+      <StatementCard
+        problem={problem({ visibility: 'practice', roundId: null, roundStatus: 'none' })}
+        hasResults={false}
+      />,
+    )
+
+    expect(screen.queryByTestId('problem-points-badge')).toBeNull()
+    expect(screen.getByTestId('problem-difficulty-badge').textContent).toBe('Fácil')
   })
 
   it('shows the round position letter only when the round supplies one', () => {

@@ -215,6 +215,23 @@ describe('ProblemScreen', () => {
     expect(screen.getByTestId('problem-submit-button')).toBeDefined()
   })
 
+  // #211: a practice problem has no round to submit to — its screen is
+  // /practice/$id, never this one with a Submeter the back would refuse.
+  it('sends a practice problem to /practice/$id, without Submeter', async () => {
+    mockedGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        participantProblem({ visibility: 'practice', roundId: null, roundStatus: 'none' }),
+      ),
+    )
+
+    const { router } = renderProblem()
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/practice/p1'))
+    expect(await screen.findByTestId('problem-run-button')).toBeDefined()
+    expect(screen.queryByTestId('problem-submit-button')).toBeNull()
+  })
+
   it('shows a retry banner on a load failure and retries on click', async () => {
     mockedGet
       .mockResolvedValueOnce(jsonResponse(500, { error: 'internal', message: 'boom' }))

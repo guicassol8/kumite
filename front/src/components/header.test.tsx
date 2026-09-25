@@ -212,6 +212,30 @@ describe('Header', () => {
     expect(screen.queryByTestId('header-leaderboard-link')).toBeNull()
   })
 
+  // #211: practice is reachable from the bar with or without a round open.
+  it('shows the practice link to a participant, pointing at /practice', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    const link = await screen.findByTestId('header-practice-link')
+    expect(link.getAttribute('href')).toBe('/practice')
+    expect(link.textContent).toBe('Prática')
+  })
+
+  it('shows the practice link to an organizer too', async () => {
+    setSession({ ...fakeUser, role: 'organizer' }, 'tok-1')
+    renderHeader()
+
+    expect(await screen.findByTestId('header-practice-link')).toBeDefined()
+  })
+
+  it('hides the practice link while anonymous', async () => {
+    renderHeader()
+
+    await waitFor(() => expect(screen.getByTestId('header-login-link')).toBeDefined())
+    expect(screen.queryByTestId('header-practice-link')).toBeNull()
+  })
+
   it('clears the session and navigates home on logout', async () => {
     setSession(fakeUser, 'tok-1')
     const router = renderHeader()
@@ -409,6 +433,20 @@ describe('Header — mobile menu panel (#217, closes #186/#198)', () => {
 
     // A single instance on the bar, never duplicated inside the panel.
     expect(screen.getAllByTestId('language-selector')).toHaveLength(1)
+  })
+
+  it('offers Prática in the panel navigation too (#211)', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader()
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    await screen.findByTestId('header-mobile-user-block')
+
+    // Same testid as the bar's link (like Times/Placar): the bar's copy plus
+    // the panel's.
+    const links = screen.getAllByTestId('header-practice-link')
+    expect(links).toHaveLength(2)
+    for (const link of links) expect(link.getAttribute('href')).toBe('/practice')
   })
 
   it('closes the panel when a nav link is clicked', async () => {

@@ -1061,7 +1061,134 @@ describe('moveMember', () => {
 
     expect(await removal).toEqual({ ok: true })
   })
+
+  // #354: the move reads the membership before its transaction and locks only
+  // the destination's key. A leave locks only the origin's, so it commits
+  // while the move is parked — and an update filtered by user alone then
+  // matched zero rows and still answered ok, a success the organizer saw for
+  // a member left in no team at all. The inverse of the leaveTeam race above.
+  async function parkedMove() {
+    const creatorA = await insertUser()
+    const mover = await insertUser()
+    const creatorB = await insertUser()
+    const teamA = await createTeam(db, creatorA.id, 'Team A')
+    if (!teamA.ok) throw new Error('expected success')
+    const joined = await joinTeam(db, mover.id, teamA.team.id)
+    if (!joined.ok) throw new Error('expected success')
+    const teamB = await createTeam(db, creatorB.id, 'Team B')
+    if (!teamB.ok) throw new Error('expected success')
+    return { mover, teamA: teamA.team, teamB: teamB.team }
+  }
+
+  async function membershipOf(userId: string) {
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, userId))
+    return membership
+  }
+
+  it('rejects a move whose member leaves while it waits for the lock', async () => {
+    const { mover, teamB } = await parkedMove()
+    const lock = await holdTeamJoinLock(teamB.id)
+
+    let result: Awaited<ReturnType<typeof moveMember>>
+    try {
+      const move = moveMember(db, mover.id, teamB.id)
+      await untilBlockedOnLock(move, 'pg_advisory_xact_lock')
+      // leaveTeam locks the origin's key, not the destination's, so it
+      // commits while the move is still parked.
+      expect(await leaveTeam(db, mover.id)).toEqual({ ok: true })
+      await lock.release()
+      result = await move
+    } finally {
+      await lock.release()
+    }
+
+    expect(result).toEqual({ ok: false, error: 'member_not_found' })
+    expect(await membershipOf(mover.id)).toBeUndefined()
+  })
+
+  it('rejects a move whose member is removed while it waits for the lock', async () => {
+    const { mover, teamB } = await parkedMove()
+    const lock = await holdTeamJoinLock(teamB.id)
+
+    let result: Awaited<ReturnType<typeof moveMember>>
+    try {
+      const move = moveMember(db, mover.id, teamB.id)
+      await untilBlockedOnLock(move, 'pg_advisory_xact_lock')
+      expect(await removeMember(db, mover.id)).toEqual({ ok: true })
+      await lock.release()
+      result = await move
+    } finally {
+      await lock.release()
+    }
+
+    expect(result).toEqual({ ok: false, error: 'member_not_found' })
+    expect(await membershipOf(mover.id)).toBeUndefined()
+  })
+
+  // The update is scoped to the membership the move read, not to the user:
+  // someone who left A and joined C in the meantime is no longer the member
+  // the organizer chose to move, and must not be dragged out of C silently.
+  it('does not drag a member who rejoined elsewhere while the move waited', async () => {
+    const { mover, teamB } = await parkedMove()
+    const creatorC = await insertUser()
+    const teamC = await createTeam(db, creatorC.id, 'Team C')
+    if (!teamC.ok) throw new Error('expected success')
+    const lock = await holdTeamJoinLock(teamB.id)
+
+    let result: Awaited<ReturnType<typeof moveMember>>
+    try {
+      const move = moveMember(db, mover.id, teamB.id)
+      await untilBlockedOnLock(move, 'pg_advisory_xact_lock')
+      expect(await leaveTeam(db, mover.id)).toEqual({ ok: true })
+      expect(await joinTeam(db, mover.id, teamC.team.id)).toMatchObject({ ok: true })
+      await lock.release()
+      result = await move
+    } finally {
+      await lock.release()
+    }
+
+    expect(result).toEqual({ ok: false, error: 'member_not_found' })
+    expect((await membershipOf(mover.id))?.teamId).toBe(teamC.team.id)
+  })
 })
+
+// Parks a concurrent leave mid-flight (#354): on its own connection, deletes
+// the user's membership and keeps the transaction open until `release`, which
+// commits it. Until then other connections still read the row, but anyone
+// deleting it queues on the row lock.
+async function holdMembershipDelete(userId: string) {
+  const holder = createDb()
+  let deleted!: () => void
+  const rowDeleted = new Promise<void>((resolve) => {
+    deleted = resolve
+  })
+  let releaseRequested!: () => void
+  const releaseWanted = new Promise<void>((resolve) => {
+    releaseRequested = resolve
+  })
+
+  const holding = holder.transaction(async (tx) => {
+    await tx.delete(teamMembersTable).where(eq(teamMembersTable.userId, userId))
+    deleted()
+    await releaseWanted
+  })
+  await rowDeleted
+
+  let released = false
+  return {
+    // Idempotent: tests release in a `finally` and again on the happy path.
+    async release() {
+      if (released) return
+      released = true
+      releaseRequested()
+      await holding
+      await holder.$client.end()
+    },
+  }
+}
 
 describe('removeMember', () => {
   it('removes a member from an active team', async () => {
@@ -1104,6 +1231,38 @@ describe('removeMember', () => {
     const result = await removeMember(db, user.id)
 
     expect(result).toEqual({ ok: false, error: 'not_found' })
+  })
+
+  // #354: the membership is read outside any transaction, so a concurrent
+  // leave can delete the row between that read and this delete. A delete that
+  // does not count its rows then answered ok for a removal that removed
+  // nothing. Here the leave holds the row; the removal queues on it and
+  // re-evaluates to zero rows once the leave commits.
+  it('answers not_found when a concurrent leave already deleted the membership', async () => {
+    const creator = await insertUser()
+    const member = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    const joined = await joinTeam(db, member.id, created.team.id)
+    if (!joined.ok) throw new Error('expected success')
+    const leave = await holdMembershipDelete(member.id)
+
+    let result: Awaited<ReturnType<typeof removeMember>>
+    try {
+      const removal = removeMember(db, member.id)
+      await untilBlockedOnLock(removal, 'delete from')
+      await leave.release()
+      result = await removal
+    } finally {
+      await leave.release()
+    }
+
+    expect(result).toEqual({ ok: false, error: 'not_found' })
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, member.id))
+    expect(membership).toBeUndefined()
   })
 })
 

@@ -76,6 +76,15 @@ export const env = parseEnv(EnvSchema, process.env, {
 
 export const JWT_SECRET = env.JWT_SECRET
 export const APP_BASE_URL = env.APP_BASE_URL
+// The origins allowed to call the API from a browser (#273), passed to the
+// app-level cors(). APP_BASE_URL is the deployed front; the local Vite dev
+// server stays in the list always (D1): there is no NODE_ENV in this stack to
+// gate it on, and with Bearer-in-localStorage auth (no cookies) a localhost
+// origin grants nothing a plain curl does not already have. Already without a
+// trailing slash (see APP_BASE_URL above), which matters: the browser's
+// `Origin` has none and hono matches the list exactly.
+export const DEV_FRONT_ORIGIN = 'http://localhost:5173'
+export const CORS_ORIGINS: string[] = [...new Set([APP_BASE_URL, DEV_FRONT_ORIGIN])]
 export const TOKEN_TTL_SECONDS = 60 * 60 * 24
 export const JUDGE_TIMEOUT_MS = env.JUDGE_TIMEOUT_MS
 export const JUDGE_MEMORY_MB = env.JUDGE_MEMORY_MB

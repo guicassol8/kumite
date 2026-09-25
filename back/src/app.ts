@@ -1,6 +1,6 @@
 import { bodyLimit, cors } from '@katajs-framework/core'
 
-import { APP_MAX_BODY_BYTES } from './config'
+import { APP_MAX_BODY_BYTES, CORS_ORIGINS } from './config'
 import { createApp } from './context'
 import { requestLogger } from './middlewares/request-logger'
 import * as auth from './modules/auth/auth.route'
@@ -53,9 +53,18 @@ export const modules = [
 // the first thing every request meets is a size check. A route may still be
 // stricter — submissions keeps its own SUBMISSION_MAX_BODY_BYTES in `use:`,
 // and the smaller of the two is what applies there.
+// cors() answers only the allowlist (#273): the front's APP_BASE_URL plus the
+// local dev front (config.ts CORS_ORIGINS). Any other Origin gets no
+// Access-Control-Allow-Origin, so a browser on another site cannot read the
+// answer. The same options drive kata's synthetic preflight (ADR-0020), so
+// OPTIONS is restricted too — src/cors.test.ts pins both.
 export const app = createApp({
   modules,
-  middlewares: [cors(), bodyLimit({ maxSize: APP_MAX_BODY_BYTES }), requestLogger],
+  middlewares: [
+    cors({ origin: CORS_ORIGINS }),
+    bodyLimit({ maxSize: APP_MAX_BODY_BYTES }),
+    requestLogger,
+  ],
 })
 
 // The single artifact the front imports (type-only) to build its typed RPC

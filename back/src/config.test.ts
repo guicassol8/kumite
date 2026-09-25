@@ -168,6 +168,55 @@ describe('config APP_BASE_URL (#162)', () => {
   })
 })
 
+// The CORS allowlist (#273): the front's own origin plus the local Vite dev
+// server, always (D1: there is no NODE_ENV in this stack to gate it on).
+describe('config CORS_ORIGINS (#273)', () => {
+  const originalEnv = { ...process.env }
+  const required = {
+    JWT_SECRET: 'test-secret',
+    DATABASE_URL: 'postgres://kumite:kumite@localhost:5433/kumite',
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    process.env = { ...originalEnv, ...required }
+  })
+
+  afterEach(() => {
+    process.env = { ...originalEnv }
+    vi.resetModules()
+  })
+
+  it('allows APP_BASE_URL and the local dev front', async () => {
+    process.env.APP_BASE_URL = 'https://kumite.example.org'
+
+    const { CORS_ORIGINS } = await import('./config')
+
+    expect(CORS_ORIGINS).toEqual(['https://kumite.example.org', 'http://localhost:5173'])
+  })
+
+  // Blank rather than deleted: loadEnvFile() would otherwise fill a deleted
+  // key back in from a developer's own back/.env.
+  it('does not list the dev front twice when APP_BASE_URL falls back to it', async () => {
+    process.env.APP_BASE_URL = ''
+
+    const { CORS_ORIGINS, DEV_FRONT_ORIGIN } = await import('./config')
+
+    expect(DEV_FRONT_ORIGIN).toBe('http://localhost:5173')
+    expect(CORS_ORIGINS).toEqual(['http://localhost:5173'])
+  })
+
+  // The browser sends `Origin` without a trailing slash and hono matches the
+  // list exactly, so a slash left in would block the real front.
+  it('lists APP_BASE_URL without its trailing slash', async () => {
+    process.env.APP_BASE_URL = 'https://kumite.example.org/'
+
+    const { CORS_ORIGINS } = await import('./config')
+
+    expect(CORS_ORIGINS).toEqual(['https://kumite.example.org', 'http://localhost:5173'])
+  })
+})
+
 describe('config BUG_REPORT_* (#145)', () => {
   const originalEnv = { ...process.env }
   const required = {

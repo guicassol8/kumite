@@ -579,16 +579,14 @@ describe('rounds.service', () => {
         .returning()
       const [first, second] = problems
       if (!first || !second) throw new Error('expected fixtures')
-      await db
-        .insert(problemTranslationsTable)
-        .values(
-          problems.map((p) => ({
-            problemId: p.id,
-            locale: 'pt' as const,
-            title: 'T',
-            statementMd: 'x',
-          })),
-        )
+      await db.insert(problemTranslationsTable).values(
+        problems.map((p) => ({
+          problemId: p.id,
+          locale: 'pt' as const,
+          title: 'T',
+          statementMd: 'x',
+        })),
+      )
       const created = await createRound(db, {
         name: 'Round 1',
         durationMinutes: 30,

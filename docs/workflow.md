@@ -123,7 +123,11 @@ pnpm install        # node_modules are per-worktree, not shared
   elsewhere. See `docs/task-workflow/reviewing-tasks.md` § Stage 0.
 - Running the app in parallel worktrees: the default ports (3000 back,
   5173 front) collide — override with `PORT` / `--port` and `VITE_API_URL`
-  in that worktree's `.env` files.
+  in that worktree's `.env` files. A front on a port other than 5173 also
+  needs `APP_BASE_URL=http://localhost:<that port>` in the worktree's
+  `back/.env`: it is the back's CORS allowlist (#273), and any other origin
+  is refused. The Browser E2E does this for the back it starts itself
+  (`FRONT_PORT` → `APP_BASE_URL`, `front/playwright.config.ts`).
 - Postgres collides too: the compose host port is fixed unless overridden.
   Copy `.env.example` to `.env` at that worktree's root and set `DB_PORT` to
   a free port (e.g. `DB_PORT=5439`), then `docker compose up -d` binds there

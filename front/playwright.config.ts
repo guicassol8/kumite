@@ -62,6 +62,14 @@ export default defineConfig({
       url: `http://localhost:${backPort}/health`,
       reuseExistingServer: true,
       cwd: '..',
+      // The back's CORS allowlist is APP_BASE_URL plus localhost:5173 (#273),
+      // so a front on a non-default FRONT_PORT would be refused unless the
+      // back it talks to allows that origin. Playwright merges this over
+      // process.env (and back/.env never overrides a variable already set).
+      // Only applies to a back Playwright starts itself: with
+      // reuseExistingServer an already-running back keeps its own
+      // APP_BASE_URL — set it in back/.env (docs/workflow.md § Worktrees).
+      env: { APP_BASE_URL: `http://localhost:${frontPort}` },
     },
     {
       command: `pnpm --filter @kumite/front dev --port ${frontPort} --strictPort`,

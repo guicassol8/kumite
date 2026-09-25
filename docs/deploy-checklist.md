@@ -121,8 +121,18 @@ restriction applies to (step 5e).
 `APP_BASE_URL` is the public front URL (the Vercel deploy of step 10) and is
 what the password-reset email turns into a clickable link
 (`${APP_BASE_URL}/reset-password`, #162). Leave it out and the email still
-sends, pointing everyone at `http://localhost:5173` — the default — so this
-one fails silently too.
+sends, pointing everyone at `http://localhost:5173` — the default. Since #273
+that no longer goes unnoticed: the same value is the CORS allowlist (below),
+so the production front is blocked outright.
+
+It is also the back's CORS allowlist (#273): the API answers
+`Access-Control-Allow-Origin` only to `APP_BASE_URL` and to
+`http://localhost:5173` (always allowed, for local dev). So it must be the
+**exact** origin the browser shows for the front: scheme + host (+ port if
+any), no path. A mistake here is not silent: every call the front makes gets
+blocked by CORS in the browser. A front served from any other host (a
+`*.vercel.app` preview, a `www.` variant) is refused too; point the domain
+at one origin, or add that origin in `back/src/config.ts` (`CORS_ORIGINS`).
 
 Miss any one of the three SES credentials and the failure is silent: the back
 falls back to logging the OTP inside the container and

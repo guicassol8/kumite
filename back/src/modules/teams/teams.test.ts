@@ -1,4 +1,4 @@
-import { eq, isNotNull, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { createDb } from '../../db/client'
@@ -138,6 +138,50 @@ async function holdTeamJoinLock(teamId: string) {
       if (released) return
       released = true
       releaseRequested()
+      await holding
+      await holder.$client.end()
+    },
+  }
+}
+
+// Parks a first-submission stamp mid-flight (#303): on its own connection, runs
+// the very statement submitSolution uses to set `firstSubmittedAt` — same
+// conditional UPDATE, so the same row lock (FOR NO KEY UPDATE) on the team —
+// and keeps the transaction open until `release`. `commit: false` rolls it
+// back instead, the stamp of a submission whose transaction failed.
+async function holdFirstSubmissionStamp(teamId: string) {
+  const holder = createDb()
+  let stamped!: () => void
+  const stampApplied = new Promise<void>((resolve) => {
+    stamped = resolve
+  })
+  let releaseRequested!: (commit: boolean) => void
+  const releaseWanted = new Promise<boolean>((resolve) => {
+    releaseRequested = resolve
+  })
+  const rollback = new Error('rollback requested by holdFirstSubmissionStamp')
+
+  const holding = holder
+    .transaction(async (tx) => {
+      await tx
+        .update(teamsTable)
+        .set({ firstSubmittedAt: sql`now()` })
+        .where(and(eq(teamsTable.id, teamId), isNull(teamsTable.firstSubmittedAt)))
+      stamped()
+      if (!(await releaseWanted)) throw rollback
+    })
+    .catch((error: unknown) => {
+      if (error !== rollback) throw error
+    })
+  await stampApplied
+
+  let released = false
+  return {
+    // Idempotent: tests release in a `finally` and again on the happy path.
+    async release({ commit }: { commit: boolean }) {
+      if (released) return
+      released = true
+      releaseRequested(commit)
       await holding
       await holder.$client.end()
     },
@@ -475,8 +519,8 @@ describe('leaveTeam', () => {
     expect(result).toEqual({ ok: false, error: 'not_in_team' })
   })
 
-  // No route sets firstSubmittedAt yet (owned by #31 until #18/#21 land a
-  // real submissions table) — proven here via a direct write.
+  // submitSolution is what stamps firstSubmittedAt; the direct write here
+  // stands in for that stamp, without needing the judge.
   it('rejects leaving a team that has already submitted', async () => {
     const creator = await insertUser()
     const created = await createTeam(db, creator.id, 'Team A')
@@ -494,6 +538,135 @@ describe('leaveTeam', () => {
       .from(teamMembersTable)
       .where(eq(teamMembersTable.userId, creator.id))
     expect(membership).toBeDefined()
+  })
+
+  // #303: the frozen check and the delete were two loose statements, so a
+  // leave could read firstSubmittedAt as null an instant before a teammate's
+  // first submission stamped it, and still walk out of a frozen team.
+  async function teamWithLeaver() {
+    const creator = await insertUser()
+    const leaver = await insertUser()
+    const created = await createTeam(db, creator.id, 'Team A')
+    if (!created.ok) throw new Error('expected success')
+    const joined = await joinTeam(db, leaver.id, created.team.id)
+    if (!joined.ok) throw new Error('expected success')
+    return { leaver, teamId: created.team.id }
+  }
+
+  async function membershipOf(userId: string) {
+    const [membership] = await db
+      .select()
+      .from(teamMembersTable)
+      .where(eq(teamMembersTable.userId, userId))
+    return membership
+  }
+
+  // Parked on the shared team-join key, the stamp commits while the leave
+  // waits: the frozen check must read after the lock, not before it.
+  it('rejects a leave when the first submission is stamped while it waits for the lock', async () => {
+    const { leaver, teamId } = await teamWithLeaver()
+    const lock = await holdTeamJoinLock(teamId)
+
+    let result: Awaited<ReturnType<typeof leaveTeam>>
+    try {
+      const leave = leaveTeam(db, leaver.id)
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      await db
+        .update(teamsTable)
+        .set({ firstSubmittedAt: new Date() })
+        .where(eq(teamsTable.id, teamId))
+      await lock.release()
+      result = await leave
+    } finally {
+      await lock.release()
+    }
+
+    expect(result).toEqual({ ok: false, error: 'team_frozen' })
+    expect((await membershipOf(leaver.id))?.teamId).toBe(teamId)
+  })
+
+  // The stamp never takes the team-join key, so the advisory lock alone does
+  // not order it: a plain re-read under the lock sees the uncommitted stamp as
+  // null (READ COMMITTED) and lets the leave through. The leave must wait on
+  // the team row itself until the stamp resolves.
+  it('makes a leave wait for an in-flight first-submission stamp, then refuse it', async () => {
+    const { leaver, teamId } = await teamWithLeaver()
+    const stamp = await holdFirstSubmissionStamp(teamId)
+
+    const leave = leaveTeam(db, leaver.id)
+    let settled = false
+    // Settle-or-reject, both observed — same reason as the removeTeam test.
+    void leave.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      expect(settled).toBe(false)
+    } finally {
+      await stamp.release({ commit: true })
+    }
+
+    expect(await leave).toEqual({ ok: false, error: 'team_frozen' })
+    expect((await membershipOf(leaver.id))?.teamId).toBe(teamId)
+  })
+
+  // Waiting must not turn into a false refusal: a stamp that rolls back never
+  // froze the team, so the leave goes through.
+  it('lets a leave through when the in-flight stamp rolls back', async () => {
+    const { leaver, teamId } = await teamWithLeaver()
+    const stamp = await holdFirstSubmissionStamp(teamId)
+
+    let result: Awaited<ReturnType<typeof leaveTeam>>
+    try {
+      const leave = leaveTeam(db, leaver.id)
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      await stamp.release({ commit: false })
+      result = await leave
+    } finally {
+      await stamp.release({ commit: false })
+    }
+
+    expect(result).toEqual({ ok: true })
+    expect(await membershipOf(leaver.id)).toBeUndefined()
+    const [team] = await db.select().from(teamsTable).where(eq(teamsTable.id, teamId))
+    expect(team?.firstSubmittedAt).toBeNull()
+  })
+
+  // The membership read outside the transaction only names the team to lock.
+  // An organizer can move the member elsewhere while the leave waits; deleting
+  // by user alone would then pull them out of the new team — frozen here, so
+  // through the very door team_frozen exists to shut.
+  it('does not remove a member the organizer moved while the leave waited', async () => {
+    const { leaver, teamId } = await teamWithLeaver()
+    const otherCreator = await insertUser()
+    const other = await createTeam(db, otherCreator.id, 'Team B')
+    if (!other.ok) throw new Error('expected success')
+    await db
+      .update(teamsTable)
+      .set({ firstSubmittedAt: new Date() })
+      .where(eq(teamsTable.id, other.team.id))
+    const lock = await holdTeamJoinLock(teamId)
+
+    let result: Awaited<ReturnType<typeof leaveTeam>>
+    try {
+      const leave = leaveTeam(db, leaver.id)
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      // moveMember locks the destination's key, not the origin's, so it runs
+      // while the leave is still parked.
+      expect(await moveMember(db, leaver.id, other.team.id)).toEqual({ ok: true })
+      await lock.release()
+      result = await leave
+    } finally {
+      await lock.release()
+    }
+
+    expect(result).toEqual({ ok: false, error: 'not_in_team' })
+    expect((await membershipOf(leaver.id))?.teamId).toBe(other.team.id)
   })
 })
 

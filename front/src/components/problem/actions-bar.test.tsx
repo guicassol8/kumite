@@ -31,6 +31,16 @@ afterEach(() => {
 })
 
 describe('ActionsBar', () => {
+  // #211: practice has no submission — without `onSubmit` there is no
+  // Submeter at all, while Executar and Limpar stay.
+  it('renders no Submeter without onSubmit, keeping Executar and Limpar', () => {
+    render(<ActionsBar isRunning={false} onRun={vi.fn()} onClear={vi.fn()} isClosed={false} />)
+
+    expect(screen.queryByTestId('problem-submit-button')).toBeNull()
+    expect(screen.getByTestId('problem-run-button')).toBeTruthy()
+    expect(screen.getByTestId('problem-clear-button')).toBeTruthy()
+  })
+
   // #285: a pause disables Submeter only — Executar and Limpar keep working.
   it('disables only Submeter while submissions are paused', () => {
     renderBar({ isPaused: true })

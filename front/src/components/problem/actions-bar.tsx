@@ -9,11 +9,12 @@ export type ActionsBarProps = {
   onRun: () => void
   onClear: () => void
   isClosed: boolean
-  isSubmitting: boolean
+  isSubmitting?: boolean
   // The organizer paused submissions (#285): Submeter goes inert, Executar
   // and Limpar keep working.
   isPaused?: boolean
-  onSubmit: () => void
+  // Absent in practice (#211): no submission exists there, so no Submeter.
+  onSubmit?: () => void
   className?: string
 }
 
@@ -27,7 +28,7 @@ export function ActionsBar({
   onRun,
   onClear,
   isClosed,
-  isSubmitting,
+  isSubmitting = false,
   isPaused = false,
   onSubmit,
   className,
@@ -66,7 +67,7 @@ export function ActionsBar({
         <Trash2 aria-hidden="true" />
         {t('problem.clearButton')}
       </Button>
-      {!isClosed && (
+      {onSubmit && !isClosed && (
         // The one filled brand-red button of the screen, pushed to the right
         // edge of the bar (identity § 5: "marca (vermelho, um por tela)").
         <Button

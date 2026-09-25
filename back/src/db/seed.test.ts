@@ -4,6 +4,8 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   computeMissingLocales,
   evaluateTestCaseCoverage,
+  getPublishedProblem,
+  listPracticeProblems,
 } from '../modules/problems/problems.service'
 import { createDb } from './client'
 import {
@@ -114,8 +116,9 @@ describe('seed', () => {
 
     expect(await db.select().from(usersTable)).toHaveLength(1)
     expect(await db.select().from(eventCodesTable)).toHaveLength(2)
-    expect(await db.select().from(problemsTable)).toHaveLength(4)
-    expect(await db.select().from(problemTranslationsTable)).toHaveLength(12)
+    // 4 competition + 3 practice problems (#210), 3 locales each.
+    expect(await db.select().from(problemsTable)).toHaveLength(7)
+    expect(await db.select().from(problemTranslationsTable)).toHaveLength(21)
 
     const eventConfig = await db.select().from(eventConfigTable)
     expect(eventConfig).toHaveLength(1)
@@ -128,7 +131,10 @@ describe('problem seed', () => {
   it('creates 4 published problems with complete translations and covered test cases', async () => {
     await seed(db)
 
-    const problems = await db.select().from(problemsTable)
+    const problems = await db
+      .select()
+      .from(problemsTable)
+      .where(eq(problemsTable.visibility, 'round'))
     expect(problems).toHaveLength(4)
 
     const translations = await db.select().from(problemTranslationsTable)
@@ -153,7 +159,10 @@ describe('problem seed', () => {
   it('covers all three difficulties', async () => {
     await seed(db)
 
-    const problems = await db.select().from(problemsTable)
+    const problems = await db
+      .select()
+      .from(problemsTable)
+      .where(eq(problemsTable.visibility, 'round'))
     const difficulties = new Set(problems.map((p) => p.difficulty))
     expect(difficulties).toEqual(new Set(['easy', 'medium', 'hard']))
   })
@@ -177,5 +186,71 @@ describe('problem seed', () => {
       { input: [5, 7, 9], expected: 0, hidden: false },
       { input: [2, 4, 6, 8], expected: 20, hidden: false },
     ])
+  })
+})
+
+describe('practice seed (#210)', () => {
+  const practiceProblems = () =>
+    db.select().from(problemsTable).where(eq(problemsTable.visibility, 'practice'))
+
+  it('creates the three practice problems, published, each in pt/es/en', async () => {
+    await seed(db)
+
+    const problems = await practiceProblems()
+    expect(problems).toHaveLength(3)
+
+    const translations = await db.select().from(problemTranslationsTable)
+    for (const problem of problems) {
+      expect(problem.status).toBe('published')
+      const locales = translations.filter((t) => t.problemId === problem.id).map((t) => t.locale)
+      expect(computeMissingLocales(locales)).toEqual([])
+      expect(evaluateTestCaseCoverage(problem.testCases, 'practice')).toBe('ok')
+      expect(problem.testCases.every((tc) => !tc.hidden)).toBe(true)
+    }
+  })
+
+  it('keeps exactly three practice problems when run twice', async () => {
+    await seed(db)
+    await seed(db)
+
+    expect(await practiceProblems()).toHaveLength(3)
+  })
+
+  it('leaves the competition problems as round problems', async () => {
+    await seed(db)
+
+    const rounds = await db
+      .select()
+      .from(problemsTable)
+      .where(eq(problemsTable.visibility, 'round'))
+    expect(rounds).toHaveLength(4)
+    for (const problem of rounds) expect(problem.status).toBe('published')
+  })
+
+  it('lists them in the order of the progression, in the requested locale', async () => {
+    await seed(db)
+
+    const listed = await listPracticeProblems(db, 'en')
+    expect(listed.map((problem) => problem.title)).toEqual([
+      'Return the input',
+      'Is it even?',
+      'Sum of the list',
+    ])
+    expect(listed.every((problem) => problem.locale === 'en')).toBe(true)
+  })
+
+  it.each([
+    ['es', 'Devuelve la entrada'],
+    ['en', 'Return the input'],
+  ] as const)('serves the statement in %s without falling back to pt', async (locale, title) => {
+    await seed(db)
+    const [organizer] = await db.select().from(usersTable)
+    const [first] = await listPracticeProblems(db, 'pt')
+
+    const problem = await getPublishedProblem(db, first!.id, locale, organizer!.id)
+
+    expect(problem?.locale).toBe(locale)
+    expect(problem?.title).toBe(title)
+    expect(problem?.visibility).toBe('practice')
   })
 })

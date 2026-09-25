@@ -1,5 +1,5 @@
 import argon2 from 'argon2'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { parseEnv } from '../lib/env'
@@ -7,7 +7,14 @@ import type { Difficulty, TestCase, TranslationInput } from '../modules/problems
 import { createProblem, publishProblem, updateProblem } from '../modules/problems/problems.service'
 import type { Db } from './client'
 import { createDb } from './client'
-import { eventCodesTable, eventConfigTable, problemTranslationsTable, usersTable } from './schema'
+import { PRACTICE_PROBLEMS } from './practice-problems'
+import {
+  eventCodesTable,
+  eventConfigTable,
+  problemsTable,
+  problemTranslationsTable,
+  usersTable,
+} from './schema'
 
 type SeedProblem = {
   difficulty: Difficulty
@@ -19,7 +26,7 @@ type SeedProblem = {
 // pt/es/en title + statement, visible/hidden test cases, 3 difficulties.
 // "Soma dos Pares" mirrors the demo hardcode (front/src/components/problem/
 // soma-dos-pares.ts) — keep the two in manual sync if either changes.
-const SEED_PROBLEMS: SeedProblem[] = [
+export const SEED_PROBLEMS: SeedProblem[] = [
   {
     difficulty: 'easy',
     points: 100,
@@ -164,6 +171,44 @@ async function seedProblems(db: Db): Promise<void> {
   }
 }
 
+// The practice catalog (#210). Same insert-if-missing rule as the competition
+// seed, keyed on the pt title but only among practice problems, so no round
+// problem can stand in for a practice one. The competition seed is the other
+// way round on purpose: it matches its titles against every problem, so a seed
+// problem the organizer turned into practice is not re-added as a round one
+// (#287). Seed data can't collide — practice-problems.test.ts keeps the two
+// sets of pt titles disjoint. Sequential on purpose: each insert is its
+// own transaction, so `created_at` follows PRACTICE_PROBLEMS' order — the
+// tie-break listPracticeProblems relies on inside a difficulty.
+async function seedPracticeProblems(db: Db): Promise<void> {
+  for (const practiceProblem of PRACTICE_PROBLEMS) {
+    const ptTitle = practiceProblem.translations.find((t) => t.locale === 'pt')?.title
+    if (!ptTitle) throw new Error('expected a pt translation in every practice problem')
+
+    const [existing] = await db
+      .select({ id: problemsTable.id })
+      .from(problemTranslationsTable)
+      .innerJoin(problemsTable, eq(problemsTable.id, problemTranslationsTable.problemId))
+      .where(
+        and(eq(problemTranslationsTable.title, ptTitle), eq(problemsTable.visibility, 'practice')),
+      )
+    if (existing) continue
+
+    const problem = await createProblem(db, {
+      difficulty: practiceProblem.difficulty,
+      visibility: 'practice',
+    })
+    await updateProblem(db, problem.id, {
+      testCases: practiceProblem.testCases,
+      translations: practiceProblem.translations,
+    })
+    const published = await publishProblem(db, problem.id)
+    if (!published.ok) {
+      throw new Error(`expected practice problem "${ptTitle}" to publish, got ${published.error}`)
+    }
+  }
+}
+
 // Validated only here, not in config.ts's global EnvSchema — `pnpm dev` and
 // `pnpm test` don't need an organizer account, only `pnpm db:seed` does.
 const SeedEnvSchema = z.object({
@@ -221,6 +266,7 @@ export async function seed(db: Db): Promise<void> {
   await db.insert(eventConfigTable).values({ id: 1 }).onConflictDoNothing()
 
   await seedProblems(db)
+  await seedPracticeProblems(db)
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -549,3 +549,32 @@ jsonpath "$.error" == "missing_test_cases"
 
 # The submission refusal for practice (400 practice_not_submittable) lives in
 # submissions.hurl § 3c: it needs a team, which would leak into ranking.hurl.
+
+# --- Seeded practice problems (#210) ---
+# db:seed publishes three practice problems. Found by title, never by count or
+# position: the hurl database accumulates this file's own practice problem.
+
+# P12. The en catalog carries the three seeded titles, served in en.
+GET {{host}}/practice/problems?locale=en
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Captures]
+seeded_practice_id: jsonpath "$[?(@.title=='Return the input')].id"
+[Asserts]
+jsonpath "$[?(@.title=='Return the input')].locale" == "en"
+jsonpath "$[?(@.title=='Is it even?')].locale" == "en"
+jsonpath "$[?(@.title=='Sum of the list')].locale" == "en"
+jsonpath "$[?(@.title=='Sum of the list')].difficulty" == "medium"
+
+# P13. The first one, read in es: its es statement, not the pt fallback, with
+# its visible cases as examples.
+GET {{host}}/problems/{{seeded_practice_id}}?locale=es
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.locale" == "es"
+jsonpath "$.title" == "Devuelve la entrada"
+jsonpath "$.visibility" == "practice"
+jsonpath "$.examples" count == 3
+jsonpath "$.examples[0].input" == 7
+jsonpath "$.examples[0].expected" == 7

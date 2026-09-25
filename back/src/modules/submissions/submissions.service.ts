@@ -363,6 +363,13 @@ export async function submitSolution(
 
       // Conditional in SQL, so the "first" stamp can never be overwritten by a
       // later attempt racing the read.
+      //
+      // This UPDATE holds the team row in FOR NO KEY UPDATE until commit, and
+      // that row lock is what leaveTeam waits on via FOR SHARE (#303), so a
+      // leave can never slip out of a team this stamp is freezing. Taking the
+      // `team-join:` advisory key here instead is deliberately avoided: it would
+      // queue every submission behind the team's joins and moves, and widen the
+      // keys held per transaction (#276's deadlock warning).
       await tx
         .update(teamsTable)
         .set({ firstSubmittedAt: sql`now()` })

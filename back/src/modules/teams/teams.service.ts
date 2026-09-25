@@ -267,13 +267,44 @@ export async function leaveTeam(db: Db, userId: string): Promise<LeaveTeamResult
     .from(teamMembersTable)
     .where(eq(teamMembersTable.userId, userId))
   if (!membership) return { ok: false, error: 'not_in_team' }
+  const teamId = membership.teamId
 
-  const [team] = await db.select().from(teamsTable).where(eq(teamsTable.id, membership.teamId))
-  if (team?.firstSubmittedAt) return { ok: false, error: 'team_frozen' }
+  // Achado #303: the frozen check and the delete were two loose statements, so
+  // a leave could read firstSubmittedAt as null an instant before a teammate's
+  // first submission stamped it, and still walk out of a frozen team.
+  //
+  // Two locks, each ordering the leave against a different writer:
+  // - `team-join:<teamId>` (joinTeam/moveMember/removeTeam's key) serializes
+  //   it with the team's membership moves.
+  // - `FOR SHARE` on the team row serializes it with the stamp. The stamp
+  //   (submissions.service.ts) deliberately does NOT take `team-join:`: every
+  //   submission would then queue behind joins and moves, and #276 flagged
+  //   widening the keys per transaction as a deadlock risk. Its UPDATE holds
+  //   the row in FOR NO KEY UPDATE, which conflicts with FOR SHARE, so a leave
+  //   arriving mid-stamp waits for it to commit (→ team_frozen) or roll back
+  //   (→ leaves); a leave that locks the row first makes the stamp wait. A
+  //   plain re-read would not wait: under READ COMMITTED it sees the
+  //   uncommitted stamp as null. No cycle is possible — the submission's FK
+  //   KEY SHARE is compatible with FOR SHARE, the stamp never touches
+  //   team_members, and the leave never touches submissions.
+  return db.transaction(async (tx) => {
+    const lockKey = `team-join:${teamId}`
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}::text))`)
 
-  await db.delete(teamMembersTable).where(eq(teamMembersTable.userId, userId))
+    const [team] = await tx.select().from(teamsTable).where(eq(teamsTable.id, teamId)).for('share')
+    if (team?.firstSubmittedAt) return { ok: false, error: 'team_frozen' }
 
-  return { ok: true }
+    // Scoped to the team just locked, not to the user alone: an organizer may
+    // have moved the member elsewhere while this leave waited, and that
+    // membership — possibly in a frozen team — is not the one being left.
+    const deleted = await tx
+      .delete(teamMembersTable)
+      .where(and(eq(teamMembersTable.userId, userId), eq(teamMembersTable.teamId, teamId)))
+      .returning()
+    if (deleted.length === 0) return { ok: false, error: 'not_in_team' }
+
+    return { ok: true }
+  })
 }
 
 // --- Organizer moderation (#50) ---

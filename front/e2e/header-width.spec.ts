@@ -48,6 +48,7 @@ const LANGUAGES = ['pt', 'es', 'en'] as const
 const BAR_INVENTORY = [
   'header-teams-link',
   'header-leaderboard-link',
+  'header-practice-link',
   'header-bug-report-trigger',
   'header-user-menu-trigger',
   'header-logout-button',

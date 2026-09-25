@@ -5,13 +5,23 @@ vi.mock('./api', () => ({
     problems: {
       ':id': { $get: vi.fn() },
     },
+    practice: {
+      problems: { $get: vi.fn() },
+    },
   },
 }))
 
 import { api } from './api'
-import { fetchProblem, ProblemNotFoundError, problemQueryKey } from './problems-query'
+import {
+  fetchPracticeProblems,
+  fetchProblem,
+  ProblemNotFoundError,
+  practiceProblemsQueryKey,
+  problemQueryKey,
+} from './problems-query'
 
 const mockedGet = vi.mocked(api.problems[':id'].$get)
+const mockedPracticeGet = vi.mocked(api.practice.problems.$get)
 
 // biome-ignore lint/suspicious/noExplicitAny: minimal fetch Response stubs
 function jsonResponse(status: number, body: unknown): any {
@@ -51,5 +61,27 @@ describe('fetchProblem', () => {
     mockedGet.mockResolvedValue(jsonResponse(500, { error: 'internal', message: 'boom' }))
 
     await expect(fetchProblem('p1', 'pt')).rejects.toThrow()
+  })
+})
+
+describe('practiceProblemsQueryKey', () => {
+  it('is scoped by locale', () => {
+    expect(practiceProblemsQueryKey('es')).toEqual(['practice-problems', 'es'])
+  })
+})
+
+describe('fetchPracticeProblems (#211)', () => {
+  it('returns the list on 200, asking for the given locale', async () => {
+    const body = [{ id: 'p1', title: 'Soma', difficulty: 'easy', locale: 'en' }]
+    mockedPracticeGet.mockResolvedValue(jsonResponse(200, body))
+
+    await expect(fetchPracticeProblems('en')).resolves.toEqual(body)
+    expect(mockedPracticeGet).toHaveBeenCalledWith({ query: { locale: 'en' } })
+  })
+
+  it('rejects on any other status', async () => {
+    mockedPracticeGet.mockResolvedValue(jsonResponse(500, { error: 'internal', message: 'x' }))
+
+    await expect(fetchPracticeProblems('pt')).rejects.toThrow()
   })
 })

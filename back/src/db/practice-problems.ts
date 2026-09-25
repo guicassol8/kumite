@@ -107,7 +107,7 @@ export const PRACTICE_PROBLEMS: PracticeProblem[] = [
           '',
           'The answer shows up as `true` or `false`: `true` means yes, it is even, and `false` means no, it is odd.',
           '',
-          'A number is even when the remainder of dividing it by 2 is 0. **Math** has a block that computes the remainder of a division, and **Logic** has a block that compares two values. Plug the comparison straight into **return**: it already is the answer.',
+          'A number is even when the remainder of dividing it by 2 is 0. **Math** has a block that computes the remainder of a division, and **Logic** has a block that compares two values. Plug the comparison straight into **return**: it is already the answer.',
         ].join('\n'),
       },
     ],

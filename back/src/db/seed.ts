@@ -172,8 +172,12 @@ async function seedProblems(db: Db): Promise<void> {
 }
 
 // The practice catalog (#210). Same insert-if-missing rule as the competition
-// seed, keyed on the pt title but only among practice problems, so neither
-// seed ever sees the other's rows. Sequential on purpose: each insert is its
+// seed, keyed on the pt title but only among practice problems, so no round
+// problem can stand in for a practice one. The competition seed is the other
+// way round on purpose: it matches its titles against every problem, so a seed
+// problem the organizer turned into practice is not re-added as a round one
+// (#287). Seed data can't collide — practice-problems.test.ts keeps the two
+// sets of pt titles disjoint. Sequential on purpose: each insert is its
 // own transaction, so `created_at` follows PRACTICE_PROBLEMS' order — the
 // tie-break listPracticeProblems relies on inside a difficulty.
 async function seedPracticeProblems(db: Db): Promise<void> {

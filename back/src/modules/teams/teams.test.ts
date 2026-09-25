@@ -1153,6 +1153,27 @@ describe('moveMember', () => {
     expect(result).toEqual({ ok: false, error: 'member_not_found' })
     expect((await membershipOf(mover.id))?.teamId).toBe(teamC.team.id)
   })
+
+  // removeTeam locks only the origin's key, so removing the whole origin team
+  // also commits while the move is parked — same zero-row update, same answer.
+  it('rejects a move whose origin team is removed while it waits for the lock', async () => {
+    const { mover, teamA, teamB } = await parkedMove()
+    const lock = await holdTeamJoinLock(teamB.id)
+
+    let result: Awaited<ReturnType<typeof moveMember>>
+    try {
+      const move = moveMember(db, mover.id, teamB.id)
+      await untilBlockedOnLock(move, 'pg_advisory_xact_lock')
+      expect(await removeTeam(db, teamA.id)).toEqual({ ok: true })
+      await lock.release()
+      result = await move
+    } finally {
+      await lock.release()
+    }
+
+    expect(result).toEqual({ ok: false, error: 'member_not_found' })
+    expect(await membershipOf(mover.id)).toBeUndefined()
+  })
 })
 
 // Parks a concurrent leave mid-flight (#354): on its own connection, deletes

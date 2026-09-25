@@ -134,10 +134,26 @@ export async function listRounds(db: Db): Promise<RoundSummary[]> {
 // definition (the organizer hasn't opened it yet), so it's filtered out
 // rather than reused as-is. Open-first, then closed rounds newest-first,
 // matches the home screen's round card followed by a closed-rounds list.
+//
+// problemCount only counts published problems (#196): an archived one is
+// gone from getParticipantRound, so the home card must not count it either.
+// The organizer's listRounds keeps counting everything it assembled.
 export async function listParticipantRounds(db: Db): Promise<RoundSummary[]> {
   const rounds = await listRounds(db)
+  const published = await db
+    .select({ roundId: roundProblemsTable.roundId })
+    .from(roundProblemsTable)
+    .innerJoin(problemsTable, eq(problemsTable.id, roundProblemsTable.problemId))
+    .where(eq(problemsTable.status, 'published'))
+
+  const publishedByRound = new Map<string, number>()
+  for (const { roundId } of published) {
+    publishedByRound.set(roundId, (publishedByRound.get(roundId) ?? 0) + 1)
+  }
+
   return rounds
     .filter((round) => round.status !== 'draft')
+    .map((round) => ({ ...round, problemCount: publishedByRound.get(round.id) ?? 0 }))
     .sort((a, b) => {
       if (a.status !== b.status) return a.status === 'open' ? -1 : 1
       return (b.closedAt?.getTime() ?? 0) - (a.closedAt?.getTime() ?? 0)
@@ -496,25 +512,37 @@ export async function getParticipantRound(
   const [round] = await db.select().from(roundsTable).where(eq(roundsTable.id, id))
   if (!round || round.status === 'draft') return null
 
-  const roundProblems = await db
+  const allRoundProblems = await db
     .select()
     .from(roundProblemsTable)
     .where(eq(roundProblemsTable.roundId, id))
-  const problemIds = roundProblems.map((rp) => rp.problemId)
+  const allProblemIds = allRoundProblems.map((rp) => rp.problemId)
 
+  // Same rule as getPublishedProblem (#196): only 'published' problems are
+  // listed, so every listed problem opens instead of 404ing. Inside a round
+  // "not archived" means published (round_problems only accepts published
+  // problems and archiving is terminal). Survivors keep their original
+  // position — the letter the organizer announced.
   const [problems, translations] = await Promise.all([
-    problemIds.length === 0
+    allProblemIds.length === 0
       ? []
-      : db.select().from(problemsTable).where(inArray(problemsTable.id, problemIds)),
-    problemIds.length === 0
+      : db
+          .select()
+          .from(problemsTable)
+          .where(
+            and(inArray(problemsTable.id, allProblemIds), eq(problemsTable.status, 'published')),
+          ),
+    allProblemIds.length === 0
       ? []
       : db
           .select()
           .from(problemTranslationsTable)
-          .where(inArray(problemTranslationsTable.problemId, problemIds)),
+          .where(inArray(problemTranslationsTable.problemId, allProblemIds)),
   ])
 
   const problemById = new Map(problems.map((problem) => [problem.id, problem]))
+  const roundProblems = allRoundProblems.filter((rp) => problemById.has(rp.problemId))
+  const problemIds = roundProblems.map((rp) => rp.problemId)
   const translationsByProblem = new Map<string, typeof translations>()
   for (const translation of translations) {
     const list = translationsByProblem.get(translation.problemId) ?? []
@@ -541,7 +569,7 @@ export async function getParticipantRound(
       .sort((a, b) => a.position - b.position)
       .map((rp) => {
         const problem = problemById.get(rp.problemId)
-        if (!problem) throw new Error('expected round problem to reference an existing problem')
+        if (!problem) throw new Error('expected round problem to reference a published problem')
 
         // pt is the fallback when the requested locale has no translation —
         // unreachable in practice since publishing requires every locale.

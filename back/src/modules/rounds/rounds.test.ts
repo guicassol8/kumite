@@ -16,6 +16,7 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
+import { archiveProblem, getPublishedProblem } from '../problems/problems.service'
 import {
   closeRound,
   createRound,
@@ -567,6 +568,41 @@ describe('rounds.service', () => {
 
       expect(result.map((r) => r.id)).toEqual([open.id, newerClosed.id, olderClosed.id])
     })
+
+    it('counts only published problems for the participant, all of them for the organizer (#196)', async () => {
+      const problems = await db
+        .insert(problemsTable)
+        .values([
+          { difficulty: 'easy', status: 'published' },
+          { difficulty: 'easy', status: 'published' },
+        ])
+        .returning()
+      const [first, second] = problems
+      if (!first || !second) throw new Error('expected fixtures')
+      await db.insert(problemTranslationsTable).values(
+        problems.map((p) => ({
+          problemId: p.id,
+          locale: 'pt' as const,
+          title: 'T',
+          statementMd: 'x',
+        })),
+      )
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [first.id, second.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      await archiveProblem(db, first.id)
+
+      const participant = await listParticipantRounds(db)
+      const organizer = await listRounds(db)
+
+      expect(participant.find((r) => r.id === created.round.id)?.problemCount).toBe(1)
+      expect(organizer.find((r) => r.id === created.round.id)?.problemCount).toBe(2)
+    })
   })
 
   describe('getProblemRoundAccess', () => {
@@ -1071,6 +1107,76 @@ describe('rounds.service', () => {
       const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
 
       expect(detail?.problems.map((p) => p.problemId)).toEqual([problemB.id, problemA.id])
+    })
+
+    // #196: an archived problem 404s on GET /problems/:id, so the round
+    // listing must drop it too — keeping the survivors' original position.
+    async function roundWithTwoProblems() {
+      const user = await insertUser()
+      const team = await insertTeamFor(user.id)
+      const problemA = await insertPublishedProblemWithTranslations()
+      const problemB = await insertPublishedProblemWithTranslations()
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problemA.id, problemB.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      const positionOf = new Map(created.round.problems.map((p) => [p.problemId, p.position]))
+      return { user, team, problemA, problemB, roundId: created.round.id, positionOf }
+    }
+
+    it('drops a problem archived while the round is open, keeping the original position (#196)', async () => {
+      const { user, team, problemA, problemB, roundId, positionOf } = await roundWithTwoProblems()
+      await insertSubmission(roundId, team.id, user.id, problemB.id, 7, 1)
+      await archiveProblem(db, problemA.id)
+
+      const detail = await getParticipantRound(db, roundId, 'pt', user.id)
+
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({
+          problemId: problemB.id,
+          position: positionOf.get(problemB.id),
+          bestScore: 7,
+        }),
+      ])
+    })
+
+    it('drops an archived problem from a closed round too (#196)', async () => {
+      const { user, problemA, problemB, roundId } = await roundWithTwoProblems()
+      const closed = await closeRound(db, roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+      await archiveProblem(db, problemA.id)
+
+      const detail = await getParticipantRound(db, roundId, 'pt', user.id)
+
+      expect(detail?.status).toBe('closed')
+      expect(detail?.problems.map((p) => p.problemId)).toEqual([problemB.id])
+    })
+
+    it('still returns the round with an empty list when every problem is archived (#196)', async () => {
+      const { user, problemA, problemB, roundId } = await roundWithTwoProblems()
+      await archiveProblem(db, problemA.id)
+      await archiveProblem(db, problemB.id)
+
+      const detail = await getParticipantRound(db, roundId, 'pt', user.id)
+
+      expect(detail).not.toBeNull()
+      expect(detail?.problems).toEqual([])
+    })
+
+    it('only lists problems whose detail GET /problems/:id serves (#196)', async () => {
+      const { user, problemA, roundId } = await roundWithTwoProblems()
+      await archiveProblem(db, problemA.id)
+
+      const detail = await getParticipantRound(db, roundId, 'pt', user.id)
+
+      expect(detail?.problems.length).toBeGreaterThan(0)
+      for (const listed of detail?.problems ?? []) {
+        expect(await getPublishedProblem(db, listed.problemId, 'pt', user.id)).not.toBeNull()
+      }
     })
   })
 })

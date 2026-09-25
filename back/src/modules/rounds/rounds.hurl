@@ -207,7 +207,7 @@ jsonpath "$.error" == "round_not_draft"
 POST {{host}}/organizer/rounds
 Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
-{ "name": "Rodada 2", "durationMinutes": 15, "problemIds": [ "{{problem_id}}" ] }
+{ "name": "Rodada 2", "durationMinutes": 15, "problemIds": [ "{{problem_id}}", "{{second_problem_id}}" ] }
 HTTP 201
 [Captures]
 second_round_id: jsonpath "$.id"
@@ -319,6 +319,52 @@ Authorization: Bearer {{organizer_token}}
 HTTP 200
 [Asserts]
 jsonpath "$.status" == "open"
+
+# 10b. Archiving a problem while its round is open (#196): the participant
+# round view drops it (keeping the survivor's original position), so every
+# listed problem opens — and the archived one 404s on its detail, as before.
+# The closed round loses it too; the participant's GET /rounds count follows,
+# while the organizer's list still counts everything it assembled.
+POST {{host}}/organizer/problems/{{second_problem_id}}/archive
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "archived"
+
+GET {{host}}/rounds/{{second_round_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "open"
+jsonpath "$.problems" count == 1
+jsonpath "$.problems[0].problemId" == "{{problem_id}}"
+
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 200
+
+GET {{host}}/problems/{{second_problem_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 404
+
+GET {{host}}/rounds/{{round_id}}
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.problems" count == 1
+jsonpath "$.problems[0].problemId" == "{{problem_id}}"
+
+GET {{host}}/rounds
+Authorization: Bearer {{participant_token}}
+HTTP 200
+[Asserts]
+jsonpath "$[?(@.id=='{{second_round_id}}')].problemCount" == 1
+
+GET {{host}}/organizer/rounds
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$[?(@.id=='{{second_round_id}}')].problemCount" == 2
 
 # 11. Every route on an unknown id -> 404.
 GET {{host}}/organizer/rounds/00000000-0000-0000-0000-000000000000

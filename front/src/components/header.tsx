@@ -245,6 +245,11 @@ export function Header() {
                       >
                         {t('header.leaderboardLink')}
                       </Link>
+                      {/* #211: with or without a round open — practice
+                          matters most exactly when none is. */}
+                      <Link to="/practice" data-testid="header-practice-link" className="text-sm">
+                        {t('header.practiceLink')}
+                      </Link>
                     </>
                   )}
                 </nav>
@@ -431,6 +436,14 @@ export function Header() {
                               onClick={closeMobileMenu}
                             >
                               {t('header.leaderboardLink')}
+                            </Link>
+                            <Link
+                              to="/practice"
+                              data-testid="header-practice-link"
+                              className="py-2 text-sm"
+                              onClick={closeMobileMenu}
+                            >
+                              {t('header.practiceLink')}
                             </Link>
                             <Link
                               to="/change-password"

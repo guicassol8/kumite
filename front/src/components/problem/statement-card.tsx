@@ -85,9 +85,13 @@ export function StatementCard({
             >
               {t(`problem.difficulty.${problem.difficulty}`)}
             </Badge>
-            <Badge data-testid="problem-points-badge" variant="secondary">
-              {t('problem.pointsBadge', { points: problem.points })}
-            </Badge>
+            {/* Practice does not score (#211): "N pts" there would promise
+                points that never land anywhere. */}
+            {problem.visibility !== 'practice' && (
+              <Badge data-testid="problem-points-badge" variant="secondary">
+                {t('problem.pointsBadge', { points: problem.points })}
+              </Badge>
+            )}
             {positionLabel && (
               <Badge data-testid="problem-position-badge" variant="outline">
                 {t('problem.positionBadge', { letter: positionLabel })}

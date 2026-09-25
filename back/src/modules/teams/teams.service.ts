@@ -387,10 +387,26 @@ export async function moveMember(
       .where(eq(teamMembersTable.teamId, destinationTeamId))
     if (members.length >= maxTeamSize) return { ok: false, error: 'team_full' }
 
-    await tx
+    // #354: only the destination is locked, so the member can leave or be
+    // removed from the origin while this move waits — neither takes this key.
+    // Updating by user alone then matched zero rows and still answered ok,
+    // leaving the organizer a success for a member in no team. The update is
+    // scoped to the membership read above and counts its rows: zero means the
+    // member is no longer where the organizer saw them (gone, or already in
+    // another team they must not be dragged out of) → member_not_found.
+    // Row locks already order this UPDATE against a concurrent DELETE, and
+    // under READ COMMITTED it re-evaluates to zero rows once the delete
+    // commits. The origin's key is deliberately NOT taken too: two crossed
+    // moves (A→B and B→A) would then lock in opposite orders and deadlock,
+    // the very risk #276 flagged.
+    const moved = await tx
       .update(teamMembersTable)
       .set({ teamId: destinationTeamId })
-      .where(eq(teamMembersTable.userId, userId))
+      .where(
+        and(eq(teamMembersTable.userId, userId), eq(teamMembersTable.teamId, membership.teamId)),
+      )
+      .returning()
+    if (moved.length === 0) return { ok: false, error: 'member_not_found' }
 
     return { ok: true }
   })
@@ -407,7 +423,17 @@ export async function removeMember(db: Db, userId: string): Promise<RemoveMember
 
   // Unlike leaveTeam, no team_frozen guard: this route is the sanctioned way
   // to remove a member from a frozen team.
-  await db.delete(teamMembersTable).where(eq(teamMembersTable.userId, userId))
+  //
+  // #354: the read above is outside any transaction, so a concurrent leave can
+  // delete the row before this does. Counting the deleted rows turns that into
+  // not_found instead of an ok for a removal that removed nothing. Still keyed
+  // on the user alone — the intent is "out of whatever team", so a member an
+  // organizer moved meanwhile is removed from the new team too.
+  const deleted = await db
+    .delete(teamMembersTable)
+    .where(eq(teamMembersTable.userId, userId))
+    .returning()
+  if (deleted.length === 0) return { ok: false, error: 'not_found' }
 
   return { ok: true }
 }

@@ -19,7 +19,7 @@ type SeedProblem = {
 // pt/es/en title + statement, visible/hidden test cases, 3 difficulties.
 // "Soma dos Pares" mirrors the demo hardcode (front/src/components/problem/
 // soma-dos-pares.ts) — keep the two in manual sync if either changes.
-const SEED_PROBLEMS: SeedProblem[] = [
+export const SEED_PROBLEMS: SeedProblem[] = [
   {
     difficulty: 'easy',
     points: 100,

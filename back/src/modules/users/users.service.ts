@@ -76,18 +76,27 @@ async function getUserSummary(db: Db, userId: string): Promise<UserSummary | nul
   return row ? toUserSummary(row) : null
 }
 
+// Makes a search term literal inside a LIKE pattern: the escape character
+// `\` and the two wildcards `%` and `_` each get a `\` in front. One
+// character class, so an escape added here is never escaped again.
+function escapeLike(term: string): string {
+  return term.replace(/[\\%_]/g, '\\$&')
+}
+
 // One search box matched against name OR email (#122) — case insensitive
 // substring match, plus optional role/university/team filters. The two sides
 // are OR'd inside a single condition so they stay AND'd to the other filters;
-// a null name simply never matches (`null like …` is null, not true).
+// a null name simply never matches (`null like …` is null, not true). The
+// term is literal text (#282): `_` finds underscores, `%` percent signs, and a
+// trailing `\` no longer makes Postgres reject the pattern.
 export async function listUsers(db: Db, filters: ListUsersQuery): Promise<UserList> {
   const conditions = []
   if (filters.q) {
-    const pattern = `%${filters.q}%`
+    const pattern = `%${escapeLike(filters.q)}%`
     conditions.push(
       or(
-        sql`lower(${usersTable.email}) like lower(${pattern})`,
-        sql`lower(${usersTable.name}) like lower(${pattern})`,
+        sql`lower(${usersTable.email}) like lower(${pattern}) escape '\\'`,
+        sql`lower(${usersTable.name}) like lower(${pattern}) escape '\\'`,
       ),
     )
   }

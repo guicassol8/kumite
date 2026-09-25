@@ -129,6 +129,27 @@ HTTP 200
 [Asserts]
 jsonpath "$.total" == 0
 
+# 5d. The term is literal text, not a LIKE pattern (#282). As a wildcard, `_`
+# would match the `-` in `users-e2e-target@…`, and a trailing `%` would match
+# anything after the fragment: both must now find nobody.
+GET {{host}}/organizer/users?q=users_e2e_target
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.total" == 0
+
+GET {{host}}/organizer/users?q=users-e2e-target%25
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.total" == 0
+
+# A lone backslash used to end the pattern on the escape character, which
+# Postgres rejects (SQLSTATE 22025) -> 500. It is a plain character now.
+GET {{host}}/organizer/users?q=%5C
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+
 # 6. Filter by role/university -> the target (a participant in pucrs) is
 # absent from an organizer-only or merida-only filter.
 GET {{host}}/organizer/users?q=users-e2e-target&role=organizer

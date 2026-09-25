@@ -86,9 +86,9 @@ describe('SubmissionResultPanel', () => {
       expect(panel.dataset.state).toBe('failed')
       expect(within(panel).getByText('Não aprovado')).toBeDefined()
       expect(panel.className).toContain('text-destructive')
-      // The outline this test is named for. `alertVariants` sets no border on
-      // `destructive` (unlike `success`), so without this the panel rendered
-      // on the neutral hairline and the assertion above still passed.
+      // The outline this test is named for. It comes from the primitive now
+      // (`alertVariants.destructive`, #308); before that the panel rendered on
+      // the neutral hairline and the assertion above still passed.
       expect(panel.className).toContain('border-destructive')
       // Identity § 5: an alert is never a filled plate.
       expect(panel.className).not.toContain('bg-destructive')

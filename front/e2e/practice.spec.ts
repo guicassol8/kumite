@@ -9,8 +9,11 @@ import {
 } from './support/blockly'
 import {
   BACK_URL,
+  EDITOR_FIXTURE_TIMEOUT_MS,
+  hasOrganizerCredentials,
   PARTICIPANT_PASSWORD,
   type SeededParticipant,
+  seedEditorFixture,
   seedParticipant,
   seedParticipantToken,
   workspaceStorageKey,
@@ -258,5 +261,50 @@ test.describe('the practice tab (#211)', () => {
     await page.screenshot({ path: evidence('09-celular-menu') })
     await panelLink.click()
     await expect(page.getByTestId('header-mobile-user-block')).toHaveCount(0)
+  })
+
+  test('a practice problem opened on /problem/$id lands on /practice/$id, without Submeter', async ({
+    page,
+  }) => {
+    test.setTimeout(EDITOR_TEST_TIMEOUT_MS)
+    const first = catalog[0] as PracticeSummary
+    await seedParticipantToken(page, aluno.token)
+
+    // 10 — before #211 this URL offered a Submeter the back refused.
+    await page.goto(`/problem/${first.id}`)
+    await expect(page).toHaveURL(new RegExp(`/practice/${first.id}$`))
+    await expectBlocklyInjected(page)
+    await expect(page.getByTestId('problem-run-button')).toBeVisible()
+    await expect(page.getByTestId('problem-submit-button')).toHaveCount(0)
+    await expect(page.getByTestId('problem-points-badge')).toHaveCount(0)
+    await page.screenshot({ path: evidence('10-problem-vira-pratica') })
+  })
+})
+
+// The other direction needs a round problem, which only an organizer can
+// seed (same fixture and skip as blockly-locale.spec.ts).
+test.describe('a round problem on the practice route (#211)', () => {
+  test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
+
+  let problemId: string
+  let participantToken: string
+
+  test.beforeAll(async () => {
+    test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
+    ;({ problemId, participantToken } = await seedEditorFixture('Pratica Redirect'))
+  })
+
+  test('lands on /problem/$id, the round screen', async ({ page }) => {
+    test.setTimeout(EDITOR_TEST_TIMEOUT_MS)
+    await seedParticipantToken(page, participantToken)
+
+    // 11 — the fixture's round is closed, so the round screen shows its
+    // closed notice: proof this is /problem's screen, not practice's.
+    await page.goto(`/practice/${problemId}`)
+    await expect(page).toHaveURL(new RegExp(`/problem/${problemId}$`))
+    await expectBlocklyInjected(page)
+    await expect(page.getByTestId('problem-closed-notice')).toBeVisible()
+    await expect(page.getByTestId('problem-points-badge')).toBeVisible()
+    await page.screenshot({ path: evidence('11-pratica-vira-problem') })
   })
 })

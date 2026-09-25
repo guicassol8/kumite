@@ -188,6 +188,37 @@ async function holdFirstSubmissionStamp(teamId: string) {
   }
 }
 
+// Resolves once `pending` is parked on a lock (a backend in this database
+// waiting on a Lock event while running `statement`), or once it has already
+// settled — then the test's own assertion reports what really happened. A
+// fixed sleep instead guesses how long the contender needs to reach the lock:
+// too short and a test that must see it parked silently proves nothing, or
+// fails on a slow machine.
+async function untilBlockedOnLock(pending: Promise<unknown>, statement: string) {
+  let settled = false
+  void pending.then(
+    () => {
+      settled = true
+    },
+    () => {
+      settled = true
+    },
+  )
+  const deadline = Date.now() + 5000
+  while (!settled) {
+    const waiting = await db.execute(sql`
+      select 1 from pg_stat_activity
+      where datname = current_database()
+        and wait_event_type = 'Lock'
+        and query ilike ${`%${statement}%`}
+    `)
+    if (waiting.length > 0) return
+    if (Date.now() > deadline)
+      throw new Error(`nothing blocked on a lock while running ${statement}`)
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
 afterAll(async () => {
   await db.$client.end()
 })
@@ -570,7 +601,7 @@ describe('leaveTeam', () => {
     let result: Awaited<ReturnType<typeof leaveTeam>>
     try {
       const leave = leaveTeam(db, leaver.id)
-      await new Promise((resolve) => setTimeout(resolve, 150))
+      await untilBlockedOnLock(leave, 'pg_advisory_xact_lock')
       await db
         .update(teamsTable)
         .set({ firstSubmittedAt: new Date() })
@@ -605,7 +636,7 @@ describe('leaveTeam', () => {
       },
     )
     try {
-      await new Promise((resolve) => setTimeout(resolve, 250))
+      await untilBlockedOnLock(leave, 'for share')
       expect(settled).toBe(false)
     } finally {
       await stamp.release({ commit: true })
@@ -624,7 +655,7 @@ describe('leaveTeam', () => {
     let result: Awaited<ReturnType<typeof leaveTeam>>
     try {
       const leave = leaveTeam(db, leaver.id)
-      await new Promise((resolve) => setTimeout(resolve, 150))
+      await untilBlockedOnLock(leave, 'for share')
       await stamp.release({ commit: false })
       result = await leave
     } finally {
@@ -655,7 +686,7 @@ describe('leaveTeam', () => {
     let result: Awaited<ReturnType<typeof leaveTeam>>
     try {
       const leave = leaveTeam(db, leaver.id)
-      await new Promise((resolve) => setTimeout(resolve, 150))
+      await untilBlockedOnLock(leave, 'pg_advisory_xact_lock')
       // moveMember locks the destination's key, not the origin's, so it runs
       // while the leave is still parked.
       expect(await moveMember(db, leaver.id, other.team.id)).toEqual({ ok: true })

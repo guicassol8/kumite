@@ -39,8 +39,8 @@ export default defineConfig({
   // A stray `test.only` would silently shrink the CI gate to one spec.
   forbidOnly: isCI,
   // #295: one retry in CI only. A spec that passes on retry is reported as
-  // flaky (html + GitHub annotations) instead of failing the gate; the known
-  // flake (#338) stays open and is fixed there, not hidden here.
+  // flaky (html + GitHub annotations) instead of failing the gate. A flake is
+  // fixed at its cause, not hidden here: #338 (the header Tab walk) was.
   retries: isCI ? 1 : 0,
   // Local runs keep Playwright's default `list`; CI adds the HTML report the
   // planned `e2e` job uploads as an artifact and inline annotations on the PR.

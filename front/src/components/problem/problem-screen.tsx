@@ -1,6 +1,6 @@
 import { emptyWorkspaceState, withRootBlock } from '@kumite/blocks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, Navigate } from '@tanstack/react-router'
 import type * as Blockly from 'blockly'
 import { Info, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -65,8 +65,8 @@ export type ProblemScreenProps = {
   mode: ProblemScreenMode
 }
 
-// `mode` is read from #211 T6 on — this extraction (T5) changes nothing.
-export function ProblemScreen({ id }: ProblemScreenProps) {
+export function ProblemScreen({ id, mode }: ProblemScreenProps) {
+  const isPractice = mode === 'practice'
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
   const locale = toApiLocale(i18n.resolvedLanguage ?? i18n.language)
@@ -88,10 +88,13 @@ export function ProblemScreen({ id }: ProblemScreenProps) {
   const eventStream = useRoundStream()
   const lastRoundChangeRef = useRef(eventStream.roundChangedAt)
   useEffect(() => {
+    // A practice problem belongs to no round: opening or closing one says
+    // nothing new about it (#211).
+    if (isPractice) return
     if (eventStream.roundChangedAt === lastRoundChangeRef.current) return
     lastRoundChangeRef.current = eventStream.roundChangedAt
     queryClient.invalidateQueries({ queryKey: problemQueryKey(id) })
-  }, [eventStream.roundChangedAt, queryClient, id])
+  }, [eventStream.roundChangedAt, queryClient, id, isPractice])
 
   const problem = useQuery({
     queryKey: [...problemQueryKey(id), locale],
@@ -132,7 +135,13 @@ export function ProblemScreen({ id }: ProblemScreenProps) {
   // apart from "no team best to speak of" (no badge) while the round is open
   // (#206). Same key as /teams and /leaderboard, so it is usually cached.
   // Decoration like the letter above: a failure drops the badge, nothing else.
-  const teams = useQuery({ queryKey: TEAMS_QUERY_KEY, queryFn: fetchTeams, retry: false })
+  // Practice has no team best at all (#211), so it never asks.
+  const teams = useQuery({
+    queryKey: TEAMS_QUERY_KEY,
+    queryFn: fetchTeams,
+    retry: false,
+    enabled: !isPractice,
+  })
   const hasTeam = Boolean(teams.data?.myTeamId)
 
   const examples = problem.data?.examples ?? []
@@ -271,16 +280,27 @@ export function ProblemScreen({ id }: ProblemScreenProps) {
     )
   }
 
+  // Each visibility has one screen (#211): a practice problem on
+  // /problem/$id would offer a Submeter the back refuses, and a round problem
+  // on /practice/$id would hide the one it needs. The payload says which.
+  if (!isPractice && data.visibility === 'practice') {
+    return <Navigate to="/practice/$id" params={{ id }} replace />
+  }
+  if (isPractice && data.visibility === 'round') {
+    return <Navigate to="/problem/$id" params={{ id }} replace />
+  }
+
   const isClosed = data.roundStatus === 'closed'
   // Open round only: once closed, the closed notice below already carries
   // the team's best (or its "never submitted" line), exactly as before #206.
-  const bestScore: TeamBestScore | undefined = isClosed
-    ? undefined
-    : data.bestSubmission
-      ? { kind: 'score', score: data.bestSubmission.score }
-      : hasTeam
-        ? { kind: 'none' }
-        : undefined
+  const bestScore: TeamBestScore | undefined =
+    isPractice || isClosed
+      ? undefined
+      : data.bestSubmission
+        ? { kind: 'score', score: data.bestSubmission.score }
+        : hasTeam
+          ? { kind: 'none' }
+          : undefined
   // Drives both the results band and how much room the statement gives up
   // for it on the stacked (mobile) layout.
   const hasResults = runState.status !== 'idle' || verdict !== null
@@ -343,7 +363,7 @@ export function ProblemScreen({ id }: ProblemScreenProps) {
 
   // #285: only while the round is still open — a closed round already says
   // so, and its Submeter is gone. The timer is not touched.
-  const isPaused = !isClosed && eventStream.submissionsPaused
+  const isPaused = !isPractice && !isClosed && eventStream.submissionsPaused
   const pausedNotice = isPaused && (
     <Alert className="shrink-0" data-testid="problem-submissions-paused-banner">
       <Info />
@@ -404,7 +424,9 @@ export function ProblemScreen({ id }: ProblemScreenProps) {
       isClosed={isClosed}
       isSubmitting={submit.isPending}
       isPaused={isPaused}
-      onSubmit={() => void handleSubmit()}
+      // Practice has no submission (#211): no Submeter, so no verdict and
+      // no submit banner can ever appear either.
+      onSubmit={isPractice ? undefined : () => void handleSubmit()}
     />
   )
 
@@ -412,7 +434,7 @@ export function ProblemScreen({ id }: ProblemScreenProps) {
     <main className="flex min-h-0 grow basis-0 flex-col gap-4 overflow-hidden p-4 md:flex-row">
       <ProblemPanels
         problem={data}
-        positionLabel={problemLetter}
+        positionLabel={isPractice ? undefined : problemLetter}
         bestScore={bestScore}
         hasResults={hasResults}
         closedNotice={closedNotice}

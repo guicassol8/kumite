@@ -146,11 +146,7 @@ function ChangePasswordScreen() {
     return (
       <AuthLayout title={t('auth.changePassword.title')}>
         <div className="flex flex-col gap-4">
-          <Alert
-            variant="destructive"
-            className="border-destructive"
-            data-testid="change-password-refresh-error"
-          >
+          <Alert variant="destructive" data-testid="change-password-refresh-error">
             <CircleAlert aria-hidden="true" />
             <AlertDescription>{t('auth.changePassword.refresh.failed')}</AlertDescription>
           </Alert>
@@ -228,11 +224,7 @@ function ChangePasswordScreen() {
             )}
           />
           {rootError && (
-            <Alert
-              variant="destructive"
-              className="border-destructive"
-              data-testid="change-password-form-error"
-            >
+            <Alert variant="destructive" data-testid="change-password-form-error">
               <CircleAlert aria-hidden="true" />
               <AlertDescription>{rootError}</AlertDescription>
             </Alert>

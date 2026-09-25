@@ -180,11 +180,7 @@ function LoginScreen() {
             )}
           />
           {rootError && (
-            <Alert
-              variant="destructive"
-              className="border-destructive"
-              data-testid="login-form-error"
-            >
+            <Alert variant="destructive" data-testid="login-form-error">
               <CircleAlert aria-hidden="true" />
               <AlertDescription>{rootError}</AlertDescription>
             </Alert>

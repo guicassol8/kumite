@@ -59,11 +59,34 @@ async function labelContrast(page: Page, locator: Locator): Promise<number> {
   return contrastRatio(text, background)
 }
 
-/** Reaches the button the way a keyboard user does, so `:focus-visible` fires. */
+/**
+ * Reaches a header control the way a keyboard user does, so `:focus-visible`
+ * fires.
+ *
+ * #338 — the walk starts on the header's first focusable, not wherever the
+ * browser happens to be. `signUpParticipant` ends with a *click* on the signup
+ * submit button, and Chromium keeps that spot as the sequential focus
+ * navigation starting point even after the route change removes the button:
+ * `activeElement` reads BODY, yet the next Tab lands in `<main>`. From there
+ * focus had to cross every `home-closed-round-*` link on the home — one per
+ * closed round in the shared database, a number every full suite run grows —
+ * and wrap around the document, so past ~35 rounds the 40 Tabs ran out.
+ * Focusing the home link resets that starting point; the target is still
+ * reached by real Tab presses. Leaving the header fails right away: the
+ * target is in the header, so a walk that exits it will never get there.
+ */
 async function tabTo(page: Page, testId: string): Promise<void> {
+  await page.getByTestId('header-home-link').focus()
   for (let i = 0; i < 40; i++) {
-    const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'))
+    const { focused, inHeader } = await page.evaluate(() => {
+      const active = document.activeElement
+      return {
+        focused: active?.getAttribute('data-testid') ?? active?.tagName,
+        inHeader: !!active?.closest('[data-testid="app-header"]'),
+      }
+    })
     if (focused === testId) return
+    if (!inHeader) throw new Error(`Tab left the header before reaching ${testId} (at ${focused})`)
     await page.keyboard.press('Tab')
   }
   throw new Error(`Tab never reached ${testId}`)

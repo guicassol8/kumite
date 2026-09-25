@@ -231,6 +231,62 @@ describe('users.service listUsers', () => {
     expect(result.items[0]?.team).toEqual({ id: team.id, name: 'Team Ada' })
   })
 
+  // #282: the search term is literal text — LIKE wildcards and the escape
+  // character in it must not act as operators.
+  it('treats _ as a literal underscore, on either side (#282)', async () => {
+    await createUser(db, { ...baseUser, email: 'ana_lima@example.com', name: 'Ana Lima' })
+    await createUser(db, { ...baseUser, email: 'mariana@example.com', name: 'Mariana' })
+    await createUser(db, { ...baseUser, email: 'x@example.com', name: 'Ana_B' })
+
+    const result = await listUsers(db, { q: '_', limit: 20, offset: 0 })
+    expect(result.items.map((u) => u.email).sort()).toEqual([
+      'ana_lima@example.com',
+      'x@example.com',
+    ])
+    expect(result.total).toBe(2)
+  })
+
+  it('treats % as a literal percent sign (#282)', async () => {
+    await createUser(db, { ...baseUser, email: 'promo@example.com', name: 'Promo 100%' })
+    await createUser(db, { ...baseUser, email: 'other@example.com', name: 'Promo 1000' })
+
+    const percent = await listUsers(db, { q: '%', limit: 20, offset: 0 })
+    expect(percent.items.map((u) => u.email)).toEqual(['promo@example.com'])
+    expect(percent.total).toBe(1)
+
+    const hundred = await listUsers(db, { q: '100%', limit: 20, offset: 0 })
+    expect(hundred.items.map((u) => u.email)).toEqual(['promo@example.com'])
+    expect(hundred.total).toBe(1)
+  })
+
+  it('treats a backslash as a literal character, not an escape (#282)', async () => {
+    await createUser(db, baseUser)
+
+    const none = await listUsers(db, { q: '\\', limit: 20, offset: 0 })
+    expect(none.items).toEqual([])
+    expect(none.total).toBe(0)
+
+    await createUser(db, { ...baseUser, email: 'slash@example.com', name: 'a\\b' })
+    const found = await listUsers(db, { q: '\\', limit: 20, offset: 0 })
+    expect(found.items.map((u) => u.email)).toEqual(['slash@example.com'])
+    expect(found.total).toBe(1)
+  })
+
+  it('still matches a plain term case-insensitively on name or email (#282)', async () => {
+    await createUser(db, { ...baseUser, email: 'a1@example.com', name: 'Ana' })
+    await createUser(db, { ...baseUser, email: 'mariana@example.com', name: 'Maria' })
+    await createUser(db, { ...baseUser, email: 'a3@example.com', name: 'ANA' })
+    await createUser(db, { ...baseUser, email: 'bob@example.com', name: 'Bob' })
+
+    const result = await listUsers(db, { q: 'ana', limit: 20, offset: 0 })
+    expect(result.items.map((u) => u.email).sort()).toEqual([
+      'a1@example.com',
+      'a3@example.com',
+      'mariana@example.com',
+    ])
+    expect(result.total).toBe(3)
+  })
+
   it('paginates with limit/offset and reports total across all pages', async () => {
     for (let i = 0; i < 5; i++) {
       await createUser(db, { ...baseUser, email: `user${i}@example.com` })

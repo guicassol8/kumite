@@ -5,11 +5,14 @@ import { ROOT_BLOCK_TYPE } from './blocks'
 import { BlocksError } from './errors'
 import { comentarioComQuebra } from './fixtures/comentario-com-quebra'
 import { indiceAleatorio } from './fixtures/indice-aleatorio'
+import { praticaDevolvaEntrada } from './fixtures/pratica-devolva-entrada'
+import { praticaEPar } from './fixtures/pratica-e-par'
+import { praticaSomaLista } from './fixtures/pratica-soma-lista'
 import { raizDesabilitada } from './fixtures/raiz-desabilitada'
 import { somaDosPares } from './fixtures/soma-dos-pares'
 import { variavelChamadaInput } from './fixtures/variavel-chamada-input'
 import { generateSolution } from './generate'
-import { emptyWorkspaceState, type WorkspaceState } from './toolbox'
+import { allowedBlockTypes, emptyWorkspaceState, type WorkspaceState } from './toolbox'
 
 const LINE_TERMINATORS = [
   String.fromCharCode(0x0d),
@@ -399,6 +402,66 @@ describe('the "soma dos pares" fixture', () => {
   })
 })
 
+/** Every `type` in a serialized workspace, however deep: `inputs`, `next` and
+ * shadows included. Walks the raw state, so it proves what the fixture holds,
+ * not what a workspace load would make of it. */
+function blockTypesIn(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(blockTypesIn)
+  if (value === null || typeof value !== 'object') return []
+  const own = 'type' in value && typeof value.type === 'string' ? [value.type] : []
+  return [...own, ...Object.values(value).flatMap(blockTypesIn)]
+}
+
+// The practice problems' reference solutions (#210): the back seeds the
+// problems, the demo (#212) replays the same workspaces.
+describe('the practice fixtures', () => {
+  const fixtures: [string, WorkspaceState, [unknown, unknown][]][] = [
+    [
+      'praticaDevolvaEntrada',
+      praticaDevolvaEntrada,
+      [
+        [7, 7],
+        [42, 42],
+        [-3, -3],
+      ],
+    ],
+    [
+      'praticaEPar',
+      praticaEPar,
+      [
+        [4, true],
+        [7, false],
+        [0, true],
+        [-3, false],
+      ],
+    ],
+    [
+      'praticaSomaLista',
+      praticaSomaLista,
+      [
+        [[1, 2, 3], 6],
+        [[10, -5, 5], 10],
+        [[], 0],
+      ],
+    ],
+  ]
+
+  it.each(fixtures)('%s solves every case of its problem', (_name, fixture, cases) => {
+    const solve = instantiate(generateSolution(fixture))
+
+    for (const [input, expected] of cases) {
+      expect(solve(input), JSON.stringify(input)).toBe(expected)
+    }
+  })
+
+  it.each(fixtures)('%s uses only blocks from the curated toolbox', (_name, fixture) => {
+    const types = blockTypesIn((fixture as { blocks: unknown }).blocks)
+
+    expect(types.length).toBeGreaterThan(0)
+    for (const type of types) expect(allowedBlockTypes).toContain(type)
+  })
+})
+
 // Recorded on develop before the kumite theme (#218) moved the two kumite
 // blocks from `setColour` to `setStyle`: the theme is UI only, so the judge
 // must keep emitting byte-for-byte the same source.
@@ -430,6 +493,47 @@ describe('generateSolution output is stable', () => {
       // sol throw 1 throw 2 throw 3
       function solve(input) {
         return 7;
+      }
+      "
+    `)
+  })
+
+  it('praticaDevolvaEntrada', () => {
+    expect(generateSolution(praticaDevolvaEntrada)).toMatchInlineSnapshot(`
+      "
+
+
+      function solve(input) {
+        return input;
+      }
+      "
+    `)
+  })
+
+  it('praticaEPar', () => {
+    expect(generateSolution(praticaEPar)).toMatchInlineSnapshot(`
+      "
+
+
+      function solve(input) {
+        return input % 2 == 0;
+      }
+      "
+    `)
+  })
+
+  it('praticaSomaLista', () => {
+    expect(generateSolution(praticaSomaLista)).toMatchInlineSnapshot(`
+      "var total, numero;
+
+
+      function solve(input) {
+        total = 0;
+        for (var numero_index in input) {
+          numero = input[numero_index];
+          total = total + numero;
+        }
+        return total;
       }
       "
     `)

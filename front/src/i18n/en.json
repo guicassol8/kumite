@@ -13,6 +13,7 @@
     "organizerLink": "Organizer",
     "teamsLink": "Teams",
     "leaderboardLink": "Leaderboard",
+    "practiceLink": "Practice",
     "changePassword": "Change password",
     "reportBug": "Report a problem",
     "theme": {
@@ -966,5 +967,14 @@
       "dismiss": "Dismiss"
     },
     "emptyProblems": "No problems in this round."
+  },
+  "practice": {
+    "title": "Practice",
+    "intro": "Train in the editor any time — there is no submission or scoring here.",
+    "loading": "Loading practice problems…",
+    "loadError": "Could not load the practice problems.",
+    "retry": "Try again",
+    "empty": "There are no practice problems available yet.",
+    "openProblem": "Open {{title}}"
   }
 }

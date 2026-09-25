@@ -13,6 +13,7 @@
     "organizerLink": "Organizador",
     "teamsLink": "Times",
     "leaderboardLink": "Placar",
+    "practiceLink": "Prática",
     "changePassword": "Trocar senha",
     "reportBug": "Reportar um problema",
     "theme": {
@@ -966,5 +967,14 @@
       "dismiss": "Dispensar"
     },
     "emptyProblems": "Nenhum problema nesta rodada."
+  },
+  "practice": {
+    "title": "Prática",
+    "intro": "Treine no editor a qualquer momento — aqui não há submissão nem pontuação.",
+    "loading": "Carregando problemas de prática…",
+    "loadError": "Não foi possível carregar os problemas de prática.",
+    "retry": "Tentar novamente",
+    "empty": "Ainda não há problemas de prática disponíveis.",
+    "openProblem": "Abrir {{title}}"
   }
 }

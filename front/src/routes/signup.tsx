@@ -232,11 +232,7 @@ function SignupScreen() {
             )}
           />
           {rootError && (
-            <Alert
-              variant="destructive"
-              className="border-destructive"
-              data-testid="signup-form-error"
-            >
+            <Alert variant="destructive" data-testid="signup-form-error">
               <CircleAlert aria-hidden="true" />
               <AlertDescription>{rootError}</AlertDescription>
             </Alert>

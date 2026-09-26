@@ -35,7 +35,8 @@ const BRAND_FILL = 'rgb(221, 40, 36)'
  * when approved, `--destructive` (#c1133a) when not. Asserting the background
  * is not brand red proves only that it is not a filled plate — it says nothing
  * about the outline, which is the half of "crimson em contorno" that went
- * missing when `alertVariants` gave `destructive` no border of its own.
+ * missing when `alertVariants` gave `destructive` no border of its own. Since
+ * #308 the verdict has no local fix, so this also guards the primitive.
  */
 const SUCCESS_BORDER = 'rgb(0, 132, 51)'
 const CRIMSON_BORDER = 'rgb(193, 19, 58)'

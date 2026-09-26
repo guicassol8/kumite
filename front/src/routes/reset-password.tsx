@@ -172,11 +172,7 @@ function ResetPasswordScreen() {
               )}
             />
             {requestError && (
-              <Alert
-                variant="destructive"
-                className="border-destructive"
-                data-testid="reset-password-request-error"
-              >
+              <Alert variant="destructive" data-testid="reset-password-request-error">
                 <CircleAlert aria-hidden="true" />
                 <AlertDescription>{requestError}</AlertDescription>
               </Alert>
@@ -251,11 +247,7 @@ function ResetPasswordScreen() {
               )}
             />
             {rootError && (
-              <Alert
-                variant="destructive"
-                className="border-destructive"
-                data-testid="reset-password-form-error"
-              >
+              <Alert variant="destructive" data-testid="reset-password-form-error">
                 <CircleAlert aria-hidden="true" />
                 <AlertDescription>{rootError}</AlertDescription>
               </Alert>

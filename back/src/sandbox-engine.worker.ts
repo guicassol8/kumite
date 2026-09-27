@@ -85,6 +85,10 @@ function runCase(module: QuickJSWASMModule, request: SandboxCaseRequest): Sandbo
       // circular, throwing getter) dump silently falls back to a string —
       // the envelope is always an object with a boolean `ok`, so anything
       // else is treated as unserializable, exactly as the old path threw.
+      // Not sealed by this: `dump` still honors a guest `toJSON` on
+      // Object.prototype, and a guest accessor on `__settled` or a redefined
+      // `Promise` can still shape the envelope — none is reachable from the
+      // curated toolbox (#181), and none gives more than `return <value>`.
       const handle = context.getProp(context.global, '__settled')
       let settled: unknown
       try {

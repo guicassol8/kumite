@@ -189,8 +189,9 @@ describe('sandbox engine (ADR-0001: quickjs-emscripten inside worker_thread)', (
     },
     {
       name: 'forged JSON plus a synchronous throw',
-      source: `function solve(input) { ${FORGE}; throw new Error('x') }`,
+      source: `function solve(input) { ${FORGE}; throw new Error('boom') }`,
       outcome: 'blocked',
+      detail: 'boom',
     },
     {
       name: 'forged JSON plus an async rejection',
@@ -214,11 +215,19 @@ describe('sandbox engine (ADR-0001: quickjs-emscripten inside worker_thread)', (
       name: 'a circular return value',
       source: 'function solve(input) { const a = {}; a.self = a; return a }',
       outcome: 'blocked',
+      detail: 'could not be serialized',
     },
     {
       name: 'a BigInt return value',
       source: 'function solve(input) { return 10n }',
       outcome: 'blocked',
+      detail: 'could not be serialized',
+    },
+    {
+      name: 'a return value whose getter throws',
+      source: `function solve(input) { return { get x() { throw new Error('g') } } }`,
+      outcome: 'blocked',
+      detail: 'could not be serialized',
     },
   ]
 

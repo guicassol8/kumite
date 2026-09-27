@@ -229,6 +229,12 @@ export type SubmitOutcome =
     }
   | { ok: false; error: 'throttled'; reason: 'in_flight' | 'cooldown'; retryAfterMs: number }
   | { ok: false; error: 'submissions_paused' }
+  | { ok: false; error: 'not_in_team' }
+
+// Thrown inside the insert transaction to roll back the row and the stamp
+// together when the author is no longer in the team (#353), and caught right
+// outside it.
+const authorLeftTheTeam = new Error('the author left the team while the submission was judged')
 
 export async function findTeamIdForUser(db: Db, userId: string): Promise<string | null> {
   const [membership] = await db
@@ -335,48 +341,87 @@ export async function submitSolution(
     // unique index on (team, problem, attempt) is the backstop.
     const attemptNumber = (await countAttempts(db, identity, problem.id)) + 1
 
-    const submission = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(submissionsTable)
-        .values({
-          problemId: problem.id,
-          // The round the accept gate above validated, not one re-derived from
-          // the clock (#176): judging can outlive the round, and the row would
-          // otherwise land outside the window it was accepted in.
-          roundId: body.roundId,
-          userId: identity.userId,
-          teamId: identity.teamId,
-          workspace: body.workspace,
-          generatedCode: generated.source,
-          caseResults: toPersistedCaseResults(results),
-          score,
-          // The scale `score` was computed on, stamped from the same `problem`
-          // row `scoreSubmission` just used (#193). Re-reading the problem here
-          // would reopen the very window this issue is about.
-          maxScore: problem.points,
-          hiddenCaseCount: countHiddenCases(problem.testCases),
-          attemptNumber,
-          acceptedAt,
-        })
-        .returning()
-      if (!row) throw new Error('expected the submission insert to return a row')
+    let submission: typeof submissionsTable.$inferSelect
+    try {
+      submission = await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(submissionsTable)
+          .values({
+            problemId: problem.id,
+            // The round the accept gate above validated, not one re-derived from
+            // the clock (#176): judging can outlive the round, and the row would
+            // otherwise land outside the window it was accepted in.
+            roundId: body.roundId,
+            userId: identity.userId,
+            teamId: identity.teamId,
+            workspace: body.workspace,
+            generatedCode: generated.source,
+            caseResults: toPersistedCaseResults(results),
+            score,
+            // The scale `score` was computed on, stamped from the same `problem`
+            // row `scoreSubmission` just used (#193). Re-reading the problem here
+            // would reopen the very window this issue is about.
+            maxScore: problem.points,
+            hiddenCaseCount: countHiddenCases(problem.testCases),
+            attemptNumber,
+            acceptedAt,
+          })
+          .returning()
+        if (!row) throw new Error('expected the submission insert to return a row')
 
-      // Conditional in SQL, so the "first" stamp can never be overwritten by a
-      // later attempt racing the read.
-      //
-      // This UPDATE holds the team row in FOR NO KEY UPDATE until commit, and
-      // that row lock is what leaveTeam waits on via FOR SHARE (#303), so a
-      // leave can never slip out of a team this stamp is freezing. Taking the
-      // `team-join:` advisory key here instead is deliberately avoided: it would
-      // queue every submission behind the team's joins and moves, and widen the
-      // keys held per transaction (#276's deadlock warning).
-      await tx
-        .update(teamsTable)
-        .set({ firstSubmittedAt: sql`now()` })
-        .where(and(eq(teamsTable.id, identity.teamId), isNull(teamsTable.firstSubmittedAt)))
+        // Conditional in SQL, so the "first" stamp can never be overwritten by a
+        // later attempt racing the read.
+        //
+        // This UPDATE holds the team row in FOR NO KEY UPDATE until commit, and
+        // that row lock is what leaveTeam waits on via FOR SHARE (#303), so a
+        // leave can never slip out of a team this stamp is freezing. It must stay
+        // ahead of the membership check below (#353). Taking the
+        // `team-join:` advisory key here instead is deliberately avoided: it would
+        // queue every submission behind the team's joins and moves, and widen the
+        // keys held per transaction (#276's deadlock warning).
+        await tx
+          .update(teamsTable)
+          .set({ firstSubmittedAt: sql`now()` })
+          .where(and(eq(teamsTable.id, identity.teamId), isNull(teamsTable.firstSubmittedAt)))
 
-      return row
-    })
+        // #353: the identity was resolved before the judge, and the author may
+        // have left (or been moved or removed by the organizer) while it ran.
+        // The submission only counts for the team its author is still in now —
+        // otherwise the row and the stamp roll back together (rule A).
+        //
+        // The order is the point. This is the only statement here that touches
+        // team_members, and it runs AFTER the stamp: teams, then member — the
+        // order leaveTeam and removeTeam lock in too, so no cycle can form. With
+        // the member locked first, a leave holding the team row in FOR SHARE
+        // would wait on this member lock while the stamp waited on its FOR SHARE:
+        // 40P01 (the #352 review). When the team is already frozen the stamp
+        // matches no row and locks nothing, leaving only this lock.
+        //
+        // FOR SHARE, not FOR KEY SHARE: team_members' key is user_id alone, so
+        // moveMember's UPDATE of team_id only takes FOR NO KEY UPDATE, which
+        // KEY SHARE would let through. FOR SHARE conflicts with it and with a
+        // DELETE, so a move or leave in flight is waited on, and the re-check
+        // under READ COMMITTED then sees whether the row still names this team.
+        const [membership] = await tx
+          .select({ userId: teamMembersTable.userId })
+          .from(teamMembersTable)
+          .where(
+            and(
+              eq(teamMembersTable.userId, identity.userId),
+              eq(teamMembersTable.teamId, identity.teamId),
+            ),
+          )
+          .for('share')
+        if (!membership) throw authorLeftTheTeam
+
+        return row
+      })
+    } catch (error) {
+      // The sandbox did run, so the `finally` still arms the cooldown — on this
+      // team's key, never on the one the author moved to.
+      if (error === authorLeftTheTeam) return { ok: false, error: 'not_in_team' }
+      throw error
+    }
 
     return {
       ok: true,

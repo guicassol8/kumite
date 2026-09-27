@@ -123,7 +123,7 @@ function Home() {
       )}
       <div className="flex flex-col items-center gap-4 text-center md:gap-6">
         <Mark className="size-14 md:size-20" />
-        <h1 data-testid="home-heading-regression-295">
+        <h1 data-testid="home-heading">
           <span className="sr-only">kumite</span>
           <Wordmark className="h-12 w-36 md:h-16 md:w-48" />
         </h1>

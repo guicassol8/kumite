@@ -70,6 +70,14 @@ export const createSubmissionRoute = defineRoute({
         return c.error('submissions_paused', 'Submissions are paused by the organizer', {
           status: 423,
         })
+      case 'not_in_team':
+        // #353: the author left (or was moved out of) the team while the
+        // submission was judged, so it was discarded. Same code and status as
+        // the teamless check above — the front already maps any submit 404 to
+        // its race banner.
+        return c.error('not_in_team', 'You are no longer a member of this team', {
+          status: 404,
+        })
       case 'throttled':
         return c.error(
           'submission_throttled',

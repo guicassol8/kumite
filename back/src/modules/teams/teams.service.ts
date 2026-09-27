@@ -285,8 +285,10 @@ export async function leaveTeam(db: Db, userId: string): Promise<LeaveTeamResult
   //   (→ leaves); a leave that locks the row first makes the stamp wait. A
   //   plain re-read would not wait: under READ COMMITTED it sees the
   //   uncommitted stamp as null. No cycle is possible — the submission's FK
-  //   KEY SHARE is compatible with FOR SHARE, the stamp never touches
-  //   team_members, and the leave never touches submissions.
+  //   KEY SHARE is compatible with FOR SHARE, the leave never touches
+  //   submissions, and the submission's transaction locks this member row
+  //   (FOR SHARE, to re-check the author is still here, #353) only AFTER its
+  //   stamp: teams, then member — the same order as this leave.
   return db.transaction(async (tx) => {
     const lockKey = `team-join:${teamId}`
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${lockKey}::text))`)

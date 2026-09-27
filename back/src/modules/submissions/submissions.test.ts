@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 
 import { signJwt } from '@katajs-framework/core/jwt'
 import { somaDosPares } from '@kumite/blocks'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { app } from '../../app'
@@ -28,6 +28,7 @@ import type { TestCase } from '../problems/problems.schema'
 import { getEventRanking, getRoundRanking } from '../ranking/ranking.service'
 import { closeRound, createRound, openRound } from '../rounds/rounds.service'
 import { runRankingTick } from '../sse/sse.service'
+import { createTeam, leaveTeam, moveMember } from '../teams/teams.service'
 
 import { SubmitSolutionBodySchema } from './submissions.schema'
 import {
@@ -1515,5 +1516,404 @@ describe('submitSolution while submissions are paused (#285)', () => {
 
     expect(closed.ok).toBe(true)
     expect((await getEventConfig(db)).submissionsPaused).toBe(true)
+  })
+})
+
+// --- #353: the author leaves the team while their own submission is judged ---
+//
+// The identity is resolved before the judge and the INSERT runs after it, so a
+// leave (or an organizer's move/removal) can land in between. Rule A: the
+// submission only counts for the team its author still belongs to when it is
+// written — otherwise it is discarded, as `not_in_team`, and nothing is
+// written or frozen.
+
+// Copied from teams.test.ts (#303), where it is documented: resolves once
+// `pending` is parked on a lock while running `statement`, or once it has
+// already settled — then the test's own assertion reports what really happened.
+async function untilBlockedOnLock(pending: Promise<unknown>, statement: string) {
+  let settled = false
+  void pending.then(
+    () => {
+      settled = true
+    },
+    () => {
+      settled = true
+    },
+  )
+  const deadline = Date.now() + 5000
+  while (!settled) {
+    const waiting = await db.execute(sql`
+      select 1 from pg_stat_activity
+      where datname = current_database()
+        and wait_event_type = 'Lock'
+        and query ilike ${`%${statement}%`}
+    `)
+    if (waiting.length > 0) return
+    if (Date.now() > deadline)
+      throw new Error(`nothing blocked on a lock while running ${statement}`)
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+/**
+ * Whether `pending` is still unsettled. Waits one macrotask so a promise that
+ * has already settled gets its reactions run first — a `Promise.race` against
+ * a plain value would always let the value win.
+ */
+async function isPending(pending: Promise<unknown>): Promise<boolean> {
+  let settled = false
+  void pending.then(
+    () => {
+      settled = true
+    },
+    () => {
+      settled = true
+    },
+  )
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  return !settled
+}
+
+// Parks a leaveTeam halfway through, on its own connection: the very
+// statements leaveTeam runs, in its order (`team-join:` key → team row FOR
+// SHARE → DELETE of the membership), with the transaction kept open until
+// `release`. `commit: false` rolls it back, a leave that never happened.
+async function holdLeaveMidway(teamId: string, userId: string) {
+  const holder = createDb()
+  let parked!: () => void
+  const leaveParked = new Promise<void>((resolve) => {
+    parked = resolve
+  })
+  let releaseRequested!: (commit: boolean) => void
+  const releaseWanted = new Promise<boolean>((resolve) => {
+    releaseRequested = resolve
+  })
+  const rollback = new Error('rollback requested by holdLeaveMidway')
+
+  const holding = holder
+    .transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`team-join:${teamId}`}::text))`)
+      await tx.select().from(teamsTable).where(eq(teamsTable.id, teamId)).for('share')
+      await tx
+        .delete(teamMembersTable)
+        .where(and(eq(teamMembersTable.userId, userId), eq(teamMembersTable.teamId, teamId)))
+      parked()
+      if (!(await releaseWanted)) throw rollback
+    })
+    .catch((error: unknown) => {
+      if (error !== rollback) throw error
+    })
+  await leaveParked
+
+  let released = false
+  return {
+    // Idempotent: tests release in a `finally` and again on the happy path.
+    async release({ commit }: { commit: boolean }) {
+      if (released) return
+      released = true
+      releaseRequested(commit)
+      await holding
+      await holder.$client.end()
+    },
+  }
+}
+
+// Holds the membership row in FOR UPDATE on its own connection — the lock an
+// organizer's move or removal takes on it — until `release`, which rolls back
+// so the row is left exactly as it was.
+async function holdMemberRow(userId: string) {
+  const holder = createDb()
+  let locked!: () => void
+  const rowLocked = new Promise<void>((resolve) => {
+    locked = resolve
+  })
+  let releaseRequested!: () => void
+  const releaseWanted = new Promise<void>((resolve) => {
+    releaseRequested = resolve
+  })
+  const rollback = new Error('rollback requested by holdMemberRow')
+
+  const holding = holder
+    .transaction(async (tx) => {
+      await tx
+        .select()
+        .from(teamMembersTable)
+        .where(eq(teamMembersTable.userId, userId))
+        .for('update')
+      locked()
+      await releaseWanted
+      throw rollback
+    })
+    .catch((error: unknown) => {
+      if (error !== rollback) throw error
+    })
+  await rowLocked
+
+  let released = false
+  return {
+    // Idempotent: tests release in a `finally` and again on the happy path.
+    async release() {
+      if (released) return
+      released = true
+      releaseRequested()
+      await holding
+      await holder.$client.end()
+    },
+  }
+}
+
+async function teamFirstSubmittedAt(teamId: string) {
+  const [team] = await db.select().from(teamsTable).where(eq(teamsTable.id, teamId))
+  return team?.firstSubmittedAt ?? null
+}
+
+describe('submitSolution when the author leaves mid-judging (#353)', () => {
+  beforeEach(() => {
+    resetSubmissionThrottle()
+  })
+
+  it(
+    'discards the submission, leaves the team unfrozen and lets the author submit for a new team',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const body = { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace }
+
+      judgeRace.onJudged = async () => {
+        // A is not frozen yet, so the leave itself is legitimate (#303).
+        expect(await leaveTeam(db, user.id)).toEqual({ ok: true })
+      }
+
+      const outcome = await submitSolution(db, { userId: user.id, teamId: team.id }, body)
+
+      expect(outcome).toEqual({ ok: false, error: 'not_in_team' })
+      expect(await db.select().from(submissionsTable)).toHaveLength(0)
+      expect(await teamFirstSubmittedAt(team.id)).toBeNull()
+      expect(await findTeamIdForUser(db, user.id)).toBeNull()
+      // The sandbox did run, so A's cooldown is armed — it is A's key, not the
+      // author's, so it never touches the team they go on to.
+      expect(acquireSubmissionSlot(`team:${team.id}`)).toMatchObject({ reason: 'cooldown' })
+
+      judgeRace.onJudged = null
+      const created = await createTeam(db, user.id, 'Time B')
+      if (!created.ok) throw new Error('expected the author to create a new team')
+      const accepted = expectSubmitted(
+        await submitSolution(db, { userId: user.id, teamId: created.team.id }, body),
+      )
+
+      expect(accepted).toMatchObject({ score: 100, attemptNumber: 1 })
+      const rows = await db.select().from(submissionsTable)
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({ userId: user.id, teamId: created.team.id })
+      expect(await teamFirstSubmittedAt(created.team.id)).not.toBeNull()
+      expect(await teamFirstSubmittedAt(team.id)).toBeNull()
+    },
+    JUDGED_TEST_TIMEOUT_MS * 2,
+  )
+
+  it(
+    'still records the submission when a teammate, not the author, leaves mid-judging',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const teammate = await insertUser('colega@edu.pucrs.br')
+      await db.insert(teamMembersTable).values({ userId: teammate.id, teamId: team.id })
+
+      judgeRace.onJudged = async () => {
+        expect(await leaveTeam(db, teammate.id)).toEqual({ ok: true })
+      }
+
+      expectSubmitted(
+        await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        ),
+      )
+
+      const rows = await db.select().from(submissionsTable)
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({ userId: user.id, teamId: team.id })
+      expect(await teamFirstSubmittedAt(team.id)).not.toBeNull()
+      expect(await findTeamIdForUser(db, teammate.id)).toBeNull()
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'discards the submission when the organizer moves the author to another team mid-judging',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const destination = await insertTeam('Time B')
+
+      judgeRace.onJudged = async () => {
+        expect(await moveMember(db, user.id, destination.id)).toEqual({ ok: true })
+      }
+
+      const outcome = await submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+      )
+
+      expect(outcome).toEqual({ ok: false, error: 'not_in_team' })
+      // Neither in the team it was judged for nor in the one the author is in now.
+      expect(await db.select().from(submissionsTable)).toHaveLength(0)
+      expect(await teamFirstSubmittedAt(team.id)).toBeNull()
+      expect(await teamFirstSubmittedAt(destination.id)).toBeNull()
+      expect(await findTeamIdForUser(db, user.id)).toBe(destination.id)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'POST /submissions answers 404 not_in_team when the author left mid-judging',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user } = await insertTeamMember()
+      const token = await signJwt(
+        { role: 'participant', university: 'pucrs' },
+        { secret: JWT_SECRET, subject: user.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+      )
+
+      judgeRace.onJudged = async () => {
+        expect(await leaveTeam(db, user.id)).toEqual({ ok: true })
+      }
+
+      const res = await app.request('/submissions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problemId: problem.id,
+          roundId: problem.roundId,
+          workspace: solutionWorkspace,
+        }),
+      })
+
+      expect(res.status).toBe(404)
+      expect(await res.json()).toMatchObject({ error: 'not_in_team' })
+      expect(await db.select().from(submissionsTable)).toHaveLength(0)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  // The review of #352: the membership check must lock team_members only
+  // AFTER the stamp's UPDATE on teams — the order leaveTeam uses (teams, then
+  // member). Locking the member first forms a cycle with a leave holding the
+  // team row in FOR SHARE: 40P01. Each side of the race is parked below at the
+  // exact statement the correct order makes it wait on.
+  describe('lock order against leaveTeam (teams, then member)', () => {
+    async function parkLeaveMidJudging(commit: boolean) {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+
+      let leave: Awaited<ReturnType<typeof holdLeaveMidway>> | undefined
+      let judged!: () => void
+      const judgedAndParked = new Promise<void>((resolve) => {
+        judged = resolve
+      })
+      judgeRace.onJudged = async () => {
+        leave = await holdLeaveMidway(team.id, user.id)
+        judged()
+      }
+
+      const submission = submitSolution(
+        db,
+        { userId: user.id, teamId: team.id },
+        { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+      )
+      try {
+        await judgedAndParked
+        // The stamp queues on the team row the leave holds in FOR SHARE —
+        // not on the member row, which is where it would park with the order
+        // reversed (and then deadlock).
+        await untilBlockedOnLock(submission, 'update "teams"')
+        expect(await isPending(submission)).toBe(true)
+        await leave?.release({ commit })
+      } finally {
+        await leave?.release({ commit })
+      }
+
+      return { user, team, outcome: await submission }
+    }
+
+    it(
+      'side 1: a leave parked mid-way makes the stamp wait; once it commits, the submission is discarded',
+      async () => {
+        const { user, team, outcome } = await parkLeaveMidJudging(true)
+
+        expect(outcome).toEqual({ ok: false, error: 'not_in_team' })
+        expect(await db.select().from(submissionsTable)).toHaveLength(0)
+        expect(await teamFirstSubmittedAt(team.id)).toBeNull()
+        expect(await findTeamIdForUser(db, user.id)).toBeNull()
+      },
+      JUDGED_TEST_TIMEOUT_MS,
+    )
+
+    it(
+      'side 1: a leave parked mid-way that rolls back lets the submission through',
+      async () => {
+        const { user, team, outcome } = await parkLeaveMidJudging(false)
+
+        expectSubmitted(outcome)
+        const rows = await db.select().from(submissionsTable)
+        expect(rows).toHaveLength(1)
+        expect(rows[0]).toMatchObject({ userId: user.id, teamId: team.id })
+        expect(await teamFirstSubmittedAt(team.id)).not.toBeNull()
+        expect(await findTeamIdForUser(db, user.id)).toBe(team.id)
+      },
+      JUDGED_TEST_TIMEOUT_MS,
+    )
+
+    it(
+      'side 2: a submission parked after its stamp makes a real leave wait on the team row, then refuse it — no deadlock',
+      async () => {
+        const problem = await insertPublishedProblem(solvableCases)
+        const { user, team } = await insertTeamMember()
+
+        let member: Awaited<ReturnType<typeof holdMemberRow>> | undefined
+        let judged!: () => void
+        const judgedAndParked = new Promise<void>((resolve) => {
+          judged = resolve
+        })
+        judgeRace.onJudged = async () => {
+          member = await holdMemberRow(user.id)
+          judged()
+        }
+
+        const submission = submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        )
+        let leave: ReturnType<typeof leaveTeam> | undefined
+        try {
+          await judgedAndParked
+          // Past the stamp (team row held) and waiting on the membership row.
+          await untilBlockedOnLock(submission, 'from "team_members"')
+          expect(await isPending(submission)).toBe(true)
+
+          leave = leaveTeam(db, user.id)
+          // The leave queues on the team row the stamp holds — not on the
+          // member row, which is where it would park with the order reversed.
+          await untilBlockedOnLock(leave, 'from "teams"%for share')
+          expect(await isPending(leave)).toBe(true)
+          await member?.release()
+        } finally {
+          await member?.release()
+        }
+
+        // Both settle as values: a 40P01 would reject one of them.
+        expectSubmitted(await submission)
+        expect(await leave).toEqual({ ok: false, error: 'team_frozen' })
+        const rows = await db.select().from(submissionsTable)
+        expect(rows).toHaveLength(1)
+        expect(rows[0]).toMatchObject({ userId: user.id, teamId: team.id })
+        expect(await teamFirstSubmittedAt(team.id)).not.toBeNull()
+        expect(await findTeamIdForUser(db, user.id)).toBe(team.id)
+      },
+      JUDGED_TEST_TIMEOUT_MS,
+    )
   })
 })

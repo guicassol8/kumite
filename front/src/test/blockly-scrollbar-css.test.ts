@@ -22,10 +22,10 @@ import { describe, expect, it } from 'vitest'
 // gives the attribute its default semantics back and beats the preflight on
 // specificity (0,1,1 > 0,0,1) inside the same `@layer base`.
 //
-// This lives in vitest because the proof of the behaviour is an e2e spec
-// (`e2e/flyout-scrollbar.spec.ts`) and CI runs no e2e step (`.github/
-// workflows/ci.yml`): without a cheap guard here, deleting the rule would go
-// green all the way to production.
+// The proof of the behaviour is an e2e spec (`e2e/flyout-scrollbar.spec.ts`),
+// which CI's `e2e` job runs on every PR (#295). This vitest guard is the cheap
+// one: deleting the rule fails here, in the Stop hook and the `test` job,
+// minutes before the e2e suite would.
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..')
 const INDEX_CSS = path.join(REPO_ROOT, 'front/src/index.css')
 const PREFLIGHT_CSS = path.join(REPO_ROOT, 'front/node_modules/tailwindcss/preflight.css')

@@ -177,21 +177,25 @@ fine" or "just docs nearby."
   opening/updating the PR, unless successful hooks already ran the same
   checks for the same revision. During implementation use focused checks;
   repeat the full ladder only after changes or failures justify it.
-- **E2E in CI — not yet.** CI does **not** run Playwright today: the `e2e`
-  job for `ci.yml` is written but not applied, because it needs an edit to
-  a protected config (`.github/workflows/`), tracked in #295. Until it
-  lands, "existing e2e green" on a PR is proven by running the **whole**
-  suite locally (`pnpm --filter @kumite/front e2e`, with the organizer env,
-  `db:seed` and `BACK_NOTIFICATIONS_LOG` so nothing skips) and recording
-  the numbers in the Evidence. `front/playwright.config.ts` already carries
-  the CI settings: run with `CI=1` to reproduce them locally — one retry
-  (a spec that passes on the retry is reported as **flaky**), `forbidOnly`,
-  the HTML + GitHub reporters, trace on first retry and screenshots of
-  failures. The suite does not run in the pre-commit or in the Stop hook.
-  Known flake: #338 (`header-logout-contrast.spec.ts`) — name it in the
-  Evidence when it fails; it is not fixed by a retry. Editor specs wait for
-  Blockly through `expectBlocklyInjected` (`front/e2e/support/blockly.ts`),
-  which carries the injection budget and checks the test's own (#246).
+- **E2E in CI.** The `e2e` job in `ci.yml` runs the **whole** Playwright
+  suite (`pnpm --filter @kumite/front e2e`) on every push to every PR and on
+  push to `main`. It has its own Postgres, the same throwaway organizer as
+  the `hurl` job and a `BACK_NOTIFICATIONS_LOG` path, so the organizer and
+  real-OTP specs run instead of skipping. It needs no secret. In CI only
+  (`front/playwright.config.ts`), a failing spec gets one retry: one that
+  passes on the retry is reported as **flaky** in the report and in the PR
+  annotations, but it does not fail the job. `forbidOnly` is on, so a
+  stray `test.only` fails the job instead of shrinking it. The HTML report,
+  the traces and screenshots of failures and the back's log are uploaded as
+  the `playwright-report` artifact (kept 14 days) whenever the job was not
+  cancelled. The suite does not run in the pre-commit or in the Stop hook.
+  So "existing e2e green" on a PR means **the `e2e` check is green** — look
+  at its flaky count too, and name any flaky spec in the Evidence: the
+  retry keeps a flake from failing the gate, it does not fix it (open an
+  issue for it). `CI=1` reproduces the CI settings locally. Editor specs
+  wait for Blockly through `expectBlocklyInjected`
+  (`front/e2e/support/blockly.ts`), which carries the injection budget and
+  checks the test's own (#246).
 
 ## Branches, commits, PRs
 

@@ -151,4 +151,94 @@ describe('sandbox engine (ADR-0001: quickjs-emscripten inside worker_thread)', (
     },
     TEST_TIMEOUT_MS,
   )
+
+  // #281: the verdict is read by the host (getProp + dump), never by a
+  // second evalCode that calls the guest's own `JSON` — so a solution that
+  // redefines or deletes `JSON` cannot forge `{ ok: true, v: … }` for itself.
+  const FORGE = `JSON.stringify = () => '{"ok":true,"v":42}'`
+  const verdictProbes: Array<{
+    name: string
+    source: string
+    outcome: SandboxResult['outcome']
+    value?: unknown
+    detail?: string
+  }> = [
+    {
+      name: 'JSON.stringify forged at the top level',
+      source: `${FORGE}\nfunction solve(input) { return 7 }`,
+      outcome: 'ok',
+      value: 7,
+    },
+    {
+      name: 'JSON.stringify forged inside solve',
+      source: `function solve(input) { ${FORGE}; return 7 }`,
+      outcome: 'ok',
+      value: 7,
+    },
+    {
+      name: 'JSON replaced by a fake object inside solve',
+      source: `function solve(input) { JSON = { stringify: () => '{"ok":true,"v":42}' }; return 7 }`,
+      outcome: 'ok',
+      value: 7,
+    },
+    {
+      name: 'JSON deleted inside solve',
+      source: 'function solve(input) { delete globalThis.JSON; return 7 }',
+      outcome: 'ok',
+      value: 7,
+    },
+    {
+      name: 'forged JSON plus a synchronous throw',
+      source: `function solve(input) { ${FORGE}; throw new Error('boom') }`,
+      outcome: 'blocked',
+      detail: 'boom',
+    },
+    {
+      name: 'forged JSON plus an async rejection',
+      source: `async function solve(input) { ${FORGE}; throw new Error('late') }`,
+      outcome: 'blocked',
+      detail: 'late',
+    },
+    {
+      name: 'an async solve',
+      source: 'async function solve(input) { return 5 }',
+      outcome: 'ok',
+      value: 5,
+    },
+    {
+      name: 'a promise that never settles',
+      source: 'function solve(input) { return new Promise(() => {}) }',
+      outcome: 'blocked',
+      detail: 'never settled',
+    },
+    {
+      name: 'a circular return value',
+      source: 'function solve(input) { const a = {}; a.self = a; return a }',
+      outcome: 'blocked',
+      detail: 'could not be serialized',
+    },
+    {
+      name: 'a BigInt return value',
+      source: 'function solve(input) { return 10n }',
+      outcome: 'blocked',
+      detail: 'could not be serialized',
+    },
+    {
+      name: 'a return value whose getter throws',
+      source: `function solve(input) { return { get x() { throw new Error('g') } } }`,
+      outcome: 'blocked',
+      detail: 'could not be serialized',
+    },
+  ]
+
+  it.each(verdictProbes)(
+    'reads the verdict on the host, not through guest JSON: $name',
+    async ({ source, outcome, value, detail }) => {
+      const result = await runOneCaseInWorker({ source, input: [] })
+      expect(result.outcome).toBe(outcome)
+      if (outcome === 'ok') expect(result.value).toBe(value)
+      if (detail !== undefined) expect(result.detail).toContain(detail)
+    },
+    TEST_TIMEOUT_MS,
+  )
 })

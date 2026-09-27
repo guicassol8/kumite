@@ -70,7 +70,11 @@ Configuration to carry into #19 (the execution service):
   before reading the result back out — `evalCode` never drains microtasks on
   its own, so a `solve` that returns (or leaks into) a Promise — e.g. a stray
   dynamic `import()` — would otherwise read back as a false "ok" with an
-  empty value.
+  empty value. The slot is read by the **host** (`context.getProp` +
+  `context.dump`, which serializes in C), never with a second `evalCode` —
+  that would run the guest's own `JSON`, which a solution can redefine to
+  forge its verdict (#281). A `dump` that does not yield an object with a
+  boolean `ok` (BigInt, circular value) reads as `blocked`.
 - `runtime.dispose()` / `context.dispose()` after every case.
 - Request/reply protocol between the main thread and the worker (message id
   per case) plus a **main-side watchdog per request** — this session used

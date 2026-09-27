@@ -77,21 +77,40 @@ function runCase(module: QuickJSWASMModule, request: SandboxCaseRequest): Sandbo
       started.value.dispose()
       runtime.executePendingJobs()
 
-      const settled = context.evalCode('JSON.stringify(globalThis.__settled)')
-      const ms = performance.now() - start
-      if (settled.error) {
-        const detail = describeError(context, settled.error)
-        return { outcome: classifyErrorMessage(detail), detail, ms }
+      // Read the verdict from the host (#281), never through a second
+      // evalCode: `JSON.stringify(globalThis.__settled)` would call whatever
+      // `JSON` the guest left behind, so a solution could redefine it and
+      // forge `{ ok: true, v: … }`. `dump` serializes in C (QTS_Dump), blind
+      // to the guest's globals. When that serialization fails (BigInt,
+      // circular, throwing getter) dump silently falls back to a string —
+      // the envelope is always an object with a boolean `ok`, so anything
+      // else is treated as unserializable, exactly as the old path threw.
+      // Not sealed by this: `dump` still honors a guest `toJSON` on
+      // Object.prototype, and a guest accessor on `__settled` or a redefined
+      // `Promise` can still shape the envelope — none is reachable from the
+      // curated toolbox (#181), and none gives more than `return <value>`.
+      const handle = context.getProp(context.global, '__settled')
+      let settled: unknown
+      try {
+        settled = context.dump(handle)
+      } finally {
+        if (handle.alive) handle.dispose()
       }
-      const raw = context.dump(settled.value) as string | undefined
-      settled.value.dispose()
-      if (raw === undefined) {
+      const ms = performance.now() - start
+      if (settled === undefined) {
         return { outcome: 'blocked', detail: 'promise never settled within the deadline', ms }
       }
-      const parsed = JSON.parse(raw) as { ok: boolean; v?: unknown; e?: string }
-      return parsed.ok
-        ? { outcome: 'ok', value: parsed.v, ms }
-        : { outcome: 'blocked', detail: parsed.e, ms }
+      if (
+        typeof settled !== 'object' ||
+        settled === null ||
+        typeof (settled as { ok?: unknown }).ok !== 'boolean'
+      ) {
+        return { outcome: 'blocked', detail: 'result could not be serialized', ms }
+      }
+      const envelope = settled as { ok: boolean; v?: unknown; e?: string }
+      return envelope.ok
+        ? { outcome: 'ok', value: envelope.v, ms }
+        : { outcome: 'blocked', detail: envelope.e, ms }
     } finally {
       context.dispose()
     }

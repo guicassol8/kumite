@@ -449,7 +449,8 @@ describe('ProblemScreen', () => {
     expect(screen.queryByTestId('problem-submit-button')).toBeNull()
   })
 
-  it('shows the never-submitted message for a closed round with no best submission', async () => {
+  it('shows the never-submitted message for a closed round the team never submitted', async () => {
+    withTeam()
     mockedGet.mockResolvedValue(
       jsonResponse(
         200,
@@ -461,6 +462,45 @@ describe('ProblemScreen', () => {
 
     expect(await screen.findByTestId('problem-closed-never-submitted')).toBeDefined()
     expect(screen.queryByTestId('problem-submit-button')).toBeNull()
+  })
+
+  // #343: no team means there is no team to have "never submitted" — only
+  // the read-only line is true. A failing /teams reads the same way.
+  async function expectReadOnlyNoticeOnly() {
+    const notice = await screen.findByTestId('problem-closed-notice')
+    expect(notice.textContent).toContain(i18n.t('problem.closedRound.notice'))
+    await waitFor(() => expect(mockedTeams).toHaveBeenCalled())
+    await act(async () => {})
+    expect(screen.queryByTestId('problem-closed-never-submitted')).toBeNull()
+    expect(notice.textContent).not.toContain(i18n.t('problem.closedRound.neverSubmitted'))
+    expect(screen.queryByTestId('problem-load-error')).toBeNull()
+  }
+
+  it('shows only the read-only notice to a participant without a team (#343)', async () => {
+    mockedGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        participantProblem({ roundStatus: 'closed', roundId: null, bestSubmission: null }),
+      ),
+    )
+
+    renderProblem()
+
+    await expectReadOnlyNoticeOnly()
+  })
+
+  it('treats a failing /teams as no team on a closed round (#343)', async () => {
+    mockedTeams.mockResolvedValue(jsonResponse(500, { error: 'internal', message: 'boom' }))
+    mockedGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        participantProblem({ roundStatus: 'closed', roundId: null, bestSubmission: null }),
+      ),
+    )
+
+    renderProblem()
+
+    await expectReadOnlyNoticeOnly()
   })
 
   // #155: the anchored layout. jsdom measures nothing, so these only pin the

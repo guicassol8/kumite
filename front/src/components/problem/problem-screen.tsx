@@ -133,8 +133,10 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
 
   // Whether the caller has a team tells "never submitted" (a badge saying so)
   // apart from "no team best to speak of" (no badge) while the round is open
-  // (#206). Same key as /teams and /leaderboard, so it is usually cached.
-  // Decoration like the letter above: a failure drops the badge, nothing else.
+  // (#206), and decides whether a closed round's notice says "your team never
+  // submitted" at all (#343). Same key as /teams and /leaderboard, so it is
+  // usually cached. Decoration like the letter above: a failure reads as "no
+  // team" — the badge and that line drop, nothing else.
   // Practice has no team best at all (#211), so it never asks.
   const teams = useQuery({
     queryKey: TEAMS_QUERY_KEY,
@@ -292,7 +294,7 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
 
   const isClosed = data.roundStatus === 'closed'
   // Open round only: once closed, the closed notice below already carries
-  // the team's best (or its "never submitted" line), exactly as before #206.
+  // the team's best (or, for a team, its "never submitted" line — #343).
   const bestScore: TeamBestScore | undefined =
     isPractice || isClosed
       ? undefined
@@ -352,11 +354,13 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
               date: formatDate(new Date(data.bestSubmission.achievedAt), lang),
             })}
           </span>
-        ) : (
+        ) : hasTeam ? (
+          // Without a team there is no team to have "never submitted": only
+          // the read-only line above holds (#343).
           <span data-testid="problem-closed-never-submitted">
             {t('problem.closedRound.neverSubmitted')}
           </span>
-        )}
+        ) : null}
       </AlertDescription>
     </Alert>
   )

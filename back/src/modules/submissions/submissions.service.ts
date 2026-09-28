@@ -104,6 +104,61 @@ export function resetSubmissionThrottle(): void {
   inFlightIdentities.clear()
   cooldownUntil.clear()
   judgingByRound.clear()
+  acceptedTimestamps.length = 0
+}
+
+// --- Live load, for the organizer's live card (#279) ---
+//
+// Process-local, same reasoning as the throttle above. One timestamp per
+// submission past the accept gate, kept for the sparkline's 15 minutes and
+// pruned on every write and read. The throttle bounds the volume (one in
+// flight per team plus the cooldown), so this stays a few thousand numbers.
+const LIVE_WINDOW_MINUTES = 15
+const MINUTE_MS = 60_000
+const acceptedTimestamps: number[] = []
+
+export type SubmissionLoad = {
+  inFlight: number
+  lastMinute: number
+  perMinute: number[]
+}
+
+function pruneAcceptedTimestamps(now: number): void {
+  const cutoff = now - LIVE_WINDOW_MINUTES * MINUTE_MS
+  let expired = 0
+  while (expired < acceptedTimestamps.length && (acceptedTimestamps[expired] ?? 0) <= cutoff) {
+    expired++
+  }
+  acceptedTimestamps.splice(0, expired)
+}
+
+/** Records one submission past the accept gate. `now` is injectable for tests. */
+export function recordAcceptedSubmission(now = Date.now()): void {
+  acceptedTimestamps.push(now)
+  pruneAcceptedTimestamps(now)
+}
+
+/**
+ * What the organizer's live card shows about submissions: the throttle slots
+ * held right now, and acceptances per minute over the last 15, oldest first.
+ * Bucket `i` covers `(now - (15 - i) min, now - (14 - i) min]`, so the last one
+ * is exactly the last minute and `lastMinute === perMinute[14]`.
+ */
+export function getSubmissionLoad(now = Date.now()): SubmissionLoad {
+  pruneAcceptedTimestamps(now)
+  const perMinute: number[] = Array(LIVE_WINDOW_MINUTES).fill(0)
+  for (const timestamp of acceptedTimestamps) {
+    const age = now - timestamp
+    if (age < 0) continue
+    const bucket = LIVE_WINDOW_MINUTES - 1 - Math.floor(age / MINUTE_MS)
+    if (bucket < 0) continue
+    perMinute[bucket] = (perMinute[bucket] ?? 0) + 1
+  }
+  return {
+    inFlight: inFlightIdentities.size,
+    lastMinute: perMinute[LIVE_WINDOW_MINUTES - 1] ?? 0,
+    perMinute,
+  }
 }
 
 // --- Judging in flight, per round (#176) ---
@@ -328,6 +383,9 @@ export async function submitSolution(
     // must not have its closure announced (#176).
     judgingRoundId = body.roundId
     enterJudging(judgingRoundId)
+    // Same line as acceptedAt below: what the organizer's live card counts as
+    // an accepted submission (#279).
+    recordAcceptedSubmission()
     // Stamped now, not at INSERT time, so the tiebreak below never inflates a
     // team's time by however long the judge sandbox happened to take (#238).
     const acceptedAt = new Date()

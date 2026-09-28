@@ -35,7 +35,9 @@ import {
   acquireSubmissionSlot,
   findTeamIdForUser,
   getBestSubmission,
+  getSubmissionLoad,
   hasJudgingInFlight,
+  recordAcceptedSubmission,
   releaseSubmissionSlot,
   resetSubmissionThrottle,
   type SubmitOutcome,
@@ -630,6 +632,84 @@ describe('submission throttle', () => {
     releaseSubmissionSlot('team:a', true, now)
 
     expect(acquireSubmissionSlot('user:b', now)).toBeNull()
+  })
+})
+
+// --- Live load for the organizer's card (#279) ---
+
+describe('getSubmissionLoad', () => {
+  beforeEach(() => {
+    resetSubmissionThrottle()
+  })
+
+  const now = 10_000_000
+
+  it('reports nothing on a quiet process', () => {
+    expect(getSubmissionLoad(now)).toEqual({
+      inFlight: 0,
+      lastMinute: 0,
+      perMinute: Array(15).fill(0),
+    })
+  })
+
+  it('counts an acceptance 59s old in the last minute, and one 61s old in the minute before', () => {
+    recordAcceptedSubmission(now - 59_000)
+    recordAcceptedSubmission(now - 61_000)
+
+    const load = getSubmissionLoad(now)
+    expect(load.lastMinute).toBe(1)
+    expect(load.perMinute[14]).toBe(1)
+    expect(load.perMinute[13]).toBe(1)
+  })
+
+  // The window is (now - 60s, now]: exactly 60s old already belongs to the
+  // minute before, so no acceptance is ever counted in two buckets.
+  it('puts an acceptance exactly 60s old in the minute before, not the last one', () => {
+    recordAcceptedSubmission(now - 60_000)
+
+    const load = getSubmissionLoad(now)
+    expect(load.lastMinute).toBe(0)
+    expect(load.perMinute[13]).toBe(1)
+  })
+
+  it('orders the 15 buckets oldest first, the last one being lastMinute', () => {
+    recordAcceptedSubmission(now - 14 * 60_000 - 30_000)
+    recordAcceptedSubmission(now - 7 * 60_000 - 1)
+    recordAcceptedSubmission(now - 7 * 60_000 - 2)
+    recordAcceptedSubmission(now)
+
+    const load = getSubmissionLoad(now)
+    expect(load.perMinute).toHaveLength(15)
+    expect(load.perMinute[0]).toBe(1)
+    expect(load.perMinute[7]).toBe(2)
+    expect(load.perMinute[14]).toBe(1)
+    expect(load.lastMinute).toBe(load.perMinute[14])
+    expect(load.perMinute.reduce((sum, n) => sum + n, 0)).toBe(4)
+  })
+
+  it('forgets acceptances older than 15 minutes', () => {
+    recordAcceptedSubmission(now - 15 * 60_000)
+    recordAcceptedSubmission(now - 20 * 60_000)
+
+    expect(getSubmissionLoad(now).perMinute).toEqual(Array(15).fill(0))
+    // And they stay gone: a later read at an earlier clock cannot resurrect them.
+    expect(getSubmissionLoad(now - 10 * 60_000).perMinute).toEqual(Array(15).fill(0))
+  })
+
+  it('reports the throttle slots currently held as in flight', () => {
+    acquireSubmissionSlot('team:a', now)
+    acquireSubmissionSlot('team:b', now)
+    expect(getSubmissionLoad(now).inFlight).toBe(2)
+
+    releaseSubmissionSlot('team:a', true, now)
+    expect(getSubmissionLoad(now).inFlight).toBe(1)
+  })
+
+  it('is cleared by the throttle test seam', () => {
+    recordAcceptedSubmission(now)
+    resetSubmissionThrottle()
+
+    expect(getSubmissionLoad(now).lastMinute).toBe(0)
   })
 })
 
@@ -1989,5 +2069,93 @@ describe('submitSolution when the author leaves mid-judging (#353)', () => {
       },
       JUDGED_TEST_TIMEOUT_MS,
     )
+  })
+})
+
+// #279: "accepted" is the accept gate — the same line acceptedAt is stamped
+// at. Refusals before it (pause, 404, no open round) never count.
+describe('submitSolution feeds the live submissions counter (#279)', () => {
+  beforeEach(async () => {
+    resetSubmissionThrottle()
+    await db.execute(sql`truncate table ${eventConfigTable} restart identity cascade`)
+  })
+
+  afterAll(async () => {
+    await db.execute(sql`truncate table ${eventConfigTable} restart identity cascade`)
+  })
+
+  it(
+    'counts an accepted submission in the last minute',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+
+      expectSubmitted(
+        await submitSolution(
+          db,
+          { userId: user.id, teamId: team.id },
+          { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+        ),
+      )
+
+      expect(getSubmissionLoad().lastMinute).toBe(1)
+      // The slot was released once judging ended.
+      expect(getSubmissionLoad().inFlight).toBe(0)
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it('does not count a submission refused while paused', async () => {
+    const problem = await insertPublishedProblem(solvableCases)
+    const { user, team } = await insertTeamMember()
+    await updateEventConfig(db, { submissionsPaused: true })
+
+    const outcome = await submitSolution(
+      db,
+      { userId: user.id, teamId: team.id },
+      { problemId: problem.id, roundId: problem.roundId, workspace: solutionWorkspace },
+    )
+
+    expect(outcome).toEqual({ ok: false, error: 'submissions_paused' })
+    expect(getSubmissionLoad().lastMinute).toBe(0)
+  })
+
+  it('does not count a submission for a problem that does not exist', async () => {
+    const { user, team } = await insertTeamMember()
+
+    const outcome = await submitSolution(
+      db,
+      { userId: user.id, teamId: team.id },
+      {
+        problemId: '00000000-0000-0000-0000-000000000000',
+        roundId: '00000000-0000-0000-0000-000000000000',
+        workspace: solutionWorkspace,
+      },
+    )
+
+    expect(outcome).toEqual({ ok: false, error: 'problem_not_found' })
+    expect(getSubmissionLoad().lastMinute).toBe(0)
+  })
+
+  it('does not count a submission with no open round', async () => {
+    const [problem] = await db
+      .insert(problemsTable)
+      .values({ difficulty: 'easy', status: 'published', testCases: solvableCases })
+      .returning()
+    if (!problem) throw new Error('expected a problem fixture')
+    const { user, team } = await insertTeamMember()
+
+    const outcome = await submitSolution(
+      db,
+      { userId: user.id, teamId: team.id },
+      {
+        problemId: problem.id,
+        roundId: '00000000-0000-0000-0000-000000000000',
+        workspace: solutionWorkspace,
+      },
+    )
+
+    expect(outcome).toEqual({ ok: false, error: 'no_active_round' })
+    expect(getSubmissionLoad().lastMinute).toBe(0)
   })
 })

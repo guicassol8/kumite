@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { type MouseEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PANEL_DIALOG_TITLE } from '@/components/organizer/panel-form'
 import { PanelTable } from '@/components/organizer/panel-table'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +58,7 @@ function OrganizerProblemsList() {
   const uiLocale = toUiLocale(i18n.resolvedLanguage ?? i18n.language)
   const queryClient = useQueryClient()
   const [archiveTargetId, setArchiveTargetId] = useState<string | null>(null)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
 
   const problems = useQuery({
     queryKey: PROBLEMS_QUERY_KEY,
@@ -73,6 +75,32 @@ function OrganizerProblemsList() {
       queryClient.invalidateQueries({ queryKey: PROBLEMS_QUERY_KEY })
     },
   })
+
+  function openArchiveDialog(id: string) {
+    setArchiveError(null)
+    setArchiveTargetId(id)
+  }
+
+  function closeArchiveDialog() {
+    setArchiveTargetId(null)
+    setArchiveError(null)
+  }
+
+  // #195: the dialog only closes once the archive is confirmed — a 404, a 500
+  // or a dead network keeps it open with the error, instead of looking exactly
+  // like a success.
+  async function confirmArchive(event: MouseEvent) {
+    // Radix's AlertDialogAction closes on click unless the default is prevented.
+    event.preventDefault()
+    if (!archiveTargetId) return
+    setArchiveError(null)
+    try {
+      await archive.mutateAsync(archiveTargetId)
+      closeArchiveDialog()
+    } catch {
+      setArchiveError(t('organizer.problems.archiveDialog.errors.failed'))
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -199,7 +227,7 @@ function OrganizerProblemsList() {
                       variant="outline"
                       size="sm"
                       data-testid={`organizer-problems-archive-${problem.id}`}
-                      onClick={() => setArchiveTargetId(problem.id)}
+                      onClick={() => openArchiveDialog(problem.id)}
                     >
                       {t('organizer.problems.archiveAction')}
                     </Button>
@@ -213,9 +241,9 @@ function OrganizerProblemsList() {
 
       <AlertDialog
         open={archiveTargetId !== null}
-        onOpenChange={(open) => !open && setArchiveTargetId(null)}
+        onOpenChange={(open) => !open && closeArchiveDialog()}
       >
-        <AlertDialogContent>
+        <AlertDialogContent data-testid="organizer-problems-archive-dialog">
           <AlertDialogHeader>
             <AlertDialogTitle className={PANEL_DIALOG_TITLE}>
               {t('organizer.problems.archiveDialog.title')}
@@ -224,15 +252,20 @@ function OrganizerProblemsList() {
               {t('organizer.problems.archiveDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {archiveError && (
+            <Alert variant="destructive" data-testid="organizer-problems-archive-error">
+              <AlertDescription>{archiveError}</AlertDescription>
+            </Alert>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('organizer.problems.archiveDialog.cancel')}</AlertDialogCancel>
+            <AlertDialogCancel data-testid="organizer-problems-archive-cancel">
+              {t('organizer.problems.archiveDialog.cancel')}
+            </AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               data-testid="organizer-problems-archive-confirm"
-              onClick={() => {
-                if (archiveTargetId) archive.mutate(archiveTargetId)
-                setArchiveTargetId(null)
-              }}
+              disabled={archive.isPending}
+              onClick={confirmArchive}
             >
               {t('organizer.problems.archiveDialog.confirm')}
             </AlertDialogAction>

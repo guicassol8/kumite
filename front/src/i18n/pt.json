@@ -175,7 +175,10 @@
         "title": "Arquivar problema?",
         "description": "O problema deixa de ficar disponível para novas rodadas, mas continua salvo no catálogo.",
         "confirm": "Arquivar",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "errors": {
+          "failed": "Não foi possível arquivar o problema. Tente novamente."
+        }
       }
     },
     "problemForm": {

@@ -175,7 +175,10 @@
         "title": "¿Archivar problema?",
         "description": "El problema deja de estar disponible para nuevas rondas, pero sigue guardado en el catálogo.",
         "confirm": "Archivar",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "errors": {
+          "failed": "No se pudo archivar el problema. Inténtalo de nuevo."
+        }
       }
     },
     "problemForm": {

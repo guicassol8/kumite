@@ -175,7 +175,10 @@
         "title": "Archive problem?",
         "description": "The problem stops being available for new rounds, but stays saved in the catalog.",
         "confirm": "Archive",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "errors": {
+          "failed": "Could not archive the problem. Please try again."
+        }
       }
     },
     "problemForm": {

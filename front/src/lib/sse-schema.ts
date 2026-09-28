@@ -72,10 +72,17 @@ export const RoundRankingTeamSchema = z.object({
   problems: z.array(RankingProblemEntrySchema),
 })
 
+// Whether the round's totals are comparable between teams (#193): see the
+// back's DenominatorVerdictSchema for what each value means. Required, like
+// the back — `z.object` strips unknown keys, so leaving it out of this mirror
+// dropped the verdict from every live `ranking.updated` (#318).
+export const DenominatorVerdictSchema = z.enum(['consistent', 'inconsistent', 'unknown'])
+
 export const RoundRankingSchema = z.object({
   roundId: z.string(),
   roundName: z.string(),
   problemIds: z.array(z.string()),
+  denominators: DenominatorVerdictSchema,
   teams: z.array(RoundRankingTeamSchema),
 })
 
@@ -132,6 +139,7 @@ export const SseEventSchema = z.discriminatedUnion('type', [
 
 export type RankingProblemEntry = z.infer<typeof RankingProblemEntrySchema>
 export type RoundRankingTeam = z.infer<typeof RoundRankingTeamSchema>
+export type DenominatorVerdict = z.infer<typeof DenominatorVerdictSchema>
 export type RoundRanking = z.infer<typeof RoundRankingSchema>
 export type EventRankingRoundEntry = z.infer<typeof EventRankingRoundEntrySchema>
 export type EventRankingTeam = z.infer<typeof EventRankingTeamSchema>

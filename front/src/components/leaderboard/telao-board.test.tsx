@@ -14,6 +14,7 @@ const roundRanking: RoundRanking = {
   roundId: 'r1',
   roundName: 'Rodada 1',
   problemIds: ['p1'],
+  denominators: 'consistent',
   teams: [
     {
       teamId: 't1',
@@ -243,6 +244,7 @@ function threeTeamRound(): RoundRanking {
     roundId: 'r1',
     roundName: 'Rodada 1',
     problemIds: ['p1'],
+    denominators: 'consistent',
     teams: [
       { ...roundRanking.teams[0]! },
       { ...roundRanking.teams[1]! },
@@ -450,5 +452,30 @@ describe('TelaoBoard — reduced motion (#220 T11)', () => {
     expect(dot?.className).not.toContain('animate-pulse')
 
     setMatchMediaMatches('(prefers-reduced-motion: reduce)', false)
+  })
+})
+
+// #318: the denominators verdict is an organizer's notice on /leaderboard;
+// the telão is projected for everyone and never shows it — pinned here so the
+// decision is not undone silently.
+describe('TelaoBoard — no denominators notice (#318)', () => {
+  it('renders no notice even when the displayed round is inconsistent or unknown', () => {
+    for (const denominators of ['inconsistent', 'unknown'] as const) {
+      render(
+        <TelaoBoard
+          {...baseProps()}
+          hasActiveRound
+          activeRoundId="r1"
+          displayedRound={{ ...roundRanking, denominators }}
+          closesAt={new Date(Date.now() + 60_000)}
+        />,
+      )
+
+      expect(screen.getByTestId('telao-live-chip')).toBeDefined()
+      expect(screen.queryByTestId('leaderboard-denominators-inconsistent')).toBeNull()
+      expect(screen.queryByTestId('leaderboard-denominators-unknown')).toBeNull()
+      cleanup()
+      setPresentationActive(false)
+    }
   })
 })

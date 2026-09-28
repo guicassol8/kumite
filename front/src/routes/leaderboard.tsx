@@ -5,6 +5,7 @@ import { motion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { DenominatorsNotice } from '@/components/leaderboard/denominators-notice'
 import { TelaoBoard } from '@/components/leaderboard/telao-board'
 import { RoundCountdown } from '@/components/round-countdown'
 import { type University, UniversityBadge } from '@/components/teams/university-badge'
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLeaderboardStream } from '@/hooks/use-leaderboard-stream'
 import { useRoundStream } from '@/hooks/use-round-stream'
+import { useSession } from '@/hooks/use-session'
 import { api } from '@/lib/api'
 import { fetchEventRanking, fetchRoundRanking } from '@/lib/ranking-query'
 import { positionLabel } from '@/lib/round-position'
@@ -164,6 +166,10 @@ function LeaderboardScreen() {
   const queryClient = useQueryClient()
   const mainRef = useRef<HTMLElement>(null)
   const [isPresentation, setIsPresentation] = useState(false)
+  // The round ranking's comparability verdict (#318) is an organizer's
+  // concern: participants read the same payload, but the notice is not theirs
+  // to act on — and the telão, projected for everyone, never shows it.
+  const isOrganizer = useSession().user?.role === 'organizer'
 
   // Exiting is TelaoBoard's job from here (it owns the fullscreenchange and
   // Escape-keydown listeners while mounted) — this effect only hands focus
@@ -574,6 +580,7 @@ function LeaderboardScreen() {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
+                {isOrganizer && <DenominatorsNotice verdict={displayedRound.denominators} />}
                 {isLastClosedRound && (
                   <p
                     className="text-muted-foreground text-sm"

@@ -919,6 +919,15 @@
       "event": "Overall"
     },
     "lastClosedRoundLabel": "{{name}} — last closed round",
+    "denominators": {
+      "inconsistent": {
+        "title": "Scores in this round are not comparable",
+        "description": "The same problem was scored on different scales in this round: its test cases or points changed after submissions had already come in. The teams' totals cannot be compared with each other."
+      },
+      "unknown": {
+        "description": "Unable to confirm that the scores in this round are on the same scale: some submissions predate the scale being recorded."
+      }
+    },
     "notLiveBadge": "not live",
     "liveChip": "Live",
     "noSubmission": "—",

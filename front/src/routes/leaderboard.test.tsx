@@ -25,7 +25,13 @@ import '@/i18n'
 import { OFFLINE_AFTER_MS } from '@/hooks/use-leaderboard-stream'
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
-import type { EventRanking, RoundRanking, RoundRankingTeam, SseEvent } from '@/lib/sse-schema'
+import {
+  type EventRanking,
+  type RoundRanking,
+  type RoundRankingTeam,
+  type SseEvent,
+  SseEventSchema,
+} from '@/lib/sse-schema'
 import { routeTree } from '@/routeTree.gen'
 
 import { POLL_WHILE_OFFLINE_MS } from './leaderboard'
@@ -82,6 +88,7 @@ const roundRanking: RoundRanking = {
   roundId: 'r1',
   roundName: 'Rodada 1',
   problemIds: ['p1'],
+  denominators: 'consistent',
   teams: [
     {
       teamId: 't1',
@@ -1164,5 +1171,113 @@ describe('LeaderboardScreen — presentation mode', () => {
     fireEvent.click(screen.getByTestId('leaderboard-presentation-toggle'))
 
     expect(screen.queryByTestId('round-countdown')).toBeNull()
+  })
+})
+
+// #318: the round ranking's comparability verdict (#193), shown only to the
+// organizer, only on the Rodada tab.
+describe('LeaderboardScreen — denominators (#318)', () => {
+  const organizer: SessionUser = { ...participant, id: 'u-org', role: 'organizer' }
+  const closedRound = {
+    id: 'r1',
+    name: 'Rodada 1',
+    status: 'closed',
+    durationMinutes: 30,
+    openedAt: new Date('2026-09-01T10:00:00.000Z'),
+    closesAt: null,
+    closedAt: new Date('2026-09-01T10:30:00.000Z'),
+    createdAt: new Date('2026-09-01T09:00:00.000Z'),
+    updatedAt: new Date('2026-09-01T10:30:00.000Z'),
+    problemCount: 1,
+  }
+
+  // The last closed round arrives over REST; with a closed round the default
+  // tab is Geral (#111), so land on Rodada first.
+  async function renderClosedRound(verdict: RoundRanking['denominators']) {
+    mockedRounds.mockResolvedValue(jsonResponse(200, [closedRound]))
+    mockedRoundRanking.mockResolvedValue(
+      jsonResponse(200, { ...roundRanking, denominators: verdict }),
+    )
+    renderLeaderboard()
+    await waitFor(() => {
+      fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-round'))
+      expect(screen.getByTestId('leaderboard-last-closed-label')).toBeDefined()
+    })
+  }
+
+  // `sse-client` is mocked on this screen, so its zod parse never runs here:
+  // do it by hand over a JSON round-trip, as the wire would. Without the
+  // mirror fix in sse-schema.ts the parse strips `denominators` and no notice
+  // ever shows during a live round. The stream is marked open first: until it
+  // is live, the REST ranking (the default fixture, `consistent`) wins over the
+  // SSE snapshot, and this helper is about the SSE path.
+  async function renderLiveRound(verdict: RoundRanking['denominators']) {
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emitStatus('open')
+    const wire = JSON.parse(
+      JSON.stringify({
+        type: 'ranking.updated',
+        serverTime: new Date(),
+        round: { ...roundRanking, denominators: verdict },
+        event: eventRanking,
+      }),
+    )
+    emit(SseEventSchema.parse(wire))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+  }
+
+  beforeEach(() => {
+    setSession(organizer, 'tok-org')
+  })
+
+  it('warns the organizer on the Rodada tab when the last closed round is inconsistent', async () => {
+    await renderClosedRound('inconsistent')
+
+    await waitFor(() =>
+      expect(screen.getByTestId('leaderboard-denominators-inconsistent')).toBeDefined(),
+    )
+    expect(screen.getByTestId('leaderboard-table')).toBeDefined()
+  })
+
+  it('warns the organizer while the round is live over SSE', async () => {
+    await renderLiveRound('inconsistent')
+
+    expect(screen.getByTestId('leaderboard-denominators-inconsistent')).toBeDefined()
+    expect(screen.queryByTestId('leaderboard-denominators-unknown')).toBeNull()
+  })
+
+  it('adds nothing when the round is consistent', async () => {
+    await renderLiveRound('consistent')
+
+    expect(screen.queryByTestId('leaderboard-denominators-inconsistent')).toBeNull()
+    expect(screen.queryByTestId('leaderboard-denominators-unknown')).toBeNull()
+  })
+
+  it('shows only the discreet note when the round is unknown', async () => {
+    await renderClosedRound('unknown')
+
+    await waitFor(() =>
+      expect(screen.getByTestId('leaderboard-denominators-unknown')).toBeDefined(),
+    )
+    expect(screen.queryByTestId('leaderboard-denominators-inconsistent')).toBeNull()
+  })
+
+  it('shows nothing to a participant, even when the round is inconsistent', async () => {
+    setSession(participant, 'tok-1')
+    await renderLiveRound('inconsistent')
+
+    expect(screen.queryByTestId('leaderboard-denominators-inconsistent')).toBeNull()
+    expect(screen.queryByTestId('leaderboard-denominators-unknown')).toBeNull()
+  })
+
+  it('keeps the Geral tab free of the notice', async () => {
+    await renderLiveRound('inconsistent')
+    expect(screen.getByTestId('leaderboard-denominators-inconsistent')).toBeDefined()
+
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-column-round-r1')).toBeDefined())
+    expect(screen.queryByTestId('leaderboard-denominators-inconsistent')).toBeNull()
   })
 })

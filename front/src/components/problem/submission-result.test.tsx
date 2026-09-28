@@ -10,6 +10,7 @@ afterEach(cleanup)
 const result: SubmissionResult = {
   submissionId: 's1',
   attemptNumber: 1,
+  attemptInRound: 1,
   score: 20,
   maxScore: 30,
   cases: [

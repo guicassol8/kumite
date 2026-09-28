@@ -798,7 +798,12 @@ describe('submitSolution', () => {
         ),
       )
 
-      expect(result).toMatchObject({ score: 100, maxScore: 100, attemptNumber: 1 })
+      expect(result).toMatchObject({
+        score: 100,
+        maxScore: 100,
+        attemptNumber: 1,
+        attemptInRound: 1,
+      })
       expect(result.cases.map((testCase) => testCase.index)).toEqual([0, 1, 2, 3])
       expect(result.cases.map((testCase) => testCase.hidden)).toEqual([false, false, true, true])
 
@@ -1013,6 +1018,75 @@ describe('submitSolution', () => {
       const second = expectSubmitted(await submitSolution(db, identity, body))
 
       expect([first.attemptNumber, second.attemptNumber]).toEqual([1, 2])
+      // One round only: the round's count is the global one (#280, no regression).
+      expect([first.attemptInRound, second.attemptInRound]).toEqual([1, 2])
+    },
+    JUDGED_TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'numbers the attempts per round on a reused problem (#280)',
+    async () => {
+      const problem = await insertPublishedProblem(solvableCases)
+      const { user, team } = await insertTeamMember()
+      const identity = { userId: user.id, teamId: team.id }
+
+      // Round 1's five attempts, inserted directly: five real judgings would
+      // prove nothing more about the numbering.
+      await db.insert(submissionsTable).values(
+        [1, 2, 3, 4, 5].map((attemptNumber) => ({
+          problemId: problem.id,
+          roundId: problem.roundId,
+          userId: user.id,
+          teamId: team.id,
+          workspace: {},
+          generatedCode: '',
+          caseResults: [],
+          score: 0,
+          attemptNumber,
+          acceptedAt: new Date(),
+        })),
+      )
+      const closed = await closeRound(db, problem.roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+
+      // The same problem, reused in round 2.
+      const created = await createRound(db, {
+        name: 'Round 2',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      const round2 = opened.round.id
+
+      const body = { problemId: problem.id, roundId: round2, workspace: solutionWorkspace }
+      const first = expectSubmitted(await submitSolution(db, identity, body))
+      resetSubmissionThrottle()
+      const second = expectSubmitted(await submitSolution(db, identity, body))
+
+      // The persisted number stays global (the unique index is untouched)...
+      expect([first.attemptNumber, second.attemptNumber]).toEqual([6, 7])
+      // ...while what the participant is told counts this round only.
+      expect([first.attemptInRound, second.attemptInRound]).toEqual([1, 2])
+
+      // The screen, the round's ranking and the problem page agree.
+      const ranking2 = await getRoundRanking(db, round2)
+      const entry2 = ranking2?.teams
+        .find((row) => row.teamId === team.id)
+        ?.problems.find((row) => row.problemId === problem.id)
+      expect(entry2?.attempts).toBe(second.attemptInRound)
+      expect((await getBestSubmission(db, team.id, problem.id, round2))?.attempts).toBe(
+        second.attemptInRound,
+      )
+
+      // Round 1 keeps its own five.
+      const ranking1 = await getRoundRanking(db, problem.roundId)
+      const entry1 = ranking1?.teams
+        .find((row) => row.teamId === team.id)
+        ?.problems.find((row) => row.problemId === problem.id)
+      expect(entry1?.attempts).toBe(5)
     },
     JUDGED_TEST_TIMEOUT_MS,
   )

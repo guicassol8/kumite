@@ -51,6 +51,7 @@ const draftProblem = {
   points: 10,
   difficulty: 'easy',
   status: 'draft',
+  visibility: 'round',
   testCaseCount: 2,
   translations: [{ locale: 'pt', title: 'Soma de dois números' }],
 }
@@ -60,6 +61,7 @@ const publishedProblem = {
   points: 20,
   difficulty: 'hard',
   status: 'published',
+  visibility: 'round',
   testCaseCount: 4,
   translations: [
     { locale: 'pt', title: 'Ordenação' },
@@ -73,6 +75,7 @@ const archivedProblem = {
   points: 15,
   difficulty: 'medium',
   status: 'archived',
+  visibility: 'round',
   testCaseCount: 3,
   translations: [{ locale: 'pt', title: 'Fila' }],
 }
@@ -82,8 +85,16 @@ const untitledProblem = {
   points: 5,
   difficulty: 'medium',
   status: 'draft',
+  visibility: 'round',
   testCaseCount: 0,
   translations: [],
+}
+
+const practiceProblem = {
+  ...publishedProblem,
+  id: 'p5',
+  visibility: 'practice',
+  testCaseCount: 1,
 }
 
 function renderList(initialEntry = '/organizer/problems') {
@@ -279,6 +290,23 @@ describe('OrganizerProblemsList', () => {
     expect(archived.dataset.variant).toBe('secondary')
     // Struck through, so "arquivado" does not rest on colour alone (§ 3).
     expect(archived.className).toContain('line-through')
+  })
+
+  // #347: practice problems wear an outlined "Prática" badge beside their
+  // state; round, the default, stays unmarked.
+  it('marks a practice problem with an outlined badge and leaves round rows bare', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [draftProblem, practiceProblem]))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-problems-table')).toBeDefined())
+    const badge = screen.getByTestId('organizer-problems-visibility-p5')
+    expect(badge.textContent).toBe('Prática')
+    expect(badge.dataset.variant).toBe('outline')
+    // Same cell as the state badge: no new column, so the table widths hold.
+    expect(badge.parentElement).toBe(
+      screen.getByTestId('organizer-problems-status-p5').parentElement,
+    )
+    expect(screen.queryByTestId('organizer-problems-visibility-p1')).toBeNull()
   })
 
   it('keeps every row action and its testid, archived rows included', async () => {

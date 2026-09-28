@@ -308,9 +308,11 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   contorno, fantasma, destrutivo (contorno crimson).
 - **Badges**: dificuldade (Fácil verde / Médio âmbar-texto / Difícil crimson,
   contorno), estado (Publicado sólido tinta, Rascunho cinza, Arquivado cinza
-  riscado, Aberta com ponto vermelho, Encerrada cinza), "Seu time" (vermelho
-  sólido), universidade (selo textual `PUCRS` / `Mérida` em Barlow Condensed
-  caixa-alta — sem emoji de bandeira, que renderiza diferente por sistema).
+  riscado, Aberta com ponto vermelho, Encerrada cinza), visibilidade (Prática
+  em contorno neutro ao lado do estado; Rodada, o default, sem selo), "Seu
+  time" (vermelho sólido), universidade (selo textual `PUCRS` / `Mérida` em
+  Barlow Condensed caixa-alta — sem emoji de bandeira, que renderiza diferente
+  por sistema).
 - **Alertas**: cartão com borda na cor semântica + ícone + texto; erro em
   crimson, sucesso em verde, informação neutra. Nunca placa preenchida.
 - **Tabelas**: cabeçalho em eyebrow, hairlines, numerais em display tabular.

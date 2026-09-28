@@ -60,6 +60,7 @@ const createdDetail = {
   points: 100,
   difficulty: 'easy',
   status: 'draft',
+  visibility: 'round',
   testCases: [],
   translations: [],
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -120,13 +121,17 @@ describe('NewProblemScreen', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/organizer/problems/p9/edit'))
     expect(mockedCreate).toHaveBeenCalledTimes(1)
-    expect(mockedCreate).toHaveBeenCalledWith({ json: { difficulty: 'easy', points: 100 } })
+    // Untouched visibility control → the problem is created as a round one.
+    expect(mockedCreate).toHaveBeenCalledWith({
+      json: { difficulty: 'easy', points: 100, visibility: 'round' },
+    })
     expect(mockedPatch).toHaveBeenCalledTimes(1)
     expect(mockedPatch).toHaveBeenCalledWith({
       param: { id: 'p9' },
       json: {
         difficulty: 'easy',
         points: 100,
+        visibility: 'round',
         testCases: [],
         translations: [{ locale: 'pt', title: 'Soma', statementMd: 'Some a e b.' }],
       },
@@ -276,6 +281,49 @@ describe('NewProblemScreen', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/organizer/problems'))
     expect(mockedCreate).toHaveBeenCalledTimes(1)
     expect(mockedPatch).toHaveBeenCalledTimes(1)
+    expect(mockedPublish).toHaveBeenCalledWith({ param: { id: 'p9' } })
+  })
+
+  // #347: a practice problem is created as one and publishes on a single
+  // visible case — no hidden case asked for.
+  it('creates and publishes a practice problem with only a visible case', async () => {
+    const practiceDetail = { ...createdDetail, visibility: 'practice' }
+    mockedCreate.mockResolvedValue(jsonResponse(201, practiceDetail))
+    mockedPatch.mockResolvedValue(jsonResponse(200, practiceDetail))
+    mockedPublish.mockResolvedValue(jsonResponse(200, { ...practiceDetail, status: 'published' }))
+    const router = renderNewProblem()
+
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+    const trigger = screen.getByTestId('problem-form-visibility')
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    fireEvent.keyDown(await screen.findByTestId('problem-form-visibility-practice'), {
+      key: 'Enter',
+    })
+    await waitFor(() => expect(screen.getByTestId('problem-form-practice-note')).toBeDefined())
+
+    for (const locale of ['pt', 'es', 'en'] as const) {
+      selectTab(locale)
+      fireEvent.change(screen.getByTestId(`problem-form-title-${locale}`), {
+        target: { value: `Título ${locale}` },
+      })
+      fireEvent.change(screen.getByTestId(`problem-form-statement-${locale}`), {
+        target: { value: `Enunciado ${locale}` },
+      })
+    }
+    fireEvent.click(screen.getByTestId('problem-form-add-case'))
+    fireEvent.change(screen.getByTestId('problem-form-case-0-input'), {
+      target: { value: '[1,2]' },
+    })
+    fireEvent.change(screen.getByTestId('problem-form-case-0-expected'), { target: { value: '3' } })
+
+    fireEvent.click(screen.getByTestId('problem-form-publish'))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/organizer/problems'))
+    expect(mockedCreate).toHaveBeenCalledWith({
+      json: { difficulty: 'easy', points: 100, visibility: 'practice' },
+    })
+    expect(mockedPatch.mock.calls[0]?.[0].json.visibility).toBe('practice')
     expect(mockedPublish).toHaveBeenCalledWith({ param: { id: 'p9' } })
   })
 

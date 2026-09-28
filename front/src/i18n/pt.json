@@ -158,6 +158,9 @@
         "published": "Publicado",
         "archived": "Arquivado"
       },
+      "visibility": {
+        "practice": "Prática"
+      },
       "loading": "Carregando problemas...",
       "missingTitle": "(sem título)",
       "empty": {
@@ -187,6 +190,11 @@
       "loading": "Carregando problema...",
       "difficultyLabel": "Dificuldade",
       "pointsLabel": "Pontos",
+      "visibilityLabel": "Visibilidade",
+      "visibility": {
+        "round": "Rodada",
+        "practice": "Prática"
+      },
       "titleLabel": "Título",
       "statementLabel": "Enunciado (markdown)",
       "previewHeading": "Pré-visualização",
@@ -202,7 +210,8 @@
         "addAction": "Adicionar caso",
         "removeAction": "Remover caso",
         "moveUpAction": "Mover para cima",
-        "moveDownAction": "Mover para baixo"
+        "moveDownAction": "Mover para baixo",
+        "practiceNote": "Problema de prática: os casos ocultos não são exigidos nem usados. Para publicar, basta um caso visível."
       },
       "saveAction": "Salvar",
       "publishAction": "Publicar",
@@ -228,6 +237,8 @@
         "saveFailed": "Não foi possível salvar o problema. Tente novamente.",
         "publishFailed": "Não foi possível publicar o problema. Tente novamente.",
         "problemInOpenRound": "Os casos de teste e a pontuação não podem mudar enquanto este problema está numa rodada aberta: as equipes já pontuadas ficariam sobre um denominador diferente do das próximas. Feche a rodada para alterá-los — o enunciado e a dificuldade continuam editáveis agora.",
+        "problemInRound": "Este problema já esteve numa rodada e não pode virar prática.",
+        "roundNeedsTestCases": "Para voltar para rodada, um problema publicado precisa de pelo menos um caso visível e um oculto.",
         "loadFailed": "Não foi possível carregar o problema.",
         "retry": "Tentar novamente",
         "notFound": "Problema não encontrado."

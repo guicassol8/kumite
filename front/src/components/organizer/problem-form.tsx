@@ -47,6 +47,7 @@ import {
   type ProblemFormError,
   type ProblemFormValues,
   type ProblemStatus,
+  type ProblemVisibility,
   parseJsonField,
   type SubmitOutcome,
   validateForPublish,
@@ -55,6 +56,7 @@ import {
 import type { UiLocale } from '@/lib/resolve-problem-title'
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
+const VISIBILITIES: ProblemVisibility[] = ['round', 'practice']
 
 type ProblemFormProps = {
   initialValues: ProblemFormValues
@@ -93,6 +95,7 @@ export function ProblemForm({
   const [caseSectionError, setCaseSectionError] = useState<string | null>(null)
 
   const testCases = form.watch('testCases')
+  const visibility = form.watch('visibility')
   const errors = form.formState.errors
 
   function messageFor(error: ProblemFormError): string {
@@ -122,6 +125,10 @@ export function ProblemForm({
         return t('organizer.problemForm.errors.publish.missingVisibleCase')
       case 'publishMissingHiddenCase':
         return t('organizer.problemForm.errors.publish.missingHiddenCase')
+      case 'visibilityLockedByRound':
+        return t('organizer.problemForm.errors.problemInRound')
+      case 'roundNeedsTestCases':
+        return t('organizer.problemForm.errors.roundNeedsTestCases')
     }
   }
 
@@ -139,8 +146,18 @@ export function ProblemForm({
         form.setError('points', { message: messageFor(error) })
         continue
       }
-      if (error.kind === 'publishMissingVisibleCase' || error.kind === 'publishMissingHiddenCase') {
+      if (
+        error.kind === 'publishMissingVisibleCase' ||
+        error.kind === 'publishMissingHiddenCase' ||
+        // The fix for this refusal is adding a case, so it sits with the cases
+        // rather than under the Select that triggered it.
+        error.kind === 'roundNeedsTestCases'
+      ) {
         sectionMessages.push(messageFor(error))
+        continue
+      }
+      if (error.kind === 'visibilityLockedByRound') {
+        form.setError('visibility', { message: messageFor(error) })
         continue
       }
       if (error.kind === 'json') {
@@ -219,12 +236,16 @@ export function ProblemForm({
         className="flex flex-col gap-6"
         onSubmit={(event) => event.preventDefault()}
       >
+        {/* The fields pin themselves to the top (`self-start`): a message under
+            one of them (the three-line `problem_in_round`, #347) grows only its
+            own cell instead of pushing its neighbours' controls down. The
+            status badge keeps the row's bottom alignment. */}
         <div className="flex flex-wrap items-end gap-4">
           <FormField
             control={form.control}
             name="difficulty"
             render={({ field }) => (
-              <FormItem className="w-40">
+              <FormItem className="w-40 self-start">
                 <FormLabel className={PANEL_FIELD_LABEL}>
                   {t('organizer.problemForm.difficultyLabel')}
                 </FormLabel>
@@ -262,7 +283,7 @@ export function ProblemForm({
             control={form.control}
             name="points"
             render={({ field }) => (
-              <FormItem className="w-32">
+              <FormItem className="w-32 self-start">
                 <FormLabel className={PANEL_FIELD_LABEL}>
                   {t('organizer.problemForm.pointsLabel')}
                 </FormLabel>
@@ -282,6 +303,52 @@ export function ProblemForm({
                 <FormMessage
                   className={PANEL_FIELD_ERROR}
                   data-testid="problem-form-points-error"
+                />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="visibility"
+            render={({ field }) => (
+              <FormItem className="w-40 self-start">
+                <FormLabel className={PANEL_FIELD_LABEL}>
+                  {t('organizer.problemForm.visibilityLabel')}
+                </FormLabel>
+                <Select
+                  value={field.value}
+                  onValueChange={(next) => {
+                    // Both visibility refusals (and the publish rule on hidden
+                    // cases) judged the value that was sent: once another one
+                    // is chosen they no longer describe the form on screen.
+                    form.clearErrors('visibility')
+                    setCaseSectionError(null)
+                    field.onChange(next)
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="problem-form-visibility">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {VISIBILITIES.map((option) => (
+                      <SelectItem
+                        key={option}
+                        value={option}
+                        data-testid={`problem-form-visibility-${option}`}
+                      >
+                        {t(`organizer.problemForm.visibility.${option}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* Where the server's `problem_in_round` lands: the refusal
+                    belongs to the control that caused it (#187). */}
+                <FormMessage
+                  className={PANEL_FIELD_ERROR}
+                  data-testid="problem-form-visibility-error"
                 />
               </FormItem>
             )}
@@ -376,6 +443,12 @@ export function ProblemForm({
 
         <section className="flex flex-col gap-3">
           <h3 className={PANEL_SECTION_TITLE}>{t('organizer.problemForm.testCases.heading')}</h3>
+
+          {visibility === 'practice' && (
+            <p className="text-muted-foreground text-sm" data-testid="problem-form-practice-note">
+              {t('organizer.problemForm.testCases.practiceNote')}
+            </p>
+          )}
 
           {testCases.length === 0 && (
             <p className="text-muted-foreground text-sm" data-testid="problem-form-cases-empty">

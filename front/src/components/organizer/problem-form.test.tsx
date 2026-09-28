@@ -30,6 +30,26 @@ function valuesWith(overrides: {
 const ptOnly = () =>
   valuesWith({ translations: { pt: { title: 'Soma', statementMd: 'Some `a` e `b`.' } } })
 
+/**
+ * Radix's Select opens on pointerdown/keyboard, and jsdom has no pointer
+ * capture for `fireEvent.pointerDown` — Enter is the interaction it supports
+ * (same note as export-menu.test.tsx).
+ */
+async function chooseVisibility(visibility: 'round' | 'practice') {
+  const trigger = screen.getByTestId('problem-form-visibility')
+  trigger.focus()
+  fireEvent.keyDown(trigger, { key: 'Enter' })
+  const item = await screen.findByTestId(`problem-form-visibility-${visibility}`)
+  fireEvent.keyDown(item, { key: 'Enter' })
+  await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+}
+
+const completeTranslations = {
+  pt: { title: 'Soma', statementMd: 'Some.' },
+  es: { title: 'Suma', statementMd: 'Suma.' },
+  en: { title: 'Sum', statementMd: 'Sum.' },
+}
+
 // Radix's Tabs trigger switches on mousedown/focus, not on a bare click.
 function selectTab(locale: 'pt' | 'es' | 'en') {
   fireEvent.mouseDown(screen.getByTestId(`problem-form-tab-${locale}`))
@@ -545,6 +565,119 @@ function labelFor(testid: string): Element {
 }
 
 // #233 — the problem form in the new identity.
+// #347 — the round/practice visibility control.
+describe('ProblemForm visibility', () => {
+  it('starts on Rodada, with no practice note', () => {
+    renderForm()
+
+    expect(screen.getByTestId('problem-form-visibility').textContent).toBe('Rodada')
+    expect(screen.queryByTestId('problem-form-practice-note')).toBeNull()
+  })
+
+  it('shows the practice note while Prática is chosen, and hides it again on Rodada', async () => {
+    renderForm()
+
+    await chooseVisibility('practice')
+    expect(screen.getByTestId('problem-form-visibility').textContent).toBe('Prática')
+    expect(screen.getByTestId('problem-form-practice-note').textContent).toContain(
+      'os casos ocultos não são exigidos nem usados',
+    )
+
+    await chooseVisibility('round')
+    expect(screen.queryByTestId('problem-form-practice-note')).toBeNull()
+  })
+
+  it('seeds Prática from the initial values', () => {
+    const values = ptOnly()
+    values.visibility = 'practice'
+    renderForm({ initialValues: values })
+
+    expect(screen.getByTestId('problem-form-visibility').textContent).toBe('Prática')
+    expect(screen.getByTestId('problem-form-practice-note')).toBeTruthy()
+  })
+
+  it('publishes a practice problem with only a visible case', async () => {
+    const { onPublish } = renderForm({
+      initialValues: valuesWith({
+        translations: completeTranslations,
+        testCases: [{ input: '[1,2]', expected: '3', hidden: false }],
+      }),
+    })
+
+    await chooseVisibility('practice')
+    fireEvent.click(screen.getByTestId('problem-form-publish'))
+
+    await waitFor(() => expect(onPublish).toHaveBeenCalledTimes(1))
+    expect(onPublish.mock.calls[0]?.[0].visibility).toBe('practice')
+    expect(screen.queryByTestId('problem-form-cases-error')).toBeNull()
+  })
+
+  it('paints problem_in_round under the Select, keeping Prática and what was typed', async () => {
+    const onSave = rejectsWith([{ kind: 'visibilityLockedByRound' }])
+    renderForm({ onSave })
+
+    await chooseVisibility('practice')
+    fireEvent.change(screen.getByTestId('problem-form-title-pt'), {
+      target: { value: 'Soma revisada' },
+    })
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-visibility-error').textContent).toBe(
+        'Este problema já esteve numa rodada e não pode virar prática.',
+      ),
+    )
+    expect(onSave.mock.calls[0]?.[0].visibility).toBe('practice')
+    expect((screen.getByTestId('problem-form-title-pt') as HTMLInputElement).value).toBe(
+      'Soma revisada',
+    )
+    expect(screen.getByTestId('problem-form-visibility').textContent).toBe('Prática')
+    expect(screen.queryByTestId('problem-form-error')).toBeNull()
+  })
+
+  it('paints missing_test_cases on the test-case section', async () => {
+    const onSave = rejectsWith([{ kind: 'roundNeedsTestCases' }])
+    renderForm({ onSave })
+
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-cases-error').textContent).toBe(
+        'Para voltar para rodada, um problema publicado precisa de pelo menos um caso visível e um oculto.',
+      ),
+    )
+    expect(screen.queryByTestId('problem-form-visibility-error')).toBeNull()
+  })
+
+  // Both refusals are about the visibility that was sent: once the organizer
+  // picks another one, the message no longer describes the form on screen.
+  it('clears problem_in_round once the organizer goes back to Rodada', async () => {
+    const onSave = rejectsWith([{ kind: 'visibilityLockedByRound' }])
+    renderForm({ onSave })
+
+    await chooseVisibility('practice')
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+    await waitFor(() => expect(screen.getByTestId('problem-form-visibility-error')).toBeTruthy())
+
+    await chooseVisibility('round')
+    expect(screen.queryByTestId('problem-form-visibility-error')).toBeNull()
+  })
+
+  it('clears missing_test_cases once the organizer goes back to Prática', async () => {
+    const values = ptOnly()
+    values.visibility = 'practice'
+    const onSave = rejectsWith([{ kind: 'roundNeedsTestCases' }])
+    renderForm({ initialValues: values, onSave })
+
+    await chooseVisibility('round')
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+    await waitFor(() => expect(screen.getByTestId('problem-form-cases-error')).toBeTruthy())
+
+    await chooseVisibility('practice')
+    expect(screen.queryByTestId('problem-form-cases-error')).toBeNull()
+  })
+})
+
 describe('ProblemForm in the panel identity', () => {
   it('makes Publicar the only button filled in brand red', () => {
     renderForm({ status: 'draft' })

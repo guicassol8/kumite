@@ -186,14 +186,27 @@ function OrganizerProblemsList() {
               id: 'status',
               header: t('organizer.problems.columns.status'),
               width: 'w-[14%]',
+              // Visibility rides in the state cell rather than a column of its
+              // own (#347): round is the default and stays unmarked, so only
+              // practice rows grow a second badge and the widths hold.
               cell: (problem) => (
-                <Badge
-                  variant={STATUS_VARIANT[problem.status]}
-                  data-testid={`organizer-problems-status-${problem.id}`}
-                  className={problem.status === 'archived' ? 'line-through' : undefined}
-                >
-                  {t(`organizer.problems.status.${problem.status}`)}
-                </Badge>
+                <div className="flex flex-wrap gap-1">
+                  <Badge
+                    variant={STATUS_VARIANT[problem.status]}
+                    data-testid={`organizer-problems-status-${problem.id}`}
+                    className={problem.status === 'archived' ? 'line-through' : undefined}
+                  >
+                    {t(`organizer.problems.status.${problem.status}`)}
+                  </Badge>
+                  {problem.visibility === 'practice' && (
+                    <Badge
+                      variant="outline"
+                      data-testid={`organizer-problems-visibility-${problem.id}`}
+                    >
+                      {t('organizer.problems.visibility.practice')}
+                    </Badge>
+                  )}
+                </div>
               ),
             },
             {

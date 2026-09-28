@@ -592,6 +592,29 @@
         "pausedBadge": "Submissões pausadas",
         "pauseError": "Não foi possível alterar a pausa. Tente novamente."
       },
+      "live": {
+        "title": "Ao vivo",
+        "loading": "Carregando os números ao vivo...",
+        "error": "Não foi possível carregar os números ao vivo.",
+        "judge": {
+          "label": "Julgando agora",
+          "waiting_one": "{{count}} esperando vaga",
+          "waiting_other": "{{count}} esperando vaga",
+          "concurrency": "Limite: {{count}} ao mesmo tempo"
+        },
+        "sse": {
+          "label": "Conexões ao vivo"
+        },
+        "submissions": {
+          "label": "Submissões no último minuto",
+          "inFlight_one": "{{count}} time sendo julgado",
+          "inFlight_other": "{{count}} times sendo julgados"
+        },
+        "trend": {
+          "label": "Por minuto · 15 min",
+          "ariaLabel": "Submissões por minuto nos últimos 15 minutos"
+        }
+      },
       "shortcuts": {
         "title": "Atalhos"
       },

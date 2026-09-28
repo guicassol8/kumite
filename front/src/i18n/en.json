@@ -592,6 +592,29 @@
         "pausedBadge": "Submissions paused",
         "pauseError": "Could not change the pause. Please try again."
       },
+      "live": {
+        "title": "Live",
+        "loading": "Loading the live numbers...",
+        "error": "Could not load the live numbers.",
+        "judge": {
+          "label": "Judging now",
+          "waiting_one": "{{count}} waiting for a slot",
+          "waiting_other": "{{count}} waiting for a slot",
+          "concurrency": "Limit: {{count}} at a time"
+        },
+        "sse": {
+          "label": "Live connections"
+        },
+        "submissions": {
+          "label": "Submissions in the last minute",
+          "inFlight_one": "{{count}} team being judged",
+          "inFlight_other": "{{count}} teams being judged"
+        },
+        "trend": {
+          "label": "Per minute · 15 min",
+          "ariaLabel": "Submissions per minute over the last 15 minutes"
+        }
+      },
       "shortcuts": {
         "title": "Shortcuts"
       },

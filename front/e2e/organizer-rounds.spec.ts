@@ -8,6 +8,7 @@ import {
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
+  withRoundLock,
 } from './support/rounds'
 
 // Visual walkthrough for #41. Prereqs (like organizer-problems.spec.ts):
@@ -129,10 +130,22 @@ test.describe('organizer rounds', () => {
 
     // 05 — confirmed: A is open with a live countdown, B's Abrir is disabled
     // and its tooltip names A (Acceptance #2).
-    await page.getByTestId('organizer-rounds-open-confirm').click()
     // Opened through the UI, so `roundSlot.open` never saw it — hand it over
     // anyway, or a failure between here and step 08 leaves it open (#150).
+    // Registered before the click: closing a round that never opened is a no-op.
     roundSlot.register(roundAId)
+    // Every open in the suite goes through the round lock, this UI one
+    // included — otherwise no other spec's critical section is exclusive
+    // (#386). Only the confirm and its response: the section stays short.
+    await withRoundLock(async () => {
+      const opened = page.waitForResponse(
+        (res) =>
+          res.url().endsWith(`/organizer/rounds/${roundAId}/open`) &&
+          res.request().method() === 'POST',
+      )
+      await page.getByTestId('organizer-rounds-open-confirm').click()
+      await opened
+    })
     await expect(page.getByTestId(`organizer-rounds-close-${roundAId}`)).toBeVisible()
     await expect(page.getByTestId(`organizer-rounds-open-${roundBId}`)).toBeDisabled()
     await page.getByTestId(`organizer-rounds-open-hint-${roundBId}`).hover()
@@ -170,7 +183,16 @@ test.describe('organizer rounds', () => {
     // read-only (Acceptance #3).
     await page.getByTestId(`organizer-rounds-close-${roundAId}`).click()
     await expect(page.getByTestId('organizer-rounds-close-confirm')).toBeVisible()
-    await page.getByTestId('organizer-rounds-close-confirm').click()
+    // Same rule as step 05: the UI close goes through the round lock too.
+    await withRoundLock(async () => {
+      const closed = page.waitForResponse(
+        (res) =>
+          res.url().endsWith(`/organizer/rounds/${roundAId}/close`) &&
+          res.request().method() === 'POST',
+      )
+      await page.getByTestId('organizer-rounds-close-confirm').click()
+      await closed
+    })
     await expect(page.getByTestId(`organizer-rounds-closed-at-${roundAId}`)).toBeVisible()
     await expect(page.getByTestId(`organizer-rounds-open-${roundBId}`)).toBeEnabled()
     await page.screenshot({ path: evidence('08-round-a-closed'), fullPage: true })

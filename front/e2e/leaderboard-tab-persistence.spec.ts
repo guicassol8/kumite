@@ -10,6 +10,7 @@ import {
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
+  withNoOpenRound,
   withRoundLock,
 } from './support/rounds'
 import { createTeamThroughUi } from './support/teams-ui'
@@ -26,7 +27,10 @@ import { createTeamThroughUi } from './support/teams-ui'
 // increasing round state in the same DB — the second deliberately starts from
 // the round the first leaves closed. What the first test can no longer assume
 // is that NO round has ever existed: that is true of a database exactly once,
-// so step 01 stubs the rounds list instead (#150).
+// so step 01 stubs the rounds list instead (#150). What the second test can
+// no longer assume is that no round is open when it starts: `serial` orders
+// these two tests, not the other worker's, so steps 04–05 wait for the slot to
+// be free and hold it (`withNoOpenRound`, #386).
 const evidence = (name: string) => `e2e/evidence/111/${name}.png`
 
 const PASSWORD = 'supersecret'
@@ -156,26 +160,38 @@ test.describe
       page,
       roundSlot,
     }) => {
+      // Up to 60s waiting for the slot in 04–05 (`withNoOpenRound`), up to
+      // ~20s of `roundSlot.open` retries in 06, plus signup and team — the
+      // 30s default fits none of the waits it would take to be contended.
+      test.setTimeout(120_000)
       const auth = await organizerAuthHeader()
       await signupThroughUi(page, `leaderboard-tab-e2e-${stamp}-b@edu.pucrs.br`)
       await goToTeamsAndCreate(page, `Placar Tab E2E B ${stamp}`)
 
-      // 04 — a round has already closed (left by the previous test): the
-      // default tab is "Geral".
-      await page.getByTestId('header-leaderboard-link').click()
-      await expect(page).toHaveURL(/\/leaderboard$/)
-      await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute(
-        'data-state',
-        'active',
-      )
-      await page.screenshot({ path: evidence('04-rodada-fechada-padrao-geral'), fullPage: true })
+      // 04 — a round has already closed (left by the previous test) and none
+      // is open: the default tab is "Geral". The "none is open" half is
+      // event-wide — another worker's live round flips the default to
+      // "Rodada" and hides the last-closed label — so it is waited for and
+      // then held, not assumed (#386). The navigation happens inside the
+      // section, so the default tab is computed from the frozen state; the
+      // assertions retry, which absorbs a `round.closed` from a close that
+      // happened just before the section began.
+      await withNoOpenRound(auth, async () => {
+        await page.getByTestId('header-leaderboard-link').click()
+        await expect(page).toHaveURL(/\/leaderboard$/)
+        await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute(
+          'data-state',
+          'active',
+        )
+        await page.screenshot({ path: evidence('04-rodada-fechada-padrao-geral'), fullPage: true })
 
-      // 05 — manually switch to "Rodada" — a genuine value change, since the
-      // default here is "Geral". Shows the last closed round.
-      await page.getByTestId('leaderboard-tab-round').click()
-      await expect(page.getByTestId('leaderboard-last-closed-label')).toBeVisible()
-      await page.waitForTimeout(200)
-      await page.screenshot({ path: evidence('05-selecao-manual-rodada'), fullPage: true })
+        // 05 — manually switch to "Rodada" — a genuine value change, since
+        // the default here is "Geral". Shows the last closed round.
+        await page.getByTestId('leaderboard-tab-round').click()
+        await expect(page.getByTestId('leaderboard-last-closed-label')).toBeVisible()
+        await page.waitForTimeout(200)
+        await page.screenshot({ path: evidence('05-selecao-manual-rodada'), fullPage: true })
+      })
 
       // 06 — the organizer opens and closes a *newer* round while this page
       // stays open. The recomputed default is still "Geral" (a round remains

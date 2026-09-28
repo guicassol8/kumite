@@ -18,6 +18,8 @@ import { test as base } from '@playwright/test'
 //   - `withRoundLock`, for the assertions that read event-wide round state —
 //     "no round is running", "mine is the one that closed last" — which the
 //     open-round slot stops protecting the moment a round closes.
+//   - `withNoOpenRound`, for the reads that need no round live anywhere —
+//     which holding the lock alone does not give (#386).
 //
 // Playwright only collects `*.spec.ts` under `testDir`, so this is a helper,
 // not a suite.
@@ -161,7 +163,11 @@ export async function openRoundWithRetry(auth: AuthHeader, roundId: string): Pro
 // It failed on a different spec each run (#150, found reviewing #153).
 //
 // This lock covers the whole transition, both directions: every close, every
-// open attempt, and the reads a spec makes in between. It lives in a file
+// open attempt, and the reads a spec makes in between. It freezes the state as
+// it is — which is not the same as "no round is open": holding it while another
+// spec's round is live keeps that round live, because its close needs this
+// same lock. A read that needs the slot *free* waits for that first, outside
+// the lock, through `withNoOpenRound` (#386). It lives in a file
 // because Playwright workers are separate processes, and is keyed by the API
 // port so two worktrees running their own stack do not share one.
 const LOCK_PATH = join(tmpdir(), `kumite-e2e-round-state-${process.env.PORT ?? '3000'}.lock`)
@@ -229,6 +235,54 @@ export async function withRoundLock<T>(body: () => Promise<T>): Promise<T> {
   } finally {
     lockDepth = 0
     await rm(LOCK_PATH, { force: true })
+  }
+}
+
+/**
+ * How long `withNoOpenRound` waits for whoever holds the slot to close. Another
+ * spec's round lives for as long as that spec takes to reach its close — well
+ * under this on a healthy run; past it, the error names the holder.
+ */
+const NO_OPEN_ROUND_WAIT_MS = 60_000
+const NO_OPEN_ROUND_POLL_MS = 500
+
+/**
+ * Runs `body` under `withRoundLock` with no round open, and none opening until
+ * it returns — the third state the lock alone cannot give: "the slot is free,
+ * and stays free while I read". For reads that depend on *no* round being live
+ * anywhere in the event, e.g. the leaderboard's default tab and its
+ * `leaderboard-last-closed-label` (#386).
+ *
+ * The wait happens OUTSIDE the lock, then the lock is taken and the slot
+ * re-checked: someone may have opened in between, in which case the lock is
+ * dropped and the wait starts over. Keep `body` well under `LOCK_STALE_MS` —
+ * it holds the lock throughout, and a hold older than that is taken over.
+ */
+export async function withNoOpenRound<T>(auth: AuthHeader, body: () => Promise<T>): Promise<T> {
+  // Nested, the wait below would hold the lock the slot's owner needs in order
+  // to close — a guaranteed deadlock. Same refusal as `openRoundWithRetry`.
+  if (lockDepth > 0) {
+    throw new Error(
+      'withNoOpenRound called inside withRoundLock — it waits for a close, and that close needs the lock',
+    )
+  }
+  const deadline = Date.now() + NO_OPEN_ROUND_WAIT_MS
+  for (;;) {
+    let holder = await describeOpenRound(auth)
+    while (holder !== null) {
+      if (Date.now() > deadline) {
+        throw new Error(
+          `no round closed within ${NO_OPEN_ROUND_WAIT_MS}ms — the slot is still held by ${holder}`,
+        )
+      }
+      await new Promise((r) => setTimeout(r, NO_OPEN_ROUND_POLL_MS))
+      holder = await describeOpenRound(auth)
+    }
+    const outcome = await withRoundLock(async () => {
+      if ((await describeOpenRound(auth)) !== null) return { ran: false as const }
+      return { ran: true as const, value: await body() }
+    })
+    if (outcome.ran) return outcome.value
   }
 }
 

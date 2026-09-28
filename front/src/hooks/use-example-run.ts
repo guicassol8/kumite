@@ -1,4 +1,4 @@
-import { generateSolution, type WorkspaceState } from '@kumite/blocks'
+import { type BlockLocale, generateSolution, type WorkspaceState } from '@kumite/blocks'
 import { useCallback, useRef, useState } from 'react'
 
 import { type CaseOutcome, type ExampleCase, runExamples } from '@/lib/run-examples'
@@ -24,9 +24,15 @@ export type UseExampleRunOptions = {
  * Codegen happens here, on the main thread, and only the resulting source
  * crosses into a worker: a workspace the curated toolbox refuses is rejected
  * before any worker starts, and the worker bundle stays free of Blockly.
+ *
+ * `locale` is required, not defaulted: `generateSolution` re-registers the
+ * kumite blocks globally in the locale it gets, the same registry the editor
+ * draws from, so a run without the UI locale flipped every block created
+ * afterwards back to pt (#183).
  */
 export function useExampleRun(
   examples: readonly ExampleCase[],
+  locale: BlockLocale,
   options: UseExampleRunOptions = {},
 ) {
   const [state, setState] = useState<ExampleRunState>({ status: 'idle' })
@@ -45,7 +51,7 @@ export function useExampleRun(
 
       let code: string
       try {
-        code = generateSolution(workspace)
+        code = generateSolution(workspace, locale)
       } catch (error) {
         // `BlocksError` is the expected shape here and its message is already
         // localized. Anything else is a bug, and showing its message beats an
@@ -70,7 +76,7 @@ export function useExampleRun(
 
       setState({ status: 'done', outcomes: settled })
     },
-    [examples],
+    [examples, locale],
   )
 
   return { state, run }

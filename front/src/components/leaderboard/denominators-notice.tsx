@@ -18,7 +18,10 @@ export function DenominatorsNotice({ verdict }: { verdict: DenominatorVerdict })
     return (
       <Alert variant="warning" data-testid="leaderboard-denominators-inconsistent">
         <TriangleAlert />
-        <AlertTitle>{t('leaderboard.denominators.inconsistent.title')}</AlertTitle>
+        {/* The title IS the message: never clip it to one line on a phone. */}
+        <AlertTitle className="line-clamp-none">
+          {t('leaderboard.denominators.inconsistent.title')}
+        </AlertTitle>
         <AlertDescription>
           {t('leaderboard.denominators.inconsistent.description')}
         </AlertDescription>

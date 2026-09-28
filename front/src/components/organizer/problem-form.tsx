@@ -316,7 +316,17 @@ export function ProblemForm({
                 <FormLabel className={PANEL_FIELD_LABEL}>
                   {t('organizer.problemForm.visibilityLabel')}
                 </FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
+                <Select
+                  value={field.value}
+                  onValueChange={(next) => {
+                    // Both visibility refusals (and the publish rule on hidden
+                    // cases) judged the value that was sent: once another one
+                    // is chosen they no longer describe the form on screen.
+                    form.clearErrors('visibility')
+                    setCaseSectionError(null)
+                    field.onChange(next)
+                  }}
+                >
                   <FormControl>
                     <SelectTrigger data-testid="problem-form-visibility">
                       <SelectValue />

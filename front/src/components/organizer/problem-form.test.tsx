@@ -648,6 +648,34 @@ describe('ProblemForm visibility', () => {
     )
     expect(screen.queryByTestId('problem-form-visibility-error')).toBeNull()
   })
+
+  // Both refusals are about the visibility that was sent: once the organizer
+  // picks another one, the message no longer describes the form on screen.
+  it('clears problem_in_round once the organizer goes back to Rodada', async () => {
+    const onSave = rejectsWith([{ kind: 'visibilityLockedByRound' }])
+    renderForm({ onSave })
+
+    await chooseVisibility('practice')
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+    await waitFor(() => expect(screen.getByTestId('problem-form-visibility-error')).toBeTruthy())
+
+    await chooseVisibility('round')
+    expect(screen.queryByTestId('problem-form-visibility-error')).toBeNull()
+  })
+
+  it('clears missing_test_cases once the organizer goes back to Prática', async () => {
+    const values = ptOnly()
+    values.visibility = 'practice'
+    const onSave = rejectsWith([{ kind: 'roundNeedsTestCases' }])
+    renderForm({ initialValues: values, onSave })
+
+    await chooseVisibility('round')
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+    await waitFor(() => expect(screen.getByTestId('problem-form-cases-error')).toBeTruthy())
+
+    await chooseVisibility('practice')
+    expect(screen.queryByTestId('problem-form-cases-error')).toBeNull()
+  })
 })
 
 describe('ProblemForm in the panel identity', () => {

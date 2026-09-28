@@ -184,6 +184,12 @@ test.describe('organizer problem visibility (#347)', () => {
     await expect(page.getByTestId('problem-form-visibility')).toHaveText('Prática')
     await page.screenshot({ path: evidence('03-problem-in-round'), fullPage: true })
     expect(await readVisibility(id)).toBe('round')
+
+    // Going back to Rodada is the way out: the refusal no longer applies, so
+    // it leaves with the choice that earned it, and the typed text stays.
+    await chooseVisibility(page, 'round')
+    await expect(page.getByTestId('problem-form-visibility-error')).toHaveCount(0)
+    await expect(page.getByTestId('problem-form-statement-pt')).toHaveValue(edited)
   })
 
   test('refuses going back to round for a published practice problem with no hidden case', async ({

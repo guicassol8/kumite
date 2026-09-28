@@ -47,9 +47,10 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
   `DB_PORT` stack shares it, so one whose migrations differ from the main
   checkout's needs its own stack (`docs/workflow.md` § Worktrees) — otherwise
   each side's tests fail against the other's schema.
-- CI runs the full Browser E2E on every PR push (job `e2e`, one retry,
-  report uploaded as the `playwright-report` artifact) — `docs/workflow.md`
-  § Gate ladder.
+- CI on a PR push runs one job, `check` (format, typecheck, verify, tests).
+  The full Browser E2E (`e2e`) and `hurl` run on push to `main` and on
+  demand (`gh workflow run CI --ref <branch>`), not on every PR push: the
+  reviewer runs them locally (#378) — `docs/workflow.md` § Gate ladder.
 
 ## Conventions
 

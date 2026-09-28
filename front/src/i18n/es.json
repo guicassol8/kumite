@@ -424,7 +424,8 @@
         "errors": {
           "teamFull": "El equipo de destino está lleno.",
           "teamNotFound": "El equipo de destino ya no existe.",
-          "memberNotFound": "Ese integrante ya no pertenece a un equipo."
+          "memberNotFound": "Ese integrante ya no pertenece a un equipo.",
+          "failed": "No se pudo mover a este integrante. Inténtalo de nuevo."
         }
       },
       "removeMember": {

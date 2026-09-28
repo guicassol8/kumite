@@ -436,6 +436,94 @@ describe('OrganizerTeamsScreen', () => {
     )
     expect(mockedTeamsGet).toHaveBeenCalledTimes(1)
   })
+
+  // #195 (achado #27): a dead network rejects `mutateAsync` instead of
+  // answering. All four actions are fired from onClick without an await, so
+  // without a catch the row stayed silent and the rejection went unhandled —
+  // which vitest itself reports as a failed run.
+  describe('a dead network', () => {
+    it('reports a failed rename inline and keeps the editor open', async () => {
+      mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+      mockedTeamsPatch.mockRejectedValue(new Error('network down'))
+      renderScreen()
+
+      await waitFor(() => expect(screen.getByTestId('team-moderation-card-team-1')).toBeDefined())
+      fireEvent.click(screen.getByTestId('team-moderation-rename-start-team-1'))
+      fireEvent.change(screen.getByTestId('team-moderation-rename-input-team-1'), {
+        target: { value: 'New Name' },
+      })
+      fireEvent.click(screen.getByTestId('team-moderation-rename-save-team-1'))
+
+      const alert = await screen.findByTestId('team-moderation-rename-error-team-1')
+      expect(alert.textContent).toContain('Não foi possível salvar')
+      expect(screen.getByTestId('team-moderation-rename-input-team-1')).toBeDefined()
+      expect(mockedTeamsGet).toHaveBeenCalledTimes(1)
+    })
+
+    it('reports a failed move inline', async () => {
+      mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+      mockedMemberMove.mockRejectedValue(new Error('network down'))
+      renderScreen()
+
+      await waitFor(() => expect(screen.getByTestId('team-moderation-member-row-u3')).toBeDefined())
+      fireEvent.click(screen.getByTestId('team-moderation-move-select-u3'))
+      fireEvent.click(await screen.findByRole('option', { name: 'Blockly Busters' }))
+      fireEvent.click(screen.getByTestId('team-moderation-move-action-u3'))
+
+      const alert = await screen.findByTestId('team-moderation-move-error-u3')
+      expect(alert.textContent).toContain('Não foi possível mover este integrante')
+      expect(mockedTeamsGet).toHaveBeenCalledTimes(1)
+    })
+
+    it('reports a failed member removal inline', async () => {
+      mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+      mockedMemberDelete.mockRejectedValue(new Error('network down'))
+      renderScreen()
+
+      await waitFor(() =>
+        expect(screen.getByTestId('team-moderation-remove-member-action-u1')).toBeDefined(),
+      )
+      fireEvent.click(screen.getByTestId('team-moderation-remove-member-action-u1'))
+      fireEvent.click(await screen.findByTestId('team-moderation-remove-member-confirm-confirm-u1'))
+
+      const alert = await screen.findByTestId('team-moderation-remove-member-error-u1')
+      expect(alert.textContent).toContain('Não foi possível remover este integrante')
+      expect(mockedTeamsGet).toHaveBeenCalledTimes(1)
+    })
+
+    it('reports a failed team removal inline', async () => {
+      mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+      mockedTeamsDelete.mockRejectedValue(new Error('network down'))
+      renderScreen()
+
+      await waitFor(() =>
+        expect(screen.getByTestId('team-moderation-remove-team-action-team-2')).toBeDefined(),
+      )
+      fireEvent.click(screen.getByTestId('team-moderation-remove-team-action-team-2'))
+      fireEvent.click(
+        await screen.findByTestId('team-moderation-remove-team-confirm-confirm-team-2'),
+      )
+
+      const alert = await screen.findByTestId('team-moderation-remove-team-error-team-2')
+      expect(alert.textContent).toContain('Não foi possível remover este time')
+      expect(mockedTeamsGet).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('does not blame a missing destination team for an undeclared move status', async () => {
+    mockedTeamsGet.mockResolvedValue(jsonResponse(200, organizerTeamsList()))
+    mockedMemberMove.mockResolvedValue(jsonResponse(500, { error: 'internal_error' }))
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('team-moderation-member-row-u3')).toBeDefined())
+    fireEvent.click(screen.getByTestId('team-moderation-move-select-u3'))
+    fireEvent.click(await screen.findByRole('option', { name: 'Blockly Busters' }))
+    fireEvent.click(screen.getByTestId('team-moderation-move-action-u3'))
+
+    const alert = await screen.findByTestId('team-moderation-move-error-u3')
+    expect(alert.textContent).toContain('Não foi possível mover este integrante')
+    expect(alert.textContent).not.toContain('não existe mais')
+  })
 })
 
 // #223: the moderation cards are a reading surface, so they move to the panel

@@ -424,7 +424,8 @@
         "errors": {
           "teamFull": "O time de destino está cheio.",
           "teamNotFound": "O time de destino não existe mais.",
-          "memberNotFound": "Esse integrante não pertence mais a um time."
+          "memberNotFound": "Esse integrante não pertence mais a um time.",
+          "failed": "Não foi possível mover este integrante. Tente novamente."
         }
       },
       "removeMember": {

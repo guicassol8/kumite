@@ -424,7 +424,8 @@
         "errors": {
           "teamFull": "The destination team is full.",
           "teamNotFound": "The destination team no longer exists.",
-          "memberNotFound": "This member no longer belongs to a team."
+          "memberNotFound": "This member no longer belongs to a team.",
+          "failed": "Could not move this member. Please try again."
         }
       },
       "removeMember": {

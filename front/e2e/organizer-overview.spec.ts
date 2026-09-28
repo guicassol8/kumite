@@ -248,6 +248,9 @@ test.describe('organizer overview', () => {
     page,
     roundSlot,
   }) => {
+    // Waits on the real clock by design: two 5 s polls, a judged submission,
+    // and the overview's three retries before its error shows.
+    test.slow()
     const liveEvidence = (name: string) => `e2e/evidence/279/${name}.png`
     const liveUrl = `${BACK_URL}/organizer/stats/live`
     const isLivePoll = (res: { url: () => string; ok: () => boolean }) =>
@@ -316,5 +319,15 @@ test.describe('organizer overview', () => {
     await expect(page.getByTestId('overview-live-sse-connections')).toBeVisible()
     await page.screenshot({ path: liveEvidence('05-live-card-dark'), fullPage: true })
     await page.evaluate(() => localStorage.removeItem('kumite:theme'))
+
+    // /organizer/stats goes to the database and the live card does not: when
+    // the former fails, the latter still answers, next to the overview's error.
+    await page.route(`${BACK_URL}/organizer/stats`, (route) =>
+      route.fulfill({ status: 500, json: { error: 'internal' } }),
+    )
+    await page.reload()
+    await expect(page.getByTestId('overview-error')).toBeVisible()
+    await expect(page.getByTestId('overview-live-sse-connections')).toBeVisible()
+    await page.screenshot({ path: liveEvidence('06-live-card-stats-down'), fullPage: true })
   })
 })

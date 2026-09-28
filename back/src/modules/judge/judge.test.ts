@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { JudgeCase, JudgeConfig, Workspace } from './judge.schema'
 import { WorkspaceSchema } from './judge.schema'
-import { generateJudgeSource, runJudge, runJudgeAgainstWorker } from './judge.service'
+import { generateJudgeSource, getJudgeLoad, runJudge, runJudgeAgainstWorker } from './judge.service'
 
 const TEST_TIMEOUT_MS = 15_000
 
@@ -164,6 +164,28 @@ describe('runJudge', () => {
       expect(results[0]).toEqual({ outcome: 'passed', ms: 0 })
       expect(results[1]?.outcome).toBe('runtime_error')
       expect(results[2]?.outcome).toBe('runtime_error')
+    },
+    TEST_TIMEOUT_MS,
+  )
+})
+
+describe('getJudgeLoad', () => {
+  // #279: the organizer's live card reads the semaphore as-is. The slot is
+  // claimed synchronously, before runJudgeAgainstWorker's first await, so five
+  // calls fired in one tick against a limit of 3 land exactly at 3 running and
+  // 2 queued — no timer, no sleep.
+  it(
+    'reports 3 in flight and 2 waiting when 5 submissions share 3 slots',
+    async () => {
+      const cases: JudgeCase[] = [{ input: 'a', expected: 'a' }]
+      const runs = Array.from({ length: 5 }, () =>
+        runJudgeAgainstWorker(CRASH_WORKER_URL, 'unused', cases, { ...testConfig, concurrency: 3 }),
+      )
+
+      expect(getJudgeLoad()).toEqual({ inFlight: 3, waiting: 2 })
+
+      await Promise.all(runs)
+      expect(getJudgeLoad()).toEqual({ inFlight: 0, waiting: 0 })
     },
     TEST_TIMEOUT_MS,
   )

@@ -17,6 +17,7 @@ describe('DenominatorsNotice (#318)', () => {
       i18n.t('leaderboard.denominators.inconsistent.description'),
     )
     expect(notice.className).toContain('border-warning')
+    expect(notice.getAttribute('role')).toBe('alert')
     expect(screen.queryByTestId('leaderboard-denominators-unknown')).toBeNull()
   })
 
@@ -26,6 +27,8 @@ describe('DenominatorsNotice (#318)', () => {
     const note = screen.getByTestId('leaderboard-denominators-unknown')
     expect(note.textContent).toContain(i18n.t('leaderboard.denominators.unknown.description'))
     expect(note.className).not.toContain('border-warning')
+    // A quiet note, not an assertive alert a screen reader would interrupt for.
+    expect(note.getAttribute('role')).toBe('note')
     expect(screen.queryByTestId('leaderboard-denominators-inconsistent')).toBeNull()
   })
 

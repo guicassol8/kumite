@@ -25,9 +25,11 @@ import {
 // leaderboard-offline-fallback) announces it over the stream, and the Rodada
 // tab rightly switches to that live round. Nor can `page.route` serve it — a
 // fulfilled body ends at once, and the reconnect loop would flash the
-// "reconnecting" banner into every capture. So `stubQuietSse` answers the
-// page's `/sse` fetch with a stream that says "no round open" and stays open:
-// the screen is live, and quiet.
+// "reconnecting" banner into every capture. So `stubSse` answers the page's
+// `/sse` fetch with a stream that stays open: by default it says "no round
+// open" (the screen is live, and quiet). Only the transport is stubbed — the
+// app's own sse-client still reads the body and parses every frame through
+// the `SseEventSchema` mirror, which is what the live-round test relies on.
 const evidence = (name: string) => `e2e/evidence/318/${name}.png`
 
 type RoundRankingResponse = InferResponseType<(typeof api.rounds)[':id']['ranking']['$get'], 200>
@@ -143,24 +145,31 @@ async function participantToken(request: APIRequestContext) {
   return login(request, email, PASSWORD)
 }
 
-// Runs before the app on every navigation: wraps `fetch` so `/sse` gets one
-// `state.sync` frame with no open round and then a body that never ends (it
-// errors only when the client aborts, as a real socket would).
-async function stubQuietSse(page: Page) {
-  await page.addInitScript(() => {
+// Runs before the app on every navigation: wraps `fetch` so `/sse` gets
+// `frames` (by default one `state.sync` with no open round) and then a body
+// that never ends (it errors only when the client aborts, as a real socket
+// would).
+type SseFrame = Record<string, unknown>
+const quietFrames = (): SseFrame[] => [
+  {
+    type: 'state.sync',
+    serverTime: new Date().toISOString(),
+    round: null,
+    submissionsPaused: false,
+  },
+]
+
+async function stubSse(page: Page, frames: SseFrame[]) {
+  await page.addInitScript((frames) => {
     const realFetch = window.fetch.bind(window)
     window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input instanceof Request ? input.url : String(input)
       if (new URL(url, window.location.href).pathname !== '/sse') return realFetch(input, init)
-      const frame = {
-        type: 'state.sync',
-        serverTime: new Date().toISOString(),
-        round: null,
-        submissionsPaused: false,
-      }
       const body = new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(frame)}\n\n`))
+          for (const frame of frames) {
+            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(frame)}\n\n`))
+          }
           init?.signal?.addEventListener('abort', () => controller.error(init.signal?.reason))
         },
       })
@@ -168,13 +177,17 @@ async function stubQuietSse(page: Page) {
         new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
       )
     }
-  })
+  }, frames)
 }
 
 // Routes are registered once per page; `verdict.current` picks what the
 // ranking mock answers, so a reload is all it takes to switch scenarios.
-async function mockRanking(page: Page, verdict: { current: Verdict }) {
-  await stubQuietSse(page)
+async function mockRanking(
+  page: Page,
+  verdict: { current: Verdict },
+  sseFrames: SseFrame[] = quietFrames(),
+) {
+  await stubSse(page, sseFrames)
   await page.route(`${BACK_URL}/teams`, (route) => route.fulfill({ json: teamsFixture }))
   await page.route(`${BACK_URL}/rounds`, (route) =>
     route.fulfill({
@@ -310,5 +323,48 @@ test.describe('leaderboard denominators notice (#318)', () => {
     await expect(page.getByTestId('leaderboard-denominators-inconsistent')).toHaveCount(0)
     await expect(page.getByTestId('leaderboard-denominators-unknown')).toHaveCount(0)
     await capture(page, '04-participante-inconsistent-sem-aviso')
+  })
+
+  // The bug behind #318's first step: the front's hand-written SSE mirror
+  // dropped `denominators`, so the verdict vanished exactly while a round was
+  // live. Here the stream announces an open round and pushes its
+  // `ranking.updated` as `inconsistent`, while REST answers `consistent` for
+  // the same round — so the warning can only have come through the app's
+  // sse-client and the mirror's parse.
+  test('the organizer is warned while the round is live over the stream', async ({
+    page,
+    request,
+  }) => {
+    const now = Date.now()
+    const liveFrames: SseFrame[] = [
+      {
+        type: 'state.sync',
+        serverTime: new Date(now).toISOString(),
+        round: { id: roundId, closesAt: new Date(now + 20 * 60_000).toISOString() },
+        submissionsPaused: false,
+      },
+      {
+        type: 'ranking.updated',
+        serverTime: new Date(now).toISOString(),
+        round: roundRanking('inconsistent'),
+        event: eventRanking,
+      },
+    ]
+    await mockRanking(page, { current: 'consistent' }, liveFrames)
+    const organizerToken = await login(request, ORGANIZER_EMAIL, ORGANIZER_PASSWORD)
+    await page.addInitScript((token) => localStorage.setItem('kumite-token', token), organizerToken)
+    await page.setViewportSize({ width: 1280, height: 800 })
+
+    await page.goto('/leaderboard')
+    await expect(page.getByTestId('leaderboard-live-chip')).toBeVisible()
+    await expect(page.getByTestId('leaderboard-tab-round')).toHaveAttribute('data-state', 'active')
+    await expect(page.getByTestId('leaderboard-table')).toBeVisible()
+    await expect(page.getByTestId('leaderboard-last-closed-label')).toHaveCount(0)
+    const inconsistent = page.getByTestId('leaderboard-denominators-inconsistent')
+    await expect(inconsistent).toBeVisible()
+    await expect(inconsistent).toContainText('Pontuações desta rodada não são comparáveis')
+    await expect(page.getByTestId('leaderboard-legend')).toContainText('Maior valor')
+    await page.waitForTimeout(200) // let the tab pill's CSS transition settle
+    await capture(page, '07-organizador-inconsistent-ao-vivo')
   })
 })

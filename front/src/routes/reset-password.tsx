@@ -116,19 +116,33 @@ function ResetPasswordScreen() {
   }
 
   async function onSubmit(values: ResetPasswordFormValues) {
-    const res = await api.auth['complete-password-reset'].$post({
-      json: { email: values.email, otp: values.otp, newPassword: values.newPassword },
-    })
+    // #195: a failure that is not the code's fault — a dead network, a 5xx —
+    // says so, and the form keeps every field, so retrying is one click with
+    // the same code. Calling it "invalid code" would send the user off to
+    // request a new one while the one they have is still good.
+    try {
+      const res = await api.auth['complete-password-reset'].$post({
+        json: { email: values.email, otp: values.otp, newPassword: values.newPassword },
+      })
 
-    if (res.status !== 204) {
-      // Single generic error, never field-level — mirrors the back's
-      // non-oracle design (unknown email, wrong/expired code, and an
-      // exhausted attempt count all look identical).
-      form.setError('root', { message: t('auth.resetPassword.errors.invalidOtp') })
-      return
+      if (res.status === 204) {
+        setSucceeded(true)
+        return
+      }
+
+      if (res.status === 400) {
+        // Single generic error, never field-level — mirrors the back's
+        // non-oracle design (unknown email, wrong/expired code, and an
+        // exhausted attempt count all look identical).
+        form.setError('root', { message: t('auth.resetPassword.errors.invalidOtp') })
+        return
+      }
+    } catch {
+      // Falls through: react-hook-form rethrows whatever escapes onSubmit, so
+      // without this catch the rejection went unhandled with nothing on screen.
     }
 
-    setSucceeded(true)
+    form.setError('root', { message: t('auth.resetPassword.errors.unexpected') })
   }
 
   const requestError = requestForm.formState.errors.root?.message

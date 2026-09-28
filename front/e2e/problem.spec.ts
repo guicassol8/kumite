@@ -25,6 +25,8 @@ import {
 const evidence = (name: string) => `e2e/evidence/7/${name}.png`
 // #206: the team's own best score while the round is still open.
 const evidence206 = (name: string) => `e2e/evidence/206/${name}.png`
+// #280: the verdict panel names the attempt within the round.
+const evidence280 = (name: string) => `e2e/evidence/280/${name}.png`
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -186,6 +188,12 @@ test.describe('problem screen (#7)', () => {
     }
     await expect(page.getByTestId('problem-results-panel')).toBeVisible()
     await page.screenshot({ path: evidence('04-submissao-com-veredito'), fullPage: true })
+    // #280: the round's own attempt count, the team's first here. The panel
+    // lives in the results pane's own scroll area, so it is scrolled to first.
+    const attempt = page.getByTestId('problem-verdict-attempt')
+    await expect(attempt).toContainText('1')
+    await attempt.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: evidence280('01-veredito-com-tentativa') })
 
     // #206: the 201 refreshes the team's best in place — no reload — while
     // the round is still open.

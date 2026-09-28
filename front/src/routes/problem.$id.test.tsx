@@ -26,10 +26,16 @@ vi.mock('@/lib/sse-client', () => ({
 
 import '@/i18n'
 
-import { ROOT_BLOCK_TYPE, type WorkspaceState } from '@kumite/blocks'
+import {
+  INPUT_BLOCK_TYPE,
+  ROOT_BLOCK_TYPE,
+  raizDesabilitada,
+  type WorkspaceState,
+} from '@kumite/blocks'
 import * as Blockly from 'blockly'
 import i18n from '@/i18n'
 import { api } from '@/lib/api'
+import { applyBlocklyLocale } from '@/lib/blockly-setup'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import { connectEventStream } from '@/lib/sse-client'
 import type { SseEvent } from '@/lib/sse-schema'
@@ -671,6 +677,99 @@ describe('ProblemScreen', () => {
       expect(mockedGet).toHaveBeenCalledTimes(2)
       expect(screen.queryByTestId('problem-load-error')).toBeNull()
       expect(screen.getByTestId('blockly-workspace')).toBe(editor)
+    })
+  })
+
+  // #183: Executar generated the code without the UI locale, and
+  // `generateSolution` re-registers the kumite blocks globally, so every block
+  // created afterwards (the Variables flyout, the fresh root of "Limpar
+  // blocos") came out in pt. Submeter sends the locale to the back and never
+  // touched the front registry.
+  describe('the block labels after Executar and Submeter (#183)', () => {
+    /** What a block created from the global registry now would read. */
+    function registryLabels(): { root: string; input: string } {
+      const workspace = new Blockly.Workspace()
+      try {
+        return {
+          root: workspace.newBlock(ROOT_BLOCK_TYPE).toString(),
+          input: workspace.newBlock(INPUT_BLOCK_TYPE).toString(),
+        }
+      } finally {
+        workspace.dispose()
+      }
+    }
+
+    afterEach(() => {
+      applyBlocklyLocale('pt')
+    })
+
+    const runCases = [
+      {
+        language: 'en',
+        message: 'There is a disabled block in your solution. Re-enable it to continue.',
+        root: ['solve', 'return'],
+        input: 'input',
+      },
+      {
+        language: 'es',
+        message: 'Hay un bloque deshabilitado en tu solución. Reactivalo para continuar.',
+        root: ['resolver', 'devolver'],
+        input: 'entrada',
+      },
+      {
+        language: 'pt',
+        message: 'Há um bloco desabilitado na sua solução. Reative-o para continuar.',
+        root: ['resolver', 'retornar'],
+        input: 'entrada',
+      },
+    ] as const
+
+    for (const expected of runCases) {
+      it(`keeps the blocks in ${expected.language} after Executar`, async () => {
+        await i18n.changeLanguage(expected.language)
+        // A disabled root goes through codegen and stops there, so no Worker
+        // is needed in jsdom.
+        saveWorkspaceState(fakeUser.id, 'p1', raizDesabilitada)
+        mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+
+        renderProblem()
+        await screen.findByTestId('blockly-workspace')
+        fireEvent.click(screen.getByTestId('problem-run-button'))
+
+        expect((await screen.findByTestId('problem-results-invalid')).textContent).toContain(
+          expected.message,
+        )
+        const labels = registryLabels()
+        expect(labels.root).toBe(`${expected.root[0]} ? ${expected.root[1]} ?`)
+        expect(labels.input).toBe(expected.input)
+      })
+    }
+
+    it('keeps the blocks in es after Submeter and sends the locale', async () => {
+      await i18n.changeLanguage('es')
+      withTeam()
+      saveWorkspaceState(fakeUser.id, 'p1', raizDesabilitada)
+      mockedGet.mockResolvedValue(jsonResponse(200, participantProblem()))
+      mockedSubmit.mockResolvedValue(
+        jsonResponse(201, {
+          submissionId: 's1',
+          attemptNumber: 1,
+          attemptInRound: 1,
+          score: 0,
+          maxScore: 20,
+          cases: [],
+        }),
+      )
+
+      renderProblem()
+      await screen.findByTestId('problem-submit-button')
+      fireEvent.click(screen.getByTestId('problem-submit-button'))
+
+      expect(await screen.findByTestId('problem-verdict-panel')).toBeDefined()
+      expect(mockedSubmit).toHaveBeenCalledWith({
+        json: expect.objectContaining({ problemId: 'p1', locale: 'es' }),
+      })
+      expect(registryLabels().root).toBe('resolver ? devolver ?')
     })
   })
 

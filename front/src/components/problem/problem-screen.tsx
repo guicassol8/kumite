@@ -147,7 +147,7 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
   const hasTeam = Boolean(teams.data?.myTeamId)
 
   const examples = problem.data?.examples ?? []
-  const { state: runState, run } = useExampleRun(examples)
+  const { state: runState, run } = useExampleRun(examples, locale)
   const isRunning = runState.status === 'running'
 
   const [verdict, setVerdict] = useState<SubmissionResult | null>(null)

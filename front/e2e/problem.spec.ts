@@ -188,10 +188,12 @@ test.describe('problem screen (#7)', () => {
     }
     await expect(page.getByTestId('problem-results-panel')).toBeVisible()
     await page.screenshot({ path: evidence('04-submissao-com-veredito'), fullPage: true })
-    // #280: the round's own attempt count, the team's first here. The panel
-    // lives in the results pane's own scroll area, so it is scrolled to first.
+    // #280: the round's own attempt count, the team's first here. Exact text
+    // (the suite pins pt-BR): a bare `1` would also pass on "Tentativa 10".
+    // The panel lives in the results pane's own scroll area, so it is
+    // scrolled to first.
     const attempt = page.getByTestId('problem-verdict-attempt')
-    await expect(attempt).toContainText('1')
+    await expect(attempt).toHaveText('Tentativa 1')
     await attempt.scrollIntoViewIfNeeded()
     await page.screenshot({ path: evidence280('01-veredito-com-tentativa') })
 

@@ -36,6 +36,7 @@ const roundRanking: RoundRanking = {
   roundId: 'r1',
   roundName: 'Rodada 1',
   problemIds: ['p1'],
+  denominators: 'consistent',
   teams: [
     {
       teamId: 't1',

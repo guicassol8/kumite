@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { SessionRevokedEventSchema, SseEventSchema, StateSyncEventSchema } from './sse-schema'
+import {
+  RankingUpdatedEventSchema,
+  SessionRevokedEventSchema,
+  SseEventSchema,
+  StateSyncEventSchema,
+} from './sse-schema'
 
 // The front mirrors back/src/modules/sse/sse.schema.ts by hand (the `/sse`
 // channel is outside the typed RPC client), so the wire contract is pinned on
@@ -41,5 +46,44 @@ describe('sse-schema', () => {
   it('rejects the internal user.deactivated control event', () => {
     const event = { type: 'user.deactivated', userId: crypto.randomUUID() }
     expect(SseEventSchema.safeParse(event).success).toBe(false)
+  })
+
+  // #318: `z.object` strips unknown keys, so a mirror without `denominators`
+  // silently dropped the verdict exactly while a round is live over SSE.
+  describe('ranking.updated round denominators (#318)', () => {
+    const round = {
+      roundId: 'round-1',
+      roundName: 'Rodada 1',
+      problemIds: ['problem-1'],
+      teams: [],
+    }
+    const event = { teams: [] }
+
+    it('round-trips a ranking.updated event keeping round.denominators', () => {
+      for (const denominators of ['consistent', 'inconsistent', 'unknown'] as const) {
+        const wire = JSON.parse(
+          JSON.stringify({
+            type: 'ranking.updated',
+            serverTime: new Date(),
+            round: { ...round, denominators },
+            event,
+          }),
+        )
+
+        const parsed = SseEventSchema.parse(wire)
+
+        expect(parsed.type === 'ranking.updated' && parsed.round?.denominators).toBe(denominators)
+      }
+    })
+
+    it('rejects a ranking.updated round without denominators', () => {
+      const wire = {
+        type: 'ranking.updated',
+        serverTime: new Date().toISOString(),
+        round,
+        event,
+      }
+      expect(RankingUpdatedEventSchema.safeParse(wire).success).toBe(false)
+    })
   })
 })

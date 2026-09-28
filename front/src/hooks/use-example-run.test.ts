@@ -201,13 +201,6 @@ function registryLabels(): { root: string; input: string } {
 // #183: `generateSolution` re-registers the kumite blocks globally, so a run
 // without the UI locale used to flip every block created afterwards to pt.
 describe('useExampleRun keeps the block locale (#183)', () => {
-  let locale: BlockLocale = 'pt'
-
-  beforeEach(() => {
-    // The editor already applied the UI locale before the click.
-    defineKumiteBlocks(locale)
-  })
-
   afterEach(() => {
     defineKumiteBlocks('pt')
   })
@@ -245,8 +238,8 @@ describe('useExampleRun keeps the block locale (#183)', () => {
   for (const expected of cases) {
     describe(`in ${expected.locale}`, () => {
       beforeEach(() => {
-        locale = expected.locale
-        defineKumiteBlocks(locale)
+        // The editor already applied the UI locale before the click.
+        defineKumiteBlocks(expected.locale)
       })
 
       it('refuses in the UI language and leaves the registry in it', async () => {
@@ -267,7 +260,6 @@ describe('useExampleRun keeps the block locale (#183)', () => {
   }
 
   it('uses the new locale on the next run after the language changes', async () => {
-    locale = 'pt'
     defineKumiteBlocks('pt')
     const workers = deferredWorkers()
     const { result, rerender } = renderHook(

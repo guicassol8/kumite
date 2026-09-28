@@ -25,8 +25,8 @@ function NewProblemScreen() {
   const { t } = useTranslation()
   const navigate = Route.useNavigate()
   const queryClient = useQueryClient()
-  // `POST /organizer/problems` only takes difficulty+points, so creating a
-  // problem is a POST followed by a PATCH. Holding the created id means a
+  // `POST /organizer/problems` only takes difficulty, points and visibility,
+  // so creating a problem is a POST followed by a PATCH. Holding the created id means a
   // failed PATCH is retried on its own instead of orphaning another draft.
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [rootError, setRootError] = useState<string | undefined>(undefined)
@@ -38,10 +38,14 @@ function NewProblemScreen() {
     let id = createdId
     if (!id) {
       const created = await api.organizer.problems.$post({
-        json: { difficulty: values.difficulty, points: values.points },
+        json: {
+          difficulty: values.difficulty,
+          points: values.points,
+          visibility: values.visibility,
+        },
       })
       if (created.status !== 201) {
-        // This POST carries only difficulty and points, so it is the request
+        // This POST carries only difficulty, points and visibility, so it is the request
         // that refuses an over-the-ceiling score — and it sends no
         // translations, hence the empty array.
         return {

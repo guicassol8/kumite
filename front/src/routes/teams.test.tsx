@@ -274,6 +274,69 @@ describe('TeamsScreen — my team panel', () => {
 
     await waitFor(() => expect(mockedLeave).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(2))
+    expect(screen.queryByTestId('teams-action-error')).toBeNull()
+  })
+
+  // #195 (achado #26): the leave used to discard the response, so every one of
+  // these ended with the participant still on the team and nothing on screen.
+  async function confirmLeave() {
+    await waitFor(() => expect(screen.getByTestId('my-team-leave')).toBeDefined())
+    fireEvent.click(screen.getByTestId('my-team-leave'))
+    await waitFor(() => expect(screen.getByTestId('teams-leave-dialog')).toBeDefined())
+    fireEvent.click(screen.getByTestId('teams-leave-confirm'))
+  }
+
+  it('says the roster is frozen when the API refuses the leave with 409 team_frozen', async () => {
+    // The listing went stale: it still says "not frozen", so the button is
+    // enabled and the API is the one that refuses.
+    mockedList.mockResolvedValue(jsonResponse(200, myTeam()))
+    mockedLeave.mockResolvedValue(
+      jsonResponse(409, { error: 'team_frozen', message: 'This team has already submitted' }),
+    )
+    renderTeams()
+    await confirmLeave()
+
+    const alert = await screen.findByTestId('teams-action-error')
+    expect(alert.textContent).toContain('formação está congelada')
+    // The refetch is what brings the frozen notice and the disabled button.
+    await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(2))
+  })
+
+  it('says the participant is no longer on a team on 404 not_in_team', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, myTeam()))
+    mockedLeave.mockResolvedValue(
+      jsonResponse(404, { error: 'not_in_team', message: 'You do not belong to a team' }),
+    )
+    renderTeams()
+    await confirmLeave()
+
+    const alert = await screen.findByTestId('teams-action-error')
+    expect(alert.textContent).toContain('Você não está mais em um time.')
+  })
+
+  it('reports a dead network instead of swallowing the rejection', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, myTeam()))
+    mockedLeave.mockRejectedValue(new Error('network down'))
+    renderTeams()
+    await confirmLeave()
+
+    const alert = await screen.findByTestId('teams-action-error')
+    expect(alert.textContent).toContain('Não foi possível sair do time')
+    expect(screen.getByTestId('my-team-panel')).toBeDefined()
+  })
+
+  it('clears a previous leave error once a retry succeeds', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, myTeam()))
+    mockedLeave.mockRejectedValueOnce(new Error('network down'))
+    renderTeams()
+    await confirmLeave()
+    await screen.findByTestId('teams-action-error')
+
+    mockedLeave.mockResolvedValueOnce(jsonResponse(204, undefined))
+    await confirmLeave()
+
+    await waitFor(() => expect(mockedLeave).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByTestId('teams-action-error')).toBeNull())
   })
 
   it('keeps the roster frozen once the team has submitted', async () => {

@@ -667,7 +667,10 @@
       "mixedLock": "A mistura entre universidades está travada — esse time é de outra universidade.",
       "alreadyInTeam": "Você já está em um time.",
       "notFound": "Esse time não existe mais.",
-      "unexpected": "Não foi possível entrar no time. Tente novamente."
+      "unexpected": "Não foi possível entrar no time. Tente novamente.",
+      "teamFrozen": "Seu time já submeteu uma solução — a formação está congelada e ninguém pode sair. Fale com a organização.",
+      "notInTeam": "Você não está mais em um time.",
+      "leaveUnexpected": "Não foi possível sair do time. Tente novamente."
     },
     "rules": "Times de até {{max}} pessoas. Mistura entre universidades {{rule}}.",
     "mixingAllowed": "liberada",

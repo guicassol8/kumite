@@ -667,7 +667,10 @@
       "mixedLock": "Mixing universities is locked — that team is from another university.",
       "alreadyInTeam": "You are already on a team.",
       "notFound": "That team no longer exists.",
-      "unexpected": "Could not join the team. Please try again."
+      "unexpected": "Could not join the team. Please try again.",
+      "teamFrozen": "Your team has already submitted a solution — the roster is frozen and no one can leave. Talk to the organizers.",
+      "notInTeam": "You are no longer on a team.",
+      "leaveUnexpected": "Could not leave the team. Please try again."
     },
     "rules": "Teams of up to {{max}} people. University mixing is {{rule}}.",
     "mixingAllowed": "allowed",

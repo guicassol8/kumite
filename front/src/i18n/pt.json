@@ -919,6 +919,15 @@
       "event": "Geral"
     },
     "lastClosedRoundLabel": "{{name}} — última rodada encerrada",
+    "denominators": {
+      "inconsistent": {
+        "title": "Pontuações desta rodada não são comparáveis",
+        "description": "Um mesmo problema foi pontuado em escalas diferentes nesta rodada: os casos de teste ou os pontos mudaram depois que já havia submissões. Os totais dos times não podem ser comparados entre si."
+      },
+      "unknown": {
+        "description": "Não é possível confirmar que as pontuações desta rodada estão na mesma escala: há submissões anteriores ao registro da escala."
+      }
+    },
     "notLiveBadge": "não ao vivo",
     "liveChip": "Ao vivo",
     "noSubmission": "—",

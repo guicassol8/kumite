@@ -919,6 +919,15 @@
       "event": "General"
     },
     "lastClosedRoundLabel": "{{name}} — última ronda cerrada",
+    "denominators": {
+      "inconsistent": {
+        "title": "Los puntajes de esta ronda no son comparables",
+        "description": "Un mismo problema se puntuó en escalas diferentes en esta ronda: los casos de prueba o los puntos cambiaron cuando ya había envíos. Los totales de los equipos no se pueden comparar entre sí."
+      },
+      "unknown": {
+        "description": "No es posible confirmar que los puntajes de esta ronda estén en la misma escala: hay envíos anteriores al registro de la escala."
+      }
+    },
     "notLiveBadge": "no en vivo",
     "liveChip": "En vivo",
     "noSubmission": "—",

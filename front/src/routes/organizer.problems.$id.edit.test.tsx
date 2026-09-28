@@ -60,6 +60,7 @@ const publishedDetail = {
   points: 20,
   difficulty: 'hard',
   status: 'published',
+  visibility: 'round',
   testCases: [
     { input: [1, 2], expected: 3, hidden: false },
     { input: [4, 5], expected: 9, hidden: true },
@@ -77,6 +78,24 @@ const draftDetail = {
   ...publishedDetail,
   status: 'draft',
   translations: [{ locale: 'pt', title: 'Soma', statementMd: 'Some a e b.' }],
+}
+
+/** A published practice problem judged on its one visible case. */
+const practiceDetail = {
+  ...publishedDetail,
+  visibility: 'practice',
+  testCases: [{ input: [1, 2], expected: 3, hidden: false }],
+}
+
+/** Radix's Select opens on keyboard in jsdom — see problem-form.test.tsx. */
+async function chooseVisibility(visibility: 'round' | 'practice') {
+  const trigger = screen.getByTestId('problem-form-visibility')
+  trigger.focus()
+  fireEvent.keyDown(trigger, { key: 'Enter' })
+  fireEvent.keyDown(await screen.findByTestId(`problem-form-visibility-${visibility}`), {
+    key: 'Enter',
+  })
+  await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
 }
 
 // Radix's Tabs trigger switches on mousedown/focus, not on a bare click.
@@ -238,6 +257,71 @@ describe('EditProblemScreen', () => {
     await waitFor(() =>
       expect(screen.getByTestId('problem-form-error').textContent).toContain('Tente novamente'),
     )
+  })
+
+  // #347: the refusal lands under the Select that caused it, and nothing the
+  // organizer typed is thrown away — no refetch, no remount.
+  it('puts problem_in_round under the visibility control, keeping the typed statement', async () => {
+    mockedDetail.mockResolvedValue(jsonResponse(200, publishedDetail))
+    mockedPatch.mockResolvedValue(
+      jsonResponse(409, {
+        error: 'problem_in_round',
+        message: 'A problem that has been in a round cannot become a practice problem',
+      }),
+    )
+    renderEdit()
+
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+    await chooseVisibility('practice')
+    fireEvent.change(screen.getByTestId('problem-form-statement-pt'), {
+      target: { value: 'Ordene a lista em ordem crescente.' },
+    })
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-visibility-error').textContent).toBe(
+        'Este problema já esteve numa rodada e não pode virar prática.',
+      ),
+    )
+    expect(mockedPatch.mock.calls[0]?.[0].json.visibility).toBe('practice')
+    expect(screen.queryByTestId('problem-form-error')).toBeNull()
+    expect((screen.getByTestId('problem-form-statement-pt') as HTMLTextAreaElement).value).toBe(
+      'Ordene a lista em ordem crescente.',
+    )
+    expect(screen.getByTestId('problem-form-visibility').textContent).toBe('Prática')
+    expect(mockedDetail).toHaveBeenCalledTimes(1)
+  })
+
+  it('puts missing_test_cases on the test-case section', async () => {
+    mockedDetail.mockResolvedValue(jsonResponse(200, practiceDetail))
+    mockedPatch.mockResolvedValue(
+      jsonResponse(400, {
+        error: 'missing_test_cases',
+        message: 'A published round problem needs at least one hidden test case (missing_hidden)',
+      }),
+    )
+    renderEdit()
+
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+    await chooseVisibility('round')
+    fireEvent.click(screen.getByTestId('problem-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('problem-form-cases-error').textContent).toBe(
+        'Para voltar para rodada, um problema publicado precisa de pelo menos um caso visível e um oculto.',
+      ),
+    )
+    expect(mockedPatch.mock.calls[0]?.[0].json.visibility).toBe('round')
+    expect(screen.queryByTestId('problem-form-error')).toBeNull()
+  })
+
+  it('seeds the visibility control from a practice detail', async () => {
+    mockedDetail.mockResolvedValue(jsonResponse(200, practiceDetail))
+    renderEdit()
+
+    await waitFor(() => expect(screen.getByTestId('problem-form')).toBeDefined())
+    expect(screen.getByTestId('problem-form-visibility').textContent).toBe('Prática')
+    expect(screen.getByTestId('problem-form-practice-note')).toBeDefined()
   })
 
   it('keeps an archived problem editable while Publicar stays disabled', async () => {

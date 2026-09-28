@@ -12,6 +12,7 @@ import {
   issuesToProblemFormErrors,
   type ProblemFormError,
   type ProblemFormValues,
+  patchRefusalToProblemFormErrors,
   problemDetailToFormValues,
   type SubmitOutcome,
   savedLocalesOf,
@@ -65,12 +66,19 @@ function EditProblemScreen() {
     // Read once: `readFieldIssues` would consume the body, leaving no way to
     // reach the error code that tells a 409 apart from a generic failure.
     const envelope = await readEnvelope(res)
+    const code = errorCodeFrom(envelope)
     // The translations actually sent are what a `translations[i].*` path indexes
-    // into — buildPatchBody drops the incomplete locales.
+    // into — buildPatchBody drops the incomplete locales. The visibility
+    // refusals (#347) come as a bare code and land on a field of their own, so
+    // neither falls into the generic "could not save". Nothing was written, so
+    // there is no refetch: the form keeps exactly what the organizer typed.
     return {
       ok: false,
-      code: errorCodeFrom(envelope),
-      fieldErrors: issuesToProblemFormErrors(fieldIssuesFrom(envelope), body.translations),
+      code,
+      fieldErrors: [
+        ...patchRefusalToProblemFormErrors(code),
+        ...issuesToProblemFormErrors(fieldIssuesFrom(envelope), body.translations),
+      ],
     }
   }
 

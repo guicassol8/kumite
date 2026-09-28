@@ -267,12 +267,16 @@ async function capture(page: Page, name: string) {
 }
 
 /** Identity § 5: horizontal scroll is never the answer to overflow. */
-async function noOverflow(page: Page) {
+async function noOverflow(page: Page, label?: string) {
   const dimensions = await page.evaluate(() => ({
     width: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth,
   }))
-  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width)
+  expect(
+    dimensions.scrollWidth,
+    label &&
+      `${label}: document scrollWidth ${dimensions.scrollWidth} exceeds viewport ${dimensions.width}`,
+  ).toBeLessThanOrEqual(dimensions.width)
 }
 
 /**
@@ -287,8 +291,22 @@ async function noOverflow(page: Page) {
  * (see the callers), and this one has gone back to being what it always
  * should have been: the extra, panel-scoped detail.
  */
-async function noPanelOverflow(page: Page) {
-  const report = await page.evaluate(() => {
+async function noPanelOverflow(page: Page, label?: string) {
+  const report = await panelOverflowReport(page)
+  const where = label ? `${label}: ` : ''
+  expect(report, `${where}the panel has no <main>`).not.toBeNull()
+  expect(report?.offenders, `${where}elements past the viewport edge`).toEqual([])
+  expect(report?.scrolls, `${where}<main> scrolls sideways`).toBe(false)
+}
+
+/**
+ * The data behind `noPanelOverflow`, without the assertions: whether `<main>`
+ * scrolls sideways and which of its descendants (by `data-testid`, else tag)
+ * cross the viewport's right edge. Split out so a test can prove the probe
+ * names a real offender (#372).
+ */
+async function panelOverflowReport(page: Page) {
+  return page.evaluate(() => {
     const main = document.querySelector('main')
     if (!main) return null
     const width = window.innerWidth
@@ -300,9 +318,6 @@ async function noPanelOverflow(page: Page) {
         .slice(0, 6),
     }
   })
-  expect(report).not.toBeNull()
-  expect(report?.offenders).toEqual([])
-  expect(report?.scrolls).toBe(false)
 }
 
 /** Asserts a CSS property equals the literal value of a design token. */
@@ -620,26 +635,66 @@ test.describe('organizer panel identity (#223)', () => {
     await capture(page, '11-painel-escuro')
   })
 
-  test('no panel screen scrolls sideways, at either width, in any language', async ({
-    page,
-    request,
-  }) => {
+  // #372 — the sweep below is only worth anything if its probe can name a
+  // real culprit. Plant one and make sure it does, so no future change to how
+  // the sweep is split or budgeted can blind it without a red test.
+  test('the sideways-scroll check names the element that overflows', async ({ page, request }) => {
     await installPanel(page, request)
+    await page.setViewportSize(BREAKPOINT)
+    await page.goto('/organizer')
+    await expect(page.getByTestId('organizer-heading')).toBeVisible()
 
-    for (const size of [PHONE, BREAKPOINT]) {
-      await page.setViewportSize(size)
-      for (const route of PANEL_ROUTES) {
+    await page.evaluate((width) => {
+      const probe = document.createElement('div')
+      probe.dataset.testid = 'overflow-probe'
+      probe.style.width = `${width * 2}px`
+      probe.style.height = '1px'
+      document.querySelector('main')?.append(probe)
+    }, BREAKPOINT.width)
+
+    const report = await panelOverflowReport(page)
+    expect(report?.offenders).toContain('overflow-probe')
+    expect(report?.scrolls).toBe(true)
+
+    // …and the assertions the sweep actually runs fail on it with a message
+    // that names the screen and the culprit, not only the raw report above.
+    const label = `/organizer @ ${BREAKPOINT.width}px, pt`
+    await expect(noPanelOverflow(page, label)).rejects.toThrow(label)
+    await expect(noPanelOverflow(page, label)).rejects.toThrow('overflow-probe')
+    await expect(noOverflow(page, label)).rejects.toThrow(`${label}: document scrollWidth`)
+  })
+
+  // One test per width × route, not one for all twelve (#372). The monolith
+  // did 12 navigations and 48 language switches on one page: 26 s without a
+  // trace and ~45 s with one — and CI's retry is the attempt that records a
+  // trace, so the flake's own retry could never pass. Measured on CI run
+  // 36365914830: ~2.2 s per route without a trace, ~3.7 s with one, against
+  // the default 30 s test timeout — a margin of 7× or more, with no
+  // `test.setTimeout`. A real hang still fails fast, and an overflow on one
+  // screen no longer hides the other eleven: the title and the assertion
+  // message both name the route, the width and the language.
+  //
+  // Each test starts from a fresh context (`locale: 'pt-BR'`), so there is no
+  // trailing switch back to PT: the first `switchLanguage` already clicks it.
+  for (const size of [PHONE, BREAKPOINT]) {
+    for (const route of PANEL_ROUTES) {
+      test(`no panel screen scrolls sideways: ${route} at ${size.width}px, in any language`, async ({
+        page,
+        request,
+      }) => {
+        await installPanel(page, request)
+        await page.setViewportSize(size)
         await page.goto(route)
         await expect(page.getByTestId('organizer-heading')).toBeVisible()
         for (const language of LANGUAGES) {
           await switchLanguage(page, language)
+          const label = `${route} @ ${size.width}px, ${language}`
           // Both widths take the whole document since #297; 768 also keeps the
           // panel-scoped detail, which names the offending element.
-          await noOverflow(page)
-          if (size === BREAKPOINT) await noPanelOverflow(page)
+          await noOverflow(page, label)
+          if (size === BREAKPOINT) await noPanelOverflow(page, label)
         }
-        await switchLanguage(page, 'pt')
-      }
+      })
     }
-  })
+  }
 })

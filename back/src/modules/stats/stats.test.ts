@@ -91,8 +91,8 @@ async function addRoundProblem(roundId: string, problemId: string, position = 0)
 let attemptCounter = 0
 
 // roundId is the round the submission was stamped with at accept time (#176).
-// These stats still count `inRound` by time window, which is why the fixtures
-// below can stamp a round and still place a row outside its window.
+// `inRound` reads that stamp, never createdAt, so the fixtures below can put a
+// row's createdAt anywhere and it still counts for the round it carries.
 async function submit(teamId: string, problemId: string, roundId: string, createdAt?: Date) {
   const user = await insertUser()
   attemptCounter += 1
@@ -225,27 +225,58 @@ describe('getEventStats submissions and rounds', () => {
     expect(stats.submissions.inRound).toBeNull()
   })
 
-  it('counts only the open round window in inRound, not every submission of its problems', async () => {
+  it('counts a submission whose judging ends after the round closed in inRound', async () => {
+    // The accept gate stamps round_id while the round is open; judging can
+    // finish (and createdAt land) after closedAt. The stamp decides, not time.
     const team = await insertTeam('Time A')
     const problem = await insertProblem()
-    const openedAt = new Date(Date.now() - 10 * 60_000)
+    const closedAt = new Date(Date.now() - 30 * 60_000)
     const round = await insertRound('Rodada 1', {
+      status: 'closed',
+      openedAt: new Date(Date.now() - 90 * 60_000),
+      closesAt: closedAt,
+      closedAt,
+    })
+    await addRoundProblem(round.id, problem.id)
+
+    await submit(team.id, problem.id, round.id, new Date(closedAt.getTime() + 2 * 60_000))
+
+    const stats = await getEventStats(db)
+
+    expect(stats.round.lastClosed?.id).toBe(round.id)
+    expect(stats.submissions.total).toBe(1)
+    expect(stats.submissions.inRound).toBe(1)
+  })
+
+  it('counts only submissions stamped with the open round, even when a row stamped with another round falls in its window', async () => {
+    const team = await insertTeam('Time A')
+    const problem = await insertProblem()
+    const older = await insertRound('Rodada 1', {
+      status: 'closed',
+      openedAt: new Date(Date.now() - 120 * 60_000),
+      closesAt: new Date(Date.now() - 60 * 60_000),
+      closedAt: new Date(Date.now() - 60 * 60_000),
+    })
+    const openedAt = new Date(Date.now() - 10 * 60_000)
+    const open = await insertRound('Rodada 2', {
       status: 'open',
       openedAt,
       closesAt: new Date(Date.now() + 30 * 60_000),
     })
-    await addRoundProblem(round.id, problem.id)
+    await addRoundProblem(older.id, problem.id)
+    await addRoundProblem(open.id, problem.id)
 
-    await submit(team.id, problem.id, round.id, new Date(openedAt.getTime() - 60_000))
-    await submit(team.id, problem.id, round.id, new Date(openedAt.getTime() + 60_000))
-    await submit(team.id, problem.id, round.id, new Date(openedAt.getTime() + 120_000))
+    // Stamped with the older round, yet created inside the open round's window.
+    await submit(team.id, problem.id, older.id, new Date(openedAt.getTime() + 30_000))
+    await submit(team.id, problem.id, open.id, new Date(openedAt.getTime() + 60_000))
+    await submit(team.id, problem.id, open.id, new Date(openedAt.getTime() + 120_000))
 
     const stats = await getEventStats(db)
 
     expect(stats.submissions.total).toBe(3)
     expect(stats.submissions.inRound).toBe(2)
-    expect(stats.round.active?.id).toBe(round.id)
-    expect(stats.round.lastClosed).toBeNull()
+    expect(stats.round.active?.id).toBe(open.id)
+    expect(stats.round.lastClosed?.id).toBe(older.id)
   })
 
   it('falls back to the last closed round as the reference when none is open', async () => {

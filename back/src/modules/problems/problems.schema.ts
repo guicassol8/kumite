@@ -157,6 +157,11 @@ export const ExampleCaseSchema = z.object({
   expected: JsonValueSchema,
 })
 
+// The step-by-step demo of a seeded practice problem (#212). The front types its
+// map of demo scripts by this enum through AppType, so a key added here without
+// a script there fails `pnpm -r typecheck`.
+export const PracticeDemoKeySchema = z.enum(['devolva-entrada', 'e-par', 'soma-lista'])
+
 export const ParticipantProblemSchema = z.object({
   id: z.string(),
   points: z.number().int(),
@@ -176,8 +181,13 @@ export const ParticipantProblemSchema = z.object({
   // The team's best submission in this round, open or closed (#206); null
   // when the team never submitted it or the caller has no team.
   bestSubmission: BestSubmissionSchema.nullable(),
+  // Which demo the practice screen can replay (#212): set only on a practice
+  // problem whose pt title is a seeded one (db/practice-problems.ts), null on
+  // a round problem and on any practice problem the organizer wrote.
+  demoKey: PracticeDemoKeySchema.nullable(),
 })
 
+export type PracticeDemoKey = z.infer<typeof PracticeDemoKeySchema>
 export type ParticipantProblemParams = z.infer<typeof ParticipantProblemParamsSchema>
 export type ParticipantProblemQuery = z.infer<typeof ParticipantProblemQuerySchema>
 export type ExampleCase = z.infer<typeof ExampleCaseSchema>

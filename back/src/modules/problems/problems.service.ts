@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 
 import type { Db } from '../../db/client'
+import { practiceDemoKeyFor } from '../../db/practice-problems'
 import { problemsTable, problemTranslationsTable } from '../../db/schema'
 import { canonicalJson } from '../../lib/json'
 import type { Locale } from '../../lib/locale'
@@ -133,6 +134,8 @@ export async function getPublishedProblem(
       roundId: null,
       roundStatus: 'none',
       bestSubmission: null,
+      // Matched on the pt title whatever locale is served (#212).
+      demoKey: practiceDemoKeyFor(translations.find((t) => t.locale === 'pt')?.title),
     }
   }
 
@@ -161,6 +164,7 @@ export async function getPublishedProblem(
       roundId: access.roundId,
       roundStatus: 'open',
       bestSubmission,
+      demoKey: null,
     }
   }
 
@@ -176,6 +180,7 @@ export async function getPublishedProblem(
     roundId: null,
     roundStatus: 'closed',
     bestSubmission,
+    demoKey: null,
   }
 }
 

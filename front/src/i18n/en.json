@@ -607,6 +607,7 @@
         },
         "submissions": {
           "label": "Submissions in the last minute",
+          "inFlight_zero": "{{count}} teams being judged",
           "inFlight_one": "{{count}} team being judged",
           "inFlight_other": "{{count}} teams being judged"
         },

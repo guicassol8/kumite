@@ -202,14 +202,14 @@ function OrganizerOverviewScreen() {
           </Card>
 
           {/* An open round is the one thing on this screen that is happening
-                right now, so it is the only card the identity lets carry the
-                brand border. */}
+              right now, so it is the only card the identity lets carry the
+              brand border. */}
           <Card data-testid="overview-round-card" className={cn(activeRound && 'border-brand')}>
             <CardHeader className="flex flex-row items-start justify-between gap-2">
               <CardTitle className={CARD_TITLE}>{t('organizer.overview.round.title')}</CardTitle>
               <div className="flex flex-wrap justify-end gap-2">
                 {/* Shown whenever the flag is on, round or not (#285): a
-                      pause left on carries over to the next round. */}
+                    pause left on carries over to the next round. */}
                 {eventStream.submissionsPaused && (
                   <Badge variant="warning" data-testid="overview-submissions-paused-badge">
                     {t('organizer.overview.round.pausedBadge')}
@@ -259,8 +259,8 @@ function OrganizerOverviewScreen() {
                     <Link to="/organizer/rounds">{t('organizer.overview.round.manageCta')}</Link>
                   </Button>
                   {/* Until #223 these two shared `overview-round-cta`, because
-                        only one of them was ever on screen; now that both are,
-                        the leaderboard link needs a name of its own. */}
+                      only one of them was ever on screen; now that both are,
+                      the leaderboard link needs a name of its own. */}
                   <Button
                     asChild
                     size="sm"
@@ -305,7 +305,7 @@ function OrganizerOverviewScreen() {
       {stats.data && (
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Same condition as before: a podium only while no round is open
-                and one has already closed. */}
+              and one has already closed. */}
           {!activeRound && lastClosedRound && (
             <Card data-testid="overview-podium-card">
               <CardHeader className="gap-1">
@@ -344,8 +344,8 @@ function OrganizerOverviewScreen() {
                         </span>
                         <span className="min-w-0 flex-1 wrap-anywhere font-medium text-sm">
                           {/* Achado #10: the podium is a ranking like any
-                                other, so a team stored blank before #185 would
-                                take a podium place with nothing written on it. */}
+                              other, so a team stored blank before #185 would
+                              take a podium place with nothing written on it. */}
                           {displayTeamName(team.teamName, t('teams.unnamed'))}
                         </span>
                         <span className="font-display font-semibold text-sm tabular-nums">
@@ -362,7 +362,7 @@ function OrganizerOverviewScreen() {
           )}
 
           {/* With a round open there is no podium, so the shortcuts take
-                the whole row instead of leaving half of it blank. */}
+              the whole row instead of leaving half of it blank. */}
           <Card
             data-testid="overview-shortcuts-card"
             className={cn(!(!activeRound && lastClosedRound) && 'lg:col-span-2')}
@@ -374,7 +374,7 @@ function OrganizerOverviewScreen() {
             </CardHeader>
             <CardContent>
               {/* A list of links with hairlines, not a row of buttons: five
-                    of them wrapped into a ragged block at panel width. */}
+                  of them wrapped into a ragged block at panel width. */}
               <ul className="flex flex-col">
                 {(
                   [

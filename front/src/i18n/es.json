@@ -607,6 +607,7 @@
         },
         "submissions": {
           "label": "Envíos en el último minuto",
+          "inFlight_zero": "{{count}} equipos en evaluación",
           "inFlight_one": "{{count}} equipo en evaluación",
           "inFlight_other": "{{count}} equipos en evaluación"
         },

@@ -607,6 +607,7 @@
         },
         "submissions": {
           "label": "Submissões no último minuto",
+          "inFlight_zero": "{{count}} times sendo julgados",
           "inFlight_one": "{{count}} time sendo julgado",
           "inFlight_other": "{{count}} times sendo julgados"
         },

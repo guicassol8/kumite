@@ -6,7 +6,7 @@ vi.mock('@/lib/api', () => ({
   api: { organizer: { stats: { live: { $get: vi.fn() } } } },
 }))
 
-import '@/i18n'
+import i18n from '@/i18n'
 
 import { api } from '@/lib/api'
 
@@ -74,6 +74,24 @@ describe('LiveStatsCard', () => {
     expect(screen.getByTestId('overview-live-submissions-in-flight').textContent).toContain('5')
     const sparkline = screen.getByTestId('overview-live-sparkline')
     expect(sparkline.querySelector('polyline')?.getAttribute('points')?.split(' ')).toHaveLength(15)
+  })
+
+  // CLDR files 0 under pt's "one" category, so without a `_zero` key the idle
+  // card (the normal state between submissions) read "0 time sendo julgado".
+  it('reads zero teams in flight in the plural in pt', async () => {
+    await i18n.changeLanguage('pt')
+    mockedLiveGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        liveStats({ submissions: { inFlight: 0, lastMinute: 0, perMinute: Array(15).fill(0) } }),
+      ),
+    )
+    renderCard()
+    await advance(0)
+
+    expect(screen.getByTestId('overview-live-submissions-in-flight').textContent).toBe(
+      '0 times sendo julgados',
+    )
   })
 
   it('shows a loading state until the first answer', () => {

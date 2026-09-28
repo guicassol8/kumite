@@ -9,6 +9,7 @@ import {
   moveTestCase,
   type ProblemFormValues,
   parseJsonField,
+  patchRefusalToProblemFormErrors,
   problemDetailToFormValues,
   savedLocalesOf,
   validateForPublish,
@@ -22,6 +23,7 @@ const detail = {
   points: 20,
   difficulty: 'hard' as const,
   status: 'published' as const,
+  visibility: 'round' as const,
   testCases: [
     { input: [1, 2], expected: 3, hidden: false },
     { input: [4, 5], expected: 9, hidden: true },
@@ -47,6 +49,7 @@ describe('emptyProblemFormValues', () => {
 
     expect(values.difficulty).toBe('easy')
     expect(values.points).toBe(100)
+    expect(values.visibility).toBe('round')
     expect(values.testCases).toEqual([])
     expect(values.translations).toEqual({
       pt: { title: '', statementMd: '' },
@@ -74,6 +77,13 @@ describe('problemDetailToFormValues', () => {
       { input: '[1,2]', expected: '3', hidden: false },
       { input: '[4,5]', expected: '9', hidden: true },
     ])
+  })
+
+  it('seeds the visibility from the detail', () => {
+    expect(problemDetailToFormValues(detail).visibility).toBe('round')
+    expect(problemDetailToFormValues({ ...detail, visibility: 'practice' }).visibility).toBe(
+      'practice',
+    )
   })
 
   it('leaves the locales missing from the detail empty', () => {
@@ -217,6 +227,24 @@ describe('validateForPublish', () => {
     expect(validateForPublish(problemDetailToFormValues(detail), ['pt', 'es', 'en'])).toEqual([])
   })
 
+  it('accepts a practice problem with only a visible case — hidden cases are not required', () => {
+    const values = problemDetailToFormValues(detail)
+    values.visibility = 'practice'
+    values.testCases = [{ input: '[1,2]', expected: '3', hidden: false }]
+
+    expect(validateForPublish(values, [])).toEqual([])
+  })
+
+  it('still requires a visible case on a practice problem', () => {
+    const values = problemDetailToFormValues(detail)
+    values.visibility = 'practice'
+    values.testCases = [{ input: '[1,2]', expected: '3', hidden: true }]
+    expect(validateForPublish(values, [])).toEqual([{ kind: 'publishMissingVisibleCase' }])
+
+    values.testCases = []
+    expect(validateForPublish(values, [])).toEqual([{ kind: 'publishMissingVisibleCase' }])
+  })
+
   it('still reports the save-level errors', () => {
     const values = problemDetailToFormValues(detail)
     values.testCases[0] = { input: '[1,', expected: '3', hidden: false }
@@ -247,9 +275,37 @@ describe('buildPatchBody', () => {
     expect(body).toEqual({
       difficulty: detail.difficulty,
       points: detail.points,
+      visibility: detail.visibility,
       testCases: detail.testCases,
       translations: detail.translations,
     })
+  })
+
+  it('always carries the visibility, so a save never silently drops the choice', () => {
+    const values = ptOnlyValues()
+    expect(buildPatchBody(values).visibility).toBe('round')
+
+    values.visibility = 'practice'
+    expect(buildPatchBody(values).visibility).toBe('practice')
+  })
+})
+
+describe('patchRefusalToProblemFormErrors', () => {
+  it('puts problem_in_round under the visibility control', () => {
+    expect(patchRefusalToProblemFormErrors('problem_in_round')).toEqual([
+      { kind: 'visibilityLockedByRound' },
+    ])
+  })
+
+  it('puts missing_test_cases on the test-case section', () => {
+    expect(patchRefusalToProblemFormErrors('missing_test_cases')).toEqual([
+      { kind: 'roundNeedsTestCases' },
+    ])
+  })
+
+  it('maps no code, and any other code, to nothing — the caller keeps its own message', () => {
+    expect(patchRefusalToProblemFormErrors(null)).toEqual([])
+    expect(patchRefusalToProblemFormErrors('problem_in_open_round')).toEqual([])
   })
 })
 

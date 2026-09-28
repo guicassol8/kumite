@@ -47,6 +47,7 @@ import {
   type ProblemFormError,
   type ProblemFormValues,
   type ProblemStatus,
+  type ProblemVisibility,
   parseJsonField,
   type SubmitOutcome,
   validateForPublish,
@@ -55,6 +56,7 @@ import {
 import type { UiLocale } from '@/lib/resolve-problem-title'
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
+const VISIBILITIES: ProblemVisibility[] = ['round', 'practice']
 
 type ProblemFormProps = {
   initialValues: ProblemFormValues
@@ -93,6 +95,7 @@ export function ProblemForm({
   const [caseSectionError, setCaseSectionError] = useState<string | null>(null)
 
   const testCases = form.watch('testCases')
+  const visibility = form.watch('visibility')
   const errors = form.formState.errors
 
   function messageFor(error: ProblemFormError): string {
@@ -122,6 +125,10 @@ export function ProblemForm({
         return t('organizer.problemForm.errors.publish.missingVisibleCase')
       case 'publishMissingHiddenCase':
         return t('organizer.problemForm.errors.publish.missingHiddenCase')
+      case 'visibilityLockedByRound':
+        return t('organizer.problemForm.errors.problemInRound')
+      case 'roundNeedsTestCases':
+        return t('organizer.problemForm.errors.roundNeedsTestCases')
     }
   }
 
@@ -139,8 +146,18 @@ export function ProblemForm({
         form.setError('points', { message: messageFor(error) })
         continue
       }
-      if (error.kind === 'publishMissingVisibleCase' || error.kind === 'publishMissingHiddenCase') {
+      if (
+        error.kind === 'publishMissingVisibleCase' ||
+        error.kind === 'publishMissingHiddenCase' ||
+        // The fix for this refusal is adding a case, so it sits with the cases
+        // rather than under the Select that triggered it.
+        error.kind === 'roundNeedsTestCases'
+      ) {
         sectionMessages.push(messageFor(error))
+        continue
+      }
+      if (error.kind === 'visibilityLockedByRound') {
+        form.setError('visibility', { message: messageFor(error) })
         continue
       }
       if (error.kind === 'json') {
@@ -287,6 +304,42 @@ export function ProblemForm({
             )}
           />
 
+          <FormField
+            control={form.control}
+            name="visibility"
+            render={({ field }) => (
+              <FormItem className="w-40">
+                <FormLabel className={PANEL_FIELD_LABEL}>
+                  {t('organizer.problemForm.visibilityLabel')}
+                </FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger data-testid="problem-form-visibility">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {VISIBILITIES.map((option) => (
+                      <SelectItem
+                        key={option}
+                        value={option}
+                        data-testid={`problem-form-visibility-${option}`}
+                      >
+                        {t(`organizer.problemForm.visibility.${option}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* Where the server's `problem_in_round` lands: the refusal
+                    belongs to the control that caused it (#187). */}
+                <FormMessage
+                  className={PANEL_FIELD_ERROR}
+                  data-testid="problem-form-visibility-error"
+                />
+              </FormItem>
+            )}
+          />
+
           {status && (
             <Badge data-testid="problem-form-status" className="mb-2">
               {t(`organizer.problems.status.${status}`)}
@@ -376,6 +429,12 @@ export function ProblemForm({
 
         <section className="flex flex-col gap-3">
           <h3 className={PANEL_SECTION_TITLE}>{t('organizer.problemForm.testCases.heading')}</h3>
+
+          {visibility === 'practice' && (
+            <p className="text-muted-foreground text-sm" data-testid="problem-form-practice-note">
+              {t('organizer.problemForm.testCases.practiceNote')}
+            </p>
+          )}
 
           {testCases.length === 0 && (
             <p className="text-muted-foreground text-sm" data-testid="problem-form-cases-empty">

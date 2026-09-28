@@ -6,6 +6,11 @@ export const FORM_LOCALES = ['pt', 'es', 'en'] as const
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export type ProblemStatus = 'draft' | 'published' | 'archived'
+/**
+ * `round` problems are played inside a round; `practice` ones sit in the open
+ * practice list, judged only against their visible cases (#209).
+ */
+export type ProblemVisibility = 'round' | 'practice'
 
 export type TranslationEntry = { title: string; statementMd: string }
 
@@ -28,6 +33,7 @@ export type TestCaseRow = { input: string; expected: string; hidden: boolean }
 export type ProblemFormValues = {
   difficulty: Difficulty
   points: number
+  visibility: ProblemVisibility
   translations: Record<UiLocale, TranslationEntry>
   testCases: TestCaseRow[]
 }
@@ -36,6 +42,7 @@ export type ProblemFormValues = {
 export type ProblemFormSource = {
   difficulty: Difficulty
   points: number
+  visibility: ProblemVisibility
   testCases: { input: JsonValue; expected: JsonValue; hidden: boolean }[]
   translations: { locale: UiLocale; title: string; statementMd: string }[]
 }
@@ -43,6 +50,7 @@ export type ProblemFormSource = {
 export type PatchBody = {
   difficulty: Difficulty
   points: number
+  visibility: ProblemVisibility
   testCases: { input: JsonValue; expected: JsonValue; hidden: boolean }[]
   translations: { locale: UiLocale; title: string; statementMd: string }[]
 }
@@ -68,6 +76,8 @@ export type ProblemFormError =
   | { kind: 'publishMissingLocale'; locale: UiLocale; field: keyof TranslationEntry }
   | { kind: 'publishMissingVisibleCase' }
   | { kind: 'publishMissingHiddenCase' }
+  | { kind: 'visibilityLockedByRound' }
+  | { kind: 'roundNeedsTestCases' }
   | { kind: 'serverRejected'; target: ProblemFormFieldTarget }
 
 /**
@@ -83,6 +93,7 @@ export function emptyProblemFormValues(): ProblemFormValues {
   return {
     difficulty: 'easy',
     points: DEFAULT_POINTS,
+    visibility: 'round',
     translations: {
       pt: { title: '', statementMd: '' },
       es: { title: '', statementMd: '' },
@@ -100,6 +111,7 @@ export function problemDetailToFormValues(detail: ProblemFormSource): ProblemFor
   const values = emptyProblemFormValues()
   values.difficulty = detail.difficulty
   values.points = detail.points
+  values.visibility = detail.visibility
   for (const translation of detail.translations) {
     values.translations[translation.locale] = {
       title: translation.title,
@@ -203,7 +215,9 @@ export function validateForPublish(
   if (!values.testCases.some((testCase) => !testCase.hidden)) {
     errors.push({ kind: 'publishMissingVisibleCase' })
   }
-  if (!values.testCases.some((testCase) => testCase.hidden)) {
+  // Mirrors the back's `evaluateTestCaseCoverage`: a practice problem is judged
+  // on its visible cases only, so a hidden one is not required to publish it.
+  if (values.visibility === 'round' && !values.testCases.some((testCase) => testCase.hidden)) {
     errors.push({ kind: 'publishMissingHiddenCase' })
   }
 
@@ -229,7 +243,27 @@ export function buildPatchBody(values: ProblemFormValues): PatchBody {
     hidden: testCase.hidden,
   }))
 
-  return { difficulty: values.difficulty, points: values.points, testCases, translations }
+  // `visibility` goes out on every save: resending the stored value is a no-op
+  // on the back, whose locks only run when the value actually changes.
+  return {
+    difficulty: values.difficulty,
+    points: values.points,
+    visibility: values.visibility,
+    testCases,
+    translations,
+  }
+}
+
+/**
+ * The two `PATCH` refusals a visibility change can earn, read from the
+ * envelope's `code` — never from its English `message`, which is also the only
+ * place the back says *which* case is missing. Anything else maps to nothing,
+ * leaving the caller its own message.
+ */
+export function patchRefusalToProblemFormErrors(code: string | null): ProblemFormError[] {
+  if (code === 'problem_in_round') return [{ kind: 'visibilityLockedByRound' }]
+  if (code === 'missing_test_cases') return [{ kind: 'roundNeedsTestCases' }]
+  return []
 }
 
 /** `translations[2].title` -> `{ list: 'translations', index: 2, key: 'title' }`. */

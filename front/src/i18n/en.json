@@ -158,6 +158,9 @@
         "published": "Published",
         "archived": "Archived"
       },
+      "visibility": {
+        "practice": "Practice"
+      },
       "loading": "Loading problems...",
       "missingTitle": "(untitled)",
       "empty": {
@@ -187,6 +190,11 @@
       "loading": "Loading problem...",
       "difficultyLabel": "Difficulty",
       "pointsLabel": "Points",
+      "visibilityLabel": "Visibility",
+      "visibility": {
+        "round": "Round",
+        "practice": "Practice"
+      },
       "titleLabel": "Title",
       "statementLabel": "Statement (markdown)",
       "previewHeading": "Preview",
@@ -202,7 +210,8 @@
         "addAction": "Add case",
         "removeAction": "Remove case",
         "moveUpAction": "Move up",
-        "moveDownAction": "Move down"
+        "moveDownAction": "Move down",
+        "practiceNote": "Practice problem: hidden cases are neither required nor used. One visible case is enough to publish."
       },
       "saveAction": "Save",
       "publishAction": "Publish",
@@ -228,6 +237,8 @@
         "saveFailed": "Couldn't save the problem. Try again.",
         "publishFailed": "Couldn't publish the problem. Try again.",
         "problemInOpenRound": "Test cases and points can't change while this problem is in an open round: the teams already scored would sit on a different denominator from the ones still to come. Close the round to change them — the statement and the difficulty are still editable now.",
+        "problemInRound": "This problem has already been in a round and cannot become a practice problem.",
+        "roundNeedsTestCases": "To go back to rounds, a published problem needs at least one visible and one hidden case.",
         "loadFailed": "Couldn't load the problem.",
         "retry": "Try again",
         "notFound": "Problem not found."

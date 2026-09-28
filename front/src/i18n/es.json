@@ -158,6 +158,9 @@
         "published": "Publicado",
         "archived": "Archivado"
       },
+      "visibility": {
+        "practice": "Práctica"
+      },
       "loading": "Cargando problemas...",
       "missingTitle": "(sin título)",
       "empty": {
@@ -187,6 +190,11 @@
       "loading": "Cargando problema...",
       "difficultyLabel": "Dificultad",
       "pointsLabel": "Puntos",
+      "visibilityLabel": "Visibilidad",
+      "visibility": {
+        "round": "Ronda",
+        "practice": "Práctica"
+      },
       "titleLabel": "Título",
       "statementLabel": "Enunciado (markdown)",
       "previewHeading": "Vista previa",
@@ -202,7 +210,8 @@
         "addAction": "Agregar caso",
         "removeAction": "Quitar caso",
         "moveUpAction": "Mover hacia arriba",
-        "moveDownAction": "Mover hacia abajo"
+        "moveDownAction": "Mover hacia abajo",
+        "practiceNote": "Problema de práctica: los casos ocultos no se exigen ni se usan. Para publicar, basta un caso visible."
       },
       "saveAction": "Guardar",
       "publishAction": "Publicar",
@@ -228,6 +237,8 @@
         "saveFailed": "No se pudo guardar el problema. Intenta de nuevo.",
         "publishFailed": "No se pudo publicar el problema. Intenta de nuevo.",
         "problemInOpenRound": "Los casos de prueba y los puntos no pueden cambiar mientras este problema está en una ronda abierta: los equipos ya puntuados quedarían sobre un denominador distinto al de los siguientes. Cierra la ronda para modificarlos; el enunciado y la dificultad siguen siendo editables ahora.",
+        "problemInRound": "Este problema ya estuvo en una ronda y no puede pasar a práctica.",
+        "roundNeedsTestCases": "Para volver a ronda, un problema publicado necesita al menos un caso visible y uno oculto.",
         "loadFailed": "No se pudo cargar el problema.",
         "retry": "Intentar de nuevo",
         "notFound": "Problema no encontrado."

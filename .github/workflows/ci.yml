@@ -124,3 +124,69 @@ jobs:
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
           npx --yes wait-on tcp:3000 --timeout 30000
           pnpm --filter @kumite/back hurl
+  e2e:
+    runs-on: ubuntu-latest
+    # The full Playwright suite takes ~6 min locally; this only stops a hung
+    # run from burning the metered minutes of a private repo (#295).
+    timeout-minutes: 30
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: kumite
+          POSTGRES_PASSWORD: kumite
+          POSTGRES_DB: kumite
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U kumite -d kumite"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://kumite:kumite@localhost:5433/kumite
+      JWT_SECRET: kumite-ci-only-jwt-secret
+      # Same throwaway organizer as the hurl job: it only exists in this job's
+      # database, so the organizer-gated specs run instead of skipping.
+      ORGANIZER_EMAIL: organizer@ci.local
+      ORGANIZER_PASSWORD: kumite-ci-only
+      # Not a secret, just a path: playwright.config.ts tees the back's stdout
+      # here so the real-OTP specs can read the code (#333). Uploaded below.
+      BACK_NOTIFICATIONS_LOG: ${{ github.workspace }}/e2e-back.log
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Resolve Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter @kumite/front exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @kumite/front exec playwright install --with-deps chromium
+      - name: Install Chromium system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @kumite/front exec playwright install-deps chromium
+      - run: pnpm --filter @kumite/back db:migrate
+      - run: pnpm --filter @kumite/back db:seed
+      - run: pnpm --filter @kumite/front e2e
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            front/playwright-report/
+            front/test-results/
+            e2e-back.log
+          retention-days: 14
+          if-no-files-found: ignore

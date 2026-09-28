@@ -111,6 +111,11 @@ explicitly, don't fix it partially.
    never `git add -A` here.
 4. Write the walkthrough in the PR's `## Evidence`: step → expected → screenshot
    path, in order.
+5. No regression elsewhere: you don't need to run the whole suite to prove
+   it. CI's `e2e` job runs every spec on every PR push (`docs/workflow.md`
+   § Gate ladder). Check that it is green on the PR's head, and name any
+   spec it reports as flaky in the Evidence. Locally, run only the specs
+   this issue touches, for the screenshots.
 
 **Back-touching PRs:**
 1. `pnpm -r test` — paste trimmed output.

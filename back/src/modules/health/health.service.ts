@@ -6,7 +6,10 @@ import type { Health } from './health.schema'
 
 // How long the database gets to answer `select 1` before the probe reports
 // `degraded` (#287). Short on purpose: a liveness check that waits as long as
-// a slow query would is not a liveness check.
+// a slow query would is not a liveness check. The budget is for one round trip
+// on an already-connected pool: the first probe after boot also pays for the
+// connection setup, and since the consumers poll (Playwright's `webServer`),
+// a cold 503 there is not a reason to raise it (#363).
 export const HEALTH_DB_TIMEOUT_MS = 500
 
 /** The cheapest round trip Postgres can answer. */

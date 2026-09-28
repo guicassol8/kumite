@@ -18,11 +18,16 @@ import {
 // `inconsistent` can no longer be produced through the UI — the #193 guard
 // refuses to edit a problem's scale mid-round — so, like
 // home-teams-identity.spec.ts, the REST sources are fulfilled by `page.route`
-// while authentication and `/sse` stay real. The rounds list holds one closed
-// round and no open one, so the Rodada tab shows that round's REST ranking.
-// The ranking mock answers for any round id: even if a parallel spec has a
-// round open, the screen still renders this fixture unless that round also
-// scores a submission (a live `ranking.updated`) during these few seconds.
+// while authentication stays real. The rounds list holds one closed round and
+// no open one, so the Rodada tab shows that round's REST ranking.
+//
+// `/sse` cannot stay real: a parallel spec holding a round open (e.g.
+// leaderboard-offline-fallback) announces it over the stream, and the Rodada
+// tab rightly switches to that live round. Nor can `page.route` serve it — a
+// fulfilled body ends at once, and the reconnect loop would flash the
+// "reconnecting" banner into every capture. So `stubQuietSse` answers the
+// page's `/sse` fetch with a stream that says "no round open" and stays open:
+// the screen is live, and quiet.
 const evidence = (name: string) => `e2e/evidence/318/${name}.png`
 
 type RoundRankingResponse = InferResponseType<(typeof api.rounds)[':id']['ranking']['$get'], 200>
@@ -138,9 +143,38 @@ async function participantToken(request: APIRequestContext) {
   return login(request, email, PASSWORD)
 }
 
+// Runs before the app on every navigation: wraps `fetch` so `/sse` gets one
+// `state.sync` frame with no open round and then a body that never ends (it
+// errors only when the client aborts, as a real socket would).
+async function stubQuietSse(page: Page) {
+  await page.addInitScript(() => {
+    const realFetch = window.fetch.bind(window)
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (new URL(url, window.location.href).pathname !== '/sse') return realFetch(input, init)
+      const frame = {
+        type: 'state.sync',
+        serverTime: new Date().toISOString(),
+        round: null,
+        submissionsPaused: false,
+      }
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(frame)}\n\n`))
+          init?.signal?.addEventListener('abort', () => controller.error(init.signal?.reason))
+        },
+      })
+      return Promise.resolve(
+        new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+      )
+    }
+  })
+}
+
 // Routes are registered once per page; `verdict.current` picks what the
 // ranking mock answers, so a reload is all it takes to switch scenarios.
 async function mockRanking(page: Page, verdict: { current: Verdict }) {
+  await stubQuietSse(page)
   await page.route(`${BACK_URL}/teams`, (route) => route.fulfill({ json: teamsFixture }))
   await page.route(`${BACK_URL}/rounds`, (route) =>
     route.fulfill({
@@ -224,11 +258,9 @@ test.describe('leaderboard denominators notice (#318)', () => {
     expect(noticeBox!.y).toBeLessThan(tableBox!.y)
     await capture(page, '01-organizador-inconsistent')
 
-    // The Geral tab stays as it was (#383 owns the event-wide verdict). With
-    // `/sse` live its content is the stream's real event ranking, not the mock
-    // above, so only the notice's absence is asserted here.
+    // The Geral tab stays as it was (#383 owns the event-wide verdict).
     await page.getByTestId('leaderboard-tab-event').click()
-    await expect(page.getByTestId('leaderboard-tab-event')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByTestId(`leaderboard-column-round-${roundId}`)).toBeVisible()
     await expect(inconsistent).toHaveCount(0)
 
     // 02 — unknown: only the discreet note.

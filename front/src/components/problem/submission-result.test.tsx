@@ -10,6 +10,7 @@ afterEach(cleanup)
 const result: SubmissionResult = {
   submissionId: 's1',
   attemptNumber: 1,
+  attemptInRound: 1,
   score: 20,
   maxScore: 30,
   cases: [
@@ -30,6 +31,17 @@ const result: SubmissionResult = {
 }
 
 describe('SubmissionResultPanel', () => {
+  // #280: a problem reused across rounds keeps a global attemptNumber, but
+  // the participant is told the round's own count, the one the round's
+  // ranking and the problem page show.
+  it("shows the attempt's number within the round, not the global one", () => {
+    render(<SubmissionResultPanel result={{ ...result, attemptNumber: 7, attemptInRound: 2 }} />)
+
+    const attempt = screen.getByTestId('problem-verdict-attempt')
+    expect(attempt.textContent).toBe('Tentativa 2')
+    expect(attempt.textContent).not.toContain('7')
+  })
+
   it('shows the score and every visible case with its detail', () => {
     render(<SubmissionResultPanel result={result} />)
 

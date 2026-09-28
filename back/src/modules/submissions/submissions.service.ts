@@ -246,16 +246,30 @@ export async function findTeamIdForUser(db: Db, userId: string): Promise<string 
 }
 
 // Attempts belong to the team — the same grouping the leaderboard and
-// getBestSubmission use.
-async function countAttempts(db: Db, identity: SubmitIdentity, problemId: string): Promise<number> {
+// getBestSubmission use. Two counts in one round trip (#280): `total` spans
+// every round and numbers the persisted row (the unique index on (team,
+// problem, attempt) needs it global), while `inRound` is the round's own count,
+// the one its ranking and the problem page show for a reused problem.
+async function countAttempts(
+  db: Db,
+  identity: SubmitIdentity,
+  problemId: string,
+  roundId: string,
+): Promise<{ total: number; inRound: number }> {
   const [row] = await db
-    .select({ attempts: sql<number>`count(*)`.mapWith(Number) })
+    .select({
+      total: sql<number>`count(*)`.mapWith(Number),
+      inRound:
+        sql<number>`count(*) filter (where ${submissionsTable.roundId} = ${roundId})`.mapWith(
+          Number,
+        ),
+    })
     .from(submissionsTable)
     .where(
       and(eq(submissionsTable.problemId, problemId), eq(submissionsTable.teamId, identity.teamId)),
     )
 
-  return row?.attempts ?? 0
+  return { total: row?.total ?? 0, inRound: row?.inRound ?? 0 }
 }
 
 /**
@@ -338,8 +352,12 @@ export async function submitSolution(
 
     const score = scoreSubmission(problem.testCases, results, problem.points)
     // The in-flight lock is what serializes this read-then-insert; the partial
-    // unique index on (team, problem, attempt) is the backstop.
-    const attemptNumber = (await countAttempts(db, identity, problem.id)) + 1
+    // unique index on (team, problem, attempt) is the backstop for the global
+    // number. The round's number is never persisted, so it needs none. Counted
+    // against the round the accept gate validated, like the INSERT below.
+    const attempts = await countAttempts(db, identity, problem.id, body.roundId)
+    const attemptNumber = attempts.total + 1
+    const attemptInRound = attempts.inRound + 1
 
     let submission: typeof submissionsTable.$inferSelect
     try {
@@ -428,6 +446,7 @@ export async function submitSolution(
       result: {
         submissionId: submission.id,
         attemptNumber,
+        attemptInRound,
         score,
         // The value just stamped on the row, so what the participant is told
         // and what the ranking will read can never disagree (#193).

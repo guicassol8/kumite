@@ -84,7 +84,13 @@ export const SubmissionResultCaseSchema = z.discriminatedUnion('hidden', [
 
 export const SubmissionResultSchema = z.object({
   submissionId: z.string(),
+  // The number persisted on the row: global per (team, problem), so a problem
+  // reused across rounds keeps counting (the unique index relies on it).
   attemptNumber: z.number().int().positive(),
+  // What the participant is told (#280): this attempt's position within the
+  // round it was accepted into — the same count the round's ranking and the
+  // problem page's bestSubmission.attempts show. Derived, never persisted.
+  attemptInRound: z.number().int().positive(),
   score: z.number().int(),
   maxScore: z.number().int(),
   cases: z.array(SubmissionResultCaseSchema),

@@ -311,6 +311,7 @@ HTTP 201
 jsonpath "$.score" == 100
 jsonpath "$.maxScore" == 100
 jsonpath "$.attemptNumber" == 1
+jsonpath "$.attemptInRound" == 1
 jsonpath "$.cases" count == 2
 jsonpath "$.cases[0].hidden" == false
 jsonpath "$.cases[0].outcome" == "passed"

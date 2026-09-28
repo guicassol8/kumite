@@ -252,6 +252,7 @@ describe('ProblemScreen', () => {
       jsonResponse(201, {
         submissionId: 's1',
         attemptNumber: 1,
+        attemptInRound: 1,
         score: 20,
         maxScore: 20,
         cases: [{ hidden: false, index: 0, outcome: 'passed', expected: 6, actual: 6, ms: 3 }],
@@ -293,6 +294,7 @@ describe('ProblemScreen', () => {
       jsonResponse(201, {
         submissionId: 's1',
         attemptNumber: 1,
+        attemptInRound: 1,
         score: 0,
         maxScore: 20,
         cases: [],
@@ -523,6 +525,7 @@ describe('ProblemScreen', () => {
       jsonResponse(201, {
         submissionId: 's1',
         attemptNumber: 1,
+        attemptInRound: 1,
         score: 20,
         maxScore: 20,
         cases: [{ hidden: false, index: 0, outcome: 'passed', expected: 6, actual: 6, ms: 3 }],
@@ -723,6 +726,7 @@ describe('ProblemScreen', () => {
     const verdict201 = {
       submissionId: 's1',
       attemptNumber: 1,
+      attemptInRound: 1,
       score: 20,
       maxScore: 20,
       cases: [{ hidden: false, index: 0, outcome: 'passed', expected: 6, actual: 6, ms: 3 }],

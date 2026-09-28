@@ -835,6 +835,7 @@
     "verdict": {
       "title": "Verdict",
       "summary": "{{score}}/{{maxScore}} points",
+      "attempt": "Attempt {{attempt}}",
       "caseLabel": "Case {{index}}",
       "expected": "expected",
       "obtained": "got",

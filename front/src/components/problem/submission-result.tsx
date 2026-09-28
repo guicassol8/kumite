@@ -18,7 +18,7 @@ function formatValue(value: unknown): string {
 
 /**
  * There is no verdict field on the wire — `SubmissionResultSchema` carries
- * `score`, `maxScore` and `cases` and nothing else. "Approved" is a full
+ * `score`, `maxScore`, `cases` and the attempt numbers. "Approved" is a full
  * score, the same notion of a clean sweep the scoreboard uses: the score is
  * rated over the HIDDEN cases only, so counting the verdict's visible cases
  * instead would call a submission approved while a hidden case failed next to
@@ -50,9 +50,17 @@ export function SubmissionResultPanel({ result }: SubmissionResultPanelProps) {
         {t(approved ? 'problem.verdict.approved' : 'problem.verdict.rejected')}
       </AlertTitle>
       <AlertDescription className="w-full">
-        <span data-testid="problem-verdict-summary" className="font-medium tabular-nums">
-          {t('problem.verdict.summary', { score: result.score, maxScore: result.maxScore })}
-        </span>
+        <div className="flex flex-wrap items-baseline gap-x-3">
+          <span data-testid="problem-verdict-summary" className="font-medium tabular-nums">
+            {t('problem.verdict.summary', { score: result.score, maxScore: result.maxScore })}
+          </span>
+          {/* The round's count (#280), not the global attemptNumber: a problem
+              reused across rounds must read the same number here as in that
+              round's ranking and on the problem page. */}
+          <span data-testid="problem-verdict-attempt" className="text-sm tabular-nums">
+            {t('problem.verdict.attempt', { attempt: result.attemptInRound })}
+          </span>
+        </div>
         <ul className="flex w-full flex-col gap-1 text-sm">
           {result.cases.map((resultCase) => (
             <li

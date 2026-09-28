@@ -236,12 +236,16 @@ export function ProblemForm({
         className="flex flex-col gap-6"
         onSubmit={(event) => event.preventDefault()}
       >
+        {/* The fields pin themselves to the top (`self-start`): a message under
+            one of them (the three-line `problem_in_round`, #347) grows only its
+            own cell instead of pushing its neighbours' controls down. The
+            status badge keeps the row's bottom alignment. */}
         <div className="flex flex-wrap items-end gap-4">
           <FormField
             control={form.control}
             name="difficulty"
             render={({ field }) => (
-              <FormItem className="w-40">
+              <FormItem className="w-40 self-start">
                 <FormLabel className={PANEL_FIELD_LABEL}>
                   {t('organizer.problemForm.difficultyLabel')}
                 </FormLabel>
@@ -279,7 +283,7 @@ export function ProblemForm({
             control={form.control}
             name="points"
             render={({ field }) => (
-              <FormItem className="w-32">
+              <FormItem className="w-32 self-start">
                 <FormLabel className={PANEL_FIELD_LABEL}>
                   {t('organizer.problemForm.pointsLabel')}
                 </FormLabel>
@@ -308,7 +312,7 @@ export function ProblemForm({
             control={form.control}
             name="visibility"
             render={({ field }) => (
-              <FormItem className="w-40">
+              <FormItem className="w-40 self-start">
                 <FormLabel className={PANEL_FIELD_LABEL}>
                   {t('organizer.problemForm.visibilityLabel')}
                 </FormLabel>

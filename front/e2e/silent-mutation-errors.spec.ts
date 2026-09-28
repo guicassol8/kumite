@@ -240,7 +240,9 @@ test.describe('organizer mutations', () => {
       'Não foi possível arquivar o problema',
     )
     await expect(page.getByTestId(`organizer-problems-archive-${id}`)).toBeVisible()
-    await page.screenshot({ path: evidence('07-archive-failed-dialog-open'), fullPage: true })
+    // Viewport-only: the modal's fixed backdrop does not stretch over a
+    // full-page stitch, which left half the list looking un-dimmed.
+    await page.screenshot({ path: evidence('07-archive-failed-dialog-open') })
 
     expect(errors).toEqual([])
   })

@@ -655,11 +655,13 @@ test.describe('organizer panel identity (#223)', () => {
     const report = await panelOverflowReport(page)
     expect(report?.offenders).toContain('overflow-probe')
     expect(report?.scrolls).toBe(true)
-    const dimensions = await page.evaluate(() => ({
-      width: window.innerWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-    }))
-    expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.width)
+
+    // …and the assertions the sweep actually runs fail on it with a message
+    // that names the screen and the culprit, not only the raw report above.
+    const label = `/organizer @ ${BREAKPOINT.width}px, pt`
+    await expect(noPanelOverflow(page, label)).rejects.toThrow(label)
+    await expect(noPanelOverflow(page, label)).rejects.toThrow('overflow-probe')
+    await expect(noOverflow(page, label)).rejects.toThrow(`${label}: document scrollWidth`)
   })
 
   // One test per width × route, not one for all twelve (#372). The monolith

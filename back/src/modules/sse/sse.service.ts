@@ -21,6 +21,11 @@ import type { RankingUpdatedEvent, SseBusEvent, StateSyncEvent } from './sse.sch
 export type SseBus = {
   subscribe: (fn: (event: SseBusEvent) => void) => () => void
   publish: (event: SseBusEvent) => void
+  // Current subscriber count. The `/sse` handler is the bus's only subscriber,
+  // one per open stream, so this is the number of live SSE connections the
+  // organizer's live card reports (#279). A new subscriber elsewhere would
+  // have to be accounted for here.
+  connections: () => number
 }
 
 // Pure in-memory pub/sub — no timers, no I/O. The 1s expiry tick is wired
@@ -36,6 +41,9 @@ export function createSseBus(): SseBus {
     },
     publish(event) {
       for (const fn of subscribers) fn(event)
+    },
+    connections() {
+      return subscribers.size
     },
   }
 }

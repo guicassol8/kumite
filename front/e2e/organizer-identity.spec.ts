@@ -226,6 +226,19 @@ function stats(round: 'open' | 'closed') {
   }
 }
 
+// #279: the live card polls /organizer/stats/live, which the /organizer/stats
+// stub above does not cover (exact path). Without this the captures would carry
+// whatever the real process happens to be doing.
+const liveStats = {
+  judge: { inFlight: 3, waiting: 1, concurrency: 4 },
+  sse: { connections: 58 },
+  submissions: {
+    inFlight: 4,
+    lastMinute: 9,
+    perMinute: [2, 3, 5, 4, 6, 8, 7, 5, 9, 11, 10, 8, 12, 10, 9],
+  },
+}
+
 const ranking = {
   roundId: closedRoundId,
   roundName: 'Rodada 1',
@@ -352,6 +365,9 @@ async function installPanel(page: Page, request: APIRequestContext, options: Pan
   const roundState = options.round ?? 'open'
   await page.route(`${BACK_URL}/organizer/stats`, (route) =>
     route.fulfill({ json: stats(roundState) }),
+  )
+  await page.route(`${BACK_URL}/organizer/stats/live`, (route) =>
+    route.fulfill({ json: liveStats }),
   )
   await page.route(`${BACK_URL}/rounds/*/ranking`, (route) => route.fulfill({ json: ranking }))
   await page.route(`${BACK_URL}/organizer/problems`, (route) => route.fulfill({ json: problems }))

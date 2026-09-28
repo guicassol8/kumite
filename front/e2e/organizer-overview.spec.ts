@@ -240,4 +240,94 @@ test.describe('organizer overview', () => {
     await expect(page).toHaveURL(/\/organizer\/rounds$/)
     await page.screenshot({ path: evidence('06-shortcut-to-rounds'), fullPage: true })
   })
+
+  // #279: the live card, against the real process. Every number on it is
+  // process-wide and other workers share the back, so each is asserted as a
+  // lower bound, never an exact value.
+  test('shows the live card: SSE connections, submissions per minute, polled every 5 s', async ({
+    page,
+    roundSlot,
+  }) => {
+    // Waits on the real clock by design: two 5 s polls, a judged submission,
+    // and the overview's three retries before its error shows.
+    test.slow()
+    const liveEvidence = (name: string) => `e2e/evidence/279/${name}.png`
+    const liveUrl = `${BACK_URL}/organizer/stats/live`
+    const isLivePoll = (res: { url: () => string; ok: () => boolean }) =>
+      res.url() === liveUrl && res.ok()
+    const numberIn = async (testId: string) =>
+      Number((await page.getByTestId(testId).textContent()) ?? 'NaN')
+
+    const auth = await organizerAuthHeader()
+    const problemId = await seedPublishedProblem(`Ao vivo ${stamp}`)
+    const participant = await apiSignupAndLogin(`overview-live-${stamp}@edu.pucrs.br`, 'PUCRS2026')
+    await apiCreateTeam(participant, `Live Squad ${stamp}`)
+    const roundId = await seedRound(`Rodada Ao Vivo ${stamp}`, problemId)
+    await roundSlot.open(auth, roundId)
+
+    await loginAsOrganizer(page)
+    await page.goto('/organizer')
+    const card = page.getByTestId('overview-live-card')
+    await expect(card).toBeVisible()
+    await expect(page.getByTestId('overview-live-judge-concurrency')).toBeVisible()
+    await expect(page.getByTestId('overview-live-sparkline')).toBeVisible()
+
+    // The page's own /sse stream is one of the connections. The first poll
+    // may land before the stream opens, so the next one is what counts.
+    await expect.poll(() => numberIn('overview-live-sse-connections')).toBeGreaterThanOrEqual(1)
+
+    // A real submission, accepted into the open round, shows up within a poll.
+    await apiSubmitSolution(participant, problemId, roundId)
+    await expect
+      .poll(() => numberIn('overview-live-submissions-last-minute'))
+      .toBeGreaterThanOrEqual(1)
+
+    // Polling, not a one-off read: two consecutive answers, about 5 s apart.
+    await page.waitForResponse(isLivePoll)
+    const firstAt = Date.now()
+    await page.waitForResponse(isLivePoll)
+    expect(Date.now() - firstAt).toBeGreaterThanOrEqual(4_000)
+
+    await card.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: liveEvidence('01-live-card-pt'), fullPage: true })
+
+    for (const [language, file] of [
+      ['es', '02-live-card-es'],
+      ['en', '03-live-card-en'],
+    ] as const) {
+      await page.getByTestId(`language-option-${language}`).click()
+      await expect(page.getByTestId(`language-option-${language}`)).toHaveAttribute(
+        'aria-current',
+        'true',
+      )
+      await page.screenshot({ path: liveEvidence(file), fullPage: true })
+    }
+    await page.getByTestId('language-option-pt').click()
+
+    // Phone width: the four blocks stack and nothing scrolls sideways.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await card.scrollIntoViewIfNeeded()
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    )
+    expect(overflow).toBeLessThanOrEqual(0)
+    await page.screenshot({ path: liveEvidence('04-live-card-phone'), fullPage: true })
+
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.evaluate(() => localStorage.setItem('kumite:theme', 'dark'))
+    await page.reload()
+    await expect(page.getByTestId('overview-live-sse-connections')).toBeVisible()
+    await page.screenshot({ path: liveEvidence('05-live-card-dark'), fullPage: true })
+    await page.evaluate(() => localStorage.removeItem('kumite:theme'))
+
+    // /organizer/stats goes to the database and the live card does not: when
+    // the former fails, the latter still answers, next to the overview's error.
+    await page.route(`${BACK_URL}/organizer/stats`, (route) =>
+      route.fulfill({ status: 500, json: { error: 'internal' } }),
+    )
+    await page.reload()
+    await expect(page.getByTestId('overview-error')).toBeVisible()
+    await expect(page.getByTestId('overview-live-sse-connections')).toBeVisible()
+    await page.screenshot({ path: liveEvidence('06-live-card-stats-down'), fullPage: true })
+  })
 })

@@ -91,6 +91,15 @@ function releaseSlot(): void {
   next?.()
 }
 
+/**
+ * Snapshot of the semaphore above, for the organizer's live card (#279):
+ * submissions with a worker spawned right now, and those queued for a slot.
+ * Read-only — observing the queue never changes it.
+ */
+export function getJudgeLoad(): { inFlight: number; waiting: number } {
+  return { inFlight, waiting: waiting.length }
+}
+
 function toJudgeResult(result: SandboxResult, expected: JsonValue): JudgeCaseResult {
   switch (result.outcome) {
     case 'ok':

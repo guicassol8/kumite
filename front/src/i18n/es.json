@@ -592,6 +592,30 @@
         "pausedBadge": "Envíos pausados",
         "pauseError": "No se pudo cambiar la pausa. Intenta de nuevo."
       },
+      "live": {
+        "title": "En vivo",
+        "loading": "Cargando los números en vivo...",
+        "error": "No se pudieron cargar los números en vivo.",
+        "judge": {
+          "label": "Evaluando ahora",
+          "waiting_one": "{{count}} esperando turno",
+          "waiting_other": "{{count}} esperando turno",
+          "concurrency": "Límite: {{count}} a la vez"
+        },
+        "sse": {
+          "label": "Conexiones en vivo"
+        },
+        "submissions": {
+          "label": "Envíos en el último minuto",
+          "inFlight_zero": "{{count}} equipos en evaluación",
+          "inFlight_one": "{{count}} equipo en evaluación",
+          "inFlight_other": "{{count}} equipos en evaluación"
+        },
+        "trend": {
+          "label": "Por minuto · 15 min",
+          "ariaLabel": "Envíos por minuto en los últimos 15 minutos"
+        }
+      },
       "shortcuts": {
         "title": "Accesos directos"
       },

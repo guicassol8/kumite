@@ -1,5 +1,6 @@
 import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 
+import { JUDGE_CONCURRENCY } from '../../config'
 import type { Db } from '../../db/client'
 import {
   roundsTable,
@@ -9,9 +10,12 @@ import {
   usersTable,
 } from '../../db/schema'
 import { getEventConfig } from '../event-config/event-config.service'
+import { getJudgeLoad } from '../judge/judge.service'
 import { findOpenRound, reapExpiredRound } from '../rounds/rounds.service'
+import type { SseBus } from '../sse/sse.service'
+import { getSubmissionLoad } from '../submissions/submissions.service'
 
-import type { EventStats, StatsRoundRef } from './stats.schema'
+import type { EventStats, LiveStats, StatsRoundRef } from './stats.schema'
 
 type RoundRow = typeof roundsTable.$inferSelect
 
@@ -134,5 +138,19 @@ export async function getEventStats(db: Db): Promise<EventStats> {
       active: activeRound ? toRoundRef(activeRound) : null,
       lastClosed: lastClosedRound ? toRoundRef(lastClosedRound) : null,
     },
+  }
+}
+
+/**
+ * The organizer's live card (#279): the judge queue, open SSE streams and
+ * accepted submissions, all read from process memory. The signature takes no
+ * `Db` on purpose — polling this every 5 s from every organizer tab must never
+ * reach the database.
+ */
+export function getLiveStats(bus: Pick<SseBus, 'connections'>, now = Date.now()): LiveStats {
+  return {
+    judge: { ...getJudgeLoad(), concurrency: JUDGE_CONCURRENCY },
+    sse: { connections: bus.connections() },
+    submissions: getSubmissionLoad(now),
   }
 }

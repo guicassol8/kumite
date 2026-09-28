@@ -232,6 +232,24 @@ describe('sse.service', () => {
       expect(b).toHaveBeenCalledWith(event)
     })
 
+    // #279: the organizer's live card reports this as open /sse connections —
+    // the /sse handler is the bus's only subscriber, one per connection.
+    it('counts current subscribers as connections', () => {
+      const bus = createSseBus()
+      expect(bus.connections()).toBe(0)
+
+      const unsubscribeA = bus.subscribe(vi.fn())
+      bus.subscribe(vi.fn())
+      expect(bus.connections()).toBe(2)
+
+      unsubscribeA()
+      expect(bus.connections()).toBe(1)
+
+      // A connection torn down twice (abort + stream close) must not go negative.
+      unsubscribeA()
+      expect(bus.connections()).toBe(1)
+    })
+
     it('stops notifying a subscriber once unsubscribed', () => {
       const bus = createSseBus()
       const fn = vi.fn()

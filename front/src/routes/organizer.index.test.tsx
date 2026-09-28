@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/api', () => ({
   api: {
     organizer: {
-      stats: { $get: vi.fn() },
+      stats: { $get: vi.fn(), live: { $get: vi.fn() } },
       'event-config': { $get: vi.fn(), $patch: vi.fn() },
     },
     rounds: { ':id': { ranking: { $get: vi.fn() } } },
@@ -29,6 +29,7 @@ import type { SseEvent } from '@/lib/sse-schema'
 import { routeTree } from '@/routeTree.gen'
 
 const mockedStatsGet = vi.mocked(api.organizer.stats.$get)
+const mockedLiveStatsGet = vi.mocked(api.organizer.stats.live.$get)
 const mockedRankingGet = vi.mocked(api.rounds[':id'].ranking.$get)
 const mockedConfigPatch = vi.mocked(api.organizer['event-config'].$patch)
 const sseUnsubscribe = vi.fn()
@@ -105,6 +106,14 @@ function renderScreen() {
 
 beforeEach(() => {
   mockedStatsGet.mockReset()
+  mockedLiveStatsGet.mockReset()
+  mockedLiveStatsGet.mockResolvedValue(
+    jsonResponse(200, {
+      judge: { inFlight: 1, waiting: 0, concurrency: 4 },
+      sse: { connections: 4 },
+      submissions: { inFlight: 0, lastMinute: 2, perMinute: [...Array(14).fill(0), 2] },
+    }),
+  )
   mockedRankingGet.mockReset()
   mockedConfigPatch.mockReset()
   connectEventStream.mockReset()
@@ -433,6 +442,32 @@ describe('organizer overview', () => {
 
     await waitFor(() => expect(screen.getByTestId('overview-error')).toBeDefined())
     expect(screen.getByTestId('overview-retry')).toBeDefined()
+  })
+
+  // #279: the live card has its own query, from process memory. When the
+  // event numbers (which need the database) fail, it still answers.
+  it('keeps the live card up when the event numbers fail to load', async () => {
+    mockedStatsGet.mockResolvedValue(jsonResponse(500, { error: 'boom' }))
+
+    renderScreen()
+
+    await waitFor(() => expect(screen.getByTestId('overview-error')).toBeDefined())
+    await waitFor(() =>
+      expect(screen.getByTestId('overview-live-sse-connections').textContent).toBe('4'),
+    )
+    expect(screen.getByTestId('overview-live-judge-in-flight').textContent).toBe('1')
+  })
+
+  it('places the live card between the numeric cards and the shortcuts', async () => {
+    mockedStatsGet.mockResolvedValue(jsonResponse(200, stats()))
+
+    renderScreen()
+
+    const roundCard = await screen.findByTestId('overview-round-card')
+    const live = screen.getByTestId('overview-live-card')
+    const shortcuts = screen.getByTestId('overview-shortcuts-card')
+    expect(roundCard.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(live.compareDocumentPosition(shortcuts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 

@@ -62,3 +62,33 @@ jsonpath "$.teams.openSlots" >= 0
 jsonpath "$.teams.maxTeamSize" >= 1
 jsonpath "$.submissions.total" >= 0
 jsonpath "$.round" exists
+
+# --- Live card (#279): process-local counters, polled every 5 s ---
+
+# 2a. No token -> 401.
+GET {{host}}/organizer/stats/live
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
+# 2b. Participant token -> 403.
+GET {{host}}/organizer/stats/live
+Authorization: Bearer {{participant_token}}
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "forbidden"
+
+# 2c. Organizer -> 200 with the judge queue, SSE connections and the
+# 15-minute submission series. The values depend on what else the process is
+# doing, so only the shape and the bounds are asserted.
+GET {{host}}/organizer/stats/live
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.judge.inFlight" >= 0
+jsonpath "$.judge.waiting" >= 0
+jsonpath "$.judge.concurrency" >= 1
+jsonpath "$.sse.connections" >= 0
+jsonpath "$.submissions.inFlight" >= 0
+jsonpath "$.submissions.lastMinute" >= 0
+jsonpath "$.submissions.perMinute" count == 15

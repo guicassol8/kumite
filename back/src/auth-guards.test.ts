@@ -61,6 +61,7 @@ const organizerRoutes: Call[] = [
   { method: 'PATCH', path: `/organizer/problems/${NIL_ID}`, body: {} },
   { method: 'POST', path: `/organizer/problems/${NIL_ID}/publish` },
   { method: 'POST', path: `/organizer/problems/${NIL_ID}/archive` },
+  { method: 'GET', path: '/organizer/stats/live' },
 ]
 
 function request(call: Call, token?: string) {

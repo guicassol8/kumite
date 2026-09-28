@@ -1,6 +1,10 @@
+import { signJwt } from '@katajs-framework/core/jwt'
 import { sql } from 'drizzle-orm'
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { app } from '../../app'
+import { JUDGE_CONCURRENCY, JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
+import { k } from '../../context'
 import { createDb } from '../../db/client'
 import {
   eventConfigTable,
@@ -12,9 +16,15 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
+import {
+  acquireSubmissionSlot,
+  recordAcceptedSubmission,
+  resetSubmissionThrottle,
+} from '../submissions/submissions.service'
 import type { Role, University } from '../users/users.schema'
 
-import { getEventStats } from './stats.service'
+import { LiveStatsSchema } from './stats.schema'
+import { getEventStats, getLiveStats } from './stats.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d), same as
 // the other DB-backed service suites.
@@ -28,6 +38,8 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await db.$client.end()
+  // The app's own client, opened by the HTTP suite below.
+  await k.resolve('db').$client.end()
 })
 
 let userCounter = 0
@@ -336,5 +348,70 @@ describe('getEventStats submissions and rounds', () => {
     expect(stats.teams).toEqual({ total: 0, openSlots: 0, maxTeamSize: 3 })
     expect(stats.submissions).toEqual({ total: 0, inRound: null })
     expect(stats.round).toEqual({ active: null, lastClosed: null })
+  })
+})
+
+// --- Organizer live card (#279) ---
+
+describe('getLiveStats', () => {
+  beforeEach(() => {
+    resetSubmissionThrottle()
+  })
+
+  it('composes the judge queue, the SSE connections and the submission load', () => {
+    const now = 50_000_000
+    recordAcceptedSubmission(now - 30_000)
+    recordAcceptedSubmission(now - 90_000)
+    acquireSubmissionSlot('team:a', now)
+
+    const live = getLiveStats({ connections: () => 7 }, now)
+
+    expect(live).toEqual({
+      judge: { inFlight: 0, waiting: 0, concurrency: JUDGE_CONCURRENCY },
+      sse: { connections: 7 },
+      submissions: {
+        inFlight: 1,
+        lastMinute: 1,
+        perMinute: [...Array(13).fill(0), 1, 1],
+      },
+    })
+    expect(LiveStatsSchema.parse(live)).toEqual(live)
+  })
+})
+
+describe('GET /organizer/stats/live', () => {
+  const appDb = k.resolve('db')
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // A2: "without touching the database" is the handler and the service. The
+  // one query per request left is requireUser's findUserById, fail-closed by
+  // design (#174, ADR-0004) — pinned here so a second one cannot creep in.
+  it('answers 100 parallel requests with no query beyond the auth lookup', async () => {
+    const organizer = await insertUser({ role: 'organizer' })
+    const token = await signJwt(
+      { role: organizer.role, university: organizer.university },
+      { secret: JWT_SECRET, subject: organizer.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+    )
+    // Every statement drizzle's postgres-js driver sends goes through one of
+    // these two: plain queries through unsafe(), transactions through begin().
+    const unsafe = vi.spyOn(appDb.$client, 'unsafe')
+    const begin = vi.spyOn(appDb.$client, 'begin')
+
+    const responses = await Promise.all(
+      Array.from({ length: 100 }, () =>
+        app.request('/organizer/stats/live', { headers: { Authorization: `Bearer ${token}` } }),
+      ),
+    )
+
+    expect(responses.map((res) => res.status)).toEqual(Array(100).fill(200))
+    expect(unsafe).toHaveBeenCalledTimes(100)
+    expect(begin).not.toHaveBeenCalled()
+
+    const body = LiveStatsSchema.parse(await responses[0]?.json())
+    expect(body.judge.concurrency).toBe(JUDGE_CONCURRENCY)
+    expect(body.submissions.perMinute).toHaveLength(15)
   })
 })

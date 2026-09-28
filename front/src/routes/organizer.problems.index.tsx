@@ -241,7 +241,9 @@ function OrganizerProblemsList() {
 
       <AlertDialog
         open={archiveTargetId !== null}
-        onOpenChange={(open) => !open && closeArchiveDialog()}
+        // Locked while the request is in flight: closing it then would hide a
+        // failure that lands afterwards, the very silence #195 removes.
+        onOpenChange={(open) => !open && !archive.isPending && closeArchiveDialog()}
       >
         <AlertDialogContent data-testid="organizer-problems-archive-dialog">
           <AlertDialogHeader>
@@ -258,7 +260,10 @@ function OrganizerProblemsList() {
             </Alert>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="organizer-problems-archive-cancel">
+            <AlertDialogCancel
+              data-testid="organizer-problems-archive-cancel"
+              disabled={archive.isPending}
+            >
               {t('organizer.problems.archiveDialog.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction

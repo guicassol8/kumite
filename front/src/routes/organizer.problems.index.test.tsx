@@ -221,6 +221,33 @@ describe('OrganizerProblemsList', () => {
     expect(screen.queryByTestId('organizer-problems-archive-error')).toBeNull()
   })
 
+  // Closing the dialog mid-request would hide a failure that lands afterwards
+  // — the same silent outcome as before the fix — so it stays open until the
+  // archive answers.
+  it('keeps the dialog open while the archive is still pending, then shows its failure', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [draftProblem]))
+    let fail: (reason: Error) => void = () => {}
+    mockedArchive.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject
+      }),
+    )
+    renderList()
+    await confirmArchive()
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId<HTMLButtonElement>('organizer-problems-archive-cancel').disabled,
+      ).toBe(true),
+    )
+    fireEvent.keyDown(screen.getByTestId('organizer-problems-archive-dialog'), { key: 'Escape' })
+    expect(screen.getByTestId('organizer-problems-archive-dialog')).toBeDefined()
+
+    fail(new Error('network down'))
+    expect(await screen.findByTestId('organizer-problems-archive-error')).toBeDefined()
+    expect(screen.getByTestId('organizer-problems-archive-dialog')).toBeDefined()
+  })
+
   // Identity § 5, verifiable through `data-variant` rather than through a
   // colour a jsdom test cannot see. The paint itself is asserted in the
   // browser (e2e/organizer-identity.spec.ts).

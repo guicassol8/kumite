@@ -223,17 +223,26 @@ function MoveMemberAction({
 
   async function onMove() {
     if (!destinationTeamId) return
-    const res = await move.mutateAsync(destinationTeamId)
-    if (res.status === 204) {
-      setDestinationTeamId(undefined)
-      setError(null)
-      onMoved()
-      return
+    try {
+      const res = await move.mutateAsync(destinationTeamId)
+      if (res.status === 204) {
+        setDestinationTeamId(undefined)
+        setError(null)
+        onMoved()
+        return
+      }
+      const body = (await res.json().catch(() => null)) as { error?: string } | null
+      // An undeclared status (a 500) says nothing about the destination, so it
+      // gets the generic sentence instead of "the team no longer exists".
+      setError(
+        t(MOVE_ERROR_KEYS[body?.error ?? ''] ?? 'organizer.teamModeration.move.errors.failed'),
+      )
+    } catch {
+      // A dead network rejects `mutateAsync` instead of answering: without
+      // this the row would show nothing at all and the rejection would go
+      // unhandled, since the button fires this off without awaiting.
+      setError(t('organizer.teamModeration.move.errors.failed'))
     }
-    const body = (await res.json().catch(() => null)) as { error?: string } | null
-    setError(
-      t(MOVE_ERROR_KEYS[body?.error ?? ''] ?? 'organizer.teamModeration.move.errors.teamNotFound'),
-    )
   }
 
   return (
@@ -315,34 +324,40 @@ function TeamNameHeader({ team, onRenamed }: { team: OrganizerTeam; onRenamed: (
       return
     }
 
-    const res = await rename.mutateAsync(name)
-    if (res.status === 200) {
-      setEditing(false)
-      setError(null)
-      onRenamed()
-      return
-    }
-    if (res.status === 409) {
-      setError(t('organizer.teamModeration.rename.errors.nameTaken'))
-      return
-    }
+    try {
+      const res = await rename.mutateAsync(name)
+      if (res.status === 200) {
+        setEditing(false)
+        setError(null)
+        onRenamed()
+        return
+      }
+      if (res.status === 409) {
+        setError(t('organizer.teamModeration.rename.errors.nameTaken'))
+        return
+      }
 
-    // kata's validation envelope names the field, so it lands on the same
-    // inline alert as the 409 rather than in the generic "could not save".
-    const nameIssue = (await readFieldIssues(res)).find((issue) => issue.path === 'name')
-    if (nameIssue) {
-      // The catalog string, never `issue.message`: that one is zod's English.
-      setError(
-        nameIssue.code === 'too_small'
-          ? t('organizer.teamModeration.rename.errors.nameRequired')
-          : nameIssue.code === 'too_big'
-            ? t('organizer.teamModeration.rename.errors.nameTooLong')
-            : t('organizer.teamModeration.rename.errors.fieldRejected'),
-      )
-      return
-    }
+      // kata's validation envelope names the field, so it lands on the same
+      // inline alert as the 409 rather than in the generic "could not save".
+      const nameIssue = (await readFieldIssues(res)).find((issue) => issue.path === 'name')
+      if (nameIssue) {
+        // The catalog string, never `issue.message`: that one is zod's English.
+        setError(
+          nameIssue.code === 'too_small'
+            ? t('organizer.teamModeration.rename.errors.nameRequired')
+            : nameIssue.code === 'too_big'
+              ? t('organizer.teamModeration.rename.errors.nameTooLong')
+              : t('organizer.teamModeration.rename.errors.fieldRejected'),
+        )
+        return
+      }
 
-    setError(t('organizer.teamModeration.rename.errors.saveFailed'))
+      setError(t('organizer.teamModeration.rename.errors.saveFailed'))
+    } catch {
+      // Dead network: see MoveMemberAction.onMove. The editor stays open with
+      // the name the organizer typed, so saving again is one click.
+      setError(t('organizer.teamModeration.rename.errors.saveFailed'))
+    }
   }
 
   if (!editing) {
@@ -427,13 +442,18 @@ function RemoveMemberAction({ userId, onRemoved }: { userId: string; onRemoved: 
 
   async function onConfirm() {
     setConfirmOpen(false)
-    const res = await remove.mutateAsync()
-    if (res.status === 204) {
-      setError(null)
-      onRemoved()
-      return
+    try {
+      const res = await remove.mutateAsync()
+      if (res.status === 204) {
+        setError(null)
+        onRemoved()
+        return
+      }
+      setError(t('organizer.teamModeration.removeMember.errors.failed'))
+    } catch {
+      // Dead network: see MoveMemberAction.onMove.
+      setError(t('organizer.teamModeration.removeMember.errors.failed'))
     }
-    setError(t('organizer.teamModeration.removeMember.errors.failed'))
   }
 
   return (
@@ -495,13 +515,18 @@ function RemoveTeamAction({ teamId, onRemoved }: { teamId: string; onRemoved: ()
 
   async function onConfirm() {
     setConfirmOpen(false)
-    const res = await remove.mutateAsync()
-    if (res.status === 204) {
-      setError(null)
-      onRemoved()
-      return
+    try {
+      const res = await remove.mutateAsync()
+      if (res.status === 204) {
+        setError(null)
+        onRemoved()
+        return
+      }
+      setError(t('organizer.teamModeration.removeTeam.errors.failed'))
+    } catch {
+      // Dead network: see MoveMemberAction.onMove.
+      setError(t('organizer.teamModeration.removeTeam.errors.failed'))
     }
-    setError(t('organizer.teamModeration.removeTeam.errors.failed'))
   }
 
   return (

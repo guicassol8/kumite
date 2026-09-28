@@ -175,7 +175,10 @@
         "title": "Archive problem?",
         "description": "The problem stops being available for new rounds, but stays saved in the catalog.",
         "confirm": "Archive",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "errors": {
+          "failed": "Could not archive the problem. Please try again."
+        }
       }
     },
     "problemForm": {
@@ -424,7 +427,8 @@
         "errors": {
           "teamFull": "The destination team is full.",
           "teamNotFound": "The destination team no longer exists.",
-          "memberNotFound": "This member no longer belongs to a team."
+          "memberNotFound": "This member no longer belongs to a team.",
+          "failed": "Could not move this member. Please try again."
         }
       },
       "removeMember": {
@@ -667,7 +671,10 @@
       "mixedLock": "Mixing universities is locked — that team is from another university.",
       "alreadyInTeam": "You are already on a team.",
       "notFound": "That team no longer exists.",
-      "unexpected": "Could not join the team. Please try again."
+      "unexpected": "Could not join the team. Please try again.",
+      "teamFrozen": "Your team has already submitted a solution — the roster is frozen and no one can leave. Talk to the organizers.",
+      "notInTeam": "You are no longer on a team.",
+      "leaveUnexpected": "Could not leave the team. Please try again."
     },
     "rules": "Teams of up to {{max}} people. University mixing is {{rule}}.",
     "mixingAllowed": "allowed",

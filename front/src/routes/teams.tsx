@@ -67,6 +67,13 @@ const JOIN_ERROR_KEYS: Record<string, string> = {
   not_found: 'teams.actionError.notFound',
 }
 
+// The leave's refusals (teams.route.ts): the listing said the team was not
+// frozen yet, or that the participant was still on it, and it went stale.
+const LEAVE_ERROR_KEYS: Record<string, string> = {
+  team_frozen: 'teams.actionError.teamFrozen',
+  not_in_team: 'teams.actionError.notInTeam',
+}
+
 type CreateTeamFormValues = { name: string }
 
 // Mirrors CreateTeamBodySchema in back/src/modules/teams/teams.schema.ts —
@@ -110,8 +117,16 @@ function TeamsScreen() {
 
   const leave = useMutation({
     mutationFn: async () => {
-      await api.teams.leave.$post()
+      const res = await api.teams.leave.$post()
+      if (res.status === 204) return null
+
+      const body = (await res.json().catch(() => null)) as { error?: string } | null
+      return LEAVE_ERROR_KEYS[body?.error ?? ''] ?? 'teams.actionError.leaveUnexpected'
     },
+    // Same surface as the join: a refusal or a dead network lands on the page
+    // alert, and a successful leave clears whatever an earlier click left there.
+    onSuccess: (errorKey) => setActionErrorKey(errorKey),
+    onError: () => setActionErrorKey('teams.actionError.leaveUnexpected'),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY })
     },

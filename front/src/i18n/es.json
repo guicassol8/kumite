@@ -175,7 +175,10 @@
         "title": "¿Archivar problema?",
         "description": "El problema deja de estar disponible para nuevas rondas, pero sigue guardado en el catálogo.",
         "confirm": "Archivar",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "errors": {
+          "failed": "No se pudo archivar el problema. Inténtalo de nuevo."
+        }
       }
     },
     "problemForm": {
@@ -424,7 +427,8 @@
         "errors": {
           "teamFull": "El equipo de destino está lleno.",
           "teamNotFound": "El equipo de destino ya no existe.",
-          "memberNotFound": "Ese integrante ya no pertenece a un equipo."
+          "memberNotFound": "Ese integrante ya no pertenece a un equipo.",
+          "failed": "No se pudo mover a este integrante. Inténtalo de nuevo."
         }
       },
       "removeMember": {
@@ -667,7 +671,10 @@
       "mixedLock": "La mezcla entre universidades está bloqueada: ese equipo es de otra universidad.",
       "alreadyInTeam": "Ya estás en un equipo.",
       "notFound": "Ese equipo ya no existe.",
-      "unexpected": "No se pudo entrar en el equipo. Inténtalo de nuevo."
+      "unexpected": "No se pudo entrar en el equipo. Inténtalo de nuevo.",
+      "teamFrozen": "Tu equipo ya envió una solución: la formación está congelada y nadie puede salir. Habla con la organización.",
+      "notInTeam": "Ya no estás en un equipo.",
+      "leaveUnexpected": "No se pudo salir del equipo. Inténtalo de nuevo."
     },
     "rules": "Equipos de hasta {{max}} personas. Mezcla entre universidades {{rule}}.",
     "mixingAllowed": "permitida",

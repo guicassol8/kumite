@@ -170,6 +170,82 @@ describe('OrganizerProblemsList', () => {
 
     await waitFor(() => expect(mockedArchive).toHaveBeenCalledWith({ param: { id: 'p1' } }))
     await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(screen.queryByTestId('organizer-problems-archive-dialog')).toBeNull(),
+    )
+  })
+
+  // #195 (achado #28): the dialog used to close on the click, before the
+  // answer — a failed archive looked exactly like a successful one.
+  async function confirmArchive() {
+    await waitFor(() => expect(screen.getByTestId('organizer-problems-archive-p1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('organizer-problems-archive-p1'))
+    await waitFor(() =>
+      expect(screen.getByTestId('organizer-problems-archive-confirm')).toBeDefined(),
+    )
+    fireEvent.click(screen.getByTestId('organizer-problems-archive-confirm'))
+  }
+
+  it.each([
+    ['a 404', () => mockedArchive.mockResolvedValue(jsonResponse(404, { error: 'not_found' }))],
+    ['a 500', () => mockedArchive.mockResolvedValue(jsonResponse(500, { error: 'internal' }))],
+    ['a dead network', () => mockedArchive.mockRejectedValue(new Error('network down'))],
+  ])('keeps the dialog open with the error on %s', async (_label, arrange) => {
+    mockedList.mockResolvedValue(jsonResponse(200, [draftProblem]))
+    arrange()
+    renderList()
+    await confirmArchive()
+
+    const alert = await screen.findByTestId('organizer-problems-archive-error')
+    expect(alert.textContent).toContain('Não foi possível arquivar o problema')
+    expect(screen.getByTestId('organizer-problems-archive-dialog')).toBeDefined()
+    expect(mockedList).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops the archive error once the dialog is cancelled and reopened', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [draftProblem]))
+    mockedArchive.mockRejectedValue(new Error('network down'))
+    renderList()
+    await confirmArchive()
+    await screen.findByTestId('organizer-problems-archive-error')
+
+    fireEvent.click(screen.getByTestId('organizer-problems-archive-cancel'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('organizer-problems-archive-dialog')).toBeNull(),
+    )
+
+    fireEvent.click(screen.getByTestId('organizer-problems-archive-p1'))
+    await waitFor(() =>
+      expect(screen.getByTestId('organizer-problems-archive-dialog')).toBeDefined(),
+    )
+    expect(screen.queryByTestId('organizer-problems-archive-error')).toBeNull()
+  })
+
+  // Closing the dialog mid-request would hide a failure that lands afterwards
+  // — the same silent outcome as before the fix — so it stays open until the
+  // archive answers.
+  it('keeps the dialog open while the archive is still pending, then shows its failure', async () => {
+    mockedList.mockResolvedValue(jsonResponse(200, [draftProblem]))
+    let fail: (reason: Error) => void = () => {}
+    mockedArchive.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject
+      }),
+    )
+    renderList()
+    await confirmArchive()
+
+    await waitFor(() =>
+      expect(
+        screen.getByTestId<HTMLButtonElement>('organizer-problems-archive-cancel').disabled,
+      ).toBe(true),
+    )
+    fireEvent.keyDown(screen.getByTestId('organizer-problems-archive-dialog'), { key: 'Escape' })
+    expect(screen.getByTestId('organizer-problems-archive-dialog')).toBeDefined()
+
+    fail(new Error('network down'))
+    expect(await screen.findByTestId('organizer-problems-archive-error')).toBeDefined()
+    expect(screen.getByTestId('organizer-problems-archive-dialog')).toBeDefined()
   })
 
   // Identity § 5, verifiable through `data-variant` rather than through a

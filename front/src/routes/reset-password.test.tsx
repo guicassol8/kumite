@@ -153,8 +153,52 @@ describe('ResetPasswordScreen — step 2, completing the reset', () => {
     fillForm()
     fireEvent.click(screen.getByTestId('reset-password-submit-button'))
 
-    expect(await screen.findByTestId('reset-password-form-error')).toBeDefined()
+    const alert = await screen.findByTestId('reset-password-form-error')
+    expect(alert.textContent).toContain('Código inválido ou expirado')
     expect(screen.queryByTestId('reset-password-success')).toBeNull()
+  })
+
+  // #195 (achado #29): a dead network used to reject out of onSubmit with no
+  // message at all, and any non-204 read as "invalid code" — which sends the
+  // user off to request a new code when the one they have is still good.
+  it('says the reset could not be completed on a dead network, keeping every field', async () => {
+    mockedComplete.mockRejectedValueOnce(new Error('network down'))
+    renderResetPassword()
+    await requestCode()
+
+    fillForm()
+    fireEvent.click(screen.getByTestId('reset-password-submit-button'))
+
+    const alert = await screen.findByTestId('reset-password-form-error')
+    expect(alert.textContent).toContain('Não foi possível redefinir a senha')
+    expect(alert.textContent).not.toContain('Código inválido')
+    expect(screen.getByTestId<HTMLInputElement>('reset-password-otp-input').value).toBe('123456')
+    expect(screen.getByTestId<HTMLInputElement>('reset-password-email-input').value).toBe(
+      'ada@edu.pucrs.br',
+    )
+
+    // One click retries with the very same code.
+    mockedComplete.mockResolvedValueOnce(jsonResponse(204))
+    fireEvent.click(screen.getByTestId('reset-password-submit-button'))
+
+    expect(await screen.findByTestId('reset-password-success')).toBeDefined()
+    expect(mockedComplete).toHaveBeenCalledTimes(2)
+    expect(mockedComplete).toHaveBeenLastCalledWith({
+      json: { email: 'ada@edu.pucrs.br', otp: '123456', newPassword: 'brandnewpassword' },
+    })
+  })
+
+  it('does not call an undeclared status (500) an invalid code', async () => {
+    mockedComplete.mockResolvedValue(jsonResponse(500, { error: 'internal_error' }))
+    renderResetPassword()
+    await requestCode()
+
+    fillForm()
+    fireEvent.click(screen.getByTestId('reset-password-submit-button'))
+
+    const alert = await screen.findByTestId('reset-password-form-error')
+    expect(alert.textContent).toContain('Não foi possível redefinir a senha')
+    expect(alert.textContent).not.toContain('Código inválido')
   })
 
   it('rejects mismatched passwords client-side, without calling the API', async () => {

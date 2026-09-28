@@ -31,7 +31,7 @@ task #16).
 - ESM-only; Node ≥ 20.
 - Back follows kata's locked layout (`src/modules/<domain>/<domain>.{route,service,schema,test,hurl}.ts`),
   enforced by `kata verify` (13 rules) in hooks and pre-commit.
-- `.hurl` E2E runs in CI (the `hurl` job, on a fresh migrated + seeded Postgres), not in the hooks.
+- `.hurl` E2E runs in CI (the `hurl` job, on a fresh migrated + seeded Postgres) on push to `main` and on demand, not in the hooks nor on PR pushes (#378).
 
 ## Infra
 

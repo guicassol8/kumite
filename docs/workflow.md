@@ -163,7 +163,8 @@ fine" or "just docs nearby."
 - **Where each step runs.** The pre-commit (`lefthook.yml`) runs format,
   typecheck and `kata verify` on every commit — fast, and none of them
   needs a database. The test suites run **once**: in Claude Code's Stop
-  hook, by hand before the PR for any other agent, and always in CI. They
+  hook, by hand before the PR for any other agent, and always in CI's
+  `check` job. They
   used to run in the pre-commit too, and two suites truncating the same
   local Postgres in parallel is where the OOM-killed commits and the
   phantom test failures came from (#288).
@@ -177,9 +178,22 @@ fine" or "just docs nearby."
   opening/updating the PR, unless successful hooks already ran the same
   checks for the same revision. During implementation use focused checks;
   repeat the full ladder only after changes or failures justify it.
+- **What CI runs, and when (#378).** Actions minutes on this private repo
+  are metered, and a PR push used to cost ~17 of them, most of it
+  re-running what the hooks already ran. So a PR push runs **one** job,
+  `check`: `pnpm format:check` → `pnpm -r typecheck` → `pnpm verify` →
+  `pnpm -r test`, the safety net for an agent that skipped the hooks. A PR
+  that only touches Markdown or `kata-feedback/` runs nothing. `hurl` and
+  `e2e` run on push to `main` (the Deploy workflow waits for CI there) and
+  on demand, on any branch: `gh workflow run CI --ref <branch>`. On a PR
+  their evidence comes from the reviewer's local runs (`reviewing-tasks.md`).
+  To put one back on every PR push, delete its `if:` line in `ci.yml`. The
+  whole workflow can also be switched off (`gh workflow disable CI`) when
+  the month's minutes run out; `gh workflow list` shows which state it is
+  in, and with it off nothing deploys.
 - **E2E in CI.** The `e2e` job in `ci.yml` runs the **whole** Playwright
-  suite (`pnpm --filter @kumite/front e2e`) on every push to every PR and on
-  push to `main`. It has its own Postgres, the same throwaway organizer as
+  suite (`pnpm --filter @kumite/front e2e`) on push to `main` and on manual
+  dispatch. It has its own Postgres, the same throwaway organizer as
   the `hurl` job and a `BACK_NOTIFICATIONS_LOG` path, so the organizer and
   real-OTP specs run instead of skipping. It needs no secret. In CI only
   (`front/playwright.config.ts`), a failing spec gets one retry: one that
@@ -188,11 +202,12 @@ fine" or "just docs nearby."
   stray `test.only` fails the job instead of shrinking it. The HTML report,
   the traces and screenshots of failures and the back's log are uploaded as
   the `playwright-report` artifact (kept 14 days) whenever the job was not
-  cancelled. The suite does not run in the pre-commit or in the Stop hook.
-  So "existing e2e green" on a PR means **the `e2e` check is green** — look
-  at its flaky count too, and name any flaky spec in the Evidence: the
-  retry keeps a flake from failing the gate, it does not fix it (open an
-  issue for it). `CI=1` reproduces the CI settings locally. Editor specs
+  cancelled. The suite does not run in the pre-commit or in the Stop hook,
+  nor on a PR push. So "existing e2e green" on a PR means the reviewer ran
+  the **whole** suite locally (`CI=1` for the CI settings) on the PR's head
+  and it passed, or dispatched the `e2e` job on the branch and it is green —
+  either way, name any flaky spec in the Evidence: the retry keeps a flake
+  from failing the gate, it does not fix it (open an issue for it). `CI=1` reproduces the CI settings locally. Editor specs
   wait for Blockly through `expectBlocklyInjected`
   (`front/e2e/support/blockly.ts`), which carries the injection budget and
   checks the test's own (#246).

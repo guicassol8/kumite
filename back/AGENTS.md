@@ -8,7 +8,8 @@ file natively; Claude Code imports it from `CLAUDE.md`.
   `--strict-coverage` (what pre-commit runs) to fail on checks a rule could
   not prove — an unresolvable middleware in a chain, for instance.
 - `pnpm test` — unit tests (Vitest).
-- `pnpm hurl` — API E2E via Hurl, now with a dedicated job in CI. Run
+- `pnpm hurl` — API E2E via Hurl; CI runs it on `main` and on demand, not
+  on PR pushes (#378), so the reviewer runs it locally. Run
   `pnpm db:reset` first: the suite asserts on seed state and is not
   re-runnable on a dirty database. `db:reset` truncates every table and
   re-seeds; it refuses any `DATABASE_URL` that is not local. It resets the

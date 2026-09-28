@@ -1,8 +1,7 @@
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lte, sql } from 'drizzle-orm'
+import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 
 import type { Db } from '../../db/client'
 import {
-  roundProblemsTable,
   roundsTable,
   submissionsTable,
   teamMembersTable,
@@ -78,32 +77,18 @@ async function countAllSubmissions(db: Db): Promise<number> {
   return row?.total ?? 0
 }
 
-// Submissions carry no round_id (#37): a round's submissions are the ones on
-// its problems inside its own [openedAt, closedAt ?? now] window — the same
-// derivation ranking.service.ts documents and relies on, safe because
-// rounds_single_open_idx allows at most one open round at a time. That
-// module's window query is private to its scoring pipeline, so the count is
-// written here rather than exporting a counter that isn't ranking's concern.
+// A submission's round is the one stamped on it at accept time (#176), right
+// after the accept gate validated that round as open — never derived from
+// createdAt. The old [openedAt, closedAt] window lost submissions whose judging
+// finished after the round closed, and could count a row stamped with another
+// round that shared a problem. No problem filter either: a round's problem set
+// is frozen once it leaves draft (round_not_draft), so every row stamped with
+// it is already on one of its problems.
 async function countSubmissionsInRound(db: Db, round: RoundRow): Promise<number> {
-  if (!round.openedAt) return 0
-
-  const problems = await db
-    .select({ problemId: roundProblemsTable.problemId })
-    .from(roundProblemsTable)
-    .where(eq(roundProblemsTable.roundId, round.id))
-  const problemIds = problems.map((problem) => problem.problemId)
-  if (problemIds.length === 0) return 0
-
-  const conditions = [
-    inArray(submissionsTable.problemId, problemIds),
-    gte(submissionsTable.createdAt, round.openedAt),
-  ]
-  if (round.closedAt) conditions.push(lte(submissionsTable.createdAt, round.closedAt))
-
   const [row] = await db
     .select({ total: count() })
     .from(submissionsTable)
-    .where(and(...conditions))
+    .where(eq(submissionsTable.roundId, round.id))
   return row?.total ?? 0
 }
 

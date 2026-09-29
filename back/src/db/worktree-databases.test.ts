@@ -1,9 +1,15 @@
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
   dropDatabases,
   dropStatement,
   mainDatabaseUrl,
+  otherWorktreeUrls,
+  redact,
   worktreeDatabaseCandidates,
   worktreeDir,
 } from './worktree-databases'
@@ -70,6 +76,63 @@ describe('worktreeDatabaseCandidates (#395)', () => {
       keep: [MAIN, 'postgres://kumite:kumite@localhost:5487/kumite_task404', undefined],
     })
     expect(names(urls)).toEqual(['kumite_test_task_404_copy', 'kumite_task404_test_task_404_copy'])
+  })
+})
+
+describe('worktreeDatabaseCandidates with a URL that does not parse', () => {
+  // `${DB_PORT}` is not expanded by parseEnv: another tree's back/.env can hold
+  // it. It must neither crash the drop of every other worktree nor print that
+  // tree's password (a TypeError from `new URL` carries its input).
+  const BAD = 'postgres://kumite:s3cret@localhost:${DB_PORT}/kumite_x'
+
+  it('still protects the database another worktree names, by its last path segment', () => {
+    const urls = worktreeDatabaseCandidates({
+      mainUrl: MAIN,
+      worktreeUrl: 'postgres://kumite:kumite@localhost:5487/kumite_x',
+      dir: 'task-8-y',
+      keep: [BAD],
+    })
+    expect(names(urls)).toEqual(['kumite_test_task_8_y', 'kumite_x_test_task_8_y'])
+  })
+
+  it('skips an unparsable base or worktree URL instead of throwing', () => {
+    const urls = worktreeDatabaseCandidates({
+      mainUrl: MAIN,
+      otherBases: [BAD],
+      worktreeUrl: BAD,
+      dir: 'task-8-y',
+    })
+    expect(names(urls)).toEqual(['kumite_test_task_8_y'])
+  })
+
+  it('names nothing when the main URL does not parse', () => {
+    expect(worktreeDatabaseCandidates({ mainUrl: BAD, dir: 'task-8-y' })).toEqual([])
+  })
+
+  it('redacts the credentials of any URL in an error text', () => {
+    expect(redact(`Invalid URL: ${BAD} and postgres://u:p@h/d`)).toBe(
+      'Invalid URL: postgres://***@localhost:${DB_PORT}/kumite_x and postgres://***@h/d',
+    )
+  })
+})
+
+describe('otherWorktreeUrls', () => {
+  it('reads every other worktree, never the one being removed — however it is spelled', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kumite-wt-'))
+    try {
+      for (const tree of ['main', 'a', 'b']) {
+        mkdirSync(join(root, tree, 'back'), { recursive: true })
+        writeFileSync(join(root, tree, 'back', '.env'), `DATABASE_URL=postgres://h/${tree}_db\n`)
+      }
+      symlinkSync(join(root, 'a'), join(root, 'link-to-a'))
+      const trees = ['main', 'a', 'b'].map((tree) => join(root, tree))
+      const dbs = (urls: (string | undefined)[]) => urls.map((url) => url?.split('/').pop())
+      expect(dbs(otherWorktreeUrls(trees, join(root, 'a')))).toEqual(['main_db', 'b_db'])
+      expect(dbs(otherWorktreeUrls(trees, join(root, 'link-to-a')))).toEqual(['main_db', 'b_db'])
+      expect(dbs(otherWorktreeUrls(trees, join(root, 'gone')))).toEqual(['main_db', 'a_db', 'b_db'])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 

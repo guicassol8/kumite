@@ -17,8 +17,48 @@ import { DEFAULT_DATABASE_URL, gitDiscoveryEnv, readDotenv, testDatabaseUrl } fr
 
 type EnvLike = Record<string, string | undefined>
 
-function databaseName(url: string): string {
-  return decodeURIComponent(new URL(url).pathname.replace(/^\//, ''))
+/** `url` parsed, or `undefined` when it is not a URL. Never the TypeError:
+ * Node attaches the input — password included — to it, and prints it. */
+function parseUrl(url: string | undefined): URL | undefined {
+  if (!url) return undefined
+  try {
+    return new URL(url)
+  } catch {
+    return undefined
+  }
+}
+
+function decode(text: string): string {
+  try {
+    return decodeURIComponent(text)
+  } catch {
+    return text
+  }
+}
+
+function databaseName(url: string | URL): string {
+  const parsed = typeof url === 'string' ? parseUrl(url) : url
+  return parsed ? decode(parsed.pathname.replace(/^\//, '')) : ''
+}
+
+/** The database `url` names, even when it does not parse (an unexpanded
+ * `${DB_PORT}` in a back/.env): the text after its last `/`. For protecting
+ * a name only — never for choosing one to drop. */
+function looseName(url: string): string {
+  const parsed = parseUrl(url)
+  if (parsed) return databaseName(parsed)
+  return decode(
+    url
+      .replace(/[?#].*$/, '')
+      .split('/')
+      .pop() ?? '',
+  )
+}
+
+/** `text` with the credentials of every URL in it masked, for an error
+ * message the CLI prints. */
+export function redact(text: string): string {
+  return text.replace(/:\/\/[^/@\s]*@/g, '://***@')
 }
 
 export type WorktreeDatabasesInput = {
@@ -42,25 +82,26 @@ export type WorktreeDatabasesInput = {
  * Candidates only — {@link dropDatabases} drops the ones that exist.
  */
 export function worktreeDatabaseCandidates(input: WorktreeDatabasesInput): string[] {
-  const bases = [input.mainUrl, ...(input.otherBases ?? [])].filter((url): url is string => !!url)
+  const main = parseUrl(input.mainUrl)
+  if (!main) return []
+  // A URL that does not parse is no base to derive from, but the database it
+  // seems to name stays protected all the same.
+  const named = [input.mainUrl, ...(input.otherBases ?? [])].filter((url): url is string => !!url)
+  const bases = named.filter((url) => parseUrl(url))
   const protectedNames = new Set(['postgres', 'template0', 'template1'])
-  for (const base of bases) {
-    protectedNames.add(databaseName(base))
-    protectedNames.add(databaseName(testDatabaseUrl(base)))
-  }
-  for (const url of input.keep ?? []) if (url) protectedNames.add(databaseName(url))
-  const host = new URL(input.mainUrl).host
+  for (const url of [...named, ...(input.keep ?? [])]) if (url) protectedNames.add(looseName(url))
+  for (const base of bases) protectedNames.add(databaseName(testDatabaseUrl(base)))
+  const host = main.host
   const candidates = bases.map((base) => testDatabaseUrl(base, input.dir))
-  if (input.worktreeUrl) {
-    candidates.push(input.worktreeUrl, testDatabaseUrl(input.worktreeUrl, input.dir))
-  }
+  const own = input.worktreeUrl
+  if (own && parseUrl(own)) candidates.push(own, testDatabaseUrl(own, input.dir))
   const seen = new Set<string>()
   return candidates.filter((url) => {
     const name = databaseName(url)
     if (protectedNames.has(name) || seen.has(name)) return false
     // A worktree pointing at another server (a Docker Postgres on its own
     // port) is not ours to drop: worktree:prune removes that container.
-    if (new URL(url).host !== host) return false
+    if (parseUrl(url)?.host !== host) return false
     seen.add(name)
     return true
   })
@@ -140,15 +181,33 @@ function listWorktrees(): string[] {
 
 const realpath = (path: string) => (existsSync(path) ? realpathSync(path) : path)
 
+/**
+ * The back/.env DATABASE_URL of every tree in `trees` but `worktree` itself,
+ * compared by real path — a relative or symlinked spelling of the removed
+ * worktree must not protect its own database. These are what {@link
+ * worktreeDatabaseCandidates} keeps.
+ */
+export function otherWorktreeUrls(
+  trees: string[],
+  worktree: string,
+  readUrl: (tree: string) => string | undefined = (tree) =>
+    readDotenv(join(tree, 'back'))['DATABASE_URL'],
+): (string | undefined)[] {
+  const self = realpath(worktree)
+  return trees.filter((tree) => realpath(tree) !== self).map(readUrl)
+}
+
 // Usage: db:drop-worktree <worktree> [--dry-run] — a relative path is taken
-// from where pnpm was run.
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const args = process.argv.slice(2).filter((arg) => arg !== '--')
+// from where pnpm was run. Exit 0: done, nothing to do, or Postgres down (the
+// databases stay, reported — a prune never waits on it). Exit 1: anything
+// unexpected, so worktree:prune keeps the tree whose back/.env names them.
+async function main(argv: string[]): Promise<number> {
+  const args = argv.filter((arg) => arg !== '--')
   const dryRun = args.includes('--dry-run')
   const arg = args.find((a) => a !== '--dry-run')
   if (!arg) {
     console.error('usage: pnpm db:drop-worktree <worktree path> [--dry-run]')
-    process.exit(2)
+    return 2
   }
   const worktree = worktreeDir(arg)
   const dir = basename(worktree)
@@ -160,34 +219,48 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     assertLocalDatabaseUrl(mainUrl, 'db:drop-worktree')
   } catch {
-    console.log('db:drop-worktree: the database server is not local — nothing dropped')
-    process.exit(0)
+    console.log(
+      'db:drop-worktree: the database server is not local (or DATABASE_URL is not a URL) — nothing dropped',
+    )
+    return 0
   }
   if (!existsSync(worktree)) {
     console.log(
       `db:drop-worktree: no directory at ${worktree} — only the suite databases named after "${dir}" are looked for`,
     )
   }
+  const worktreeUrl = readDotenv(join(worktree, 'back'))['DATABASE_URL']
+  if (worktreeUrl && !URL.canParse(worktreeUrl)) {
+    console.log(
+      "db:drop-worktree: this worktree's DATABASE_URL is not a URL — only its suite databases are looked for",
+    )
+  }
   // A database another worktree's back/.env still names is never dropped —
   // a copied back/.env must not take a live worktree's database with it.
-  const self = realpath(worktree)
-  const keep = trees
-    .filter((tree) => realpath(tree) !== self)
-    .map((tree) => readDotenv(join(tree, 'back'))['DATABASE_URL'])
   const urls = worktreeDatabaseCandidates({
     mainUrl,
     otherBases: [process.env['DATABASE_URL']],
-    worktreeUrl: readDotenv(join(worktree, 'back'))['DATABASE_URL'],
+    worktreeUrl,
     dir,
-    keep,
+    keep: otherWorktreeUrls(trees, worktree),
   })
   try {
     const names = await dropDatabases(mainUrl, urls, dryRun)
     if (names.length === 0) console.log('db:drop-worktree: no database of this worktree left')
   } catch (error) {
-    // Postgres down must not stop the prune: the databases stay, reported.
     console.log(
-      `db:drop-worktree: could not reach Postgres (${(error as Error).message}) — nothing dropped`,
+      `db:drop-worktree: could not reach Postgres (${redact((error as Error).message)}) — nothing dropped`,
     )
+  }
+  return 0
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    process.exitCode = await main(process.argv.slice(2))
+  } catch (error) {
+    // Only the message, redacted: a printed error object carries its input.
+    console.log(`db:drop-worktree: failed (${redact(String((error as Error).message))})`)
+    process.exitCode = 1
   }
 }

@@ -337,4 +337,45 @@ describe('BlocklyWorkspace theme (#218)', () => {
 
     expect(ref.current?.getWorkspace()?.getTheme().name).toBe('kumite-dark')
   })
+
+  // #212: the practice demo's canvas — navigated, never edited.
+  describe('read-only', () => {
+    it('injects a read-only workspace with no toolbox', () => {
+      const ref = createRef<BlocklyWorkspaceHandle>()
+      render(<BlocklyWorkspace ref={ref} options={{ readOnly: true }} initialState={fixture} />)
+      const workspace = ref.current?.getWorkspace()
+
+      expect(workspace?.isReadOnly()).toBe(true)
+      expect(workspace?.getToolbox()).toBeNull()
+      expect(workspace?.getBlockById('fixtureNum')).not.toBeNull()
+    })
+
+    it('ignores a toolbox swap instead of throwing on the missing toolbox', () => {
+      const ref = createRef<BlocklyWorkspaceHandle>()
+      const { rerender } = render(
+        <BlocklyWorkspace ref={ref} toolbox={toolbox} options={{ readOnly: true }} />,
+      )
+
+      expect(() =>
+        rerender(
+          <BlocklyWorkspace ref={ref} toolbox={buildToolbox('en')} options={{ readOnly: true }} />,
+        ),
+      ).not.toThrow()
+      expect(ref.current?.getWorkspace()?.getToolbox()).toBeNull()
+    })
+
+    it('takes its own test id and label, leaving the editor defaults alone', () => {
+      render(
+        <BlocklyWorkspace
+          options={{ readOnly: true }}
+          testId="practice-demo-canvas"
+          label="Demonstração"
+        />,
+      )
+
+      const canvas = screen.getByTestId('practice-demo-canvas')
+      expect(canvas.getAttribute('aria-label')).toBe('Demonstração')
+      expect(screen.queryByTestId('blockly-workspace')).toBeNull()
+    })
+  })
 })

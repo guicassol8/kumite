@@ -4,8 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { LocaleSchema } from '../lib/locale'
 import { WorkspaceSchema } from '../modules/judge/judge.schema'
 import { generateJudgeSource, runJudge } from '../modules/judge/judge.service'
+import { PracticeDemoKeySchema } from '../modules/problems/problems.schema'
 import { evaluateTestCaseCoverage } from '../modules/problems/problems.service'
-import { PRACTICE_PROBLEMS } from './practice-problems'
+import { PRACTICE_PROBLEMS, practiceDemoKeyFor } from './practice-problems'
 import { SEED_PROBLEMS } from './seed'
 
 const TEST_TIMEOUT_MS = 15_000
@@ -88,5 +89,28 @@ describe('PRACTICE_PROBLEMS', () => {
     for (const problem of PRACTICE_PROBLEMS) {
       expect(competition.has(ptTitleOf(problem))).toBe(false)
     }
+  })
+
+  // #212: each seeded problem links to exactly one step-by-step demo, and the
+  // enum the front types its demo map with has no key without a problem.
+  it('gives each problem its own demoKey, covering the whole enum', () => {
+    const keys = PRACTICE_PROBLEMS.map((problem) => problem.demoKey)
+
+    expect(new Set(keys).size).toBe(keys.length)
+    expect([...keys].sort()).toEqual([...PracticeDemoKeySchema.options].sort())
+  })
+})
+
+describe('practiceDemoKeyFor (#212)', () => {
+  it('finds a problem by its pt title, the seed identity', () => {
+    for (const problem of PRACTICE_PROBLEMS) {
+      expect(practiceDemoKeyFor(ptTitleOf(problem))).toBe(problem.demoKey)
+    }
+  })
+
+  it('never matches a title in another locale, an unknown title or none', () => {
+    expect(practiceDemoKeyFor('Return the input')).toBeNull()
+    expect(practiceDemoKeyFor('Soma')).toBeNull()
+    expect(practiceDemoKeyFor(undefined)).toBeNull()
   })
 })

@@ -1023,6 +1023,36 @@
   "practice": {
     "title": "Práctica",
     "intro": "Entrena en el editor cuando quieras: aquí no hay envío ni puntuación.",
+    "demo": {
+      "start": "Ver cómo se resuelve",
+      "position": "Paso {{current}} de {{total}}",
+      "prev": "Anterior",
+      "next": "Siguiente",
+      "exit": "Salir de la demostración",
+      "canvasLabel": "Demostración de la solución, solo lectura",
+      "steps": {
+        "root": "Toda solución empieza en el bloque \"resolver\". Lo que se encaje en \"devolver\" es la respuesta.",
+        "devolva-entrada": {
+          "2": "El bloque \"entrada\" (en Variables) trae el valor del problema. Encajado en \"devolver\", vuelve sin cambios — listo."
+        },
+        "e-par": {
+          "2": "En Lógica, la comparación \"=\" responde verdadero o falso. Encajada directamente en \"devolver\", ya es la respuesta.",
+          "3": "A la izquierda, \"resto de … ÷ …\" (en Matemáticas): lo que sobra al dividir un número entre el otro.",
+          "4": "El número a dividir es la \"entrada\".",
+          "5": "Dividimos entre 2.",
+          "6": "A la derecha, 0: si la división entre 2 no deja resto, el número es par."
+        },
+        "soma-lista": {
+          "2": "En Variables, \"Crear variable...\" crea \"total\", y \"establecer total a\" guarda un valor en ella.",
+          "3": "El total empieza en 0: antes de sumar ningún número, la suma es cero.",
+          "4": "En Bucles, \"para cada elemento numero en la lista\" repite lo que está dentro una vez por elemento.",
+          "5": "La lista recorrida es la \"entrada\".",
+          "6": "Dentro del bucle, otro \"establecer total a\" cambia el total por un valor nuevo en cada vuelta.",
+          "7": "El valor nuevo es \"total + numero\": la suma hasta aquí más el número de esta vuelta.",
+          "8": "Después del bucle, \"total\" va en \"devolver\": es la suma de toda la lista."
+        }
+      }
+    },
     "loading": "Cargando problemas de práctica…",
     "loadError": "No se pudieron cargar los problemas de práctica.",
     "retry": "Reintentar",

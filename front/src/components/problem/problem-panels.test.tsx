@@ -19,6 +19,7 @@ const problem = {
   visibility: 'round' as const,
   roundStatus: 'open' as const,
   bestSubmission: null,
+  demoKey: null,
 }
 
 afterEach(() => {

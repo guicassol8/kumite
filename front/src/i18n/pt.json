@@ -1023,6 +1023,36 @@
   "practice": {
     "title": "Prática",
     "intro": "Treine no editor a qualquer momento — aqui não há submissão nem pontuação.",
+    "demo": {
+      "start": "Ver como se resolve",
+      "position": "Passo {{current}} de {{total}}",
+      "prev": "Anterior",
+      "next": "Próximo",
+      "exit": "Sair da demonstração",
+      "canvasLabel": "Demonstração da solução, somente leitura",
+      "steps": {
+        "root": "Toda solução começa no bloco \"resolver\". O que for encaixado em \"retornar\" é a resposta.",
+        "devolva-entrada": {
+          "2": "O bloco \"entrada\" (em Variáveis) traz o valor do problema. Encaixado em \"retornar\", ele volta sem mudança — pronto."
+        },
+        "e-par": {
+          "2": "Em Lógica, a comparação \"=\" responde verdadeiro ou falso. Encaixada direto em \"retornar\", ela já é a resposta.",
+          "3": "Do lado esquerdo, \"resto da divisão de … ÷ …\" (em Matemática): o que sobra ao dividir um número pelo outro.",
+          "4": "O número a dividir é a \"entrada\".",
+          "5": "Dividimos por 2.",
+          "6": "Do lado direito, 0: se a divisão por 2 não deixa resto, o número é par."
+        },
+        "soma-lista": {
+          "2": "Em Variáveis, \"Criar variável...\" cria \"total\", e \"definir total para\" guarda um valor nela.",
+          "3": "O total começa em 0: antes de somar qualquer número, a soma é zero.",
+          "4": "Em Laços, \"para cada item numero na lista\" repete o que está dentro uma vez por item.",
+          "5": "A lista percorrida é a \"entrada\".",
+          "6": "Dentro do laço, outro \"definir total para\" troca o total por um valor novo a cada volta.",
+          "7": "O valor novo é \"total + numero\": a soma até aqui mais o número da vez.",
+          "8": "Depois do laço, \"total\" vai em \"retornar\": é a soma da lista inteira."
+        }
+      }
+    },
     "loading": "Carregando problemas de prática…",
     "loadError": "Não foi possível carregar os problemas de prática.",
     "retry": "Tentar novamente",

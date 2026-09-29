@@ -5,7 +5,12 @@ import {
   type WorkspaceState,
 } from '@kumite/blocks'
 
-import type { Difficulty, TestCase, TranslationInput } from '../modules/problems/problems.schema'
+import type {
+  Difficulty,
+  PracticeDemoKey,
+  TestCase,
+  TranslationInput,
+} from '../modules/problems/problems.schema'
 
 export type PracticeProblem = {
   difficulty: Difficulty
@@ -15,6 +20,9 @@ export type PracticeProblem = {
    * replays the same workspace. practice-problems.test.ts runs it against
    * `testCases` in the judge sandbox. */
   solution: WorkspaceState
+  /** The front's step-by-step demo of `solution` (#212), sent to the
+   * participant as `demoKey` — see practiceDemoKeyFor. */
+  demoKey: PracticeDemoKey
 }
 
 // The practice catalog (#210), in the order of the progression: seedPracticeProblems
@@ -67,6 +75,7 @@ export const PRACTICE_PROBLEMS: PracticeProblem[] = [
       },
     ],
     solution: praticaDevolvaEntrada,
+    demoKey: 'devolva-entrada',
   },
   {
     difficulty: 'easy',
@@ -112,6 +121,7 @@ export const PRACTICE_PROBLEMS: PracticeProblem[] = [
       },
     ],
     solution: praticaEPar,
+    demoKey: 'e-par',
   },
   {
     difficulty: 'medium',
@@ -150,5 +160,20 @@ export const PRACTICE_PROBLEMS: PracticeProblem[] = [
       },
     ],
     solution: praticaSomaLista,
+    demoKey: 'soma-lista',
   },
 ]
+
+/**
+ * The demo of the seeded practice problem with this pt title (#212), or null.
+ * The pt title is the seed's own identity (seed.ts, insert-if-missing), so it
+ * is the link here too: an organizer who renames a seeded problem in pt takes
+ * its demo away with it.
+ */
+export function practiceDemoKeyFor(ptTitle: string | undefined): PracticeDemoKey | null {
+  if (ptTitle === undefined) return null
+  const match = PRACTICE_PROBLEMS.find(
+    (problem) => problem.translations.find((t) => t.locale === 'pt')?.title === ptTitle,
+  )
+  return match?.demoKey ?? null
+}

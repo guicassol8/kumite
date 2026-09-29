@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/api', () => ({
@@ -20,10 +20,9 @@ vi.mock('@/lib/sse-client', () => ({
   connectEventStream: vi.fn(() => () => {}),
 }))
 
-import '@/i18n'
-
 import { ROOT_BLOCK_TYPE, type WorkspaceState } from '@kumite/blocks'
 import * as Blockly from 'blockly'
+import i18n from '@/i18n'
 import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import { saveWorkspaceState } from '@/lib/workspace-storage'
@@ -67,6 +66,7 @@ function practiceProblem(overrides: Record<string, unknown> = {}) {
     roundId: null,
     roundStatus: 'none',
     bestSubmission: null,
+    demoKey: null,
     ...overrides,
   }
 }
@@ -114,11 +114,33 @@ beforeEach(() => {
   setSession(fakeUser, 'tok-1')
 })
 
-afterEach(() => {
+afterEach(async () => {
   cleanup()
   clearSession('manual')
   localStorage.clear()
+  // i18n is a singleton: the demo's language switch must not leak.
+  await act(() => i18n.changeLanguage('pt'))
 })
+
+// Blockly batches its events and flushes them on a macrotask.
+function flushBlocklyEvents() {
+  return act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+}
+
+// Mirrors lib/workspace-storage.ts: the autosave key carries user and problem.
+const storageKey = `kumite:workspace:${fakeUser.id}:p1`
+
+/** Opens a practice problem with a demo, the participant's blocks already saved. */
+async function openWithDemo() {
+  saveWorkspaceState(fakeUser.id, 'p1', savedWorkspace('blocoDaPratica'))
+  mockedGet.mockResolvedValue(jsonResponse(200, practiceProblem({ demoKey: 'e-par' })))
+  renderAt('/practice/p1')
+  await screen.findByTestId('blockly-workspace')
+  await waitFor(() => expect(liveBlockIds()).toEqual(expect.arrayContaining(['blocoDaPratica'])))
+  await flushBlocklyEvents()
+  const participant = Blockly.getMainWorkspace()
+  return { participant }
+}
 
 describe('/practice/$id (#211)', () => {
   it('shows the statement, the examples, the editor and Executar', async () => {
@@ -197,5 +219,82 @@ describe('/practice/$id (#211)', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
     expect(mockedGet).not.toHaveBeenCalled()
+  })
+})
+
+describe('/practice/$id demo (#212)', () => {
+  it('offers no demo on a practice problem without one', async () => {
+    mockedGet.mockResolvedValue(jsonResponse(200, practiceProblem()))
+
+    renderAt('/practice/p1')
+
+    expect(await screen.findByTestId('problem-run-button')).toBeTruthy()
+    expect(screen.queryByTestId('practice-demo-start')).toBeNull()
+  })
+
+  it('swaps the editor for the read-only demo and its controls, Executar and Limpar gone', async () => {
+    await openWithDemo()
+
+    fireEvent.click(screen.getByTestId('practice-demo-start'))
+
+    expect(await screen.findByTestId('practice-demo-canvas')).toBeTruthy()
+    expect(screen.getByTestId('practice-demo-controls')).toBeTruthy()
+    expect(screen.getByTestId('practice-demo-position').textContent).toBe('Passo 1 de 6')
+    expect(screen.getByTestId('practice-demo-exit')).toBeTruthy()
+    expect(screen.queryByTestId('problem-run-button')).toBeNull()
+    expect(screen.queryByTestId('problem-clear-button')).toBeNull()
+    // The participant's canvas stays mounted underneath, out of reach.
+    const underlay = screen.getByTestId('blockly-workspace').closest('[inert]')
+    expect(underlay?.getAttribute('aria-hidden')).toBe('true')
+    // The demo's glow (#212 review) is its own: the participant's canvas
+    // shows none, and nothing is selected for Delete or Ctrl+Z to act on.
+    expect(
+      screen.getByTestId('practice-demo-canvas').querySelectorAll('.blocklySelected'),
+    ).toHaveLength(1)
+    expect(screen.getByTestId('blockly-workspace').querySelector('.blocklySelected')).toBeNull()
+    expect(Blockly.common.getSelected()).toBeNull()
+  })
+
+  it('never writes the autosave and gives the canvas back exactly as it was', async () => {
+    const { participant } = await openWithDemo()
+    const before = Blockly.serialization.workspaces.save(participant)
+    const savedBefore = localStorage.getItem(storageKey)
+    expect(savedBefore).not.toBeNull()
+
+    fireEvent.click(screen.getByTestId('practice-demo-start'))
+    await screen.findByTestId('practice-demo-canvas')
+    fireEvent.click(screen.getByTestId('practice-demo-next'))
+    fireEvent.click(screen.getByTestId('practice-demo-next'))
+    await flushBlocklyEvents()
+    expect(localStorage.getItem(storageKey)).toBe(savedBefore)
+
+    fireEvent.click(screen.getByTestId('practice-demo-exit'))
+    await flushBlocklyEvents()
+
+    expect(screen.queryByTestId('practice-demo-canvas')).toBeNull()
+    expect(screen.getByTestId('problem-run-button')).toBeTruthy()
+    expect(screen.getByTestId('blockly-workspace').closest('[inert]')).toBeNull()
+    // Same instance, never remounted, with the same blocks.
+    expect(Blockly.common.getAllWorkspaces()).toContain(participant)
+    expect(Blockly.serialization.workspaces.save(participant)).toEqual(before)
+    expect(localStorage.getItem(storageKey)).toBe(savedBefore)
+    // Blockly's shortcuts (Delete, Ctrl+Z) act on the main workspace: it is
+    // the participant's again, not the disposed demo.
+    expect(Blockly.getMainWorkspace()).toBe(participant)
+  })
+
+  it('keeps the step through a language switch', async () => {
+    await openWithDemo()
+    fireEvent.click(screen.getByTestId('practice-demo-start'))
+    await screen.findByTestId('practice-demo-canvas')
+    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByTestId('practice-demo-next'))
+
+    await act(() => i18n.changeLanguage('en'))
+
+    expect(screen.getByTestId('practice-demo-position').textContent).toBe('Step 4 of 6')
+    expect(screen.getByTestId('practice-demo-step-text').textContent).toBe(
+      'The number to divide is the "input".',
+    )
+    expect(screen.getByTestId('practice-demo-canvas')).toBeTruthy()
   })
 })

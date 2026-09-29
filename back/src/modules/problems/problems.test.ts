@@ -169,6 +169,7 @@ describe('ParticipantProblemSchema', () => {
       roundId: null,
       roundStatus: 'closed',
       bestSubmission: null,
+      demoKey: null,
     })
 
     expect(parsed.examples[0]).toEqual({ input: [1, 2], expected: 3 })
@@ -188,6 +189,7 @@ describe('ParticipantProblemSchema', () => {
       roundId: '9f3f1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
       roundStatus: 'open',
       bestSubmission: { score: 80, achievedAt: new Date().toISOString(), attempts: 2 },
+      demoKey: null,
     })
 
     expect(parsed.roundStatus).toBe('open')
@@ -207,10 +209,40 @@ describe('ParticipantProblemSchema', () => {
       roundId: null,
       roundStatus: 'none',
       bestSubmission: null,
+      demoKey: null,
     })
 
     expect(parsed.visibility).toBe('practice')
     expect(parsed.roundStatus).toBe('none')
+  })
+
+  // #212: the link from a seeded practice problem to its step-by-step demo.
+  // Nullable, not optional — every read says whether there is a demo.
+  const practiceRead = {
+    id: '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+    points: 100,
+    difficulty: 'easy',
+    locale: 'pt',
+    title: 'É par?',
+    statementMd: 'Descubra se é par.',
+    examples: [],
+    visibility: 'practice',
+    roundId: null,
+    roundStatus: 'none',
+    bestSubmission: null,
+  }
+
+  it('accepts a known demoKey (#212)', () => {
+    expect(ParticipantProblemSchema.parse({ ...practiceRead, demoKey: 'e-par' }).demoKey).toBe(
+      'e-par',
+    )
+  })
+
+  it('rejects a demoKey outside the catalog and a missing one (#212)', () => {
+    expect(ParticipantProblemSchema.safeParse({ ...practiceRead, demoKey: 'nope' }).success).toBe(
+      false,
+    )
+    expect(ParticipantProblemSchema.safeParse(practiceRead).success).toBe(false)
   })
 })
 
@@ -1226,6 +1258,7 @@ describe('problems.service', () => {
           roundId: null,
           roundStatus: 'none',
           bestSubmission: null,
+          demoKey: null,
         })
       })
 
@@ -1289,6 +1322,53 @@ describe('problems.service', () => {
         const user = await insertUser()
 
         expect((await getPublishedProblem(db, id, 'pt', user.id))?.visibility).toBe('round')
+      })
+
+      // #212: the demo link is the seed's identity — the pt title — and only
+      // on the practice branch. The same title on a round problem, open or
+      // closed, never offers a demo.
+      describe('demoKey', () => {
+        const seededTitle = [
+          { locale: 'pt' as const, title: 'É par?', statementMd: 'Descubra se é par.' },
+          { locale: 'es' as const, title: 'Otro título', statementMd: 'Descubre si es par.' },
+          { locale: 'en' as const, title: 'Another title', statementMd: 'Find out.' },
+        ]
+
+        it('links a practice problem whose pt title is a seeded one, in any locale', async () => {
+          const id = await publishedPractice()
+          expectUpdated(await updateProblem(db, id, { translations: seededTitle }))
+          const user = await insertUser()
+
+          expect((await getPublishedProblem(db, id, 'pt', user.id))?.demoKey).toBe('e-par')
+          expect((await getPublishedProblem(db, id, 'en', user.id))?.demoKey).toBe('e-par')
+        })
+
+        it('is null on a practice problem the organizer wrote', async () => {
+          const id = await publishedPractice()
+          const user = await insertUser()
+
+          expect((await getPublishedProblem(db, id, 'pt', user.id))?.demoKey).toBeNull()
+        })
+
+        it('is null on a round problem, open or closed, even with a seeded pt title', async () => {
+          const id = await publishedRound()
+          expectUpdated(await updateProblem(db, id, { translations: seededTitle }))
+          const created = await createRound(db, {
+            name: 'R',
+            durationMinutes: 30,
+            problemIds: [id],
+          })
+          if (!created.ok) throw new Error('expected the round to be created')
+          const opened = await openRound(db, created.round.id)
+          if (!opened.ok) throw new Error('expected the round to open')
+          const user = await insertUser()
+
+          expect((await getPublishedProblem(db, id, 'pt', user.id))?.demoKey).toBeNull()
+
+          const closed = await closeRound(db, created.round.id)
+          if (!closed.ok) throw new Error('expected the round to close')
+          expect((await getPublishedProblem(db, id, 'pt', user.id))?.demoKey).toBeNull()
+        })
       })
     })
 

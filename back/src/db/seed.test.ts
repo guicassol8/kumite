@@ -253,4 +253,21 @@ describe('practice seed (#210)', () => {
     expect(problem?.title).toBe(title)
     expect(problem?.visibility).toBe('practice')
   })
+
+  // #212: the demo link is matched on the pt title, never on the locale being
+  // served — reading in es still finds each problem's own demo.
+  it('links every seeded practice problem to its demo, read in es', async () => {
+    await seed(db)
+    const [organizer] = await db.select().from(usersTable)
+    const listed = await listPracticeProblems(db, 'pt')
+
+    const keys = await Promise.all(
+      listed.map(
+        async (problem) =>
+          (await getPublishedProblem(db, problem.id, 'es', organizer!.id))?.demoKey,
+      ),
+    )
+
+    expect(keys).toEqual(['devolva-entrada', 'e-par', 'soma-lista'])
+  })
 })

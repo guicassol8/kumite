@@ -1,6 +1,6 @@
 # kata-feedback
 
-Reports about the **kata framework itself** (`~/Projetos/kata`), gathered
+Reports about the **kata framework itself** (`@katajs-framework/core`), gathered
 while working on kumite — not kumite bugs, not kumite feature requests.
 
 ## When to write a report (and when not to)
@@ -35,10 +35,9 @@ date,task,phase,kata_in_frame,docs_lookups,verify_runs,verify_findings,friction_
 `friction_turns` is how many turns kata cost you beyond the task itself.
 Leave `note` empty when there is nothing to say.
 
-The kata-docs MCP server is **optional** in this repo: when it is enabled in
-your session, prefer it for kata questions; when it is not, read
-`~/Projetos/kata/docs` and the bundled `.d.ts` directly. Its absence is not
-a finding.
+Where to read kata's docs (the `kata-docs` MCP when it is enabled, else the
+installed package): `AGENTS.md` § Kata framework feedback. The MCP's absence
+is not a finding.
 
 ## Format of a report
 

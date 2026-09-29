@@ -1,7 +1,7 @@
 # kumite — agent instructions
 
-Canonical instructions for every agent on this repo. Claude Code imports this
-from `CLAUDE.md`; Codex reads it natively.
+Canonical instructions for this repo. Claude Code imports this from
+`CLAUDE.md`.
 
 kumite is the competitive block-programming platform for the PUCRS × Mérida
 event. Product: `docs/product.md` · Stack decisions: `docs/tech-stack.md` ·
@@ -21,14 +21,12 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
   built by `logo/export.sh`), image-generation prompts, canvas source files and
   a PNG per screen. Source of truth for the redesign epic (#214): screens follow
   the tokens, never the other way around.
-- `docs/task-workflow/` — the canonical, agent-agnostic task process (create
-  → pick → plan → implement → review); conventions (labels, worktrees,
-  branches/PRs) in `docs/workflow.md`. `orchestrating-batch.md` runs 2–3
-  issues from picking to merge in one session, delegating planning,
-  implementation and review to a fresh subagent each. Codex
-  discovers the thin wrappers in `.agents/skills/`; Claude Code uses
-  `.claude/skills/`. Both read the same canonical docs rather than
-  duplicating the process.
+- `docs/task-workflow/` — the canonical task process (create → pick → plan
+  → implement → review); conventions (labels, worktrees, branches/PRs) in
+  `docs/workflow.md`. `orchestrating-batch.md` runs 2–3 issues from picking
+  to merge in one session, delegating planning, implementation and review
+  to a fresh subagent each. The skills in `.claude/skills/` are thin
+  wrappers that import these docs.
 - Tasks are GitHub Issues (`gh`); format and labels in `docs/workflow.md`.
 
 ## Verify your work (from the repo root)
@@ -84,10 +82,23 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
 
 ## Kata framework feedback
 
-When a kumite task **genuinely touches the kata framework** (not kumite
-code) — a `defineRoute`/`defineMiddleware`/DI surface, the JWT or error
-envelopes, a `kata verify` rule, the hurl conventions, `hc<AppType>` typing,
-anything under `~/Projetos/kata` — and you learned something or hit
+The one place for this rule — every step doc points here instead of
+repeating it.
+
+**Reading kata's docs.** Never guess a kata API shape (routes, middleware,
+DI, verify rules, the JWT and error envelopes). Use the `kata-docs` MCP
+server (`.mcp.json`) when it is enabled in your session. Otherwise read the
+installed package under `back/node_modules/@katajs-framework/core`: the
+JSDoc in its `dist/**/*.d.ts` for the API (its `README.md` is only a
+quickstart that links kata's ADRs), and
+`pnpm --filter @kumite/back exec kata verify --help` for every verify rule
+and its ADR — plus a local checkout of the kata repo, on a machine that has
+one. The MCP's absence is not a finding and needs no explanation.
+
+**Reporting.** When a kumite task **genuinely touches the kata framework**
+(not kumite code) — a `defineRoute`/`defineMiddleware`/DI surface, the JWT
+or error envelopes, a `kata verify` rule, the hurl conventions,
+`hc<AppType>` typing, kata's own code — and you learned something or hit
 friction, write a report in `kata-feedback/` at the repo root (format and
 the full rule in `kata-feedback/README.md`). A suggested fix is optional.
 Never expand the current task's scope to fix kata itself.
@@ -96,11 +107,8 @@ When kata was **out of frame** (front-only, docs-only, a task where `kata
 verify` merely ran and passed), do **not** write a report: append one line
 to `kata-feedback/LEDGER.csv` instead. The old "attempt a report every
 time" rule produced a hundred near-identical files (`kata-feedback/v2/`).
-
-The `kata-docs` MCP server (`.mcp.json`) is optional: use it when it is
-enabled in your session, otherwise read `~/Projetos/kata/docs` and the
-bundled `.d.ts` directly. Its absence is not a finding and needs no
-explanation.
+Each step (planning, implementing, reviewing) that ran adds its own line or
+report before its handoff.
 
 Where you have the numbers, include them in the report or the ledger:
 docs lookups made and whether they paid for themselves, `kata verify` runs

@@ -106,9 +106,8 @@ Post the plan as a `## Plan` comment on the issue AND return its full text in
 your final report; the orchestrator relays it to the user, who cannot see
 your report.
 
-If you consult the kata-docs MCP server or kata's docs, follow AGENTS.md
-§ Kata framework feedback (a `kata-feedback/` entry when kata was genuinely
-in frame, one LEDGER.csv line otherwise).
+Kata: follow AGENTS.md § Kata framework feedback (where to read kata's docs;
+a `kata-feedback/` report or one LEDGER.csv line).
 
 End with the canonical handoff line from the doc.
 ```

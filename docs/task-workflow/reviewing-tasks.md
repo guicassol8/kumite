@@ -63,8 +63,8 @@ Review the diff only (not the whole repo) for:
 - correctness and error paths;
 - kata idioms in back (schemas in `.schema.ts`, `c.error(...)` for errors,
   services pure — `kata verify` catches most, look for what it can't).
-  For an idiom you're unsure about, read `~/Projetos/kata/docs` (or the
-  kata-docs MCP server when it is enabled in this session);
+  For an idiom you're unsure about, read kata's docs (`AGENTS.md` § Kata
+  framework feedback);
 - AI-regression smells: unrelated deletions, ghost imports, weakened
   assertions, swallowed errors, `any`;
 - test quality (asserting behavior, not implementation) and i18n catalog parity.
@@ -157,15 +157,10 @@ that `check` did not run (#399).
   findings (needs a fresh plan, or the user chose not to fix it now) —
   precise, file-level items on the PR.
 
-## Kata feedback (only when kata was in frame)
+## Kata feedback
 
-Stage 2 reads the diff for kata idioms. If a kata surface was part of the
-review — a lint rule that caught or missed something real, an idiom you had
-to look up, a hurl or `hc` constraint that shaped a fix — write a
-`kata-feedback/` entry before the handoff. A front-only or docs-only PR
-where verify merely ran green gets one line in `kata-feedback/LEDGER.csv`
-instead. Rule and format: `AGENTS.md` § Kata framework feedback,
-`kata-feedback/README.md`.
+Before the handoff, a `kata-feedback/` report or a `LEDGER.csv` line, per
+`AGENTS.md` § Kata framework feedback.
 
 ## Handoff (MANDATORY)
 

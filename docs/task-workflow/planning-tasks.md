@@ -22,10 +22,9 @@ task).
   Reading is fine anywhere, but the moment you need to RUN the app or try
   scratch code, do it in a worktree (`docs/workflow.md` § Worktrees) — the
   main checkout must never accumulate changes, planned or exploratory.
-- kata questions (API shapes, middleware, DI, verify rules) → read kata's
-  docs and the bundled `.d.ts` (`~/Projetos/kata/docs`, or the kata-docs
-  MCP server when it is enabled in this session — it is optional and often
-  is not). Never guess a kata API shape; never report the MCP's absence.
+- kata questions (API shapes, middleware, DI, verify rules) → kata's docs,
+  where `AGENTS.md` § Kata framework feedback says. Never guess a kata API
+  shape.
 
 ## Step 2 — Resolve material ambiguities
 
@@ -65,14 +64,10 @@ gh issue comment <N> --body-file -
 Show it to the user. Implementing a task may only start after the user
 explicitly approves; revisions edit the same comment (`gh issue comment --edit-last`).
 
-## Step 5 — Kata feedback (only when kata was in frame)
+## Step 5 — Kata feedback
 
-If the plan hinged on a kata surface (an API shape you had to look up, a
-verify rule that shapes the design, a hurl or `hc` constraint) and you
-learned something or hit friction, write a `kata-feedback/` entry. If kata
-was out of frame, append one line to `kata-feedback/LEDGER.csv` and move
-on. Rule and format: `AGENTS.md` § Kata framework feedback,
-`kata-feedback/README.md`.
+A `kata-feedback/` report or a `LEDGER.csv` line, per `AGENTS.md` § Kata
+framework feedback.
 
 ## Step 6 — Handoff (MANDATORY)
 

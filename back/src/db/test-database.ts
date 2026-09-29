@@ -96,15 +96,21 @@ export function readDotenv(dir: string): EnvLike {
 }
 
 /**
+ * DATABASE_URL resolved the way config.ts resolves it — the real environment,
+ * then back/.env, then the default — without config.ts's validation.
+ */
+export function resolveDatabaseUrl(env: EnvLike, dotenv: EnvLike): string {
+  return env['DATABASE_URL'] || dotenv['DATABASE_URL'] || DEFAULT_DATABASE_URL
+}
+
+/**
  * The suite's database URL. `TEST_DATABASE_URL` wins outright; otherwise the
- * base is resolved the way config.ts resolves it (the real environment, then
- * back/.env, then the default) and renamed by {@link testDatabaseUrl}.
+ * base from {@link resolveDatabaseUrl}, renamed by {@link testDatabaseUrl}.
  */
 export function resolveTestDatabaseUrl(env: EnvLike, dotenv: EnvLike, slug?: string): string {
   const explicit = env['TEST_DATABASE_URL']
   if (explicit) return explicit
-  const base = env['DATABASE_URL'] || dotenv['DATABASE_URL'] || DEFAULT_DATABASE_URL
-  return testDatabaseUrl(base, slug)
+  return testDatabaseUrl(resolveDatabaseUrl(env, dotenv), slug)
 }
 
 /** {@link resolveTestDatabaseUrl} for the back package rooted at `backDir`. */

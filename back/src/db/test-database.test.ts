@@ -2,9 +2,16 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { resolveTestDatabaseUrl, testDatabaseUrl, worktreeSlug } from './test-database'
+import {
+  ensureDatabase,
+  resolveDatabaseUrl,
+  resolveTestDatabaseUrl,
+  testDatabaseUrl,
+  worktreeSlug,
+} from './test-database'
 
 // #392: the back suite truncates `users` and friends, so it must never share a
 // database with the E2E, hurl or a dev server. These cases pin how its own
@@ -126,4 +133,36 @@ describe('the suite itself (#392 regression)', () => {
     if (slug === undefined) expect(name).toMatch(/_test$/)
     else expect(name).toContain('_test_')
   })
+})
+
+describe('resolveDatabaseUrl', () => {
+  it('prefers the real environment over back/.env, like process.loadEnvFile()', () => {
+    expect(
+      resolveDatabaseUrl({ DATABASE_URL: BASE }, { DATABASE_URL: 'postgres://x@localhost/y' }),
+    ).toBe(BASE)
+    expect(resolveDatabaseUrl({}, { DATABASE_URL: BASE })).toBe(BASE)
+    expect(resolveDatabaseUrl({}, {})).toBe('postgres://kumite:kumite@localhost:5433/kumite')
+  })
+})
+
+describe('ensureDatabase (db:create and the globalSetup)', () => {
+  it('creates a missing database once, then reports it as existing', async () => {
+    const probe = new URL(process.env['DATABASE_URL'] ?? '')
+    probe.pathname = `${probe.pathname}_probe`
+    const name = decodeURIComponent(probe.pathname.slice(1))
+    const admin = new URL(probe)
+    admin.pathname = '/postgres'
+    const sql = postgres(admin.toString(), { max: 1, onnotice: () => {} })
+    try {
+      await sql.unsafe(`drop database if exists "${name}"`)
+      expect(await ensureDatabase(probe.toString())).toBe('created')
+      expect(await ensureDatabase(probe.toString())).toBe('existed')
+      const rows = await sql`select 1 from pg_database where datname = ${name}`
+      expect(rows).toHaveLength(1)
+    } finally {
+      await sql.unsafe(`drop database if exists "${name}"`)
+      await sql.end()
+    }
+    // create/drop database fsyncs a whole template copy: seconds on WSL.
+  }, 30_000)
 })

@@ -11,22 +11,29 @@
 # (`<local ref> <local sha> <remote ref> <remote sha>`). The ladder runs only
 # when those commits change something under back/, front/, blocks/ or
 # package.json — a docs-only push goes straight through. A new branch is
-# compared with its merge-base on origin/develop. With no stdin at all
-# (`lefthook run pre-push` by hand) the ladder always runs.
+# compared with its merge-base on origin/develop. With no refs on stdin (none
+# at all, or a terminal) the ladder always runs: that is the full ladder by
+# hand, `bash scripts/pre-push-ladder.sh </dev/null`.
 #
 # Output: one line per step; on failure, the tail of that step's output and
 # the path of the full log. The full run takes a few minutes, so an agent
 # pushes with a long timeout (docs/workflow.md § Gate ladder).
+# `bash scripts/pre-push-ladder-smoke.sh` proves the scope guard.
 set -uo pipefail
 
 root="$(git rev-parse --show-toplevel)" || exit 1
 cd "$root" || exit 1
 
 base_ref="${KUMITE_PRE_PUSH_BASE:-origin/develop}"
-gated='^(back|front|blocks)/|^package\.json$'
+# Pathspecs, relative to the root: `package.json` is the root one only (a
+# package's own package.json is already under back/, front/ or blocks/).
+gated=(back front blocks package.json)
 
 need=0
 saw_ref=0
+# A terminal is a person running the hook by hand, not git: reading it would
+# hang until Ctrl-D, so treat it as "no refs" and run the ladder.
+[ -t 0 ] && exec </dev/null
 while read -r _local_ref local_sha _remote_ref remote_sha; do
   [ -n "${local_sha:-}" ] || continue
   saw_ref=1
@@ -38,7 +45,16 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     base="$(git merge-base "$local_sha" "$base_ref" 2>/dev/null)" || base=""
   fi
   # No usable base: check everything rather than skip silently.
-  if [ -z "$base" ] || git diff --name-only "$base" "$local_sha" | grep -qE "$gated"; then
+  if [ -z "$base" ]; then
+    need=1
+    break
+  fi
+  # `git diff --quiet` exits 0 when the gated paths are untouched, 1 when they
+  # changed and 128 on an error — anything but 0 runs the ladder. Not
+  # `git diff --name-only | grep -q`: under pipefail, grep quitting at the
+  # first match kills a long diff with SIGPIPE (141) and the push read as
+  # "nothing gated" once the file list outgrew the pipe buffer (#399 review).
+  if ! git diff --quiet "$base" "$local_sha" -- "${gated[@]}" 2>/dev/null; then
     need=1
     break
   fi

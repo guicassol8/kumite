@@ -191,7 +191,8 @@ fine" or "just docs nearby."
     carries changes under `back/`, `front/`, `blocks/` or `package.json`
     (#399). It is the one local gate every agent and every mode goes
     through — subagents included, which never fire the Stop hook. A
-    docs-only push skips it.
+    docs-only push skips it. `bash scripts/pre-push-ladder-smoke.sh`
+    proves which pushes it gates, with a throwaway repo and a stub `pnpm`.
   - Claude Code's **Stop hook** (`.claude/hooks/stop.sh`) runs the ladder
     when the session's tree has uncommitted code changes, and blocks the
     session from ending while it is red — up to 3 times in a row, then it
@@ -209,7 +210,9 @@ fine" or "just docs nearby."
   is in `/tmp/kumite-pre-push-<tree dir>.log`.
 - **During implementation** run focused tests for what you are changing;
   the full ladder by hand is redundant with the pre-push, unless you want
-  the answer before committing.
+  the answer before committing. By hand,
+  `bash scripts/pre-push-ladder.sh </dev/null` runs exactly what the
+  pre-push runs.
 - **What CI runs, and when (#378).** Actions minutes on this private repo
   are metered, and a PR push used to cost ~17 of them, most of it
   re-running what the hooks already ran. So a PR push runs **one** job,
@@ -244,8 +247,8 @@ fine" or "just docs nearby."
   stray `test.only` fails the job instead of shrinking it. The HTML report,
   the traces and screenshots of failures and the back's log are uploaded as
   the `playwright-report` artifact (kept 14 days) whenever the job was not
-  cancelled. The suite does not run in the pre-commit or in the Stop hook,
-  nor on a PR push. So "existing e2e green" on a PR means the reviewer ran
+  cancelled. The suite does not run in the pre-commit, the pre-push or the
+  Stop hook, nor on a PR push. So "existing e2e green" on a PR means the reviewer ran
   the **whole** suite locally (`CI=1` for the CI settings) on the PR's head
   and it passed, or dispatched the `e2e` job on the branch and it is green —
   either way, name any flaky spec in the Evidence: the retry keeps a flake

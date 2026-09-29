@@ -261,6 +261,22 @@ describe('TourProvider', () => {
     expect(screen.getByTestId('tour-popover').getAttribute('data-tour-step')).toBe('round')
   })
 
+  it('restarting on step 1 (the user menu while the tour is open) shows step 1 again', async () => {
+    const router = renderTour()
+    await start()
+    await stepShown('header')
+
+    fireEvent.click(screen.getByTestId('start'))
+
+    await stepShown('header')
+    expect(screen.getByTestId('language-selector').hasAttribute('data-tour-highlight')).toBe(true)
+    // Still a live tour: leaving on their own still ends it.
+    await act(async () => {
+      await router.navigate({ to: '/elsewhere' as '/' })
+    })
+    await waitFor(() => expect(screen.queryByTestId('tour-popover')).toBeNull())
+  })
+
   it('ends where the user went when they navigate away on their own', async () => {
     const router = renderTour()
     await start()

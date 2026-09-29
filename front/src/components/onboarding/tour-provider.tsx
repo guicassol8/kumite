@@ -134,7 +134,10 @@ function fillsViewport(box: DOMRect): boolean {
   return box.top < POPOVER_ROOM_PX && window.innerHeight - box.bottom < POPOVER_ROOM_PX
 }
 
-type TourState = { stepIndex: number; originHref: string }
+// `run` changes on every start, so restarting while already on step 1 still
+// re-lands it — stepIndex alone would not change, and the popover would stay
+// closed on an invisible, never-ending tour.
+type TourState = { stepIndex: number; originHref: string; run: number }
 // undefined while the step is navigating / waiting; null = centered fallback.
 type Resolved = { stepIndex: number; element: HTMLElement | null }
 
@@ -159,6 +162,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
       stepIndex: 0,
       // Restarting mid-tour keeps the place the user first left from.
       originHref: current?.originHref ?? router.state.location.href,
+      run: (current?.run ?? 0) + 1,
     }))
   }, [router])
 
@@ -176,6 +180,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   )
 
   const stepIndex = tour?.stepIndex ?? null
+  const run = tour?.run ?? null
 
   // Lands each step: navigate if the screen differs, then wait for its target.
   useEffect(() => {
@@ -230,7 +235,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
     return () => controller.abort()
     // `i18n` is the singleton instance, so switching language mid-step
     // re-renders the texts without re-landing the step.
-  }, [stepIndex, router, queryClient, i18n])
+  }, [stepIndex, run, router, queryClient, i18n])
 
   const element = resolved?.element ?? null
 

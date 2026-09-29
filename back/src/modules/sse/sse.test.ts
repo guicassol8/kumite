@@ -159,6 +159,8 @@ describe('sse.schema', () => {
   })
 
   const eventRankingFixture = {
+    // #383: the per-round verdict rides along with the event ranking.
+    rounds: [{ roundId: 'r1', roundName: 'Round 1', denominators: 'inconsistent' as const }],
     teams: [
       {
         teamId: 't1',
@@ -197,6 +199,8 @@ describe('sse.schema', () => {
     }
     expect(RankingUpdatedEventSchema.safeParse(event).success).toBe(true)
     expect(SseEventSchema.safeParse(event).success).toBe(true)
+    // Parsing must keep the verdict, not strip it as an unknown key (#383).
+    expect(RankingUpdatedEventSchema.parse(event).event.rounds).toEqual(eventRankingFixture.rounds)
   })
 
   it('round-trips a ranking.updated event with no open round', () => {
@@ -212,6 +216,17 @@ describe('sse.schema', () => {
 
   it('rejects a ranking.updated event missing the event ranking', () => {
     const event = { type: 'ranking.updated' as const, serverTime: new Date(), round: null }
+    expect(RankingUpdatedEventSchema.safeParse(event).success).toBe(false)
+  })
+
+  it('rejects a ranking.updated event whose event ranking lacks the round verdicts (#383)', () => {
+    const { rounds: _rounds, ...withoutRounds } = eventRankingFixture
+    const event = {
+      type: 'ranking.updated' as const,
+      serverTime: new Date(),
+      round: null,
+      event: withoutRounds,
+    }
     expect(RankingUpdatedEventSchema.safeParse(event).success).toBe(false)
   })
 })
@@ -563,7 +578,11 @@ describe('sse.service', () => {
 
         expect(event.type).toBe('ranking.updated')
         expect(event.round?.roundId).toBe(round.id)
-        expect(event.event).toEqual({ teams: [] })
+        // #383: the open round's verdict reaches the stream with the event ranking.
+        expect(event.event).toEqual({
+          rounds: [{ roundId: round.id, roundName: 'Round 1', denominators: 'consistent' }],
+          teams: [],
+        })
       })
 
       // #184: a team that never submitted must not show up on the round
@@ -631,7 +650,7 @@ describe('sse.service', () => {
         const event = await buildRankingUpdatedEvent(db)
 
         expect(event.round).toBeNull()
-        expect(event.event).toEqual({ teams: [] })
+        expect(event.event).toEqual({ rounds: [], teams: [] })
       })
     })
 

@@ -675,5 +675,101 @@ describe('getEventRanking', () => {
         tiebreakTimeMs: expect.any(Number),
       },
     ])
+    // #383: the verdict of every round in the sum, once, in column order.
+    expect(ranking.rounds).toEqual([
+      { roundId: firstRound.round.id, roundName: 'Rodada 1', denominators: 'consistent' },
+      { roundId: secondRound.round.id, roundName: 'Rodada 2', denominators: 'consistent' },
+    ])
+  })
+
+  // #383: the event total sums rounds, so a round whose scores are not on one
+  // scale contaminates it. The event ranking states each summed round's
+  // verdict (same semantics as RoundRanking.denominators) — never repairs it.
+  describe('denominators per round', () => {
+    // Opens a round with `problemId`, lets `submitInto` fill it, then closes
+    // it so the next one can open (only one round is open at a time).
+    const playRound = async (
+      name: string,
+      problemId: string,
+      submitInto: (roundId: string) => Promise<void>,
+      { keepOpen = false } = {},
+    ) => {
+      const created = await createRound(db, { name, durationMinutes: 30, problemIds: [problemId] })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      await submitInto(opened.round.id)
+      if (!keepOpen) {
+        const closed = await closeRound(db, created.round.id)
+        if (!closed.ok) throw new Error('expected close to succeed')
+      }
+      return created.round.id
+    }
+
+    it('reports inconsistent for the round that mixed scales, consistent for the other', async () => {
+      const problemA = await insertProblem()
+      const problemB = await insertProblem()
+      const teamA = await insertTeam('Time A')
+      const teamB = await insertTeam('Time B')
+
+      const mixedId = await playRound('Rodada 1', problemA.id, async (roundId) => {
+        await submit(roundId, teamA.id, problemA.id, 50, { maxScore: 100, hiddenCaseCount: 2 })
+        await submit(roundId, teamB.id, problemA.id, 25, { maxScore: 100, hiddenCaseCount: 4 })
+      })
+      const cleanId = await playRound('Rodada 2', problemB.id, async (roundId) => {
+        await submit(roundId, teamA.id, problemB.id, 10)
+        await submit(roundId, teamB.id, problemB.id, 40)
+      })
+
+      const ranking = await getEventRanking(db)
+
+      expect(ranking.rounds).toEqual([
+        { roundId: mixedId, roundName: 'Rodada 1', denominators: 'inconsistent' },
+        { roundId: cleanId, roundName: 'Rodada 2', denominators: 'consistent' },
+      ])
+      // Reported, never repaired: the totals are the plain sums of the rows.
+      expect(ranking.teams.map((team) => [team.teamName, team.totalScore])).toEqual([
+        ['Time B', 65],
+        ['Time A', 60],
+      ])
+    })
+
+    it('reports unknown for a round with a submission that predates the stamp', async () => {
+      const problem = await insertProblem()
+      const teamA = await insertTeam('Time A')
+
+      const roundId = await playRound('Rodada 1', problem.id, async (id) => {
+        await submit(id, teamA.id, problem.id, 50, { maxScore: null, hiddenCaseCount: null })
+      })
+
+      expect((await getEventRanking(db)).rounds).toEqual([
+        { roundId, roundName: 'Rodada 1', denominators: 'unknown' },
+      ])
+    })
+
+    it('leaves a draft round out and lists an open round with no submissions as consistent', async () => {
+      const problem = await insertProblem()
+      await insertTeam('Time A')
+
+      const draft = await createRound(db, {
+        name: 'Rascunho',
+        durationMinutes: 30,
+        problemIds: [problem.id],
+      })
+      if (!draft.ok) throw new Error('expected create to succeed')
+      const openId = await playRound('Rodada aberta', problem.id, async () => {}, {
+        keepOpen: true,
+      })
+
+      expect((await getEventRanking(db)).rounds).toEqual([
+        { roundId: openId, roundName: 'Rodada aberta', denominators: 'consistent' },
+      ])
+    })
+
+    it('is an empty list when no round was ever announced', async () => {
+      await insertTeam('Time A')
+
+      expect((await getEventRanking(db)).rounds).toEqual([])
+    })
   })
 })

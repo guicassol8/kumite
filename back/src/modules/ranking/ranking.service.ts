@@ -357,7 +357,7 @@ export async function getRoundRanking(db: Db, roundId: string): Promise<RoundRan
 /**
  * The event-wide leaderboard: every non-draft round (closed + the one
  * currently open, if any) summed per team, with the per-round breakdown kept
- * alongside the total.
+ * alongside the total, and each summed round's denominator verdict (#383).
  */
 export async function getEventRanking(db: Db): Promise<EventRanking> {
   await reapExpiredRound(db)
@@ -374,8 +374,11 @@ export async function getEventRanking(db: Db): Promise<EventRanking> {
   const roundNameById = new Map(orderedRounds.map((round) => [round.id, round.name]))
 
   const roundEntriesByTeam = new Map<string, ScoringEntry[]>(teamIds.map((id) => [id, []]))
+  const verdicts: EventRanking['rounds'] = []
   for (const round of orderedRounds) {
-    const { entriesByTeam } = await computeRoundEntries(db, round, teamIds)
+    const { entriesByTeam, denominators } = await computeRoundEntries(db, round, teamIds)
+    // Reported once per summed round (#383), never repaired — see assessDenominators.
+    verdicts.push({ roundId: round.id, roundName: round.name, denominators })
     for (const teamId of teamIds) {
       const summary = sumScoring(entriesByTeam.get(teamId) ?? [])
       roundEntriesByTeam.get(teamId)?.push({
@@ -384,8 +387,8 @@ export async function getEventRanking(db: Db): Promise<EventRanking> {
         attempts: summary.totalAttempts,
         elapsedMs: summary.totalScore > 0 ? summary.tiebreakTimeMs : null,
         // A key here is a whole round, which has no single maximum: the
-        // per-problem stamps do not add up to one number, and EventRanking
-        // never exposes it.
+        // per-problem stamps do not add up to one number. What EventRanking
+        // exposes about a round's scale is its verdict, in `rounds`.
         maxScore: null,
       })
     }
@@ -400,6 +403,7 @@ export async function getEventRanking(db: Db): Promise<EventRanking> {
   )
 
   return {
+    rounds: verdicts,
     teams: ranked.map((team) => ({
       teamId: team.teamId,
       teamName: team.teamName,

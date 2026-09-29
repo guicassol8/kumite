@@ -103,6 +103,9 @@ function roundRanking(denominators: Verdict): RoundRankingResponse {
 }
 
 const eventRanking: EventRankingResponse = {
+  // The event-wide verdict (#383) says the summed round is comparable, so the
+  // Geral tab stays quiet in every #318 scenario below.
+  rounds: [{ roundId, roundName: 'Rodada 1', denominators: 'consistent' }],
   teams: [
     {
       teamId: teamA,
@@ -271,7 +274,8 @@ test.describe('leaderboard denominators notice (#318)', () => {
     expect(noticeBox!.y).toBeLessThan(tableBox!.y)
     await capture(page, '01-organizador-inconsistent')
 
-    // The Geral tab stays as it was (#383 owns the event-wide verdict).
+    // The round's own notice never leaks into the Geral tab, which carries
+    // its own event-wide verdict (#383) — consistent in this mock.
     await page.getByTestId('leaderboard-tab-event').click()
     await expect(page.getByTestId(`leaderboard-column-round-${roundId}`)).toBeVisible()
     await expect(inconsistent).toHaveCount(0)

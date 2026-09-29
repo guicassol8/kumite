@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import postgres from 'postgres'
 
 import { assertLocalDatabaseUrl } from './local-database'
-import { DEFAULT_DATABASE_URL, readDotenv, testDatabaseUrl } from './test-database'
+import { DEFAULT_DATABASE_URL, gitDiscoveryEnv, readDotenv, testDatabaseUrl } from './test-database'
 
 // db:drop-worktree (#395): the databases a linked worktree leaves on the local
 // Postgres — the back suite's `<db>_test_<dir>` (#392) and the E2E/hurl
@@ -115,7 +115,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   // The main checkout is git's first worktree — not this script's own tree,
   // which may be a linked worktree whose back/.env names its own database.
   const mainTree =
-    execFileSync('git', ['worktree', 'list', '--porcelain'], { encoding: 'utf8' })
+    execFileSync('git', ['worktree', 'list', '--porcelain'], {
+      encoding: 'utf8',
+      env: gitDiscoveryEnv(),
+    })
       .split('\n')[0]
       ?.replace(/^worktree /, '') ?? join(import.meta.dirname, '..', '..', '..')
   const mainUrl = mainDatabaseUrl(join(mainTree, 'back'))

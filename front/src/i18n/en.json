@@ -1023,6 +1023,36 @@
   "practice": {
     "title": "Practice",
     "intro": "Train in the editor any time — there is no submission or scoring here.",
+    "demo": {
+      "start": "See how it's solved",
+      "position": "Step {{current}} of {{total}}",
+      "prev": "Previous",
+      "next": "Next",
+      "exit": "Exit demo",
+      "canvasLabel": "Solution demo, read-only",
+      "steps": {
+        "root": "Every solution starts at the \"solve\" block. Whatever is plugged into \"return\" is the answer.",
+        "devolva-entrada": {
+          "2": "The \"input\" block (in Variables) holds the problem's value. Plugged into \"return\", it comes back unchanged — done."
+        },
+        "e-par": {
+          "2": "In Logic, the \"=\" comparison answers true or false. Plugged straight into \"return\", it is already the answer.",
+          "3": "On the left, \"remainder of … ÷ …\" (in Math): what is left over when dividing one number by the other.",
+          "4": "The number to divide is the \"input\".",
+          "5": "We divide by 2.",
+          "6": "On the right, 0: if dividing by 2 leaves no remainder, the number is even."
+        },
+        "soma-lista": {
+          "2": "In Variables, \"Create variable...\" creates \"total\", and \"set total to\" stores a value in it.",
+          "3": "The total starts at 0: before adding any number, the sum is zero.",
+          "4": "In Loops, \"for each item numero in list\" repeats what is inside once per item.",
+          "5": "The list being walked through is the \"input\".",
+          "6": "Inside the loop, another \"set total to\" replaces the total with a new value on every pass.",
+          "7": "The new value is \"total + numero\": the sum so far plus the current number.",
+          "8": "After the loop, \"total\" goes into \"return\": it is the sum of the whole list."
+        }
+      }
+    },
     "loading": "Loading practice problems…",
     "loadError": "Could not load the practice problems.",
     "retry": "Try again",

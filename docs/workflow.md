@@ -128,14 +128,35 @@ pnpm install        # node_modules are per-worktree, not shared
   `back/.env`: it is the back's CORS allowlist (#273), and any other origin
   is refused. The Browser E2E does this for the back it starts itself
   (`FRONT_PORT` → `APP_BASE_URL`, `front/playwright.config.ts`).
-- Postgres collides too: the compose host port is fixed unless overridden.
-  Copy `.env.example` to `.env` at that worktree's root and set `DB_PORT` to
-  a free port (e.g. `DB_PORT=5439`), then `docker compose up -d` binds there
-  instead of 5433. Each worktree is already its own compose project
-  (directory-based), so its volume is separate and disposable on its own —
-  point that worktree's `back/.env` `DATABASE_URL` at the same port
-  (`postgres://kumite:kumite@localhost:5439/kumite`) and run
-  `pnpm --filter @kumite/back db:migrate` (+ `db:seed` if needed).
+- Postgres is shared unless you isolate it. **The back test suite already
+  isolates itself** (#392): `pnpm test` in `back/` runs against its own
+  database, derived from `DATABASE_URL` — `<db>_test` in the main checkout
+  and CI, `<db>_test_<worktree dir>` in a linked worktree (`TEST_DATABASE_URL`
+  overrides it) — which its vitest globalSetup creates and migrates. So the
+  Stop hook's ladder never truncates the database an E2E, hurl or dev server
+  is using. Those three still share whatever `DATABASE_URL` points at: to give
+  a worktree's E2E/hurl a database of its own on a **shared native Postgres
+  (no Docker)**:
+  1. In that worktree's `back/.env`: `DATABASE_URL` naming a new database
+     (`postgres://kumite:kumite@localhost:5487/kumite_task<N>`), a free
+     `PORT`, and `APP_BASE_URL=http://localhost:<front port>`; in
+     `front/.env`, `VITE_API_URL=http://localhost:<that PORT>`.
+  2. `unset PORT DATABASE_URL` in the shell you run from — a shell that
+     exports them wins, because `back/.env` never overrides a variable
+     already set, and `db:reset` would land on the shared database.
+  3. `pnpm --filter @kumite/back db:create` (creates it; a no-op when it
+     exists; needs no `createdb`/`psql`), then `db:migrate` and `db:reset`
+     (or `db:seed`).
+  4. `set -a; . back/.env; set +a` (the organizer credentials and `PORT`),
+     `export FRONT_PORT=<front port>`, then `pnpm --filter @kumite/front e2e`.
+  5. After the PR merges, drop `kumite_task<N>` and `kumite_test_<worktree
+     dir>` (`dropdb`, or `psql -d postgres -c 'drop database …'`).
+
+  With Docker (cloud sessions, a machine that has it): set `DB_PORT` to a
+  free port in a root `.env` copied from `.env.example`, `docker compose up
+  -d` binds there instead of 5433 in the worktree's own compose project,
+  and `back/.env` `DATABASE_URL` points at that port — then `db:migrate`
+  (+ `db:seed`).
 - After the PR merges: `pnpm worktree:prune` from the main checkout. It
   removes every worktree whose branch is already in `origin/develop` and
   whose tree is clean, together with that worktree's compose project and
@@ -167,7 +188,9 @@ fine" or "just docs nearby."
   `check` job. They
   used to run in the pre-commit too, and two suites truncating the same
   local Postgres in parallel is where the OOM-killed commits and the
-  phantom test failures came from (#288).
+  phantom test failures came from (#288). The back suite truncates only its
+  own derived database (`<db>_test[_<worktree dir>]`, § Worktrees), never
+  the one the E2E, hurl or a dev server uses (#392).
 - **Claude Code**: the Stop hook (`.claude/hooks/stop.sh`) runs the full
   ladder and blocks the session from ending while any step fails — but only
   when the working tree carries uncommitted changes under `back/`, `front/`,

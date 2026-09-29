@@ -59,7 +59,12 @@ subagent each instead of to a new chat. Same isolation, different boundary —
   payload's `cwd`, PostToolUse the toplevel of the edited file (either one
   only if it is a worktree of this repo; otherwise the main checkout, as
   before). The ladder uses that tree's `back/.env` `DATABASE_URL`, else the
-  shared 5433 default. Stop blocks until the worktree has run `pnpm install`.
+  shared 5433 default — as the base only: the back tests derive their own
+  `<db>_test_<worktree dir>` (`<db>_test` in the main checkout) from it and
+  truncate that, so a Stop that fires mid-E2E or mid-hurl in the same tree
+  no longer wipes their seed (#392); the ladder itself is unchanged.
+  Isolating the E2E's own database without Docker: `docs/workflow.md`
+  § Worktrees. Stop blocks until the worktree has run `pnpm install`.
   Each Stop run appends one line (root, DB source, decision — never the URL)
   to `/tmp/kumite-stop-hook.log`: look there first on an `exit 143`.
   `bash scripts/claude-hooks-smoke.sh` proves the behavior with throwaway

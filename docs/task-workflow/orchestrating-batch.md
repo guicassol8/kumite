@@ -153,25 +153,30 @@ leaves data behind — and use `--workers=1` for probe runs (exit 137 is OOM,
 not a regression).
 
 **Fix verifier.** When the reviewer's report carries a fix range (a fix
-touched production code) and `verdict: pending fix verification`, spawn a
-**`fix-verifier`** agent (`.claude/agents/fix-verifier.md`):
+touched production code), spawn a **`fix-verifier`** agent
+(`.claude/agents/fix-verifier.md`):
 
 ```text
 Verify the review fixes on PR #<PR>: <from>..<to>.
 ```
 
-Send its result to the **same** reviewer (`SendMessage`, it keeps the
+The range alone is the trigger: any verdict that comes with one is
+provisional until the verifier returns, whatever the reviewer wrote (it
+should say `verdict: pending fix verification`). Send its result to the
+**same** reviewer (`SendMessage`, it keeps the
 context): on `fixes verified` the reviewer posts the Verdict; on a defect it
 fixes it and reports a new range, verified again the same way. A third round
-goes to the user. No fix range → no verifier, and the reviewer's verdict
-stands.
+goes to the user. Only a report with no fix range carries a final verdict.
 
 Relay the verdict, the mutant score, the verifier's result and the Evidence
 link to the user.
 
 ### 4c — Merge, on the user's word
 
-Before asking, read `gh pr checks <PR>`: a `check` that did not run (out of
+A review whose report carried a fix range comes here only after the
+verifier's `fixes verified` and the reviewer's final Verdict — never on the
+reviewer's word alone. Before asking, read `gh pr checks <PR>`: a `check`
+that did not run (out of
 Actions minutes) is not green — the merge then rests on the full local
 ladder in the Evidence, and the question says so. Ask explicitly, then:
 

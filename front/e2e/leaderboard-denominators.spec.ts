@@ -579,4 +579,51 @@ test.describe('leaderboard event denominators notice (#383)', () => {
     await page.waitForTimeout(200) // let the tab pill's CSS transition settle
     await capture(page, '08-ao-vivo-sse', 383)
   })
+
+  // The copy and the round list's conjunction follow the viewer's language:
+  // both notices in es and en (pt is every capture above).
+  for (const { lang, heading, list, note, shots } of [
+    {
+      lang: 'es',
+      heading: 'El total del evento no es comparable entre los equipos',
+      list: 'escalas diferentes: Rodada 1 y Rodada 2.',
+      note: 'No es posible confirmar que el total del evento',
+      shots: ['09-espanhol-inconsistent', '10-espanhol-unknown'],
+    },
+    {
+      lang: 'en',
+      heading: 'The event total is not comparable between teams',
+      list: 'different scales: Rodada 1 and Rodada 2.',
+      note: 'Unable to confirm that the event total',
+      shots: ['11-ingles-inconsistent', '12-ingles-unknown'],
+    },
+  ] as const) {
+    test(`the organizer reads both notices in ${lang}`, async ({ page, request }) => {
+      const event = { current: eventRankingWith(['inconsistent', 'inconsistent']) }
+      await mockRanking(page, { current: 'consistent' }, quietFrames(), event)
+      const organizerToken = await login(request, ORGANIZER_EMAIL, ORGANIZER_PASSWORD)
+      await page.addInitScript(
+        ([token, language]) => {
+          localStorage.setItem('kumite-token', token)
+          localStorage.setItem('kumite-lang', language)
+        },
+        [organizerToken, lang] as const,
+      )
+      await page.setViewportSize({ width: 1280, height: 800 })
+
+      const inconsistent = page.getByTestId(inconsistentId)
+      const unknown = page.getByTestId(unknownId)
+
+      await openEventTab(page)
+      await expect(inconsistent).toContainText(heading)
+      await expect(inconsistent).toContainText(list)
+      await capture(page, shots[0], 383)
+
+      event.current = eventRankingWith(['unknown', 'consistent'])
+      await openEventTab(page)
+      await expect(unknown).toContainText(note)
+      await expect(inconsistent).toHaveCount(0)
+      await capture(page, shots[1], 383)
+    })
+  }
 })

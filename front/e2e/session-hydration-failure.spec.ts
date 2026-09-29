@@ -6,10 +6,12 @@ import { BACK_URL, E2E_PARTICIPANT_NAME } from './support/rounds'
 // Repro + visual walkthrough for #179: `GET /me` fails while the session
 // hydrates (a blip on the auditorium wifi, the back restarting) and the app
 // used to strand the participant — the rejected promise was cached, so every
-// later `ensureHydrated()` re-threw it and F5 was the only way out. The
-// committed `00-antes-erro-do-router.png` is what that looked like before the
-// fix: TanStack Router's bare error boundary, in English, with no header, no
-// footer and no action.
+// later `ensureHydrated()` re-threw it and F5 was the only way out.
+// `00-antes-erro-do-router.png` is what that looked like before the fix:
+// TanStack Router's bare error boundary, in English, with no header, no
+// footer and no action. No spec writes it, and evidence is not committed
+// since #402, so it lives only in history: commit 1bb4f74,
+// `front/e2e/evidence/179/00-antes-erro-do-router.png`.
 // Prereqs (like auth.spec.ts):
 //   docker compose up -d && pnpm db:migrate && pnpm db:seed
 // No organizer credentials and no round needed: the bug lives entirely in the

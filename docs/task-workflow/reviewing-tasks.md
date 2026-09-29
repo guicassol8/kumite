@@ -123,8 +123,10 @@ explicitly, don't fix it partially.
 You wrote those fixes, so you are the worst judge of them: a model misses
 its own errors far more often than the same errors attributed to someone
 else. When any fix you committed touches production code — anything outside
-tests, `e2e/`, docs and `kata-feedback/` — a fresh agent checks those
-commits before the verdict. Note the range: `<head before your first
+tests, `e2e/`, `docs/` and `kata-feedback/`; the harness counts as code
+(`scripts/`, `.claude/` agents, skills and hooks, `lefthook.yml`), since it
+changes what runs or what agents do — a fresh agent checks those commits
+before the verdict. Note the range: `<head before your first
 fix>..<head after your last fix>`.
 
 - **Standalone review session**: spawn the `fix-verifier` agent

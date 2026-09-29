@@ -176,10 +176,11 @@ mutants, one push for all fixes, `gh pr checks`, never merge.
 Review PR #<PR> (fixes issue #<N>).
 ```
 
-E2E care to add to that prompt when the PR touches the front: re-seed
-(`db:reset`) before each full run — the suite asserts on seed state and
-leaves data behind — and use `--workers=1` for probe runs (exit 137 is OOM,
-not a regression).
+E2E care to add to that prompt when the PR touches the front: re-seed with
+`pnpm worktree:env --reset` before each full run — the suite asserts on seed
+state and leaves data behind, and a bare `db:reset` in a shell that exports
+`DATABASE_URL` resets the shared database instead of the worktree's — and use
+`--workers=1` for probe runs (exit 137 is OOM, not a regression).
 
 **Fix verifier.** When the reviewer's report carries a fix range (a fix
 touched production code), spawn a **`fix-verifier`** agent

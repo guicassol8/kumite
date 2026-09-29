@@ -8,7 +8,9 @@ TanStack Router (file-based) + TanStack Query · i18next · zod ^3.
 - `pnpm dev:front` — dev server on http://localhost:5173
 - `pnpm --filter @kumite/front test` — vitest (jsdom)
 - `pnpm --filter @kumite/front typecheck`
-- `pnpm --filter @kumite/front e2e` — Playwright (boots back + front itself)
+- `pnpm e2e` — Playwright (boots back + front itself) with this tree's
+  `back/.env` and a slot in the machine's E2E semaphore; in a linked
+  worktree, `pnpm worktree:env` first (`docs/workflow.md` § Worktrees)
 
 ## Conventions
 

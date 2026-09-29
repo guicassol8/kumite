@@ -14,7 +14,9 @@ Canonical instructions for this package. Claude Code imports this file from
   `DATABASE_URL` database itself when it does not exist (local only).
 - `pnpm hurl` — API E2E via Hurl; CI runs it on `main` and on demand, not
   on PR pushes (#378), so the reviewer runs it locally. Run
-  `pnpm db:reset` first: the suite asserts on seed state and is not
+  `pnpm db:reset` first — in a linked worktree, `pnpm worktree:env --reset`
+  from the root, and the server with that tree's env
+  (`docs/workflow.md` § Worktrees): the suite asserts on seed state and is not
   re-runnable on a dirty database. `db:reset` truncates every table and
   re-seeds; it refuses any `DATABASE_URL` that is not local. It resets the
   database, not the process: the bug-report and password-reset windows are

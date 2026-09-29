@@ -125,15 +125,18 @@ pnpm worktree:env   # its own database and ports (below) — when it runs the ap
 - **Its own database and ports: `pnpm worktree:env`** (#404), once, right
   after `pnpm install`. On the shared native Postgres (no Docker) it gives the
   worktree a database of its own — `kumite_task<N>` on a `task/<N>-…`
-  branch, `kumite_review<PR>` in `.worktrees/review-<PR>` — plus a back port
+  branch, `kumite_review<PR>` in `.worktrees/review-<PR>`, with a `_2`
+  suffix when another tree's `back/.env` already names it — plus a back port
   3xxx and a front port 5xxx from the same number (skipping any port that is
   listening or already named by another tree's `back/.env`), writes
   `back/.env` (the main checkout's, with `DATABASE_URL`, `PORT`,
   `APP_BASE_URL` and `FRONT_PORT` replaced) and `front/.env`
   (`VITE_API_URL`), and runs `db:create` + `db:migrate` + `db:seed`. Re-running
-  keeps the same database and ports and only migrates; `--reset` re-seeds
-  (`db:reset`) — do that before a full E2E or hurl run. The shell's exported
-  `PORT`, `DATABASE_URL` and `APP_BASE_URL` never leak in.
+  keeps the same database and ports and only migrates (and seeds a database
+  it had to create again); `--reset` re-seeds (`db:reset`) — do that before a
+  full E2E or hurl run. The shell's exported `PORT`, `DATABASE_URL` and
+  `APP_BASE_URL` never leak in. `bash scripts/worktree-env-smoke.sh` proves
+  all of it, the E2E semaphore included, in a throwaway repository.
   - E2E: `pnpm e2e [playwright args]` (`CI=1 pnpm e2e` for the CI settings)
     runs Playwright with this tree's `back/.env` exported over the shell,
     `FRONT_PORT`, `VITE_API_URL` and a `BACK_NOTIFICATIONS_LOG`, so the

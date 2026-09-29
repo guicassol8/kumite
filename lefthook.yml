@@ -23,6 +23,11 @@ pre-commit:
 
 pre-push:
   jobs:
+    # A script job, not `run:`: lefthook skips a `run:` job whenever its own
+    # push-file list (HEAD vs @{push}, existing files only) is empty — a push
+    # that only deletes files, or `git push origin <other branch>`, went
+    # through ungated. The wrapper hands off to scripts/pre-push-ladder.sh.
     - name: gate-ladder
-      run: bash scripts/pre-push-ladder.sh
+      script: gate-ladder.sh
+      runner: bash
       use_stdin: true

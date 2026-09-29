@@ -1,7 +1,7 @@
 name: CI
 
 # What runs where (#378). A PR push runs one job, `check`: the same ladder the
-# pre-commit and the Stop hook already run locally, kept as the safety net for
+# pre-push (and the Stop hook) already run locally, kept as the safety net for
 # any agent that skips them. `hurl` and `e2e` cost ~10 of the ~17 metered
 # minutes a PR push used to burn on this private repo, so they run on push to
 # `main` (Deploy waits for this workflow there) and on demand:

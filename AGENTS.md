@@ -87,11 +87,13 @@ repeating it.
 
 **Reading kata's docs.** Never guess a kata API shape (routes, middleware,
 DI, verify rules, the JWT and error envelopes). Use the `kata-docs` MCP
-server (`.mcp.json`) when it is enabled in your session; otherwise read the
-installed package's `README.md` and bundled `.d.ts` under
-`back/node_modules/@katajs-framework/core` (and a local checkout of the kata
-repo, on a machine that has one). The MCP's absence is not a finding and
-needs no explanation.
+server (`.mcp.json`) when it is enabled in your session. Otherwise read the
+installed package under `back/node_modules/@katajs-framework/core`: the
+JSDoc in its `dist/**/*.d.ts` for the API (its `README.md` is only a
+quickstart that links kata's ADRs), and
+`pnpm --filter @kumite/back exec kata verify --help` for every verify rule
+and its ADR — plus a local checkout of the kata repo, on a machine that has
+one. The MCP's absence is not a finding and needs no explanation.
 
 **Reporting.** When a kumite task **genuinely touches the kata framework**
 (not kumite code) — a `defineRoute`/`defineMiddleware`/DI surface, the JWT

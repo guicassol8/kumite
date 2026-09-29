@@ -4,6 +4,7 @@ import { PgTable } from 'drizzle-orm/pg-core'
 import { env } from '../config'
 import type { Db } from './client'
 import { createDb } from './client'
+import { assertLocalDatabaseUrl } from './local-database'
 import * as schema from './schema'
 import { seed } from './seed'
 
@@ -16,8 +17,6 @@ import { seed } from './seed'
 // This script wipes every table: it refuses anything that is not plainly a
 // local database. The guard lives in a config-free module since #392, shared
 // with db:create and the test suite's globalSetup.
-import { assertLocalDatabaseUrl } from './local-database'
-
 export { assertLocalDatabaseUrl }
 
 /** Every table drizzle knows about — derived from the schema module so a new

@@ -88,6 +88,7 @@ function participantProblem(overrides: Record<string, unknown> = {}) {
     roundId: 'r1',
     roundStatus: 'open',
     bestSubmission: null,
+    demoKey: null,
     ...overrides,
   }
 }
@@ -219,6 +220,19 @@ describe('ProblemScreen', () => {
     )
     expect(screen.getByTestId('problem-example-0')).toBeDefined()
     expect(screen.getByTestId('problem-submit-button')).toBeDefined()
+  })
+
+  // #212: the demo is practice only. The back never sends a demoKey on a
+  // round problem; even if one slipped through, this screen offers nothing.
+  it('never offers the practice demo on a round problem, even with a demoKey', async () => {
+    mockedGet.mockResolvedValue(
+      jsonResponse(200, participantProblem({ visibility: 'round', demoKey: 'e-par' })),
+    )
+
+    renderProblem()
+
+    expect(await screen.findByTestId('problem-submit-button')).toBeDefined()
+    expect(screen.queryByTestId('practice-demo-start')).toBeNull()
   })
 
   // #211: a practice problem has no round to submit to — its screen is

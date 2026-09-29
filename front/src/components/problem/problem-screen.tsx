@@ -1,7 +1,7 @@
 import { emptyWorkspaceState, withRootBlock } from '@kumite/blocks'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate } from '@tanstack/react-router'
-import type * as Blockly from 'blockly'
+import * as Blockly from 'blockly'
 import { Info, TriangleAlert } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -12,6 +12,7 @@ import {
 import { CreateVariableDialog } from '@/components/blockly/create-variable-dialog'
 import { ActionsBar } from '@/components/problem/actions-bar'
 import { ExampleResults, type ExampleResultsNotice } from '@/components/problem/example-results'
+import { PracticeDemoCanvas, PracticeDemoControls } from '@/components/problem/practice-demo'
 import { ProblemPanels } from '@/components/problem/problem-panels'
 import type { TeamBestScore } from '@/components/problem/statement-card'
 import {
@@ -28,6 +29,7 @@ import { useWorkspaceAutoSave } from '@/hooks/use-workspace-autosave'
 import { formatDate } from '@/i18n/format'
 import { api } from '@/lib/api'
 import { workspaceOptions } from '@/lib/blockly-setup'
+import { PRACTICE_DEMOS } from '@/lib/practice-demos'
 import { fetchProblem, ProblemNotFoundError, problemQueryKey } from '@/lib/problems-query'
 import { positionLabel } from '@/lib/round-position'
 import { fetchRound, roundQueryKey } from '@/lib/rounds-query'
@@ -108,6 +110,29 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
     placeholderData: (previous, previousQuery) =>
       previousQuery?.queryKey[1] === id ? previous : undefined,
   })
+
+  // The step-by-step demo (#212). Two locks: practice mode here, and the
+  // back's demoKey, which is null on any round problem. The step lives on this
+  // screen, which survives a language switch (placeholderData above), so the
+  // position does too. Keyed by problem: navigating to another one never
+  // takes the demo along.
+  const demoScript =
+    isPractice && problem.data?.visibility === 'practice' && problem.data.demoKey
+      ? PRACTICE_DEMOS[problem.data.demoKey]
+      : undefined
+  const [demo, setDemo] = useState<{ problemId: string; step: number } | null>(null)
+  const demoStep = demoScript && demo?.problemId === id ? demo.step : null
+  const isDemoActive = demoStep !== null
+
+  // Injecting the demo canvas made it Blockly's main workspace, the one its
+  // keyboard shortcuts (Delete, Ctrl+Z) act on. Once it is disposed, hand that
+  // back to the participant's canvas — it would otherwise stay on a dead
+  // workspace until the next click. Runs after the demo's own unmount.
+  useEffect(() => {
+    if (isDemoActive) return
+    const participant = workspaceRef.current?.getWorkspace()
+    if (participant) Blockly.common.setMainWorkspace(participant)
+  }, [isDemoActive])
 
   // The problem's letter in the round (A, B, C) lives on `/rounds/:id`, not on
   // `/problems/:id` — the participant payload carries no `position`. Same query
@@ -330,6 +355,31 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
     />
   )
 
+  // #212: the demo overlays the participant's canvas instead of replacing it.
+  // The canvas underneath stays mounted — blocks, viewport and undo stack —
+  // and out of reach (`inert`), and the demo has no onChange, so the autosave
+  // never hears of it. The wrapper is always there, demo or not: the tree
+  // around the participant's canvas never changes, so it never remounts
+  // (#178).
+  const editor = (
+    <div className="relative h-full w-full">
+      <div className="h-full w-full" inert={isDemoActive} aria-hidden={isDemoActive || undefined}>
+        {blocklyWorkspace}
+      </div>
+      {demoScript && demoStep !== null && (
+        <PracticeDemoCanvas script={demoScript} step={demoStep} className="absolute inset-0" />
+      )}
+    </div>
+  )
+
+  function enterDemo() {
+    // Whatever is focused on the participant's canvas (a selected block, a
+    // field) lets go first, so no key acts on it underneath the demo.
+    const active = document.activeElement
+    if (active instanceof HTMLElement || active instanceof SVGElement) active.blur()
+    setDemo({ problemId: id, step: 0 })
+  }
+
   const closedNotice = isClosed && (
     <Alert
       data-testid="problem-closed-notice"
@@ -408,31 +458,45 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
     </>
   )
 
-  const actionsBar = (
-    <ActionsBar
-      isRunning={isRunning}
-      onRun={() => {
-        // The run owns its own errors and settles into a state — nothing
-        // here has to await it.
-        void run(workspaceRef.current?.serialize() ?? {})
-      }}
-      onClear={() => {
-        // The root block isn't offered by the toolbox (it's seeded, not
-        // dragged in), so "clear" resets to it rather than to nothing — an
-        // empty workspace would leave no way back in.
-        workspaceRef.current?.deserialize(emptyWorkspaceState)
-        // Back to the same state as a fresh editor, so the same view (#205).
-        workspaceRef.current?.recenter()
-        clearSaved()
-      }}
-      isClosed={isClosed}
-      isSubmitting={submit.isPending}
-      isPaused={isPaused}
-      // Practice has no submission (#211): no Submeter, so no verdict and
-      // no submit banner can ever appear either.
-      onSubmit={isPractice ? undefined : () => void handleSubmit()}
-    />
-  )
+  // While the demo runs its controls take the bar's place: Executar and Limpar
+  // would act blind on the canvas hidden underneath.
+  const actionsBar =
+    demoScript && demoStep !== null ? (
+      <PracticeDemoControls
+        script={demoScript}
+        step={demoStep}
+        onPrev={() => setDemo({ problemId: id, step: Math.max(0, demoStep - 1) })}
+        onNext={() =>
+          setDemo({ problemId: id, step: Math.min(demoScript.steps.length - 1, demoStep + 1) })
+        }
+        onExit={() => setDemo(null)}
+      />
+    ) : (
+      <ActionsBar
+        isRunning={isRunning}
+        onRun={() => {
+          // The run owns its own errors and settles into a state — nothing
+          // here has to await it.
+          void run(workspaceRef.current?.serialize() ?? {})
+        }}
+        onClear={() => {
+          // The root block isn't offered by the toolbox (it's seeded, not
+          // dragged in), so "clear" resets to it rather than to nothing — an
+          // empty workspace would leave no way back in.
+          workspaceRef.current?.deserialize(emptyWorkspaceState)
+          // Back to the same state as a fresh editor, so the same view (#205).
+          workspaceRef.current?.recenter()
+          clearSaved()
+        }}
+        isClosed={isClosed}
+        isSubmitting={submit.isPending}
+        isPaused={isPaused}
+        // Practice has no submission (#211): no Submeter, so no verdict and
+        // no submit banner can ever appear either.
+        onSubmit={isPractice ? undefined : () => void handleSubmit()}
+        onShowDemo={demoScript ? enterDemo : undefined}
+      />
+    )
 
   return (
     <main className="flex min-h-0 grow basis-0 flex-col gap-4 overflow-hidden p-4 md:flex-row">
@@ -448,7 +512,7 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
             {submitBannerAlert}
           </>
         }
-        editor={blocklyWorkspace}
+        editor={editor}
         results={hasResults ? resultsContent : undefined}
         actionsBar={actionsBar}
         resultsVersion={resultsVersion}

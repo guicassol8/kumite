@@ -31,6 +31,31 @@ afterEach(() => {
 })
 
 describe('ActionsBar', () => {
+  // #212: "Ver como se resolve" exists only when the screen hands a demo in.
+  it('offers no demo without onShowDemo', () => {
+    renderBar()
+
+    expect(screen.queryByTestId('practice-demo-start')).toBeNull()
+  })
+
+  it('offers the demo with onShowDemo, and reports the click', () => {
+    const onShowDemo = vi.fn()
+    render(
+      <ActionsBar
+        isRunning={false}
+        onRun={vi.fn()}
+        onClear={vi.fn()}
+        isClosed={false}
+        onShowDemo={onShowDemo}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('practice-demo-start'))
+
+    expect(screen.getByTestId('practice-demo-start').textContent).toContain('Ver como se resolve')
+    expect(onShowDemo).toHaveBeenCalledTimes(1)
+  })
+
   // #211: practice has no submission — without `onSubmit` there is no
   // Submeter at all, while Executar and Limpar stay.
   it('renders no Submeter without onSubmit, keeping Executar and Limpar', () => {

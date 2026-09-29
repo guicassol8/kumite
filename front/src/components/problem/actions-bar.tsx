@@ -1,4 +1,4 @@
-import { Play, Send, Trash2 } from 'lucide-react'
+import { Lightbulb, Play, Send, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,9 @@ export type ActionsBarProps = {
   isPaused?: boolean
   // Absent in practice (#211): no submission exists there, so no Submeter.
   onSubmit?: () => void
+  // Present only on a practice problem with a demo script (#212): "Ver como
+  // se resolve".
+  onShowDemo?: () => void
   className?: string
 }
 
@@ -31,6 +34,7 @@ export function ActionsBar({
   isSubmitting = false,
   isPaused = false,
   onSubmit,
+  onShowDemo,
   className,
 }: ActionsBarProps) {
   const { t } = useTranslation()
@@ -67,6 +71,20 @@ export function ActionsBar({
         <Trash2 aria-hidden="true" />
         {t('problem.clearButton')}
       </Button>
+      {onShowDemo && (
+        // Right edge, where Submeter sits on a round problem: practice never
+        // has both.
+        <Button
+          type="button"
+          variant="outline"
+          className="ml-auto"
+          data-testid="practice-demo-start"
+          onClick={onShowDemo}
+        >
+          <Lightbulb aria-hidden="true" />
+          {t('practice.demo.start')}
+        </Button>
+      )}
       {onSubmit && !isClosed && (
         // The one filled brand-red button of the screen, pushed to the right
         // edge of the bar (identity § 5: "marca (vermelho, um por tela)").

@@ -212,7 +212,9 @@ fine" or "just docs nearby."
   the full ladder by hand is redundant with the pre-push, unless you want
   the answer before committing. By hand,
   `bash scripts/pre-push-ladder.sh </dev/null` runs exactly what the
-  pre-push runs.
+  pre-push runs. Through lefthook it is `pnpm exec lefthook run pre-push
+  </dev/null` — without the `</dev/null`, lefthook hands the job a pipe
+  from your terminal and it waits for Ctrl-D.
 - **What CI runs, and when (#378).** Actions minutes on this private repo
   are metered, and a PR push used to cost ~17 of them, most of it
   re-running what the hooks already ran. So a PR push runs **one** job,

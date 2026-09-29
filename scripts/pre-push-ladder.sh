@@ -31,8 +31,11 @@ gated=(back front blocks package.json)
 
 need=0
 saw_ref=0
-# A terminal is a person running the hook by hand, not git: reading it would
-# hang until Ctrl-D, so treat it as "no refs" and run the ladder.
+# A terminal is a person running this script by hand, not git: reading it
+# would hang until Ctrl-D, so treat it as "no refs" and run the ladder. This
+# only catches the script launched straight from a terminal: `lefthook run
+# pre-push` hands its jobs a pipe (use_stdin), so run it as
+# `lefthook run pre-push </dev/null` — otherwise it waits for Ctrl-D.
 [ -t 0 ] && exec </dev/null
 while read -r _local_ref local_sha _remote_ref remote_sha; do
   [ -n "${local_sha:-}" ] || continue

@@ -6,7 +6,8 @@
 # origin/develop ref) and runs the working copy of the script there, feeding
 # it the lines git hands a pre-push hook on stdin
 # (`<local ref> <local sha> <remote ref> <remote sha>`). A stub `pnpm` on PATH
-# records each call and the DATABASE_URL it saw, and fails the call whose
+# records each call, the DATABASE_URL it saw and any git repository variable
+# it inherited, and fails the call whose
 # arguments contain $SMOKE_PNPM_FAIL — nothing real is built or tested, and
 # nothing outside the temp dir is touched.
 #
@@ -33,7 +34,14 @@ ladder=$'-r typecheck\n--filter @kumite/back exec kata verify --strict-coverage\
 mkdir -p "$tmp/bin"
 cat >"$tmp/bin/pnpm" <<'STUB'
 #!/usr/bin/env bash
-printf '%s\t%s\n' "${DATABASE_URL-<unset>}" "$*" >>"$SMOKE_PNPM_LOG"
+# The git repository variables this call inherited, by name — set counts,
+# even empty (git exports GIT_PREFIX= to hooks).
+inherited=""
+for v in GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX; do
+  [ -n "${!v+set}" ] && inherited+="$v "
+done
+printf '%s\t%s\t%s\n' "${DATABASE_URL-<unset>}" "$*" "$inherited" >>"$SMOKE_PNPM_LOG"
 if [ -n "${SMOKE_PNPM_FAIL:-}" ] && [[ "$*" == *"$SMOKE_PNPM_FAIL"* ]]; then
   echo "smoke: stubbed failure of 'pnpm $*'"
   exit 1
@@ -53,7 +61,8 @@ line() { printf 'refs/heads/%s %s refs/heads/%s %s\n' "$1" "$2" "$1" "$3"; }
 # run_ladder <stdin lines> [VAR=value ...] — newline-terminated, as git sends
 # them ("" = no refs at all).
 # Sets: out (stdout+stderr), rc (exit code), calls (pnpm arguments, one per line),
-#       dbs (the DATABASE_URL each pnpm call saw).
+#       dbs (the DATABASE_URL each pnpm call saw), gitenv (the GIT_DIR,
+#       GIT_WORK_TREE… each call inherited, empty when none).
 run_ladder() {
   local input="$1"
   shift
@@ -64,6 +73,7 @@ run_ladder() {
   rc=$?
   calls="$(cut -f2 "$pnpm_log")"
   dbs="$(cut -f1 "$pnpm_log")"
+  gitenv="$(cut -f3 "$pnpm_log" | tr -d '\n')"
 }
 
 failures=0
@@ -233,6 +243,23 @@ run_ladder "" DATABASE_URL=postgres://inherited:secret@localhost:5433/kumite
 expect "every pnpm call saw :5439 (got: $(sort -u <<<"$dbs" | tr '\n' ' '))" \
   bash -c '[ -n "$1" ] && ! grep -qvF ":5439/" <<<"$1"' _ "$dbs"
 rm -f "$work/back/.env"
+end
+
+begin "(n) git's hook variables: the scope guard reads them, the ladder never sees them (#407)"
+# git exports these to a hook; a test that runs git elsewhere would see them.
+# The git dir sits outside the work tree (`git --git-dir … --work-tree … push`),
+# so the guard reaches the repository only through them — unset them before it
+# and the push is refused.
+mv "$work/.git" "$tmp/work.git"
+hook_vars=(GIT_DIR="$tmp/work.git" GIT_WORK_TREE="$work" GIT_INDEX_FILE="$tmp/work.git/index"
+  GIT_COMMON_DIR="$tmp/work.git" GIT_OBJECT_DIRECTORY="$tmp/work.git/objects"
+  GIT_ALTERNATE_OBJECT_DIRECTORIES="$tmp/work.git/objects" GIT_PREFIX=back/)
+run_ladder "$(line task/1-x "$c_docs" "$base")" "${hook_vars[@]}"
+expect "a docs-only push is skipped (rc=$rc)" skipped
+run_ladder "$(line task/1-x "$c_back" "$c_docs")" "${hook_vars[@]}"
+expect "a back/ push runs the ladder (rc=$rc)" full_ladder
+expect "no pnpm call inherited any of them (got: $gitenv)" [ -z "$gitenv" ]
+mv "$tmp/work.git" "$work/.git"
 end
 
 echo

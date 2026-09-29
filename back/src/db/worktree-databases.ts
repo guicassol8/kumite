@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 
 import postgres from 'postgres'
@@ -111,7 +112,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error('usage: pnpm db:drop-worktree <worktree path> [--dry-run]')
     process.exit(2)
   }
-  const mainUrl = mainDatabaseUrl(join(import.meta.dirname, '..', '..'))
+  // The main checkout is git's first worktree — not this script's own tree,
+  // which may be a linked worktree whose back/.env names its own database.
+  const mainTree =
+    execFileSync('git', ['worktree', 'list', '--porcelain'], { encoding: 'utf8' })
+      .split('\n')[0]
+      ?.replace(/^worktree /, '') ?? join(import.meta.dirname, '..', '..', '..')
+  const mainUrl = mainDatabaseUrl(join(mainTree, 'back'))
   try {
     assertLocalDatabaseUrl(mainUrl, 'db:drop-worktree')
   } catch {

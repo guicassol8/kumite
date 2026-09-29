@@ -19,7 +19,9 @@ anyone's intentions.
 
 Stage 0: inspect `git worktree list --porcelain` first; the implementation
 worktree may still hold the branch. Then use a detached worktree plus an
-explicit push, never a forced checkout.
+explicit push, never a forced checkout. Other reviews and implementations may
+be running: `pnpm worktree:env --reset` gives yours its own database and
+ports before any E2E or hurl run.
 
 The fix verifier is the orchestrator's to spawn, not yours, even though
 nesting would allow it (`reviewing-tasks.md` § Verifying the fixes). When

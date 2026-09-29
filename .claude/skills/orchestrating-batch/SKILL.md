@@ -1,6 +1,6 @@
 ---
 name: orchestrating-batch
-description: Runs a batch of 2–3 GitHub Issues end to end in one session — picks the batch, then delegates planning, implementation and review to fresh-context subagents, relaying plans, PRs, evidence and verdicts to the user and stopping for every approval. Triggers: "roda um lote", "orquestra as tasks", "pega 2 tasks e faz", "pega 3 issues do começo ao fim", "modo lote", "run a batch", "batch these issues", "orchestrate the next tasks".
+description: Runs a batch of 1–3 GitHub Issues (or grouped tracks) end to end in one session — picks the batch, then delegates planning, implementation and review to fresh-context subagents, relaying plans, PRs, evidence and verdicts to the user and stopping for every approval. Triggers: "roda um lote", "orquestra as tasks", "pega 2 tasks e faz", "pega 3 issues do começo ao fim", "modo lote", "run a batch", "batch these issues", "orchestrate the next tasks".
 ---
 
 # Orchestrating a batch
@@ -26,8 +26,8 @@ description: Runs a batch of 2–3 GitHub Issues end to end in one session — p
   implementation spawn: if `git rev-parse --abbrev-ref origin/HEAD` in the
   main checkout still says `origin/main`, run `git remote set-head origin
   --auto` once — the agent's own skill reads that caveat too late.
-- **Never** spawn two implementation agents at once, and never reuse one
-  step's agent for the next step.
+- Implementers run in parallel, one per approved track (#404), at most 4
+  agents alive at once; never reuse one step's agent for the next step.
 - Use `AskUserQuestion` for the three blocking gates — batch confirmation,
   plan approval (one at a time), merge authorization — batched, with options
   and a recommendation.

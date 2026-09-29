@@ -20,8 +20,10 @@ cd .worktrees/task-<N>-<slug>
 pnpm install   # node_modules are per-worktree
 ```
 
-- Running the app from the worktree while another instance is up? Override the
-  ports (`PORT`, `--port`, `VITE_API_URL`) in this worktree's `.env` files.
+- Running the app, the E2E or hurl from the worktree? `pnpm worktree:env`
+  first — its own database and ports (`docs/workflow.md` § Worktrees) — then
+  `pnpm e2e`, or `eval "$(bash scripts/worktree-env.sh --print)"` for
+  `pnpm dev:back` and hurl.
 
 ## Loop — per plan step
 
@@ -35,7 +37,8 @@ pnpm install   # node_modules are per-worktree
    hand first is optional. See `docs/workflow.md` § Gate ladder.
 4. Extra obligations by surface:
    - back route added/changed → update the module's `.hurl` and run it against
-     a live server when feasible (`pnpm dev:back` + `pnpm --filter @kumite/back hurl`);
+     a live server when feasible (`pnpm dev:back` + `pnpm --filter @kumite/back hurl`,
+     with this worktree's env — see Preconditions);
    - front UI → `data-testid` on new interactive elements + keys in the three
      i18n catalogs;
    - db change → `db/schema.ts` + `pnpm --filter @kumite/back db:generate`,

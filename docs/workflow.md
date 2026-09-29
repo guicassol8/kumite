@@ -181,26 +181,35 @@ This is a contract, not tooling trivia: a task is **not ready for PR or
 review** while any of the three fails — no exceptions for "it's probably
 fine" or "just docs nearby."
 
-- **Where each step runs.** The pre-commit (`lefthook.yml`) runs format,
-  typecheck and `kata verify` on every commit — fast, and none of them
-  needs a database. The test suites run **once**: in Claude Code's Stop
-  hook, by hand before the PR for any other agent, and always in CI's
-  `check` job. They
-  used to run in the pre-commit too, and two suites truncating the same
-  local Postgres in parallel is where the OOM-killed commits and the
-  phantom test failures came from (#288). The back suite truncates only its
-  own derived database (`<db>_test[_<worktree dir>]`, § Worktrees), never
-  the one the E2E, hurl or a dev server uses (#392).
-- **Claude Code**: the Stop hook (`.claude/hooks/stop.sh`) runs the full
-  ladder and blocks the session from ending while any step fails — but only
-  when the working tree carries uncommitted changes under `back/`, `front/`,
-  `blocks/` or `package.json`. Don't run the tests by hand too; that's pure
-  duplication of what the hook already gates.
-- **Any other agent (e.g. Codex)**: do not assume Claude Code's hooks run.
-  Run the three commands before considering the implementation done or
-  opening/updating the PR, unless successful hooks already ran the same
-  checks for the same revision. During implementation use focused checks;
-  repeat the full ladder only after changes or failures justify it.
+- **Where each step runs.**
+  - The pre-commit (`lefthook.yml`) runs format, typecheck and `kata verify`
+    on every commit — fast, and none of them needs a database. The test
+    suites left it in #288, when two suites truncating the same local
+    Postgres caused OOM-killed commits and phantom failures.
+  - The **pre-push** (`lefthook.yml` → `scripts/pre-push-ladder.sh`) runs the
+    whole ladder before anything reaches the remote, whenever the push
+    carries changes under `back/`, `front/`, `blocks/` or `package.json`
+    (#399). It is the one local gate every agent and every mode goes
+    through — subagents included, which never fire the Stop hook. A
+    docs-only push skips it.
+  - Claude Code's **Stop hook** (`.claude/hooks/stop.sh`) runs the ladder
+    when the session's tree has uncommitted code changes, and blocks the
+    session from ending while it is red — up to 3 times in a row, then it
+    lets the session stop with a warning, and the pre-push still refuses
+    the code (#399).
+  - CI's `check` job runs format, typecheck, verify and tests on every PR
+    push (below).
+  - The back suite truncates only its own derived database
+    (`<db>_test[_<worktree dir>]`, § Worktrees), never the one the E2E,
+    hurl or a dev server uses (#392).
+- **Pushing.** With code in it, `git push` takes a few minutes: run it in the
+  foreground with a 10-minute timeout (Bash `timeout: 600000` in Claude
+  Code), never in the background. A refused push is a real failure — fix
+  it and push again; `--no-verify` is denied. The full log of the last run
+  is in `/tmp/kumite-pre-push-<tree dir>.log`.
+- **During implementation** run focused tests for what you are changing;
+  the full ladder by hand is redundant with the pre-push, unless you want
+  the answer before committing.
 - **What CI runs, and when (#378).** Actions minutes on this private repo
   are metered, and a PR push used to cost ~17 of them, most of it
   re-running what the hooks already ran. So a PR push runs **one** job,
@@ -214,6 +223,16 @@ fine" or "just docs nearby."
   whole workflow can also be switched off (`gh workflow disable CI`) when
   the month's minutes run out; `gh workflow list` shows which state it is
   in, and with it off nothing deploys.
+- **Spend few CI minutes.** A branch without a PR runs no CI, so push it as
+  often as you need before `gh pr create`. Once the PR is open, every push
+  is a `check` run: batch the review's fixes into one push, and never
+  `gh workflow run` unless the user asks.
+- **When `check` did not run.** Out of Actions minutes, GitHub marks the job
+  failed without starting it ("The job was not started because…"). That is
+  not a green CI: before the merge, the review's Evidence carries the full
+  local ladder (`pnpm -r typecheck`, `pnpm verify`, `pnpm -r test`) run on
+  the PR's head, and says that `check` did not run (`reviewing-tasks.md`
+  § Verdict).
 - **E2E in CI.** The `e2e` job in `ci.yml` runs the **whole** Playwright
   suite (`pnpm --filter @kumite/front e2e`) on push to `main` and on manual
   dispatch. It has its own Postgres, the same throwaway organizer as
@@ -246,8 +265,8 @@ fine" or "just docs nearby."
 - Conventional commits on **every** commit: `feat:` `fix:` `chore:` `test:`
   `docs:` `refactor:`.
 - Open the PR against `develop` explicitly: `gh pr create --base develop ...`.
-- Before opening or updating the PR, the gate ladder above must be green
-  (automatic in Claude Code, manual everywhere else).
+- Before opening or updating the PR, the gate ladder above must be green —
+  the pre-push enforces it.
 - PR body starts with `Fixes #N` and ends with an `## Evidence` section.
 - **Evidence is mandatory** (reviewing-tasks):
   - front → Playwright walkthrough screenshots committed under

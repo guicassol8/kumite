@@ -131,10 +131,10 @@ approval in the state file; it is what the implementation prompt asserts.
 
 ## Step 4 — Implement → review → merge, one issue at a time
 
-**Never run two implementations in parallel.** Worktrees share CPU, RAM and
-the local Postgres; two suites truncating the same database produce phantom
-failures and OOM-killed commits (#288). Each issue completes the whole cycle —
-implemented, reviewed, merged — before the next one starts.
+**Never run two implementations in parallel.** Worktrees share CPU, RAM and,
+for the E2E, hurl and dev server, the local Postgres (#392 isolated only the
+back suite). Each issue completes the whole cycle — implemented, reviewed,
+merged — before the next one starts.
 
 ### 4a — Implementation
 
@@ -156,9 +156,11 @@ install` inside it — node_modules are per-worktree. If you need to run the app
 or Postgres, override the ports (`PORT`, `--port`, `VITE_API_URL`, `DB_PORT`
 in that worktree's `.env`); the defaults collide with other worktrees.
 
-Conventional commits, never in the background: the Stop hook runs the suite in
-parallel with the pre-commit and both truncate the same database. A commit
-killed with exit 137 is OOM — retry it as `VITEST_MAX_THREADS=2 git commit …`.
+Conventional commits. `git push` runs the full gate ladder (pre-push, #399)
+and takes a few minutes: run it in the foreground with a 10-minute timeout. A
+refused push is a real failure — fix it; `--no-verify` is denied. Push the
+branch as often as you need before `gh pr create` (no CI runs yet); after it,
+every push costs CI minutes, so keep them few.
 
 The durable deliverable is the PR on origin (`gh pr create --base develop`,
 body starting with `Fixes #<N>` and ending with `## Evidence`). Push
@@ -188,13 +190,17 @@ Evidence is mandatory and blocking: front → a Playwright walkthrough with
 screenshots under `front/e2e/evidence/<issue>/`, referenced step by step in
 the PR body; back → trimmed `pnpm -r test` and hurl output.
 
-E2E care in this repo: re-seed after every commit (the pre-commit truncates
-the database), use `--workers=1` for probe runs (exit 137 is OOM, not a
-regression), and run `pnpm evidence:restore <issue>` before committing so you
-do not commit evidence of older issues that the suite overwrote.
+E2E care in this repo: re-seed (`db:reset`) before each full run — the suite
+asserts on seed state and leaves data behind — use `--workers=1` for probe
+runs (exit 137 is OOM, not a regression), and run `pnpm evidence:restore
+<issue>` before committing so you do not commit evidence of older issues that
+the suite overwrote.
 
 Fix every finding you can fix safely, in this same session, on the PR branch.
-Hand back only what needs a fresh plan or a product decision.
+Hand back only what needs a fresh plan or a product decision. Push all the
+fixes at once: each push to the open PR costs CI minutes, and the pre-push
+re-runs the ladder anyway. Check `gh pr checks <PR>`: if `check` did not run,
+the Evidence carries the full local ladder on the PR's head.
 
 Do NOT merge — the merge is the user's call and the orchestrator asks for it.
 
@@ -206,7 +212,9 @@ Relay the verdict and the evidence paths to the user.
 
 ### 4c — Merge, on the user's word
 
-Ask explicitly, then:
+Before asking, read `gh pr checks <PR>`: a `check` that did not run (out of
+Actions minutes) is not green — the merge then rests on the full local
+ladder in the Evidence, and the question says so. Ask explicitly, then:
 
 ```bash
 gh pr merge <PR> --squash          # no --delete-branch: it fails while the

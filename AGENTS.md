@@ -50,6 +50,10 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
   whose migrations differ from the main checkout's needs its own database for
   those (`db:create`, `docs/workflow.md` § Worktrees, no Docker needed) —
   otherwise each side's E2E/hurl fails against the other's schema.
+- `git push` runs the full ladder (lefthook pre-push, #399) whenever the push
+  carries code, so it takes a few minutes — push with a long timeout, in the
+  foreground. The Stop hook and CI are the other gates (`docs/workflow.md`
+  § Gate ladder).
 - CI on a PR push runs one job, `check` (format, typecheck, verify, tests).
   The full Browser E2E (`e2e`) and `hurl` run on push to `main` and on
   demand (`gh workflow run CI --ref <branch>`), not on every PR push: the

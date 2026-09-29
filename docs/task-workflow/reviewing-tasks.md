@@ -85,8 +85,10 @@ Stage 1 or Stage 2 finding, in the review worktree, on the PR branch:
    it fits, conventional commits, no scope creep beyond the finding itself).
 3. Re-run the full gate ladder (`pnpm -r typecheck`, `pnpm verify`,
    `pnpm -r test`, plus hurl for back changes) before moving on.
-4. Commit the fix on the PR branch with a conventional commit message and
-   push it — this updates the existing PR, it does not open a new one.
+4. Commit the fix on the PR branch with a conventional commit message. Push
+   all the review's fixes together, once — each push to the open PR is a
+   CI run, and the pre-push re-runs the ladder (10-minute timeout). This
+   updates the existing PR, it does not open a new one.
 5. Re-derive the Stage 1 table and Stage 2 notes against the fixed diff
    before writing the review comment, so what's posted reflects the PR as
    it now stands, not as it stood before the fix.
@@ -135,6 +137,13 @@ explicitly, don't fix it partially.
 No evidence = the review is NOT done. Say exactly that rather than approving.
 
 ## Verdict
+
+First read `gh pr checks <PR>`. A red `check` on the code is a finding. A
+`check` that did not run — out of Actions minutes, GitHub fails the job
+without starting it ("The job was not started because…") — is not green:
+the Evidence then carries the full local ladder (`pnpm -r typecheck`,
+`pnpm verify`, `pnpm -r test`) run on the PR's head, and the verdict says
+that `check` did not run (#399).
 
 - **Approve**: comment with the compliance table + evidence links (call out
   any fixes made during review, with their commits) then merge only with the

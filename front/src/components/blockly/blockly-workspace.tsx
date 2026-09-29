@@ -22,7 +22,11 @@ export type BlocklyWorkspaceHandle = {
 }
 
 export type BlocklyWorkspaceProps = {
-  toolbox: Blockly.utils.toolbox.ToolboxDefinition
+  /**
+   * Absent on a read-only canvas (#212): Blockly drops the toolbox when
+   * `options.readOnly` is set, and a later swap would then throw.
+   */
+  toolbox?: Blockly.utils.toolbox.ToolboxDefinition
   initialState?: WorkspaceState
   onChange?: (state: WorkspaceState) => void
   options?: Partial<Blockly.BlocklyOptions>
@@ -43,6 +47,11 @@ export type BlocklyWorkspaceProps = {
    * changes — the editor is never remounted and the blocks stay put (#218).
    */
   theme?: Blockly.Theme
+  /** Defaults to `blockly-workspace`; a second canvas on the page (the
+   * practice demo, #212) takes its own so the editor's stays unambiguous. */
+  testId?: string
+  /** Screen-reader label; defaults to the editor's own. */
+  label?: string
 }
 
 // The coloured bar on each toolbox category row: 4px in the identity, 8px in
@@ -70,7 +79,17 @@ const defaultOptions: Partial<Blockly.BlocklyOptions> = {
  */
 export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorkspaceProps>(
   function BlocklyWorkspace(
-    { toolbox, initialState, onChange, options, className, onReady, theme },
+    {
+      toolbox,
+      initialState,
+      onChange,
+      options,
+      className,
+      onReady,
+      theme,
+      testId = 'blockly-workspace',
+      label,
+    },
     ref,
   ) {
     const { t } = useTranslation()
@@ -172,6 +191,9 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       const workspace = workspaceRef.current
       if (!workspace || appliedToolboxRef.current === toolbox) return
       appliedToolboxRef.current = toolbox
+      // A read-only workspace has no toolbox to swap: Blockly never built it,
+      // and `updateToolbox` throws "Existing toolbox is null" (#212).
+      if (!toolbox || workspace.isReadOnly()) return
       workspace.updateToolbox(toolbox)
     }, [toolbox])
 
@@ -209,8 +231,8 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
     return (
       <div
         ref={containerRef}
-        aria-label={t('editor.workspaceLabel')}
-        data-testid="blockly-workspace"
+        aria-label={label ?? t('editor.workspaceLabel')}
+        data-testid={testId}
         // `isolate`: Blockly's toolbox (z-index 70) and scrollbars (30) would
         // otherwise compete with the page and paint over the app's dialogs
         // (z-50), e.g. "Criar variável" (#205). Blockly's dropdowns and

@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Smoke test for scripts/worktree-env.sh and scripts/e2e.sh (#404): the
-# database and ports each worktree gets, and the E2E semaphore.
+# database and ports each worktree gets, and the E2E semaphore — plus
+# scripts/worktree-prune.sh's database step (#395).
 #
 # It builds a throwaway repository in a temp dir with the working copy of the
-# two scripts (and env-exports.mjs), adds linked worktrees to it, and runs
+# scripts (and env-exports.mjs), adds linked worktrees to it, and runs
 # them there with a shell that exports PORT, DATABASE_URL and APP_BASE_URL,
 # as this machine's does. A stub `pnpm` on PATH records every call with the
-# DATABASE_URL and PORT it saw; `db:create` keeps a fake database list in the
-# temp dir, and `--filter @kumite/front e2e` sleeps and logs when it started
-# and ended. No Postgres, no Playwright, nothing outside the temp dir — except
+# DATABASE_URL and PORT it saw, and fails the call whose arguments contain
+# $SMOKE_PNPM_FAIL; `db:create` keeps a fake database list in the temp dir,
+# `--filter @kumite/front e2e` sleeps and logs when it started and ended, and
+# `db:drop-worktree` logs whether the worktree's back/.env was still there. No Postgres, no Playwright, nothing outside the temp dir — except
 # one TCP listener on 127.0.0.1, for the "skip a listening port" case.
 #
 # Usage: bash scripts/worktree-env-smoke.sh
@@ -41,7 +43,16 @@ mkdir -p "$tmp/bin" "$tmp/dbs" "$tmp/locks" "$wt"
 cat >"$tmp/bin/pnpm" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\t%s\t%s\t%s\n' "$(basename "$PWD")" "$*" "${DATABASE_URL-<unset>}" "${PORT-<unset>}" >>"$SMOKE_PNPM_LOG"
+if [ -n "${SMOKE_PNPM_FAIL:-}" ] && [[ "$*" == *"$SMOKE_PNPM_FAIL"* ]]; then
+  echo "smoke: stubbed failure of 'pnpm $*'"
+  exit 1
+fi
 case "$*" in
+  *db:drop-worktree*)
+    for arg in "$@"; do
+      case "$arg" in /*) [ -f "$arg/back/.env" ] && env=yes || env=no; echo "drop $(basename "$arg") env=$env" >>"$SMOKE_PNPM_LOG.drops" ;; esac
+    done
+    ;;
   *db:create*)
     name="${DATABASE_URL##*/}"
     if [ -e "$SMOKE_DBS/$name" ]; then
@@ -67,7 +78,8 @@ g() { git -C "$main" -c user.name=smoke -c user.email=smoke@example.invalid -c c
 
 git init -q -b develop "$main" || exit 1
 mkdir -p "$main/scripts" "$main/back" "$main/front"
-cp "$repo/scripts/worktree-env.sh" "$repo/scripts/e2e.sh" "$repo/scripts/env-exports.mjs" "$main/scripts/"
+cp "$repo/scripts/worktree-env.sh" "$repo/scripts/e2e.sh" "$repo/scripts/env-exports.mjs" \
+  "$repo/scripts/worktree-prune.sh" "$main/scripts/"
 cp "$repo/back/.env.example" "$main/back/.env.example"
 echo '{}' >"$main/front/package.json" # git keeps no empty dir: front/ must exist
 printf 'back/.env\nback/.env.bak\nfront/.env\nnode_modules/\n' >"$main/.gitignore"
@@ -90,7 +102,8 @@ in_tree() {
   local dir="$1"
   shift
   (cd "$dir" && env "${LEAK[@]}" PATH="$tmp/bin:$PATH" TMPDIR="$tmp" \
-    SMOKE_PNPM_LOG="$pnpm_log" SMOKE_DBS="$tmp/dbs" SMOKE_E2E_LOG="$e2e_log" "$@")
+    SMOKE_PNPM_LOG="$pnpm_log" SMOKE_DBS="$tmp/dbs" SMOKE_E2E_LOG="$e2e_log" \
+    SMOKE_PNPM_FAIL="${fail:-}" "$@")
 }
 # wenv <dir> [args]: worktree-env.sh there. Sets out, rc, calls (the pnpm
 # arguments of this run, one per line), dbs (the DATABASE_URL each saw).
@@ -130,6 +143,7 @@ end() {
   fi
 }
 says() { grep -qF -- "$1" <<<"$out"; }
+not() { ! "$@"; }
 called() { grep -qxF -- "--filter @kumite/back $1" <<<"$calls"; }
 not_called() { ! called "$1"; }
 in_range() { [ "$1" -ge "$2" ] && [ "$1" -lt "$3" ]; } # in_range <n> <from> <below>
@@ -287,6 +301,70 @@ if command -v flock >/dev/null; then
 else
   echo "  skip (l)/(m): flock not found"
 fi
+
+# first_run_fails <dir> <branch> <step>: a first worktree:env that dies at <step>.
+first_run_fails() {
+  add_tree "$1" "$2"
+  fail="$3" wenv "$wt/$1"
+  fail=""
+}
+
+begin "(n) a first run that failed at db:migrate -> the re-run seeds"
+first_run_fails task-80-n task/80-n db:migrate
+expect "the first run failed (rc=$rc)" [ "$rc" != 0 ]
+wenv "$wt/task-80-n"
+expect "exit 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "db:seed" called db:seed
+end
+
+begin "(o) a first run that failed at db:seed -> the re-run seeds"
+first_run_fails task-81-o task/81-o db:seed
+expect "the first run failed (rc=$rc)" [ "$rc" != 0 ]
+wenv "$wt/task-81-o"
+expect "db:seed" called db:seed
+wenv "$wt/task-81-o"
+expect "a third run only migrates" not_called db:seed
+end
+
+begin "(p) a --reset that failed -> the next plain run seeds"
+fail=db:reset wenv "$wt/task-7-a" --reset
+fail=""
+expect "the reset failed (rc=$rc)" [ "$rc" != 0 ]
+wenv "$wt/task-7-a"
+expect "db:seed" called db:seed
+end
+
+# --- worktree:prune's database step (#395) ------------------------------------
+# Every branch above sits on the first commit; moving origin/develop one commit
+# past it makes them all "merged". review-7 is detached, so it is kept.
+echo x >"$main/later" && g add later && g commit -qm later
+g update-ref refs/remotes/origin/develop "$(g rev-parse HEAD)"
+branch_trees() { git -C "$main" worktree list --porcelain | grep -c '^branch '; }
+before_prune="$(branch_trees)"
+prune() {
+  : >"$pnpm_log"
+  : >"$pnpm_log.drops"
+  out="$(in_tree "$main" bash scripts/worktree-prune.sh "$@" 2>&1)"
+  rc=$?
+}
+
+begin "(q) prune: a drop that fails keeps the worktree and its back/.env"
+fail=db:drop-worktree prune
+fail=""
+expect "exit 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "every merged tree kept ($(branch_trees) of $before_prune branch trees left)" [ "$(branch_trees)" = "$before_prune" ]
+expect "says so" says "kept instead: db:drop-worktree failed"
+expect "task-7-a still has its back/.env" [ -f "$wt/task-7-a/back/.env" ]
+end
+
+begin "(r) prune: databases dropped while back/.env is there, then the tree goes"
+prune
+expect "exit 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "the merged trees are gone (task-7-a)" [ ! -d "$wt/task-7-a" ]
+expect "the detached review-7 stays" [ -d "$wt/review-7" ]
+expect "db:drop-worktree ran for task-7-a with its back/.env in place" grep -qx 'drop task-7-a env=yes' "$pnpm_log.drops"
+expect "never with the back/.env already gone" not grep -q 'env=no' "$pnpm_log.drops"
+end
 
 echo
 if [ "$failures" = 0 ]; then

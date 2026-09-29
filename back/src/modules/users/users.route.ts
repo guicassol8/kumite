@@ -15,7 +15,14 @@ import {
   UserListSchema,
   UserSummarySchema,
 } from './users.schema'
-import { deactivateUser, demoteUser, listUsers, promoteUser, reactivateUser } from './users.service'
+import {
+  deactivateUser,
+  demoteUser,
+  listUsers,
+  markOnboardingPrompted,
+  promoteUser,
+  reactivateUser,
+} from './users.service'
 
 // 401 (requireUser) and 403 (requireOrganizer / requirePasswordUpToDate) are
 // not declared on any route below: all of them short-circuit from middleware,
@@ -34,6 +41,25 @@ export const meRoute = defineRoute({
   input: {},
   output: PublicUserSchema,
   handler: async (c) => c.get('currentUser'),
+})
+
+// #213: records that the caller answered the onboarding-tour invite, accepted
+// or declined — the front only asks while this is null, so the answer holds
+// on every machine. Idempotent: a repeat returns the first timestamp. Not an
+// escape hatch (ADR-0004): a user who must change their password is sent to
+// that screen before the home ever shows the invite.
+export const markOnboardingRoute = defineRoute({
+  method: 'POST',
+  path: '/me/onboarding',
+  use: [requireUser, requirePasswordUpToDate],
+  input: {},
+  output: { 200: PublicUserSchema, 404: ErrorBodySchema },
+  handler: async (c) => {
+    const user = await markOnboardingPrompted(c.get('db'), c.get('currentUser').id)
+    if (!user) return c.error('not_found', 'User not found', { status: 404 })
+    const { passwordHash: _passwordHash, ...publicUser } = user
+    return c.json(publicUser, 200)
+  },
 })
 
 export const listUsersRoute = defineRoute({

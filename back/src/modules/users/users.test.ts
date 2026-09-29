@@ -1,5 +1,5 @@
 import { signJwt } from '@katajs-framework/core/jwt'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { app } from '../../app'
@@ -16,6 +16,7 @@ import {
   findUserByEmail,
   findUserById,
   listUsers,
+  markOnboardingPrompted,
   promoteUser,
   reactivateUser,
 } from './users.service'
@@ -468,5 +469,73 @@ describe('POST /organizer/users/:id/deactivate — sse side effect', () => {
     expect(fn).not.toHaveBeenCalled()
 
     unsubscribe()
+  })
+})
+
+// #213: the onboarding-tour invite is asked once per account, on any machine.
+// A fresh account answers GET /me with `onboardingPromptedAt: null` ("never
+// asked"); POST /me/onboarding records the first answer and never moves it.
+describe('onboarding invite — GET /me + POST /me/onboarding', () => {
+  async function participantSession() {
+    const user = await createUser(db, {
+      ...baseUser,
+      email: `onboarding-${crypto.randomUUID()}@example.com`,
+    })
+    if (!user) throw new Error('expected fixture')
+    const token = await signJwt(
+      { role: user.role, university: user.university },
+      { secret: JWT_SECRET, subject: user.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+    )
+    return { user, headers: { Authorization: `Bearer ${token}` } }
+  }
+
+  it('a new account has never been asked', async () => {
+    const { headers } = await participantSession()
+    const res = await app.request('/me', { headers })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as Record<string, unknown>
+    expect(body.onboardingPromptedAt).toBeNull()
+    expect(body).not.toHaveProperty('passwordHash')
+  })
+
+  it('records a timestamp on the first call and keeps it on the second', async () => {
+    const { headers } = await participantSession()
+
+    const first = await app.request('/me/onboarding', { method: 'POST', headers })
+    expect(first.status).toBe(200)
+    const firstBody = (await first.json()) as Record<string, unknown>
+    expect(firstBody).not.toHaveProperty('passwordHash')
+    expect(typeof firstBody.onboardingPromptedAt).toBe('string')
+
+    const second = await app.request('/me/onboarding', { method: 'POST', headers })
+    expect(second.status).toBe(200)
+    const secondBody = (await second.json()) as Record<string, unknown>
+    expect(secondBody.onboardingPromptedAt).toBe(firstBody.onboardingPromptedAt)
+
+    const me = await app.request('/me', { headers })
+    const meBody = (await me.json()) as Record<string, unknown>
+    expect(meBody.onboardingPromptedAt).toBe(firstBody.onboardingPromptedAt)
+  })
+
+  it('answers 401 without a token', async () => {
+    const res = await app.request('/me/onboarding', { method: 'POST' })
+    expect(res.status).toBe(401)
+  })
+
+  it('answers 403 password_change_required while the password must change', async () => {
+    const { user, headers } = await participantSession()
+    await db.update(usersTable).set({ mustChangePassword: true }).where(eq(usersTable.id, user.id))
+
+    const res = await app.request('/me/onboarding', { method: 'POST', headers })
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ error: 'password_change_required' })
+    const row = await findUserById(db, user.id)
+    expect(row?.onboardingPromptedAt).toBeNull()
+  })
+})
+
+describe('users.service markOnboardingPrompted', () => {
+  it('returns null for an unknown id', async () => {
+    expect(await markOnboardingPrompted(db, crypto.randomUUID())).toBeNull()
   })
 })

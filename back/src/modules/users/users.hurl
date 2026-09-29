@@ -37,6 +37,39 @@ jsonpath "$.role" == "participant"
 jsonpath "$.university" == "pucrs"
 jsonpath "$.active" == true
 jsonpath "$.passwordHash" not exists
+jsonpath "$.onboardingPromptedAt" == null
+
+# 1b. POST /me/onboarding (#213) -> 200, records when the tour invite was
+# answered; no passwordHash leaked.
+POST {{host}}/me/onboarding
+Authorization: Bearer {{token}}
+HTTP 200
+[Asserts]
+jsonpath "$.email" == "me-e2e@edu.pucrs.br"
+jsonpath "$.onboardingPromptedAt" isString
+jsonpath "$.passwordHash" not exists
+[Captures]
+prompted_at: jsonpath "$.onboardingPromptedAt"
+
+# 1c. A second answer never moves the first one.
+POST {{host}}/me/onboarding
+Authorization: Bearer {{token}}
+HTTP 200
+[Asserts]
+jsonpath "$.onboardingPromptedAt" == "{{prompted_at}}"
+
+# 1d. GET /me reflects it, so no other machine asks again.
+GET {{host}}/me
+Authorization: Bearer {{token}}
+HTTP 200
+[Asserts]
+jsonpath "$.onboardingPromptedAt" == "{{prompted_at}}"
+
+# 1e. POST /me/onboarding with no token -> 401.
+POST {{host}}/me/onboarding
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
 
 # 2. GET /me with no Authorization header -> 401.
 GET {{host}}/me

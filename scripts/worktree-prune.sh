@@ -17,7 +17,9 @@
 # back suite's `<db>_test_<dir>` and the database `pnpm worktree:env` gave it,
 # through `pnpm db:drop-worktree` (back/src/db/worktree-databases.ts) — never
 # the main checkout's database or its `<db>_test`, never a remote server.
-# `--dry-run` lists them.
+# `--dry-run` lists them. A drop that fails unexpectedly keeps the worktree
+# (its back/.env is what names its database), for the next prune to retry;
+# Postgres down is only reported.
 #
 # Usage: pnpm worktree:prune [--dry-run]
 set -uo pipefail
@@ -65,9 +67,12 @@ is_merged() {
 }
 
 # drop_databases <worktree> [--dry-run]: its local Postgres databases (#395).
-# A failure is reported and never stops the prune.
+# Returns db:drop-worktree's status: non-zero only when it failed unexpectedly
+# (Postgres down is reported and returns 0); $drop_status keeps it.
 drop_databases() {
-  (cd "$main/back" && pnpm -s db:drop-worktree "$@" 2>&1) | sed 's/^/        /' || true
+  (cd "$main/back" && pnpm -s db:drop-worktree "$@" 2>&1) | sed 's/^/        /'
+  drop_status="${PIPESTATUS[0]}"
+  return "$drop_status"
 }
 
 removed=0
@@ -101,12 +106,19 @@ while IFS= read -r line; do
 
   if [ "$dry_run" = 1 ]; then
     echo "would remove  $name  ($branch merged, clean)"
-    drop_databases "$path" --dry-run
+    drop_databases "$path" --dry-run ||
+      echo "        db:drop-worktree failed (exit $drop_status) — a real run would keep it"
     removed=$((removed + 1))
     continue
   fi
 
   echo "remove  $name  ($branch merged, clean)"
+  # First, while the worktree's back/.env still names its own database.
+  if ! drop_databases "$path"; then
+    echo "        kept instead: db:drop-worktree failed (exit $drop_status) — the next prune retries"
+    kept=$((kept + 1))
+    continue
+  fi
   if [ -f "$path/docker-compose.yml" ]; then
     docker compose --project-directory "$path" -f "$path/docker-compose.yml" down -v --remove-orphans >/dev/null 2>&1 || true
   fi
@@ -114,8 +126,6 @@ while IFS= read -r line; do
   # task-<N>-<slug>-db, review-<PR>-db) — only ones whose name starts with it.
   ids="$(docker ps -aq --filter "name=^${name}" 2>/dev/null || true)"
   [ -n "$ids" ] && docker rm -f -v $ids >/dev/null 2>&1 || true
-  # Before the removal: the worktree's back/.env names its own database.
-  drop_databases "$path"
   git worktree remove --force "$path"
   git branch -D "$branch" >/dev/null
   removed=$((removed + 1))

@@ -58,6 +58,29 @@ export function testDatabaseUrl(baseUrl: string, slug?: string): string {
   return url.toString()
 }
 
+/** The variables git exports to its hooks to point them at a repository. */
+const GIT_REPOSITORY_VARIABLES = [
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_COMMON_DIR',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_PREFIX',
+]
+
+/**
+ * `env` without the variables that pin git to one repository (#407). Run from
+ * a git hook — the pre-push ladder — they made git answer about the hook's
+ * repository from any directory, and made a test fixture's `git commit` land
+ * on a real branch. With them gone, git discovers the repository from `cwd`.
+ */
+export function gitDiscoveryEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const clean = { ...env }
+  for (const key of GIT_REPOSITORY_VARIABLES) delete clean[key]
+  return clean
+}
+
 /**
  * The directory name of the linked git worktree containing `cwd`, or
  * `undefined` in the main checkout (and outside git, or when git fails).
@@ -74,7 +97,7 @@ export function worktreeSlug(cwd: string): string | undefined {
         '--git-common-dir',
         '--show-toplevel',
       ],
-      { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+      { cwd, env: gitDiscoveryEnv(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
     )
       .trim()
       .split('\n')

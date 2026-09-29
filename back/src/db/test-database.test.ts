@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   ensureDatabase,
+  gitDiscoveryEnv,
   resolveDatabaseUrl,
   resolveTestDatabaseUrl,
   testDatabaseUrl,
@@ -62,8 +63,10 @@ describe('worktreeSlug', () => {
 
   beforeAll(() => {
     dir = realpathSync(mkdtempSync(join(tmpdir(), 'kumite-392-')))
+    // gitDiscoveryEnv (#407): with an inherited GIT_DIR, this fixture's init,
+    // commit and worktree add would write into that repository instead.
     const git = (cwd: string, ...args: string[]) =>
-      execFileSync('git', args, { cwd, stdio: 'ignore' })
+      execFileSync('git', args, { cwd, env: gitDiscoveryEnv(), stdio: 'ignore' })
     git(dir, 'init', '-q', 'main')
     writeFileSync(join(dir, 'main', 'f'), 'x')
     git(join(dir, 'main'), 'add', 'f')
@@ -85,6 +88,29 @@ describe('worktreeSlug', () => {
 
   it('is undefined outside any git repository', () => {
     expect(worktreeSlug(tmpdir())).toBeUndefined()
+  })
+
+  // #407: git exports GIT_DIR, GIT_WORK_TREE… to its hooks. Inherited by the
+  // suite (the pre-push ladder), they made git answer about *that* repository
+  // from any directory. Here they point at this fixture's main checkout, never
+  // at the real repository.
+  it('ignores a GIT_DIR / GIT_WORK_TREE it inherited from a git hook (#407)', () => {
+    const inherited = {
+      GIT_DIR: join(dir, 'main', '.git'),
+      GIT_WORK_TREE: join(dir, 'main'),
+      GIT_INDEX_FILE: join(dir, 'main', '.git', 'index'),
+    }
+    const saved = Object.fromEntries(Object.keys(inherited).map((k) => [k, process.env[k]]))
+    try {
+      Object.assign(process.env, inherited)
+      expect(worktreeSlug(join(dir, 'task-392-stop-hook'))).toBe('task-392-stop-hook')
+      expect(worktreeSlug(tmpdir())).toBeUndefined()
+    } finally {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+    }
   })
 })
 

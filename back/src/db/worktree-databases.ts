@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { join } from 'node:path'
+import { existsSync, realpathSync } from 'node:fs'
+import { basename, join, resolve } from 'node:path'
 
 import postgres from 'postgres'
 
@@ -29,6 +30,9 @@ export type WorktreeDatabasesInput = {
   worktreeUrl?: string | undefined
   /** The removed worktree's directory name — the suite's slug. */
   dir: string
+  /** Databases other worktrees still use (their back/.env DATABASE_URL):
+   * never candidates, whatever the removed worktree's back/.env names. */
+  keep?: (string | undefined)[]
 }
 
 /**
@@ -44,6 +48,7 @@ export function worktreeDatabaseCandidates(input: WorktreeDatabasesInput): strin
     protectedNames.add(databaseName(base))
     protectedNames.add(databaseName(testDatabaseUrl(base)))
   }
+  for (const url of input.keep ?? []) if (url) protectedNames.add(databaseName(url))
   const host = new URL(input.mainUrl).host
   const candidates = bases.map((base) => testDatabaseUrl(base, input.dir))
   if (input.worktreeUrl) {
@@ -114,24 +119,43 @@ export function mainDatabaseUrl(backDir: string, env: EnvLike = process.env): st
   return readDotenv(backDir)['DATABASE_URL'] || env['DATABASE_URL'] || DEFAULT_DATABASE_URL
 }
 
-// Usage (from the main checkout's back/): db:drop-worktree <worktree> [--dry-run]
+/** The worktree argument as an absolute path. pnpm runs the script from
+ * back/, so a relative path is resolved against the directory pnpm was
+ * invoked from (INIT_CWD) — against back/ it named nothing, and the tool
+ * reported "no database left" while the worktree's database was still there. */
+export function worktreeDir(arg: string, env: EnvLike = process.env, cwd = process.cwd()): string {
+  return resolve(env['INIT_CWD'] || cwd, arg)
+}
+
+/** Every worktree `git worktree list --porcelain` names, main checkout first. */
+function listWorktrees(): string[] {
+  return execFileSync('git', ['worktree', 'list', '--porcelain'], {
+    encoding: 'utf8',
+    env: gitDiscoveryEnv(),
+  })
+    .split('\n')
+    .filter((line) => line.startsWith('worktree '))
+    .map((line) => line.slice('worktree '.length))
+}
+
+const realpath = (path: string) => (existsSync(path) ? realpathSync(path) : path)
+
+// Usage: db:drop-worktree <worktree> [--dry-run] — a relative path is taken
+// from where pnpm was run.
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2).filter((arg) => arg !== '--')
   const dryRun = args.includes('--dry-run')
-  const worktree = args.find((arg) => arg !== '--dry-run')
-  if (!worktree) {
+  const arg = args.find((a) => a !== '--dry-run')
+  if (!arg) {
     console.error('usage: pnpm db:drop-worktree <worktree path> [--dry-run]')
     process.exit(2)
   }
+  const worktree = worktreeDir(arg)
+  const dir = basename(worktree)
   // The main checkout is git's first worktree — not this script's own tree,
   // which may be a linked worktree whose back/.env names its own database.
-  const mainTree =
-    execFileSync('git', ['worktree', 'list', '--porcelain'], {
-      encoding: 'utf8',
-      env: gitDiscoveryEnv(),
-    })
-      .split('\n')[0]
-      ?.replace(/^worktree /, '') ?? join(import.meta.dirname, '..', '..', '..')
+  const trees = listWorktrees()
+  const mainTree = trees[0] ?? join(import.meta.dirname, '..', '..', '..')
   const mainUrl = mainDatabaseUrl(join(mainTree, 'back'))
   try {
     assertLocalDatabaseUrl(mainUrl, 'db:drop-worktree')
@@ -139,12 +163,23 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log('db:drop-worktree: the database server is not local — nothing dropped')
     process.exit(0)
   }
-  const dir = worktree.replace(/\/+$/, '').split('/').pop() ?? ''
+  if (!existsSync(worktree)) {
+    console.log(
+      `db:drop-worktree: no directory at ${worktree} — only the suite databases named after "${dir}" are looked for`,
+    )
+  }
+  // A database another worktree's back/.env still names is never dropped —
+  // a copied back/.env must not take a live worktree's database with it.
+  const self = realpath(worktree)
+  const keep = trees
+    .filter((tree) => realpath(tree) !== self)
+    .map((tree) => readDotenv(join(tree, 'back'))['DATABASE_URL'])
   const urls = worktreeDatabaseCandidates({
     mainUrl,
     otherBases: [process.env['DATABASE_URL']],
     worktreeUrl: readDotenv(join(worktree, 'back'))['DATABASE_URL'],
     dir,
+    keep,
   })
   try {
     const names = await dropDatabases(mainUrl, urls, dryRun)

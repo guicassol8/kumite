@@ -5,6 +5,7 @@ import {
   dropStatement,
   mainDatabaseUrl,
   worktreeDatabaseCandidates,
+  worktreeDir,
 } from './worktree-databases'
 
 const MAIN = 'postgres://kumite:kumite@localhost:5487/kumite'
@@ -41,15 +42,44 @@ describe('worktreeDatabaseCandidates (#395)', () => {
     expect(names(urls)).not.toContain('kumite_test')
     expect(names(urls)).not.toContain('kumite_task200')
     expect(names(urls)).toContain('kumite_task200_test_task_9_x')
+    // An exported base is protected even when the worktree's own back/.env
+    // names it: a shell that exports it may be serving it right now.
+    const own = worktreeDatabaseCandidates({
+      mainUrl: MAIN,
+      otherBases: ['postgres://kumite:kumite@localhost:5487/kumite_task200'],
+      worktreeUrl: 'postgres://kumite:kumite@localhost:5487/kumite_task200',
+      dir: 'task-9-x',
+    })
+    expect(names(own)).toEqual(['kumite_test_task_9_x', 'kumite_task200_test_task_9_x'])
   })
 
   it('leaves a worktree database on another server alone', () => {
     const urls = worktreeDatabaseCandidates({
       mainUrl: MAIN,
-      worktreeUrl: 'postgres://kumite:kumite@localhost:5440/kumite',
+      worktreeUrl: 'postgres://kumite:kumite@localhost:5440/kumite_task7',
       dir: 'task-7-docker',
     })
     expect(names(urls)).toEqual(['kumite_test_task_7_docker'])
+  })
+
+  it('never names a database another worktree still uses', () => {
+    const urls = worktreeDatabaseCandidates({
+      mainUrl: MAIN,
+      worktreeUrl: 'postgres://kumite:kumite@localhost:5487/kumite_task404',
+      dir: 'task-404-copy',
+      keep: [MAIN, 'postgres://kumite:kumite@localhost:5487/kumite_task404', undefined],
+    })
+    expect(names(urls)).toEqual(['kumite_test_task_404_copy', 'kumite_task404_test_task_404_copy'])
+  })
+})
+
+describe('worktreeDir', () => {
+  it('resolves a relative path from where pnpm was run, not from back/', () => {
+    expect(worktreeDir('.worktrees/review-9', { INIT_CWD: '/repo' }, '/repo/back')).toBe(
+      '/repo/.worktrees/review-9',
+    )
+    expect(worktreeDir('../x', {}, '/repo/back')).toBe('/repo/x')
+    expect(worktreeDir('/abs/wt/', { INIT_CWD: '/repo' }, '/repo/back')).toBe('/abs/wt')
   })
 })
 

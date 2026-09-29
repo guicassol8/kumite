@@ -16,8 +16,11 @@
 #     with DATABASE_URL, PORT, APP_BASE_URL and FRONT_PORT replaced — and
 #     front/.env (VITE_API_URL);
 #   - runs db:create, db:migrate and db:seed the first time, db:migrate on
-#     later runs (plus db:seed when the database had to be created again),
-#     db:reset with --reset (a clean seed before a full E2E).
+#     later runs, db:reset with --reset (a clean seed before a full E2E) —
+#     and db:seed again whenever the last seed did not complete: a run cut
+#     short (a failed migrate or seed, Ctrl-C) or a database created anew.
+#     back/.env carries a `# worktree:env: seeded` line only while the last
+#     seed or reset has completed.
 # Re-running keeps the database and ports it chose the first time.
 #
 # The shell's own PORT, DATABASE_URL and APP_BASE_URL never leak in: every
@@ -121,9 +124,7 @@ listening() {
   fi
 }
 
-first_run=1
 if [ -f back/.env ] && grep -qF "$marker" back/.env; then
-  first_run=0
   db_url="$(get_var back/.env DATABASE_URL)"
   port="$(get_var back/.env PORT)"
   front="$(get_var back/.env FRONT_PORT)"
@@ -218,16 +219,29 @@ db() { # db <script>: quiet on success, the tail on failure; output in $db_out
   fi
   echo "worktree-env: $1 ok"
 }
+# `seeded` is in back/.env only while the last seed (or reset) completed:
+# removed before one starts, written back after it succeeds. So any run cut
+# short past db:create — a failed migrate or seed, Ctrl-C — seeds next time.
+seeded='# worktree:env: seeded'
+unmark_seeded() {
+  local tmp
+  tmp="$(mktemp)" || exit 1
+  grep -vxF "$seeded" back/.env >"$tmp"
+  mv "$tmp" back/.env
+}
+
 db db:create
-# A database created now is empty even on a later run — dropped by hand, or
-# a first run that stopped after writing back/.env — so it gets the seed too.
+# A database created now is empty even when back/.env says seeded (it was
+# dropped by hand), so it gets the seed too.
 created=0
 [[ "$db_out" == *'" created'* ]] && created=1
-db db:migrate
-if [ "$reset" = 1 ]; then
-  db db:reset
-elif [ "$first_run" = 1 ] || [ "$created" = 1 ]; then
-  db db:seed
+if [ "$reset" = 1 ] || [ "$created" = 1 ] || ! grep -qxF "$seeded" back/.env; then
+  unmark_seeded
+  db db:migrate
+  if [ "$reset" = 1 ]; then db db:reset; else db db:seed; fi
+  echo "$seeded" >>back/.env
+else
+  db db:migrate
 fi
 
 name="$(node -e 'process.stdout.write(decodeURIComponent(new URL(process.argv[1]).pathname.slice(1)))' "$db_url")"

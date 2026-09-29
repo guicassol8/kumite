@@ -18,9 +18,12 @@ description: Runs a batch of 2–3 GitHub Issues end to end in one session — p
   `## PERGUNTAS` go back with `SendMessage` to the same agent — a new `Agent`
   call starts cold and loses the investigation.
 - **Worktree base**: `EnterWorktree` and `isolation: "worktree"` branch from
-  `origin/main`, and this repo integrates on `develop` — the implementation
-  prompt must tell the agent to `git fetch origin && git reset --hard
-  origin/develop` right after entering, before any edit.
+  the remote's default branch, `develop` (#400); the implementation agent
+  only renames its branch to `task/<N>-<slug>`. The worktree is cut from
+  this session's clone, so the stale-clone check is yours, before the first
+  implementation spawn: if `git rev-parse --abbrev-ref origin/HEAD` in the
+  main checkout still says `origin/main`, run `git remote set-head origin
+  --auto` once — the agent's own skill reads that caveat too late.
 - **Never** spawn two implementation agents at once, and never reuse one
   step's agent for the next step.
 - Use `AskUserQuestion` for the three blocking gates — batch confirmation,

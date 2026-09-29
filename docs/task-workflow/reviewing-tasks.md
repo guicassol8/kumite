@@ -147,12 +147,12 @@ that `check` did not run (#399).
 
 - **Approve**: comment with the compliance table + evidence links (call out
   any fixes made during review, with their commits) then merge only with the
-  user's explicit go-ahead: `gh pr merge --squash --delete-branch`. The PR
-  targets `develop`, not the repo's default branch, so `Fixes #N` does
-  **not** auto-close the issue — close it explicitly:
-  `gh issue close <N> --reason completed`. Then, from the main checkout,
-  `pnpm worktree:prune` removes the merged branch's worktree and its
-  Postgres (and any other merged, clean one left behind).
+  user's explicit go-ahead: `gh pr merge --squash --delete-branch`.
+  `develop` is the default branch (#400), so `Fixes #N` closes the issue on
+  merge — confirm with `gh issue view <N> --json state`, and run
+  `gh issue close <N> --reason completed` only if it stayed open. Then,
+  from the main checkout, `pnpm worktree:prune` removes the merged branch's
+  worktree and its Postgres (and any other merged, clean one left behind).
 - **Request changes**: only for a finding left unfixed per § Fixing
   findings (needs a fresh plan, or the user chose not to fix it now) —
   precise, file-level items on the PR.

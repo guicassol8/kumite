@@ -147,12 +147,10 @@ docs/task-workflow/implementing-tasks.md for issue #<N>.
 The approved plan is the `## Plan` comment on the issue. I confirm the user
 approved it in this session — treat the approval precondition as satisfied.
 
-Worktree: this repo integrates on `develop`, so the branch must come from
-`origin/develop` (`docs/workflow.md` § Worktrees). If your harness creates the
-worktree for you and branches from the default branch instead, fix it right
-after entering, with a clean tree: `git fetch origin && git reset --hard
-origin/develop`, then rename the branch to `task/<N>-<slug>`. Run `pnpm
-install` inside it — node_modules are per-worktree. If you need to run the app
+Worktree: the branch comes from `origin/develop`, the default branch, so a
+worktree the harness creates already starts there (#400); rename its branch
+to `task/<N>-<slug>` right after entering. Run `pnpm install` inside it —
+node_modules are per-worktree. If you need to run the app
 or Postgres, override the ports (`PORT`, `--port`, `VITE_API_URL`, `DB_PORT`
 in that worktree's `.env`); the defaults collide with other worktrees.
 
@@ -219,15 +217,16 @@ ladder in the Evidence, and the question says so. Ask explicitly, then:
 ```bash
 gh pr merge <PR> --squash          # no --delete-branch: it fails while the
                                    # branch is checked out in a worktree
-gh issue close <N> --reason completed
+gh issue view <N> --json state     # Fixes #N closed it (develop is the default)
 pnpm worktree:prune                # from the main checkout; --dry-run first
 git branch -D task/<N>-<slug>      # only if it survived the prune
 ```
 
 `reviewing-tasks.md` § Verdict prints `--delete-branch`; in batch mode the
 implementation worktree is usually still around, so drop the flag and let
-`pnpm worktree:prune` do the cleanup. The PR targets `develop`, not the
-default branch, so `Fixes #N` does not auto-close — close it explicitly.
+`pnpm worktree:prune` do the cleanup. `develop` is the default branch (#400),
+so `Fixes #N` closes the issue on merge; `gh issue close <N> --reason
+completed` only if it stayed open.
 
 Update the state file to `merged` before starting the next issue.
 

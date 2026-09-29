@@ -231,3 +231,8 @@
   outline-offset: 2px;
   scroll-margin: 6rem;
 }
+/* Alvos que ocupam a tela (o painel do editor) vivem dentro de um contêiner
+   que corta o que transborda: o contorno vai para dentro deles. */
+[data-tour-highlight='inset'] {
+  outline-offset: -3px;
+}

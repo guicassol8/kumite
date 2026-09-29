@@ -85,24 +85,53 @@ function waitForTarget(
   })
 }
 
+function rect(left: number, top: number, width: number, height: number): DOMRect {
+  return {
+    x: left,
+    y: top,
+    top,
+    left,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
+    toJSON: () => ({}),
+  } as DOMRect
+}
+
 // The anchor when a step's target never showed up: a zero-size point a third
 // of the way down the viewport, so the popover sits roughly centered.
 const centeredAnchor = {
-  getBoundingClientRect: () => {
-    const x = window.innerWidth / 2
-    const y = window.innerHeight / 3
-    return {
-      x,
-      y,
-      top: y,
-      left: x,
-      right: x,
-      bottom: y,
-      width: 0,
-      height: 0,
-      toJSON: () => ({}),
-    } as DOMRect
-  },
+  getBoundingClientRect: () => rect(window.innerWidth / 2, window.innerHeight / 3, 0, 0),
+}
+
+/** Roughly the popover's height plus its offset — the room it needs beside a target. */
+const POPOVER_ROOM_PX = 240
+/** How far into a tall target the popover's anchor point sits. */
+const INSET_ANCHOR_PX = 96
+
+/**
+ * Anchors on the target itself when there is room above or below it. A target
+ * with no room on either side (the editor panel fills the problem screen) would
+ * push the popover off-screen — Radix only shifts it sideways — so the anchor
+ * becomes a point inside the target's visible top, and the popover sits over
+ * it. `contextElement` keeps floating-ui's scroll/resize tracking on the target.
+ */
+function anchorFor(element: HTMLElement) {
+  return {
+    contextElement: element,
+    getBoundingClientRect: () => {
+      const box = element.getBoundingClientRect()
+      if (!fillsViewport(box)) return box
+      const y = Math.min(Math.max(box.top, 0) + INSET_ANCHOR_PX, window.innerHeight)
+      return rect(box.left, y, box.width, 0)
+    },
+  }
+}
+
+/** No room for the popover above or below the target. */
+function fillsViewport(box: DOMRect): boolean {
+  return box.top < POPOVER_ROOM_PX && window.innerHeight - box.bottom < POPOVER_ROOM_PX
 }
 
 type TourState = { stepIndex: number; originHref: string }
@@ -208,8 +237,14 @@ export function TourProvider({ children }: { children: ReactNode }) {
   // Highlight + bring into view; cleared on the next step and on exit.
   useEffect(() => {
     if (!element) return
-    element.setAttribute(HIGHLIGHT_ATTR, '')
     element.scrollIntoView?.({ block: 'center', inline: 'nearest' })
+    // A target that fills the screen (the editor panel) sits inside a
+    // container that clips overflow, which would cut an outer outline off —
+    // `inset` draws it inside the element instead (index.css).
+    element.setAttribute(
+      HIGHLIGHT_ATTR,
+      fillsViewport(element.getBoundingClientRect()) ? 'inset' : '',
+    )
     return () => element.removeAttribute(HIGHLIGHT_ATTR)
   }, [element])
 
@@ -225,7 +260,10 @@ export function TourProvider({ children }: { children: ReactNode }) {
     if (tour && status !== 'authenticated') endTour(false)
   }, [status, tour, endTour])
 
-  const anchorRef = useMemo(() => ({ current: element ?? centeredAnchor }), [element])
+  const anchorRef = useMemo(
+    () => ({ current: element ? anchorFor(element) : centeredAnchor }),
+    [element],
+  )
   const value = useMemo(() => ({ active: tour !== null, startTour }), [tour, startTour])
 
   const open = tour !== null && resolved !== undefined && resolved.stepIndex === tour.stepIndex

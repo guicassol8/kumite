@@ -16,6 +16,11 @@ export function formatDate(value: Date, lang: string): string {
   return new Intl.DateTimeFormat(toBcp47(lang)).format(value)
 }
 
+/** "A, B e C" in the viewer's language — a conjunction list (#383). */
+export function formatList(values: string[], lang: string): string {
+  return new Intl.ListFormat(toBcp47(lang), { type: 'conjunction' }).format(values)
+}
+
 export function formatTime(value: Date, lang: string): string {
   return new Intl.DateTimeFormat(toBcp47(lang), { hour: '2-digit', minute: '2-digit' }).format(
     value,

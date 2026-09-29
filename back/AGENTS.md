@@ -7,7 +7,11 @@ file natively; Claude Code imports it from `CLAUDE.md`.
 - `kata verify` — fast deterministic checks; use `--json` for hook output, and
   `--strict-coverage` (what pre-commit runs) to fail on checks a rule could
   not prove — an unresolvable middleware in a chain, for instance.
-- `pnpm test` — unit tests (Vitest).
+- `pnpm test` — unit tests (Vitest). They run against their own database,
+  `<db>_test` (`<db>_test_<worktree dir>` in a linked worktree), derived
+  from `DATABASE_URL` and created + migrated by `src/db/test-global-setup.ts`;
+  `TEST_DATABASE_URL` overrides it (#392). `pnpm db:create` creates the
+  `DATABASE_URL` database itself when it does not exist (local only).
 - `pnpm hurl` — API E2E via Hurl; CI runs it on `main` and on demand, not
   on PR pushes (#378), so the reviewer runs it locally. Run
   `pnpm db:reset` first: the suite asserts on seed state and is not

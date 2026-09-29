@@ -38,15 +38,18 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
 - `pnpm -r test` — vitest in both packages.
 - `pnpm format` — biome, single config at the root.
 - Everything: `pnpm check`. Browser E2E: `pnpm --filter @kumite/front e2e`
-  (boots back+front itself; `docker compose up -d` first for db-backed flows).
+  (boots back+front itself; a running Postgres first for db-backed flows).
   Organizer flows need `ORGANIZER_EMAIL`/`ORGANIZER_PASSWORD` in the
   environment plus `db:seed`, and the reset-password happy path needs
   `BACK_NOTIFICATIONS_LOG`; without them those specs skip. Claude Code cloud
-  sessions get all of it from `.claude/hooks/session-start.sh`. That hook's
-  Postgres (5433) belongs to the main checkout: a worktree without its own
-  `DB_PORT` stack shares it, so one whose migrations differ from the main
-  checkout's needs its own stack (`docs/workflow.md` § Worktrees) — otherwise
-  each side's tests fail against the other's schema.
+  sessions get all of it from `.claude/hooks/session-start.sh`.
+- The back suite never shares a database (#392): it runs against its own
+  `<db>_test` (main checkout, CI) or `<db>_test_<worktree dir>`, created and
+  migrated by its vitest globalSetup, so the tests never wipe an E2E's seed.
+  The E2E, hurl and dev server do share `DATABASE_URL`'s database: a worktree
+  whose migrations differ from the main checkout's needs its own database for
+  those (`db:create`, `docs/workflow.md` § Worktrees, no Docker needed) —
+  otherwise each side's E2E/hurl fails against the other's schema.
 - CI on a PR push runs one job, `check` (format, typecheck, verify, tests).
   The full Browser E2E (`e2e`) and `hurl` run on push to `main` and on
   demand (`gh workflow run CI --ref <branch>`), not on every PR push: the

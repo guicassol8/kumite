@@ -132,8 +132,9 @@ pnpm worktree:env   # its own database and ports (below) — when it runs the ap
   `back/.env` (the main checkout's, with `DATABASE_URL`, `PORT`,
   `APP_BASE_URL` and `FRONT_PORT` replaced) and `front/.env`
   (`VITE_API_URL`), and runs `db:create` + `db:migrate` + `db:seed`. Re-running
-  keeps the same database and ports and only migrates (and seeds a database
-  it had to create again); `--reset` re-seeds (`db:reset`) — do that before a
+  keeps the same database and ports and only migrates (it seeds again when
+  the last seed did not complete — a run cut short, or a database created
+  anew); `--reset` re-seeds (`db:reset`) — do that before a
   full E2E or hurl run. The shell's exported `PORT`, `DATABASE_URL` and
   `APP_BASE_URL` never leak in. `bash scripts/worktree-env-smoke.sh` proves
   all of it, the E2E semaphore included, in a throwaway repository.
@@ -164,8 +165,10 @@ pnpm worktree:env   # its own database and ports (below) — when it runs the ap
   whose tree is clean, together with that worktree's compose project and
   `docker run` Postgres, and its databases on the local Postgres — its
   `<db>_test_<dir>` and the one `worktree:env` gave it (#395); never the
-  main checkout's (`--dry-run` lists first). Dirty trees and unmerged
-  branches are always kept — they may be another agent's.
+  main checkout's, nor one another worktree's `back/.env` names
+  (`--dry-run` lists first). A worktree whose databases could not be
+  dropped is kept for the next prune. Dirty trees and unmerged branches are
+  always kept — they may be another agent's.
 - Playwright writes every spec's screenshots to `front/e2e/evidence/<n>/`,
   which git ignores (#402): a run never leaves changes behind, and the
   review attaches its own issue's folder to the PR instead of committing it.

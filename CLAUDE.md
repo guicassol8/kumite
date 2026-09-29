@@ -68,7 +68,8 @@ subagent each instead of to a new chat. Same isolation, different boundary —
   truncate that, so a Stop that fires mid-E2E or mid-hurl in the same tree
   no longer wipes their seed (#392); the ladder itself is unchanged.
   Isolating the E2E's own database without Docker: `docs/workflow.md`
-  § Worktrees. Stop blocks until the worktree has run `pnpm install`.
+  § Worktrees. Stop blocks (up to 3 times in a row, like any red step) until
+  the worktree has run `pnpm install`.
   Each Stop run appends one line (root, DB source, decision — never the URL)
   to `/tmp/kumite-stop-hook.log`: look there first on an `exit 143`.
   `bash scripts/claude-hooks-smoke.sh` proves the behavior with throwaway

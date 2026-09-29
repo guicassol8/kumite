@@ -34,7 +34,9 @@ if [ "$root" != "$main" ] && ! grep -qF '# worktree:env (#404)' back/.env; then
   echo "     it may share its database with the main checkout" >&2
 fi
 
-eval "$(bash scripts/worktree-env.sh --print)" || exit 1
+# Captured first: `eval "$(…)"` succeeds even when --print failed.
+envs="$(bash scripts/worktree-env.sh --print)" || exit 1
+eval "$envs"
 export BACK_NOTIFICATIONS_LOG="${BACK_NOTIFICATIONS_LOG:-${TMPDIR:-/tmp}/kumite-e2e-back-$(basename "$root").log}"
 
 slots="${KUMITE_E2E_SLOTS:-}"
@@ -68,5 +70,6 @@ else
   echo "e2e: flock not found — running without the E2E semaphore" >&2
 fi
 
-# fd 9 (the slot's lock) stays open in Playwright until it exits.
+# fd 9 (the slot's lock) stays open in pnpm, which exits when Playwright does;
+# pnpm's children do not inherit it, so a leftover webServer never holds a slot.
 exec pnpm --filter @kumite/front e2e "$@"

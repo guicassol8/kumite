@@ -13,27 +13,12 @@ import { seed } from './seed'
 // db:seed's event_config reset used to do for the test suites before #287
 // moved that reset out of the production path.
 
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
+// This script wipes every table: it refuses anything that is not plainly a
+// local database. The guard lives in a config-free module since #392, shared
+// with db:create and the test suite's globalSetup.
+import { assertLocalDatabaseUrl } from './local-database'
 
-/**
- * Refuses anything that is not plainly a local database. This script wipes
- * every table, and the only thing standing between it and production is
- * `DATABASE_URL` — which, in the VPS container, points at the `db` service.
- * `pg_dump`/`psql` by hand is the path for anything that is not local.
- */
-export function assertLocalDatabaseUrl(url: string): void {
-  let host: string
-  try {
-    host = new URL(url).hostname.replace(/^\[|\]$/g, '')
-  } catch {
-    throw new Error(`db:reset: DATABASE_URL is not a URL it can reason about: ${url}`)
-  }
-  if (!LOCAL_HOSTS.has(host)) {
-    throw new Error(
-      `db:reset refuses to run against "${host}": it truncates every table, and only a local database (${[...LOCAL_HOSTS].join(', ')}) may be wiped.`,
-    )
-  }
-}
+export { assertLocalDatabaseUrl }
 
 /** Every table drizzle knows about — derived from the schema module so a new
  * table can never be forgotten here. */

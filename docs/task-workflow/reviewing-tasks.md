@@ -39,7 +39,7 @@ explicitly instead of reviewing stale code.
 If the branch exists only on the remote, create its local tracking branch with
 `git worktree add --track -b <pr-head-branch> .worktrees/review-<PR> origin/<pr-head-branch>`.
 
-Everything below — reading, running the app, committing evidence — happens
+Everything below — reading, running the app, producing evidence — happens
 inside the selected dedicated worktree. Remove only a worktree created by this
 review, after preserving all changes and following the compose cleanup in
 `docs/workflow.md`. Run removal from the main checkout, not inside the worktree.
@@ -108,7 +108,10 @@ explicitly, don't fix it partially.
 3. Screenshot each meaningful final state to
    `front/e2e/evidence/<issue>/<nn>-<state>.png`. That folder is git-ignored
    (#402): every spec rewrites its own issue's folder on each run, and
-   nothing under it is ever committed.
+   nothing under it is ever committed. Empty your issue's folder
+   (`rm -rf front/e2e/evidence/<issue>`) before the run: a screenshot left
+   from an earlier run no longer shows in `git status`, and step 4 attaches
+   every PNG in the folder, appending the unreferenced ones to the comment.
 4. Publish the walkthrough as a PR comment with the screenshots **attached**:
    write the steps in order — step → expected →
    `![<state>](./<nn>-<state>.png)` — into a Markdown file outside the repo,

@@ -183,15 +183,14 @@ Stage 0 says to inspect `git worktree list --porcelain` first: the
 implementation worktree may still exist with that branch checked out. In that
 case use a detached worktree plus an explicit push, never a forced checkout.
 
-Evidence is mandatory and blocking: front → a Playwright walkthrough with
-screenshots under `front/e2e/evidence/<issue>/`, referenced step by step in
-the PR body; back → trimmed `pnpm -r test` and hurl output.
+Evidence is mandatory and blocking: front → a Playwright walkthrough whose
+screenshots (git-ignored `front/e2e/evidence/<issue>/`) are attached to a PR
+comment with `gh pr comment --attach`, never committed (#402); back →
+trimmed `pnpm -r test` and hurl output.
 
 E2E care in this repo: re-seed (`db:reset`) before each full run — the suite
-asserts on seed state and leaves data behind — use `--workers=1` for probe
-runs (exit 137 is OOM, not a regression), and run `pnpm evidence:restore
-<issue>` before committing so you do not commit evidence of older issues that
-the suite overwrote.
+asserts on seed state and leaves data behind — and use `--workers=1` for
+probe runs (exit 137 is OOM, not a regression).
 
 Fix every finding you can fix safely, in this same session, on the PR branch.
 Hand back only what needs a fresh plan or a product decision. Push all the
@@ -202,10 +201,11 @@ the Evidence carries the full local ladder on the PR's head.
 Do NOT merge — the merge is the user's call and the orchestrator asks for it.
 
 Final report: the Acceptance compliance table, findings and what you fixed,
-the evidence paths, and the verdict (approved / changes requested).
+the link to the Evidence comment, and the verdict (approved / changes
+requested).
 ```
 
-Relay the verdict and the evidence paths to the user.
+Relay the verdict and the Evidence link to the user.
 
 ### 4c — Merge, on the user's word
 
@@ -241,7 +241,7 @@ alone — an unfixable finding usually hides a product decision.
 The user never sees a subagent's report, so:
 
 - **plans: in full**, verbatim, because approval depends on them;
-- implementation and review: a summary, the PR link, the evidence paths and
+- implementation and review: a summary, the PR link, the Evidence link and
   which gates ran;
 - questions: never summarized away — options and recommendation intact;
 - the verdict and every finding, fixed or open.
@@ -254,7 +254,7 @@ why it is harder than the rest.
 
 ## Step 5 — Handoff (MANDATORY)
 
-Close with the batch summary — issues closed, PRs merged, evidence paths,
+Close with the batch summary — issues closed, PRs merged, Evidence links,
 discoveries that became new issues — and, as the very last thing, the literal
 handoff line:
 

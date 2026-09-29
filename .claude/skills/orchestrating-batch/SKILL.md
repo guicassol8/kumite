@@ -30,7 +30,7 @@ description: Runs a batch of 2–3 GitHub Issues end to end in one session — p
   plan approval (one at a time), merge authorization — batched, with options
   and a recommendation.
 - The user does not see subagent reports: relay plans **in full**, and
-  summaries + PR links + evidence paths for everything else.
+  summaries + PR links + Evidence links for everything else.
 - Handoff (MANDATORY): the next batch runs in a **fresh chat**, so the very
   last thing you print is the command to paste there — alone in a fenced
   block, nothing after it:

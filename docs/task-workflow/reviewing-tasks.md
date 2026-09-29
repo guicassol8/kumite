@@ -39,7 +39,7 @@ explicitly instead of reviewing stale code.
 If the branch exists only on the remote, create its local tracking branch with
 `git worktree add --track -b <pr-head-branch> .worktrees/review-<PR> origin/<pr-head-branch>`.
 
-Everything below — reading, running the app, committing evidence — happens
+Everything below — reading, running the app, producing evidence — happens
 inside the selected dedicated worktree. Remove only a worktree created by this
 review, after preserving all changes and following the compose cleanup in
 `docs/workflow.md`. Run removal from the main checkout, not inside the worktree.
@@ -106,13 +106,25 @@ explicitly, don't fix it partially.
 2. Drive every changed flow via a Playwright spec in `front/e2e/`
    (extend or add one), asserting through `data-testid`.
 3. Screenshot each meaningful final state to
-   `front/e2e/evidence/<issue>/<nn>-<state>.png`. Specs of *other* issues
-   rewrite their own folders on every run, so before committing run
-   `pnpm evidence:restore <issue>` (restores everything outside this
-   issue's folder) and stage only `git add front/e2e/evidence/<issue>` —
-   never `git add -A` here.
-4. Write the walkthrough in the PR's `## Evidence`: step → expected → screenshot
-   path, in order.
+   `front/e2e/evidence/<issue>/<nn>-<state>.png`. That folder is git-ignored
+   (#402): every spec rewrites its own issue's folder on each run, and
+   nothing under it is ever committed. Empty your issue's folder
+   (`rm -rf front/e2e/evidence/<issue>`) before the run: a screenshot left
+   from an earlier run no longer shows in `git status`, and step 4 attaches
+   every PNG in the folder, appending the unreferenced ones to the comment.
+4. Publish the walkthrough as a PR comment with the screenshots **attached**:
+   write the steps in order — step → expected →
+   `![<state>](./<nn>-<state>.png)` — into a Markdown file outside the repo,
+   then, from inside `front/e2e/evidence/<issue>/`:
+
+   ```bash
+   gh pr comment <PR> --body-file <file>.md $(printf -- '--attach %s ' *.png)
+   ```
+
+   `gh` uploads each PNG (up to 50 per command) and rewrites every
+   `./<name>.png` reference to the uploaded asset; it prints the comment's
+   URL. Link that URL from the PR body's `## Evidence`, next to the text
+   outputs. The review comment itself may carry the attachments.
 5. No regression elsewhere: CI no longer runs the e2e suite on a PR push
    (#378, `docs/workflow.md` § Gate ladder), so you prove it. Run the
    **whole** suite locally with `CI=1` on the PR's head (organizer

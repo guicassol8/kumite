@@ -162,9 +162,9 @@ pnpm install        # node_modules are per-worktree, not shared
   whose tree is clean, together with that worktree's compose project and
   `docker run` Postgres (`--dry-run` lists first). Dirty trees and unmerged
   branches are always kept — they may be another agent's.
-- Reviewing with Playwright rewrites `front/e2e/evidence/<n>/` for every
-  spec it runs, not only the current issue's: `pnpm evidence:restore <issue>`
-  before committing evidence.
+- Playwright writes every spec's screenshots to `front/e2e/evidence/<n>/`,
+  which git ignores (#402): a run never leaves changes behind, and the
+  review attaches its own issue's folder to the PR instead of committing it.
 - In Claude Code, prefer the harness's managed isolation (EnterWorktree /
   subagent `isolation: "worktree"`) — it creates and cleans worktrees itself.
 
@@ -274,8 +274,10 @@ fine" or "just docs nearby."
   the pre-push enforces it.
 - PR body starts with `Fixes #N` and ends with an `## Evidence` section.
 - **Evidence is mandatory** (reviewing-tasks):
-  - front → Playwright walkthrough screenshots committed under
-    `front/e2e/evidence/<issue>/`, referenced step by step in the PR body;
+  - front → a Playwright walkthrough: screenshots written to the git-ignored
+    `front/e2e/evidence/<issue>/` and attached step by step to a PR comment
+    with `gh pr comment --attach`, linked from the PR body (#402). Evidence
+    PNGs are never committed; the ones from before #402 stay in history;
   - back → trimmed `pnpm -r test` + `pnpm --filter @kumite/back hurl` output.
 - `develop` is also the repo's **default branch** on GitHub (#400), so:
   `Fixes #N` closes the issue when the PR merges; the worktrees Claude Code

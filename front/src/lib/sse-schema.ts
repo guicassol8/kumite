@@ -104,7 +104,18 @@ export const EventRankingTeamSchema = z.object({
   rounds: z.array(EventRankingRoundEntrySchema),
 })
 
+// One summed round's verdict (#383), stated once for the event ranking — see
+// the back's EventRankingRoundVerdictSchema. Required for the same reason as
+// `denominators` above (#318): `z.object` strips unknown keys, so a mirror
+// without `rounds` would silence the Geral tab's notice while a round is live.
+export const EventRankingRoundVerdictSchema = z.object({
+  roundId: z.string(),
+  roundName: z.string(),
+  denominators: DenominatorVerdictSchema,
+})
+
 export const EventRankingSchema = z.object({
+  rounds: z.array(EventRankingRoundVerdictSchema),
   teams: z.array(EventRankingTeamSchema),
 })
 
@@ -142,6 +153,7 @@ export type RoundRankingTeam = z.infer<typeof RoundRankingTeamSchema>
 export type DenominatorVerdict = z.infer<typeof DenominatorVerdictSchema>
 export type RoundRanking = z.infer<typeof RoundRankingSchema>
 export type EventRankingRoundEntry = z.infer<typeof EventRankingRoundEntrySchema>
+export type EventRankingRoundVerdict = z.infer<typeof EventRankingRoundVerdictSchema>
 export type EventRankingTeam = z.infer<typeof EventRankingTeamSchema>
 export type EventRanking = z.infer<typeof EventRankingSchema>
 export type RankingUpdatedEvent = z.infer<typeof RankingUpdatedEventSchema>

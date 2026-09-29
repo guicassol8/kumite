@@ -57,7 +57,7 @@ describe('sse-schema', () => {
       problemIds: ['problem-1'],
       teams: [],
     }
-    const event = { teams: [] }
+    const event = { rounds: [], teams: [] }
 
     it('round-trips a ranking.updated event keeping round.denominators', () => {
       for (const denominators of ['consistent', 'inconsistent', 'unknown'] as const) {
@@ -82,6 +82,52 @@ describe('sse-schema', () => {
         serverTime: new Date().toISOString(),
         round,
         event,
+      }
+      expect(RankingUpdatedEventSchema.safeParse(wire).success).toBe(false)
+    })
+  })
+
+  // #383: the same trap one level up — the event ranking now states each
+  // summed round's verdict, and a mirror without `rounds` would strip it from
+  // every live `ranking.updated`, leaving the Geral tab silent while a round runs.
+  describe('ranking.updated event round verdicts (#383)', () => {
+    const rounds = [
+      { roundId: 'round-1', roundName: 'Rodada 1', denominators: 'consistent' },
+      { roundId: 'round-2', roundName: 'Rodada 2', denominators: 'inconsistent' },
+      { roundId: 'round-3', roundName: 'Rodada 3', denominators: 'unknown' },
+    ]
+
+    it('round-trips a ranking.updated event keeping event.rounds', () => {
+      const wire = JSON.parse(
+        JSON.stringify({
+          type: 'ranking.updated',
+          serverTime: new Date(),
+          round: null,
+          event: { rounds, teams: [] },
+        }),
+      )
+
+      const parsed = SseEventSchema.parse(wire)
+
+      expect(parsed.type === 'ranking.updated' && parsed.event.rounds).toEqual(rounds)
+    })
+
+    it('rejects a ranking.updated event ranking without rounds', () => {
+      const wire = {
+        type: 'ranking.updated',
+        serverTime: new Date().toISOString(),
+        round: null,
+        event: { teams: [] },
+      }
+      expect(RankingUpdatedEventSchema.safeParse(wire).success).toBe(false)
+    })
+
+    it('rejects a round verdict outside the three known values', () => {
+      const wire = {
+        type: 'ranking.updated',
+        serverTime: new Date().toISOString(),
+        round: null,
+        event: { rounds: [{ ...rounds[0], denominators: 'maybe' }], teams: [] },
       }
       expect(RankingUpdatedEventSchema.safeParse(wire).success).toBe(false)
     })

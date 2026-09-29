@@ -113,6 +113,7 @@ const roundRanking: RoundRanking = {
 }
 
 const eventRanking: EventRanking = {
+  rounds: [{ roundId: 'r1', roundName: 'Rodada 1', denominators: 'consistent' }],
   teams: [
     {
       teamId: 't1',
@@ -638,7 +639,7 @@ describe('LeaderboardScreen — no active round', () => {
       type: 'ranking.updated',
       serverTime: new Date(),
       round: null,
-      event: { teams: [] },
+      event: { rounds: [], teams: [] },
     })
 
     await waitFor(() => expect(screen.getByTestId('leaderboard-empty-no-round')).toBeDefined())
@@ -917,7 +918,7 @@ describe('LeaderboardScreen — empty state', () => {
       type: 'ranking.updated',
       serverTime: new Date(),
       round: { ...roundRanking, teams: [] },
-      event: { teams: [] },
+      event: { rounds: [], teams: [] },
     })
 
     await waitFor(() =>
@@ -969,14 +970,14 @@ describe('LeaderboardScreen — empty state', () => {
     // fetches whenever the stream isn't marked live, so it must agree with
     // the empty event ranking below.
     mockedRoundRanking.mockResolvedValue(jsonResponse(200, { ...roundRanking, teams: [] }))
-    mockedEventRanking.mockResolvedValue(jsonResponse(200, { teams: [] }))
+    mockedEventRanking.mockResolvedValue(jsonResponse(200, { rounds: [], teams: [] }))
     renderLeaderboard()
     await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
     emit({
       type: 'ranking.updated',
       serverTime: new Date(),
       round: { ...roundRanking, teams: [] },
-      event: { teams: [] },
+      event: { rounds: [], teams: [] },
     })
     await waitFor(() => expect(screen.getByTestId('leaderboard-tabs')).toBeDefined())
 

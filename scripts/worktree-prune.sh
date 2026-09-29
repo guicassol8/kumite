@@ -13,6 +13,12 @@
 # variants from docs/workflow.md § Worktrees). Nothing else in Docker is
 # touched — never the root compose project, never another worktree's.
 #
+# On a shared native Postgres (no Docker), its databases go too (#395): the
+# back suite's `<db>_test_<dir>` and the database `pnpm worktree:env` gave it,
+# through `pnpm db:drop-worktree` (back/src/db/worktree-databases.ts) — never
+# the main checkout's database or its `<db>_test`, never a remote server.
+# `--dry-run` lists them.
+#
 # Usage: pnpm worktree:prune [--dry-run]
 set -uo pipefail
 
@@ -58,6 +64,12 @@ is_merged() {
   [ "${merged:-0}" -gt 0 ] 2>/dev/null
 }
 
+# drop_databases <worktree> [--dry-run]: its local Postgres databases (#395).
+# A failure is reported and never stops the prune.
+drop_databases() {
+  (cd "$main/back" && pnpm -s db:drop-worktree "$@" 2>&1) | sed 's/^/        /' || true
+}
+
 removed=0
 kept=0
 while IFS= read -r line; do
@@ -89,6 +101,7 @@ while IFS= read -r line; do
 
   if [ "$dry_run" = 1 ]; then
     echo "would remove  $name  ($branch merged, clean)"
+    drop_databases "$path" --dry-run
     removed=$((removed + 1))
     continue
   fi
@@ -101,6 +114,8 @@ while IFS= read -r line; do
   # task-<N>-<slug>-db, review-<PR>-db) — only ones whose name starts with it.
   ids="$(docker ps -aq --filter "name=^${name}" 2>/dev/null || true)"
   [ -n "$ids" ] && docker rm -f -v $ids >/dev/null 2>&1 || true
+  # Before the removal: the worktree's back/.env names its own database.
+  drop_databases "$path"
   git worktree remove --force "$path"
   git branch -D "$branch" >/dev/null
   removed=$((removed + 1))

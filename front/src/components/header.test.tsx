@@ -22,6 +22,7 @@ vi.mock('@/lib/sse-client', () => ({
 }))
 
 import { Header } from '@/components/header'
+import { TourProvider } from '@/components/onboarding/tour-provider'
 import { RoundStreamProvider } from '@/hooks/use-round-stream'
 import i18n from '@/i18n'
 import { api } from '@/lib/api'
@@ -66,12 +67,13 @@ function emitSse(event: SseEvent) {
 // resolves `<Link to>` against the tree, and a missing path breaks the `href`.
 // Nothing asserted below — pathname, `aria-current`, the Link classes — needs
 // the real screens.
+// TourProvider (#213): the user menu's "Fazer o tour" needs it, as in __root.
 const rootRoute = createRootRoute({
   component: () => (
-    <>
+    <TourProvider>
       <Header />
       <Outlet />
-    </>
+    </TourProvider>
   ),
 })
 const routeTree = rootRoute.addChildren(
@@ -83,6 +85,7 @@ const routeTree = rootRoute.addChildren(
     '/leaderboard',
     '/change-password',
     '/organizer/problems',
+    '/how-it-works',
   ].map((path) => createRoute({ getParentRoute: () => rootRoute, path, component: () => null })),
 )
 
@@ -286,6 +289,54 @@ describe('Header — user menu (#217)', () => {
     expect(screen.getByTestId('language-selector')).toBeDefined()
     expect(screen.getByTestId('header-theme-toggle')).toBeDefined()
     expect(screen.getByTestId('header-logout-button')).toBeDefined()
+  })
+})
+
+describe('Header — Como funciona e tour (#213)', () => {
+  it('puts both entries in the user menu, and "Fazer o tour" starts the tour', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader('/teams')
+
+    // Nothing new on the bar itself (#297's width budget).
+    await screen.findByTestId('header-user-menu-trigger')
+    expect(screen.queryByTestId('header-how-it-works-link')).toBeNull()
+    expect(screen.queryByTestId('header-start-tour')).toBeNull()
+
+    const trigger = screen.getByTestId('header-user-menu-trigger')
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByTestId('header-how-it-works-link').getAttribute('href')).toBe(
+      '/how-it-works',
+    )
+    expect(within(menu).getByTestId('header-start-tour').textContent).toBe('Fazer o tour')
+
+    fireEvent.click(within(menu).getByTestId('header-start-tour'))
+
+    const popover = await screen.findByTestId('tour-popover')
+    await waitFor(() => expect(popover.getAttribute('data-tour-step')).toBe('header'))
+  })
+
+  it('shows "Como funciona" next to Entrar/Cadastrar while anonymous, and no tour', async () => {
+    renderHeader()
+
+    const link = await screen.findByTestId('header-how-it-works-link')
+    expect(link.getAttribute('href')).toBe('/how-it-works')
+    expect(screen.queryByTestId('header-start-tour')).toBeNull()
+  })
+
+  it('offers both in the mobile panel, closing it before the tour starts', async () => {
+    setSession(fakeUser, 'tok-1')
+    renderHeader('/teams')
+
+    fireEvent.click(await screen.findByTestId('header-mobile-menu-trigger'))
+    await screen.findByTestId('header-mobile-user-block')
+    expect(screen.getByTestId('header-how-it-works-link')).toBeDefined()
+
+    fireEvent.click(screen.getByTestId('header-start-tour'))
+
+    await waitFor(() => expect(screen.queryByTestId('header-mobile-user-block')).toBeNull())
+    expect(await screen.findByTestId('tour-popover')).toBeDefined()
   })
 })
 

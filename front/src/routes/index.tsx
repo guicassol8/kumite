@@ -6,6 +6,7 @@ import { z } from 'zod'
 
 import { Mark } from '@/components/brand/mark'
 import { Wordmark } from '@/components/brand/wordmark'
+import { OnboardingInvite } from '@/components/onboarding/onboarding-invite'
 import { RoundCountdown } from '@/components/round-countdown'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -121,6 +122,7 @@ function Home() {
           </AlertDescription>
         </Alert>
       )}
+      {isAuthenticated && <OnboardingInvite />}
       <div className="flex flex-col items-center gap-4 text-center md:gap-6">
         <Mark className="size-14 md:size-20" />
         <h1 data-testid="home-heading">

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { Mark } from '@/components/brand/mark'
@@ -88,9 +89,21 @@ export function Footer() {
           <ApiStatusIndicator />
         </div>
 
+        {/* "Como funciona" (#213) rides on this row rather than adding one:
+            the vertical budget above is what #155 protects. */}
         <div className="flex items-center justify-center gap-2 md:justify-start">
           <Mark className="h-4 w-auto" />
           <span className="font-display text-sm uppercase tracking-wide">{EVENT_LABEL}</span>
+          <span aria-hidden="true" className="text-chrome-muted">
+            ·
+          </span>
+          <Link
+            to="/how-it-works"
+            data-testid="footer-how-it-works-link"
+            className="text-sm underline"
+          >
+            {t('footer.howItWorks')}
+          </Link>
         </div>
       </div>
     </footer>

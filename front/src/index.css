@@ -221,3 +221,13 @@
 .blocklyFlyoutBackground {
   stroke: var(--border);
 }
+
+/* Tour guiado (#213): o alvo do passo atual ganha um contorno na cor da
+   marca. Atributo, não classe nem `style`: o tour marca elementos das telas
+   reais, que não sabem que estão sendo apontados. `outline` não ocupa espaço,
+   então destacar não mexe no layout. */
+[data-tour-highlight] {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+  scroll-margin: 6rem;
+}

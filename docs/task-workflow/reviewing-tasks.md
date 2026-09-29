@@ -80,8 +80,10 @@ implementation. For each new rule the diff adds — a condition, a guard, a
 boundary, a status code, a filter — make one mutant by hand: invert the
 condition, delete the guard, move the boundary by one. Run only the tests
 that cover it. A mutant no test kills is a finding: add or fix the test
-(§ Fixing findings). Revert every mutant (`git checkout -- <file>`); never
-commit one.
+(§ Fixing findings). Mutate only on a clean tree (commit your fixes first),
+revert every mutant (`git checkout -- <file>`) and confirm `git status` is
+clean before the next one: a surviving mutant passes every gate, so nothing
+but you keeps it out of the next commit. Never commit one.
 
 Cap it at 3–5 mutants per PR, on the rules that matter most. Record the
 score in the Evidence — `mutants: <killed>/<made> killed` — with one line
@@ -127,9 +129,13 @@ fix>..<head after your last fix>`.
 
 - **Standalone review session**: spawn the `fix-verifier` agent
   (`.claude/agents/fix-verifier.md`) with the PR number and the range.
-- **As a subagent** (batch mode): a subagent cannot spawn another — put the
-  range in your final report; the orchestrator runs the verifier
-  (`orchestrating-batch.md` § 4b).
+- **As a subagent** (batch mode): the orchestrator runs the verifier, not
+  you — even though nesting would let you spawn it — so its report reaches
+  the user without passing through the agent whose fixes it judges
+  (`orchestrating-batch.md` § 4b). Stop before the Verdict: post no verdict,
+  and end your report with the range and `verdict: pending fix
+  verification`. The verifier's result comes back to you as a message; the
+  Verdict follows it.
 
 A defect the verifier reports is fixed and verified again the same way; a
 third round goes to the user. Fixes only to tests, docs or evidence skip

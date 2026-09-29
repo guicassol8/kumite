@@ -153,16 +153,18 @@ leaves data behind — and use `--workers=1` for probe runs (exit 137 is OOM,
 not a regression).
 
 **Fix verifier.** When the reviewer's report carries a fix range (a fix
-touched production code), spawn a **`fix-verifier`** agent
-(`.claude/agents/fix-verifier.md`):
+touched production code) and `verdict: pending fix verification`, spawn a
+**`fix-verifier`** agent (`.claude/agents/fix-verifier.md`):
 
 ```text
 Verify the review fixes on PR #<PR>: <from>..<to>.
 ```
 
-A defect it reports goes back to the **same** reviewer (`SendMessage`, it
-keeps the context), and the new fixes are verified again the same way; a
-third round goes to the user. No fix range → no verifier.
+Send its result to the **same** reviewer (`SendMessage`, it keeps the
+context): on `fixes verified` the reviewer posts the Verdict; on a defect it
+fixes it and reports a new range, verified again the same way. A third round
+goes to the user. No fix range → no verifier, and the reviewer's verdict
+stands.
 
 Relay the verdict, the mutant score, the verifier's result and the Evidence
 link to the user.

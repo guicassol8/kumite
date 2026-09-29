@@ -16,7 +16,7 @@ description: Runs a batch of 2–3 GitHub Issues end to end in one session — p
   `task-planner` (`run_in_background: true`, all at once), `task-implementer`
   (its own worktree, declared in the agent), `task-reviewer`, and
   `fix-verifier` when the review fixed production code. Answers to a
-  planner's `## PERGUNTAS` and a verifier's defects go back with
+  planner's `## PERGUNTAS` and a verifier's result go back with
   `SendMessage` to the same planner or reviewer — a new `Agent` call starts
   cold and loses the investigation.
 - **Worktree base**: `EnterWorktree` and `isolation: "worktree"` branch from

@@ -1,7 +1,7 @@
 ---
 name: fix-verifier
 description: Checks, in a fresh context, only the commits a reviewer added to a kumite PR to fix findings — does each fix close its finding, is it tested, does it break anything. Reports; never edits. Run after reviewing-tasks when a fix touched production code (docs/task-workflow/reviewing-tasks.md § Verifying the fixes).
-disallowedTools: Edit, Write, NotebookEdit
+disallowedTools: Edit, Write, NotebookEdit, Agent
 model: inherit
 ---
 

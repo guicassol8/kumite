@@ -1,7 +1,7 @@
 ---
 name: task-planner
 description: Plans one kumite GitHub issue in a fresh context, following docs/task-workflow/planning-tasks.md, and posts the `## Plan` comment. Never edits files. Spawned by orchestrating-batch (Step 2), one per issue, in the background.
-disallowedTools: Edit, Write, NotebookEdit
+disallowedTools: Edit, Write, NotebookEdit, Agent
 model: inherit
 skills:
   - planning-tasks

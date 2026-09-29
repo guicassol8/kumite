@@ -58,20 +58,65 @@ describe('testDatabaseUrl', () => {
   })
 })
 
+/** Runs `fn` with `vars` set in process.env, then puts back what was there. */
+function withEnv<T>(vars: Record<string, string>, fn: () => T): T {
+  const saved = Object.fromEntries(Object.keys(vars).map((key) => [key, process.env[key]]))
+  Object.assign(process.env, vars)
+  try {
+    return fn()
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+}
+
+describe('gitDiscoveryEnv', () => {
+  it('drops every variable that pins git to a repository, and nothing else (#407)', () => {
+    const pinning = {
+      GIT_DIR: '/r/.git/worktrees/w',
+      GIT_WORK_TREE: '/r',
+      GIT_INDEX_FILE: '/r/.git/index',
+      GIT_COMMON_DIR: '/r/.git',
+      GIT_OBJECT_DIRECTORY: '/r/.git/objects',
+      GIT_ALTERNATE_OBJECT_DIRECTORIES: '/q/objects',
+      GIT_PREFIX: 'back/',
+    }
+    // GIT_EXEC_PATH is git's own install, exported to every hook: no repository.
+    const kept = { PATH: '/usr/bin', HOME: '/home/x', GIT_EXEC_PATH: '/usr/lib/git-core' }
+    const env = { ...pinning, ...kept }
+    expect(gitDiscoveryEnv(env)).toEqual(kept)
+    expect(env).toEqual({ ...pinning, ...kept })
+  })
+})
+
 describe('worktreeSlug', () => {
   let dir: string
+  // gitDiscoveryEnv (#407): with an inherited GIT_DIR, this fixture's init,
+  // commit and worktree add would write into that repository instead.
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync('git', args, { cwd, env: gitDiscoveryEnv(), encoding: 'utf8' }).trim()
+  const commit = (cwd: string, ...args: string[]) =>
+    git(cwd, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', ...args)
 
   beforeAll(() => {
     dir = realpathSync(mkdtempSync(join(tmpdir(), 'kumite-392-')))
-    // gitDiscoveryEnv (#407): with an inherited GIT_DIR, this fixture's init,
-    // commit and worktree add would write into that repository instead.
-    const git = (cwd: string, ...args: string[]) =>
-      execFileSync('git', args, { cwd, env: gitDiscoveryEnv(), stdio: 'ignore' })
-    git(dir, 'init', '-q', 'main')
-    writeFileSync(join(dir, 'main', 'f'), 'x')
-    git(join(dir, 'main'), 'add', 'f')
-    git(join(dir, 'main'), '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'init')
-    git(join(dir, 'main'), 'worktree', 'add', '-q', join(dir, 'task-392-stop-hook'))
+    // The fixture is built the way the pre-push ladder of a linked worktree
+    // would build it: with git's hook variables inherited (GIT_DIR on a
+    // pre-push, GIT_INDEX_FILE too on a pre-commit). They point at `decoy`,
+    // standing in for the real repository.
+    git(dir, 'init', '-q', 'decoy')
+    commit(join(dir, 'decoy'), '--allow-empty', '-m', 'decoy')
+    git(join(dir, 'decoy'), 'worktree', 'add', '-q', join(dir, 'decoy-wt'))
+    const hookGitDir = join(dir, 'decoy', '.git', 'worktrees', 'decoy-wt')
+    withEnv({ GIT_DIR: hookGitDir, GIT_INDEX_FILE: join(hookGitDir, 'index') }, () => {
+      git(dir, 'init', '-q', 'main')
+      writeFileSync(join(dir, 'main', 'f'), 'x')
+      git(join(dir, 'main'), 'add', 'f')
+      commit(join(dir, 'main'), '-m', 'init')
+      git(join(dir, 'main'), 'worktree', 'add', '-q', join(dir, 'task-392-stop-hook'))
+    })
   })
 
   afterAll(() => {
@@ -90,27 +135,41 @@ describe('worktreeSlug', () => {
     expect(worktreeSlug(tmpdir())).toBeUndefined()
   })
 
-  // #407: git exports GIT_DIR, GIT_WORK_TREE… to its hooks. Inherited by the
+  it('built that fixture without writing into the repository a hook points at (#407)', () => {
+    expect(git(join(dir, 'main'), 'rev-parse', '--absolute-git-dir')).toBe(
+      join(dir, 'main', '.git'),
+    )
+    const decoy = join(dir, 'decoy')
+    expect(git(decoy, 'rev-list', '--all', '--count')).toBe('1')
+    expect(git(decoy, 'worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(2)
+  })
+
+  // #407: git exports its repository variables to hooks. Inherited by the
   // suite (the pre-push ladder), they made git answer about *that* repository
-  // from any directory. Here they point at this fixture's main checkout, never
-  // at the real repository.
-  it('ignores a GIT_DIR / GIT_WORK_TREE it inherited from a git hook (#407)', () => {
-    const inherited = {
-      GIT_DIR: join(dir, 'main', '.git'),
-      GIT_WORK_TREE: join(dir, 'main'),
-      GIT_INDEX_FILE: join(dir, 'main', '.git', 'index'),
-    }
-    const saved = Object.fromEntries(Object.keys(inherited).map((k) => [k, process.env[k]]))
-    try {
-      Object.assign(process.env, inherited)
+  // from any directory. Here they point at this fixture, never at the real
+  // repository.
+  it.each([
+    {
+      // What a pre-push from a linked worktree gets: the #401 failure.
+      shape: 'a pre-push from a linked worktree',
+      vars: (d: string) => ({
+        GIT_DIR: join(d, 'main', '.git', 'worktrees', 'task-392-stop-hook'),
+      }),
+    },
+    {
+      shape: 'git --git-dir --work-tree, with an index',
+      vars: (d: string) => ({
+        GIT_DIR: join(d, 'main', '.git'),
+        GIT_WORK_TREE: join(d, 'main'),
+        GIT_INDEX_FILE: join(d, 'main', '.git', 'index'),
+      }),
+    },
+  ])('ignores the variables git exports to $shape (#407)', ({ vars }) => {
+    withEnv(vars(dir), () => {
+      expect(worktreeSlug(join(dir, 'main'))).toBeUndefined()
       expect(worktreeSlug(join(dir, 'task-392-stop-hook'))).toBe('task-392-stop-hook')
       expect(worktreeSlug(tmpdir())).toBeUndefined()
-    } finally {
-      for (const [key, value] of Object.entries(saved)) {
-        if (value === undefined) delete process.env[key]
-        else process.env[key] = value
-      }
-    }
+    })
   })
 })
 

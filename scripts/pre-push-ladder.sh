@@ -69,6 +69,14 @@ if [ "$need" = 0 ]; then
   exit 0
 fi
 
+# Git exports GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE… to its hooks, so that git
+# commands in the hook find this repository — the scope guard above relies on
+# it. The ladder must not inherit them: a test that runs git in another
+# directory (worktreeSlug, #392) would see this repository instead, and the
+# back suite would derive its database from the wrong tree (#407).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY \
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_PREFIX
+
 # Same database rule as the Stop hook: this tree's back/.env wins over an
 # inherited DATABASE_URL (process.loadEnvFile() never overrides one already
 # set). The back suite derives its own <db>_test[_<worktree dir>] from it

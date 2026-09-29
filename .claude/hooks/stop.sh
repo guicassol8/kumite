@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Stop hook: the full gate ladder. Blocks the agent from stopping while
-# typecheck, kata verify or tests fail.
+# typecheck, kata verify or tests fail — up to KUMITE_STOP_HOOK_MAX_BLOCKS (3)
+# times in a row, then lets it stop with a visible warning (#399).
 #
 # Scope guard: the ladder only runs when the working tree actually carries
 # uncommitted changes under the code packages. A session that only talked,
-# researched or planned touches nothing and stops instantly; a session that
-# already landed its work was gated by lefthook's pre-commit, so re-running
-# the same three commands here is pure duplication.
+# researched or planned touches nothing and stops instantly; work that is
+# already committed is gated when it is pushed, by the pre-push ladder
+# (lefthook, scripts/pre-push-ladder.sh — #399).
 #
 # Which tree (#286): Claude Code runs this script from $CLAUDE_PROJECT_DIR —
 # always the main checkout, even when the session works in a worktree — so
@@ -17,13 +18,24 @@
 # ladder uses that tree's back/.env DATABASE_URL, and every run appends one
 # line to /tmp/kumite-stop-hook.log (never the URL itself) — the first place
 # to look when a Stop dies with exit 143.
+#
+# Retries (#399): Claude Code sets `stop_hook_active` once a Stop hook has
+# blocked and the agent is trying to stop again. This hook used to exit 0
+# right there, so it blocked exactly once and never checked the fix. Now the
+# ladder runs every time; a counter per session and tree caps the blocks in a
+# row at MAX_BLOCKS, after which the stop goes through with a systemMessage
+# saying the ladder is still red. A green ladder or a clean tree resets it.
 set -uo pipefail
 
 SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOG="${KUMITE_STOP_HOOK_LOG:-/tmp/kumite-stop-hook.log}"
+MAX_BLOCKS="${KUMITE_STOP_HOOK_MAX_BLOCKS:-3}"
+STATE_DIR="${KUMITE_STOP_HOOK_STATE_DIR:-${TMPDIR:-/tmp}}"
 START_PWD="$PWD"
 payload="$(cat)"
 payload_cwd="$(jq -r '.cwd // empty' <<<"$payload" 2>/dev/null)"
+session_id="$(jq -r '.session_id // empty' <<<"$payload" 2>/dev/null)"
+active="$(jq -r 'if .stop_hook_active == true then "true" else "false" end' <<<"$payload" 2>/dev/null)"
 
 # resolve_root <dir>: the toplevel of <dir> when it is a worktree of the same
 # repository as this script, else SCRIPT_ROOT.
@@ -41,6 +53,9 @@ resolve_root() {
 }
 
 ROOT="$(resolve_root "${payload_cwd:-$START_PWD}")"
+
+# Blocks in a row, per session and tree.
+counter="$STATE_DIR/kumite-stop-hook-$(printf '%s|%s' "${session_id:-no-session}" "$ROOT" | cksum | cut -d' ' -f1).count"
 
 # The ladder must hit this tree's database: back/.env wins over an inherited
 # DATABASE_URL, because process.loadEnvFile() never overrides one already set.
@@ -62,17 +77,11 @@ fi
 
 # log <decision>: one line per run; a failed write never affects the hook.
 log() {
-  printf '%s pwd=%s payload_cwd=%s project_dir=%s root=%s db=%s decision=%s\n' \
+  printf '%s pwd=%s payload_cwd=%s project_dir=%s root=%s db=%s active=%s decision=%s\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$START_PWD" "${payload_cwd:-<none>}" \
-    "${CLAUDE_PROJECT_DIR:-<unset>}" "$ROOT" "$db_source" "$1" \
+    "${CLAUDE_PROJECT_DIR:-<unset>}" "$ROOT" "$db_source" "${active:-false}" "$1" \
     >>"$LOG" 2>/dev/null || true
 }
-
-# Avoid ping-pong: if we already blocked once this stop, let it through.
-if jq -e '.stop_hook_active == true' <<<"$payload" >/dev/null 2>&1; then
-  log skip-active
-  exit 0
-fi
 
 cd "$ROOT" || exit 0
 
@@ -82,14 +91,32 @@ cd "$ROOT" || exit 0
 # guard may skip work, never skip it silently on an error.
 if changed="$(git status --porcelain -uall -- back front blocks package.json 2>/dev/null)"; then
   if [ -z "$changed" ]; then
+    rm -f "$counter" 2>/dev/null
     log skip-clean
     exit 0
   fi
 fi
 
+# block <step> <reason>: block the stop, unless this session already got
+# MAX_BLOCKS in a row for this tree — then let it stop, loudly.
 block() {
+  local n
+  n="$(cat "$counter" 2>/dev/null)"
+  case "$n" in '' | *[!0-9]*) n=0 ;; esac
+  n=$((n + 1))
+  if [ "$n" -gt "$MAX_BLOCKS" ]; then
+    rm -f "$counter" 2>/dev/null
+    log "released:$1"
+    jq -n --arg msg "Stop hook: $1 still failing in $ROOT after $MAX_BLOCKS blocks in a row — letting the agent stop. The gate ladder is NOT green; the pre-push ladder will refuse the push until it is." \
+      '{systemMessage: $msg}'
+    exit 0
+  fi
+  mkdir -p "$STATE_DIR" 2>/dev/null
+  echo "$n" >"$counter" 2>/dev/null || true
   log "blocked:$1"
-  jq -n --arg reason "$2" '{decision: "block", reason: $reason}'
+  jq -n --arg reason "$2
+
+(Stop hook: block $n of $MAX_BLOCKS in a row.)" '{decision: "block", reason: $reason}'
   exit 0
 }
 
@@ -107,5 +134,6 @@ $(tail -c 4000 <<<"$out")"
 out="$(pnpm -r test 2>&1)" || block test "tests failed:
 $(tail -c 4000 <<<"$out")"
 
+rm -f "$counter" 2>/dev/null
 log ladder
 exit 0

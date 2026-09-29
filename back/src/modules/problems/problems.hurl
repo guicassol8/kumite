@@ -283,6 +283,8 @@ jsonpath "$.status" not exists
 jsonpath "$.roundStatus" == "open"
 jsonpath "$.roundId" == "{{round_id}}"
 jsonpath "$.bestSubmission" == null
+# #212: a round problem never offers the practice demo.
+jsonpath "$.demoKey" == null
 
 # 10e. No locale query param -> pt.
 GET {{host}}/problems/{{problem_id}}
@@ -459,6 +461,8 @@ jsonpath "$.bestSubmission" == null
 jsonpath "$.examples" count == 1
 jsonpath "$.examples[0].expected" == 4
 jsonpath "$..hidden" not exists
+# #212: a practice problem the organizer wrote has no demo.
+jsonpath "$.demoKey" == null
 
 # P5. No token -> 401, like every participant route.
 GET {{host}}/problems/{{practice_id}}
@@ -567,7 +571,8 @@ jsonpath "$[?(@.title=='Sum of the list')].locale" == "en"
 jsonpath "$[?(@.title=='Sum of the list')].difficulty" == "medium"
 
 # P13. The first one, read in es: its es statement, not the pt fallback, with
-# its visible cases as examples.
+# its visible cases as examples — and its step-by-step demo (#212), linked by
+# the pt title whatever locale is served.
 GET {{host}}/problems/{{seeded_practice_id}}?locale=es
 Authorization: Bearer {{participant_token}}
 HTTP 200
@@ -578,3 +583,4 @@ jsonpath "$.visibility" == "practice"
 jsonpath "$.examples" count == 3
 jsonpath "$.examples[0].input" == 7
 jsonpath "$.examples[0].expected" == 7
+jsonpath "$.demoKey" == "devolva-entrada"

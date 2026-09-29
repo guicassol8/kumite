@@ -12,9 +12,8 @@ material assumptions. A complete request does not need another question round.
 
 ## Skills
 
-These are Claude Code's slash-command shortcut over the agent-agnostic
-process in `docs/task-workflow/` (see `AGENTS.md` § Map) — use them when
-running inside Claude Code; the docs are the source of truth.
+These are slash-command wrappers over the process in `docs/task-workflow/`
+(see `AGENTS.md` § Map); the docs are the source of truth.
 
 | Skill | Use when |
 |---|---|
@@ -36,14 +35,9 @@ subagent each instead of to a new chat. Same isolation, different boundary —
 
 ## Claude-specific notes
 
-- The `kata-docs` MCP server (`.mcp.json`) is optional — it may be disabled
-  in `settings.local.json`. When it is available, prefer it for kata API
-  questions; when it is not, read `~/Projetos/kata/docs` and the bundled
-  `.d.ts` directly, and do not report its absence.
-- Kata feedback: a report in `kata-feedback/` only when kata was genuinely
-  in frame or caused friction; otherwise one line in `kata-feedback/LEDGER.csv`.
-  See `AGENTS.md` § Kata framework feedback. Never fix kata itself as a side
-  effect of a kumite task.
+- Kata (docs to read, the `kata-feedback/` report vs the `LEDGER.csv` line):
+  `AGENTS.md` § Kata framework feedback. The `kata-docs` MCP may be disabled
+  in `settings.local.json`.
 - Hooks: PostToolUse auto-formats and runs `kata verify` on back edits. Stop
   runs the full gate ladder (typecheck → verify → tests) when the session's
   tree has uncommitted code changes, and blocks up to 3 times in a row while

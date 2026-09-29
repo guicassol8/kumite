@@ -1,12 +1,7 @@
 # Claude Code Instructions
 
-See @AGENTS.md for the canonical instructions (shared with Codex and other
-agents).
+See @AGENTS.md for the canonical instructions of this package.
 
-Claude-specific notes:
-- `.claude/settings.json` wires the harness hooks (PreToolUse / PostToolUse /
-  Stop) and the config-tampering `permissions.deny` bans.
-- PreToolUse / PostToolUse run `kata verify --json`; the PostToolUse hook
-  injects remaining findings as `hookSpecificOutput.additionalContext` so the
-  fix lands on the next turn.
-- Stop runs `pnpm test` — a red suite blocks ending the session.
+The hooks and gates (PostToolUse `kata verify`, the Stop ladder, the
+pre-commit and pre-push) are the repo's, described in the root `CLAUDE.md`
+§ Claude-specific notes and `docs/workflow.md` § Gate ladder.

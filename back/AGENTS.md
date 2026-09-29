@@ -1,7 +1,7 @@
 # Agent Instructions
 
-Canonical instructions for every agent on this project. Codex loads this
-file natively; Claude Code imports it from `CLAUDE.md`.
+Canonical instructions for this package. Claude Code imports this file from
+`CLAUDE.md`.
 
 ## Verify your work
 - `kata verify` — fast deterministic checks; use `--json` for hook output, and

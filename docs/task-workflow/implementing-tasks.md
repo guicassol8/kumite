@@ -40,8 +40,8 @@ pnpm install   # node_modules are per-worktree
      i18n catalogs;
    - db change → `db/schema.ts` + `pnpm --filter @kumite/back db:generate`,
      commit the migration; for any kata-side question it raises (DI, verify
-     rules) read `~/Projetos/kata/docs` or the kata-docs MCP server when it
-     is enabled — never guess.
+     rules) read kata's docs (`AGENTS.md` § Kata framework feedback) —
+     never guess.
 5. One conventional commit per coherent step (`feat: …`, `test: …`).
 
 ## House rules
@@ -76,16 +76,10 @@ its throwaway Postgres:
 pnpm worktree:prune          # --dry-run to list first
 ```
 
-## Kata feedback (only when kata was in frame)
+## Kata feedback
 
-This loop is where kata shows up most — `kata verify`, hurl, the
-DI/JWT/error idioms. Before the handoff: if kata was genuinely in frame and
-you learned something or hit friction (a false positive, a rule that
-blocked the plan, a hurl trap, a type that lied), write a `kata-feedback/`
-entry with the metrics you have. If it was out of frame — a front-only or
-docs-only task where verify merely ran green — append one line to
-`kata-feedback/LEDGER.csv` and nothing else. Rule and format: `AGENTS.md`
-§ Kata framework feedback, `kata-feedback/README.md`.
+Before the handoff, a `kata-feedback/` report or a `LEDGER.csv` line, per
+`AGENTS.md` § Kata framework feedback.
 
 ## Handoff (MANDATORY)
 

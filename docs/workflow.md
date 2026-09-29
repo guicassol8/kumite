@@ -4,7 +4,7 @@ Tasks are **GitHub Issues** in this repo, driven by five steps:
 creating tasks → picking the next task → planning a task → implementing a
 task → reviewing a task. This file holds the mechanical conventions shared by
 every step (labels, issue format, ready-work rules, worktrees, branches/PRs,
-releases); the step-by-step process for each one is agent-agnostic prose in
+releases); the step-by-step process for each one is in
 `docs/task-workflow/`:
 
 | Step | Doc |
@@ -15,10 +15,10 @@ releases); the step-by-step process for each one is agent-agnostic prose in
 | Implementing a task | `docs/task-workflow/implementing-tasks.md` |
 | Reviewing a task | `docs/task-workflow/reviewing-tasks.md` |
 
-Codex discovers each step through `.agents/skills/` (invoke with
-`$creating-tasks`, `$picking-next-task`, `$planning-tasks`,
-`$implementing-tasks` or `$reviewing-tasks`). Claude Code uses slash-command
-wrappers under `.claude/skills/`. Both read the canonical docs above.
+Claude Code runs each step through its skill under `.claude/skills/`
+(`/creating-tasks`, `/picking-next-task`, `/planning-tasks #N`,
+`/implementing-tasks #N`, `/reviewing-tasks #PR`), a thin wrapper that
+imports the doc above.
 
 Running several issues in one sitting is **batch mode**
 (`docs/task-workflow/orchestrating-batch.md`): one thin session that only

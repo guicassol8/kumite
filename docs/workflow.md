@@ -281,9 +281,14 @@ fine" or "just docs nearby."
   `Fixes #N` closes the issue when the PR merges; the worktrees Claude Code
   creates (`EnterWorktree`, `isolation: "worktree"`) start from
   `origin/develop`; and `gh pr create` targets it. `main` keeps triggering
-  CI and Deploy on push, and Vercel's production branch stays `main`. A
-  clone made before the switch needs `git remote set-head origin --auto`
-  once, or its `origin/HEAD` keeps saying `main`.
+  CI and Deploy on push, and Vercel's production branch stays `main`. One
+  catch: Deploy is a `workflow_run` workflow, and GitHub always runs those
+  from the default branch's copy of the file — so a change to
+  `.github/workflows/deploy.yml` applies to the next deploy of `main` as
+  soon as it merges into `develop`, not at the release (the code it builds
+  and ships is still `main`'s commit). A clone made before the switch needs
+  `git remote set-head origin --auto` once, or its `origin/HEAD` keeps
+  saying `main`.
 
 ## Releases — merging `develop` into `main`
 

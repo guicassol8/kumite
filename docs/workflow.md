@@ -277,10 +277,13 @@ fine" or "just docs nearby."
   - front → Playwright walkthrough screenshots committed under
     `front/e2e/evidence/<issue>/`, referenced step by step in the PR body;
   - back → trimmed `pnpm -r test` + `pnpm --filter @kumite/back hurl` output.
-- GitHub only auto-closes a `Fixes #N` issue when the PR merges into the
-  repo's **default branch**. Since PRs merge into `develop` (not default),
-  `reviewing-tasks` closes the issue explicitly on merge instead of relying
-  on that.
+- `develop` is also the repo's **default branch** on GitHub (#400), so:
+  `Fixes #N` closes the issue when the PR merges; the worktrees Claude Code
+  creates (`EnterWorktree`, `isolation: "worktree"`) start from
+  `origin/develop`; and `gh pr create` targets it. `main` keeps triggering
+  CI and Deploy on push, and Vercel's production branch stays `main`. A
+  clone made before the switch needs `git remote set-head origin --auto`
+  once, or its `origin/HEAD` keeps saying `main`.
 
 ## Releases — merging `develop` into `main`
 

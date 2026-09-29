@@ -78,6 +78,7 @@ subagent each instead of to a new chat. Same isolation, different boundary —
   worktree — the pre-push does (#399), and CI after it.
 - Worktrees: prefer the harness's own isolation — `EnterWorktree` for this
   session's task work, `isolation: "worktree"` when spawning subagents that
-  edit files. Manual fallback:
-  `git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> develop`
+  edit files. Both start from `origin/develop`, the default branch (#400);
+  rename the branch to `task/<N>-<slug>`. Manual fallback:
+  `git fetch origin && git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> origin/develop`
   then `pnpm install` inside it (node_modules are not shared).

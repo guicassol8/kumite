@@ -1283,3 +1283,130 @@ describe('LeaderboardScreen — denominators (#318)', () => {
     expect(screen.queryByTestId('leaderboard-denominators-inconsistent')).toBeNull()
   })
 })
+
+// #383: the Geral tab sums every announced round, so the organizer is told when
+// one of them makes the event total not comparable. Same rules as #318 one
+// level up — organizer only, never the telão (telao-board.test.tsx) — with
+// testids of its own, so #318's "Geral stays free of the round notice" holds.
+describe('LeaderboardScreen — event denominators (#383)', () => {
+  const organizer: SessionUser = { ...participant, id: 'u-org', role: 'organizer' }
+  const closedRound = {
+    id: 'r1',
+    name: 'Rodada 1',
+    status: 'closed',
+    durationMinutes: 30,
+    openedAt: new Date('2026-09-01T10:00:00.000Z'),
+    closesAt: null,
+    closedAt: new Date('2026-09-01T10:30:00.000Z'),
+    createdAt: new Date('2026-09-01T09:00:00.000Z'),
+    updatedAt: new Date('2026-09-01T10:30:00.000Z'),
+    problemCount: 1,
+  }
+  type Verdict = EventRanking['rounds'][number]['denominators']
+  const withVerdict = (denominators: Verdict): EventRanking => ({
+    ...eventRanking,
+    rounds: [{ roundId: 'r1', roundName: 'Rodada 1', denominators }],
+  })
+  const inconsistentId = 'leaderboard-event-denominators-inconsistent'
+  const unknownId = 'leaderboard-event-denominators-unknown'
+
+  // With only a closed round the screen lands on Geral (#111), whose ranking
+  // comes from REST.
+  async function renderGeral(verdict: Verdict) {
+    mockedRounds.mockResolvedValue(jsonResponse(200, [closedRound]))
+    mockedEventRanking.mockResolvedValue(jsonResponse(200, withVerdict(verdict)))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-column-round-r1')).toBeDefined())
+  }
+
+  beforeEach(() => {
+    setSession(organizer, 'tok-org')
+  })
+
+  it('warns the organizer above the Geral table, naming the inconsistent round', async () => {
+    await renderGeral('inconsistent')
+
+    const notice = await screen.findByTestId(inconsistentId)
+    expect(notice.textContent).toContain('O total do evento não é comparável entre os times')
+    expect(notice.textContent).toContain('escalas diferentes: Rodada 1.')
+    const table = screen.getByTestId('leaderboard-table')
+    // The notice sits above the table it qualifies.
+    expect(notice.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId(unknownId)).toBeNull()
+  })
+
+  it('shows only the discreet note when a summed round is unknown', async () => {
+    await renderGeral('unknown')
+
+    expect(await screen.findByTestId(unknownId)).toBeDefined()
+    expect(screen.queryByTestId(inconsistentId)).toBeNull()
+  })
+
+  it('adds nothing when every summed round is consistent', async () => {
+    await renderGeral('consistent')
+
+    expect(screen.getByTestId('leaderboard-table')).toBeDefined()
+    expect(screen.queryByTestId(inconsistentId)).toBeNull()
+    expect(screen.queryByTestId(unknownId)).toBeNull()
+  })
+
+  it('shows nothing to a participant, even when a summed round is inconsistent', async () => {
+    setSession(participant, 'tok-1')
+    await renderGeral('inconsistent')
+
+    expect(screen.getByTestId('leaderboard-table')).toBeDefined()
+    expect(screen.queryByTestId(inconsistentId)).toBeNull()
+    expect(screen.queryByTestId(unknownId)).toBeNull()
+  })
+
+  it('stays on the empty state, with no notice, when the Geral tab has no team', async () => {
+    mockedRounds.mockResolvedValue(jsonResponse(200, [closedRound]))
+    mockedEventRanking.mockResolvedValue(
+      jsonResponse(200, { ...withVerdict('inconsistent'), teams: [] }),
+    )
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-empty')).toBeDefined())
+    expect(screen.queryByTestId(inconsistentId)).toBeNull()
+  })
+
+  // `sse-client` is mocked here, so the mirror's parse is run by hand over a
+  // JSON round-trip, as the wire would. REST says `consistent`, the live
+  // `ranking.updated` says `inconsistent`: the warning can only have come
+  // through the stream — which a mirror stripping `rounds` would silence.
+  it('warns the organizer from a live ranking.updated, keeping the verdict through the mirror', async () => {
+    mockedEventRanking.mockResolvedValue(jsonResponse(200, withVerdict('consistent')))
+    renderLeaderboard()
+    await waitFor(() => expect(screen.getByTestId('leaderboard-loading')).toBeDefined())
+    emitStatus('open')
+    const wire = JSON.parse(
+      JSON.stringify({
+        type: 'ranking.updated',
+        serverTime: new Date(),
+        round: roundRanking,
+        event: withVerdict('inconsistent'),
+      }),
+    )
+    emit(SseEventSchema.parse(wire))
+    await waitFor(() => expect(screen.getByTestId('leaderboard-table')).toBeDefined())
+
+    // A live round opens on Rodada, where the event notice never shows.
+    expect(screen.queryByTestId(inconsistentId)).toBeNull()
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-event'))
+
+    expect(await screen.findByTestId(inconsistentId)).toBeDefined()
+    // Nor does the round's own #318 notice leak in: that round is consistent.
+    expect(screen.queryByTestId('leaderboard-denominators-inconsistent')).toBeNull()
+  })
+
+  it('leaves the Rodada tab as it was', async () => {
+    await renderGeral('inconsistent')
+    expect(await screen.findByTestId(inconsistentId)).toBeDefined()
+
+    fireEvent.mouseDown(screen.getByTestId('leaderboard-tab-round'))
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-last-closed-label')).toBeDefined())
+    expect(screen.queryByTestId(inconsistentId)).toBeNull()
+    expect(screen.queryByTestId(unknownId)).toBeNull()
+  })
+})

@@ -5,7 +5,10 @@ import { motion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DenominatorsNotice } from '@/components/leaderboard/denominators-notice'
+import {
+  DenominatorsNotice,
+  EventDenominatorsNotice,
+} from '@/components/leaderboard/denominators-notice'
 import { TelaoBoard } from '@/components/leaderboard/telao-board'
 import { RoundCountdown } from '@/components/round-countdown'
 import { type University, UniversityBadge } from '@/components/teams/university-badge'
@@ -166,9 +169,10 @@ function LeaderboardScreen() {
   const queryClient = useQueryClient()
   const mainRef = useRef<HTMLElement>(null)
   const [isPresentation, setIsPresentation] = useState(false)
-  // The round ranking's comparability verdict (#318) is an organizer's
-  // concern: participants read the same payload, but the notice is not theirs
-  // to act on — and the telão, projected for everyone, never shows it.
+  // The comparability verdicts — the round ranking's (#318) and each summed
+  // round's on the Geral tab (#383) — are an organizer's concern: participants
+  // read the same payload, but the notices are not theirs to act on — and the
+  // telão, projected for everyone, never shows them.
   const isOrganizer = useSession().user?.role === 'organizer'
 
   // Exiting is TelaoBoard's job from here (it owns the fullscreenchange and
@@ -634,7 +638,14 @@ function LeaderboardScreen() {
                 <p className="text-muted-foreground">{t('leaderboard.empty.title')}</p>
               </div>
             ) : (
-              <RankingTable columns={eventColumns} rows={eventRanking.teams} myTeamId={myTeamId} />
+              <div className="flex flex-col gap-2">
+                {isOrganizer && <EventDenominatorsNotice rounds={eventRanking.rounds} />}
+                <RankingTable
+                  columns={eventColumns}
+                  rows={eventRanking.teams}
+                  myTeamId={myTeamId}
+                />
+              </div>
             )}
           </TabsContent>
         </Tabs>

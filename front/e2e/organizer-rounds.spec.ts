@@ -8,6 +8,7 @@ import {
   ORGANIZER_PASSWORD,
   organizerAuthHeader,
   test,
+  withNoOpenRound,
   withRoundLock,
 } from './support/rounds'
 
@@ -66,6 +67,11 @@ test.describe('organizer rounds', () => {
     page,
     roundSlot,
   }) => {
+    // Up to 60s waiting for another spec to free the open-round slot before
+    // step 04 (`withNoOpenRound`, NO_OPEN_ROUND_WAIT_MS), on top of the flow
+    // itself — the same budget as leaderboard-tab-persistence.spec.ts (#389).
+    test.setTimeout(120_000)
+    const auth = await organizerAuthHeader()
     await loginAsOrganizer(page)
     const problemId = await seedPublishedProblem('Soma de dois números')
 
@@ -123,29 +129,53 @@ test.describe('organizer rounds', () => {
     const roundBId = rows.find((r) => r.name.includes(roundBName))?.id
     if (!roundAId || !roundBId) throw new Error('expected both seeded rounds in the table')
 
-    // 04 — Abrir confirmation dialog on round A.
-    await page.getByTestId(`organizer-rounds-open-${roundAId}`).click()
-    await expect(page.getByTestId('organizer-rounds-open-confirm')).toBeVisible()
-    await page.screenshot({ path: evidence('04-open-confirm-dialog'), fullPage: true })
+    // 04–05 open A through the UI, which only works with the single
+    // open-round slot free: while any round is open, every draft's Abrir is
+    // disabled and `POST …/open` answers 409 `another_round_open`. Another
+    // worker may be holding it right now, so both steps run inside
+    // `withNoOpenRound` — the slot is waited for outside the lock, then held
+    // free until A has opened (#389, the same family as #386). Every open in
+    // the suite goes through the round lock, this UI one included, or no other
+    // spec's critical section is exclusive (#386, #388).
+    await withNoOpenRound(auth, async () => {
+      // The navigation happens inside the section, and it is not optional:
+      // this page has been up since step 03, and its Abrir reads the round
+      // list (refetched only on a `round.opened`/`round.closed` event) and
+      // the event stream's current round. `round.closed` can be held back
+      // while the closed round is still being judged (#176), so a page that
+      // saw another round open may keep A's Abrir disabled after the slot is
+      // already free. A fresh load refetches the list and opens a new `/sse`,
+      // whose `state.sync` both reflect the frozen state.
+      await page.goto('/organizer/rounds')
+      // Short on purpose: the section holds the lock (LOCK_STALE_MS), and a
+      // disabled Abrir here means the UI disagrees with the API.
+      await expect(page.getByTestId(`organizer-rounds-open-${roundAId}`)).toBeEnabled({
+        timeout: 10_000,
+      })
 
-    // 05 — confirmed: A is open with a live countdown, B's Abrir is disabled
-    // and its tooltip names A (Acceptance #2).
-    // Opened through the UI, so `roundSlot.open` never saw it — hand it over
-    // anyway, or a failure between here and step 08 leaves it open (#150).
-    // Registered before the click: closing a round that never opened is a no-op.
-    roundSlot.register(roundAId)
-    // Every open in the suite goes through the round lock, this UI one
-    // included — otherwise no other spec's critical section is exclusive
-    // (#386). Only the confirm and its response: the section stays short.
-    await withRoundLock(async () => {
+      // 04 — Abrir confirmation dialog on round A.
+      await page.getByTestId(`organizer-rounds-open-${roundAId}`).click()
+      await expect(page.getByTestId('organizer-rounds-open-confirm')).toBeVisible()
+      await page.screenshot({ path: evidence('04-open-confirm-dialog'), fullPage: true })
+
+      // 05 — confirmed. Opened through the UI, so `roundSlot.open` never saw
+      // it — hand it over anyway, or a failure between here and step 08
+      // leaves it open (#150). Registered before the click: closing a round
+      // that never opened is a no-op.
+      roundSlot.register(roundAId)
       const opened = page.waitForResponse(
         (res) =>
           res.url().endsWith(`/organizer/rounds/${roundAId}/open`) &&
           res.request().method() === 'POST',
       )
       await page.getByTestId('organizer-rounds-open-confirm').click()
-      await opened
+      // A 409 fails here, with its cause, not later on a missing Encerrar.
+      expect((await opened).status()).toBe(200)
     })
+
+    // 05 — A is open with a live countdown, B's Abrir is disabled and its
+    // tooltip names A (Acceptance #2). Outside the section: A holds the slot
+    // now, so nobody else can open meanwhile.
     await expect(page.getByTestId(`organizer-rounds-close-${roundAId}`)).toBeVisible()
     await expect(page.getByTestId(`organizer-rounds-open-${roundBId}`)).toBeDisabled()
     await page.getByTestId(`organizer-rounds-open-hint-${roundBId}`).hover()

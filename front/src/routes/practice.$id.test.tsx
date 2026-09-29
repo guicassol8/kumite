@@ -246,6 +246,13 @@ describe('/practice/$id demo (#212)', () => {
     // The participant's canvas stays mounted underneath, out of reach.
     const underlay = screen.getByTestId('blockly-workspace').closest('[inert]')
     expect(underlay?.getAttribute('aria-hidden')).toBe('true')
+    // The demo's glow (#212 review) is its own: the participant's canvas
+    // shows none, and nothing is selected for Delete or Ctrl+Z to act on.
+    expect(
+      screen.getByTestId('practice-demo-canvas').querySelectorAll('.blocklySelected'),
+    ).toHaveLength(1)
+    expect(screen.getByTestId('blockly-workspace').querySelector('.blocklySelected')).toBeNull()
+    expect(Blockly.common.getSelected()).toBeNull()
   })
 
   it('never writes the autosave and gives the canvas back exactly as it was', async () => {

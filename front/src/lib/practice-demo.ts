@@ -86,10 +86,42 @@ function checkIndex(script: DemoScript, index: number): void {
   }
 }
 
-/** The ids that enter the canvas on step `index` — what the demo highlights. */
+/** The ids that enter the canvas on step `index`. */
 export function revealedAt(script: DemoScript, index: number): string[] {
   checkIndex(script, index)
   return [...(script.steps[index]?.reveal ?? [])]
+}
+
+/** Each block's parent id — through an input or a `next` — in the solution. */
+function parentsIn(state: WorkspaceState): Map<string, string> {
+  const parents = new Map<string, string>()
+  const walk = (block: Json) => {
+    for (const connection of connectionsOf(block)) {
+      const child = connection['block']
+      if (!isObject(child)) continue
+      if (typeof block['id'] === 'string' && typeof child['id'] === 'string') {
+        parents.set(child['id'], block['id'])
+      }
+      walk(child)
+    }
+  }
+  for (const block of topBlocksOf(state)) walk(block)
+  return parents
+}
+
+/**
+ * The blocks entering on step `index` whose parent is not entering with them —
+ * what the demo marks with the selection glow. A child revealed together with
+ * its parent already sits inside the parent's outline.
+ */
+export function outermostRevealedAt(script: DemoScript, index: number): string[] {
+  const revealed = revealedAt(script, index)
+  const entering = new Set(revealed)
+  const parents = parentsIn(script.solution)
+  return revealed.filter((id) => {
+    const parent = parents.get(id)
+    return parent === undefined || !entering.has(parent)
+  })
 }
 
 /**

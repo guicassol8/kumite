@@ -2,7 +2,13 @@ import type { WorkspaceState } from '@kumite/blocks'
 import { describe, expect, it } from 'vitest'
 
 import { deepEqual } from './deep-equal'
-import { blockIdsIn, type DemoScript, demoStepState, revealedAt } from './practice-demo'
+import {
+  blockIdsIn,
+  type DemoScript,
+  demoStepState,
+  outermostRevealedAt,
+  revealedAt,
+} from './practice-demo'
 
 // Synthetic, not one of the real scripts: a root with a value input, a
 // statement input with a `next` chain, and a variable — every shape the
@@ -107,5 +113,33 @@ describe('revealedAt', () => {
 
   it('refuses a step outside the script', () => {
     expect(() => revealedAt(script, 4)).toThrow(RangeError)
+  })
+})
+
+// #212 review: the demo marks what just entered with the editor's own
+// selection glow, on the outermost block only — a child revealed with its
+// parent sits inside the parent's outline already.
+describe('outermostRevealedAt', () => {
+  it('names each revealed block whose parent entered on an earlier step', () => {
+    expect(outermostRevealedAt(script, 0)).toEqual(['root'])
+    // `num` hangs from `set` (value input), `again` from `set` (next): both
+    // parents came before, so both are outermost.
+    expect(outermostRevealedAt(script, 2)).toEqual(['num', 'again'])
+  })
+
+  it('leaves out a block whose parent enters on the same step', () => {
+    const together: DemoScript = {
+      solution,
+      steps: [
+        { reveal: ['root'], textKey: 'a' },
+        { reveal: ['set', 'num', 'again', 'get'], textKey: 'b' },
+      ],
+    }
+
+    expect(outermostRevealedAt(together, 1)).toEqual(['set', 'get'])
+  })
+
+  it('refuses a step outside the script', () => {
+    expect(() => outermostRevealedAt(script, -1)).toThrow(RangeError)
   })
 })

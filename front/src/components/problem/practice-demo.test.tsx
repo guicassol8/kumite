@@ -1,9 +1,10 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import * as Blockly from 'blockly'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import i18n from '@/i18n'
 import { applyBlocklyLocale } from '@/lib/blockly-setup'
-import { blockIdsIn, demoStepState } from '@/lib/practice-demo'
+import { blockIdsIn, demoStepState, outermostRevealedAt } from '@/lib/practice-demo'
 import { PRACTICE_DEMOS } from '@/lib/practice-demos'
 import { PracticeDemoCanvas, PracticeDemoControls } from './practice-demo'
 
@@ -13,6 +14,14 @@ const script = PRACTICE_DEMOS['e-par']
 function canvasBlockIds(): string[] {
   const canvas = screen.getByTestId('practice-demo-canvas')
   return [...canvas.querySelectorAll('[data-id]')]
+    .map((node) => node.getAttribute('data-id') ?? '')
+    .sort()
+}
+
+/** Ids of the demo's blocks that carry a Blockly class on their svg group. */
+function canvasBlocksWith(className: string): string[] {
+  const canvas = screen.getByTestId('practice-demo-canvas')
+  return [...canvas.querySelectorAll(`[data-id].${className}`)]
     .map((node) => node.getAttribute('data-id') ?? '')
     .sort()
 }
@@ -112,6 +121,26 @@ describe('PracticeDemoCanvas', () => {
 
     expect(canvasBlockIds()).toEqual(before)
     expect(screen.getByTestId('practice-demo-canvas').textContent).toContain('solve')
+  })
+
+  // #212 review (option A): the block that just entered wears the editor's
+  // selection glow (the theme's selectedGlowColour), never highlightBlock's
+  // emboss, which lightened it into looking disabled. Visual only: nothing is
+  // selected globally, so no key and no other canvas ever sees it.
+  it('glows the outermost block that just entered, and lightens none', () => {
+    const { rerender } = render(<PracticeDemoCanvas script={script} step={2} />)
+    expect(canvasBlocksWith('blocklySelected')).toEqual(outermostRevealedAt(script, 2))
+    expect(canvasBlocksWith('blocklyHighlighted')).toEqual([])
+
+    rerender(<PracticeDemoCanvas script={script} step={3} />)
+    expect(canvasBlocksWith('blocklySelected')).toEqual(outermostRevealedAt(script, 3))
+    expect(canvasBlocksWith('blocklyHighlighted')).toEqual([])
+  })
+
+  it('never selects a block for real', () => {
+    render(<PracticeDemoCanvas script={script} step={1} />)
+
+    expect(Blockly.common.getSelected()).toBeNull()
   })
 
   it('labels itself as the read-only demo, not as the editor', () => {

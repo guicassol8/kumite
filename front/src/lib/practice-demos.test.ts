@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import i18n from '@/i18n'
 import { deepEqual } from './deep-equal'
-import { blockIdsIn, demoStepState } from './practice-demo'
+import { blockIdsIn, demoStepState, outermostRevealedAt } from './practice-demo'
 import { PRACTICE_DEMOS } from './practice-demos'
 
 /** The ids a step's block depends on: its parent, found in the solution. */
@@ -67,6 +67,14 @@ describe('PRACTICE_DEMOS', () => {
         if (parent === undefined) continue
         expect(stepOf.get(parent)).toBeLessThanOrEqual(stepOf.get(id) ?? -1)
       }
+    })
+
+    // #212 review: each step's glow lands on one block — the one the step's
+    // sentence talks about — never on several at once.
+    it('glows exactly one block on every step', () => {
+      script.steps.forEach((_step, index) => {
+        expect(outermostRevealedAt(script, index)).toHaveLength(1)
+      })
     })
 
     it('ends on the reference solution', () => {

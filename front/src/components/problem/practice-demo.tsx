@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useBlocklyTheme } from '@/hooks/use-blockly-theme'
 import { applyBlocklyLocale, workspaceOptions } from '@/lib/blockly-setup'
-import { type DemoScript, demoStepState, revealedAt } from '@/lib/practice-demo'
+import { type DemoScript, demoStepState, outermostRevealedAt } from '@/lib/practice-demo'
 import { cn } from '@/lib/utils'
 
 function toBlockLocale(language: string): BlockLocale {
@@ -60,7 +60,12 @@ export function PracticeDemoCanvas({ script, step, className }: PracticeDemoCanv
     } finally {
       Blockly.Events.enable()
     }
-    for (const id of revealedAt(script, step)) workspace.highlightBlock(id, true)
+    // The block that just entered wears the editor's selection glow (the
+    // theme's selectedGlowColour). `addSelect` is visual only: nothing is
+    // selected, no event fires and focus stays put, so no shortcut and no
+    // other canvas ever sees it. `highlightBlock` lightened the block into
+    // looking disabled instead (#212 review).
+    for (const id of outermostRevealedAt(script, step)) workspace.getBlockById(id)?.addSelect()
     workspace.scrollCenter()
   }, [script, step, locale])
 

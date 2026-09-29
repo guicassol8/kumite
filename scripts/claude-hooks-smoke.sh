@@ -106,6 +106,11 @@ printf '%s\t%s\t%s\n' "$PWD" "${DATABASE_URL-<unset>}" "$*" >>"$SMOKE_PNPM_LOG"
 case "$*" in
   *"kata verify --json"*) echo '{}' ;;
 esac
+# SMOKE_PNPM_FAIL=<substring>: the call whose arguments contain it fails.
+if [ -n "${SMOKE_PNPM_FAIL:-}" ] && [[ "$*" == *"$SMOKE_PNPM_FAIL"* ]]; then
+  echo "smoke: stubbed failure of 'pnpm $*'"
+  exit 1
+fi
 exit 0
 STUB
 chmod +x "$tmp/bin/pnpm"
@@ -129,6 +134,7 @@ run_hook() {
     CLAUDE_PROJECT_DIR="$host" \
     SMOKE_PNPM_LOG="$pnpm_log" \
     KUMITE_STOP_HOOK_LOG="$stop_log" \
+    KUMITE_STOP_HOOK_STATE_DIR="$tmp/state" \
     "$@" bash "$host/.claude/hooks/$hook.sh" <<<"$payload" 2>/dev/null)"
   rc=$?
   calls="$(cat "$pnpm_log")"
@@ -136,6 +142,11 @@ run_hook() {
 }
 
 stop_payload() { jq -nc --arg cwd "$1" '{hook_event_name: "Stop", cwd: $cwd, stop_hook_active: false}'; }
+# stop_retry <cwd> <session_id>: a Stop that follows a block in the same session.
+stop_retry() {
+  jq -nc --arg cwd "$1" --arg s "$2" \
+    '{hook_event_name: "Stop", cwd: $cwd, session_id: $s, stop_hook_active: true}'
+}
 edit_payload() {
   jq -nc --arg cwd "$1" --arg f "$2" \
     '{hook_event_name: "PostToolUse", cwd: $cwd, tool_name: "Edit", tool_input: {file_path: $f}}'
@@ -177,6 +188,7 @@ exit_zero() { [ "$rc" = 0 ]; }
 silent() { [ -z "$out" ]; }
 empty_json() { [ "$(jq -c . <<<"$out" 2>/dev/null)" = "{}" ]; }
 blocks_with() { jq -e --arg s "$1" '.decision == "block" and (.reason | contains($s))' <<<"$out" >/dev/null 2>&1; }
+warns_with() { jq -e --arg s "$1" '(.decision == null) and (.systemMessage | contains($s))' <<<"$out" >/dev/null 2>&1; }
 not_blocked() { ! jq -e '.decision == "block"' <<<"$out" >/dev/null 2>&1; }
 one_log_line() { [ -n "$logged" ] && [ "$(wc -l <<<"$logged")" = 1 ]; }
 log_has() { grep -qF -- "$1" <<<"$logged"; }
@@ -239,13 +251,57 @@ expect "log never carries the URL" log_no_secret
 end
 clean "$host"
 
-begin "(e) stop_hook_active -> exit 0 immediately"
+begin "(e) stop_hook_active with back/ changes -> the ladder still runs (#399)"
 dirty "$session"
-run_hook stop "$session" "$(jq -nc --arg cwd "$session" '{cwd: $cwd, stop_hook_active: true}')"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e)"
 expect "exit 0" exit_zero
-expect "silent" silent
-expect "no pnpm" no_pnpm
+expect "not blocked" not_blocked
+expect "pnpm called" some_pnpm
 expect "one log line" one_log_line
+expect "log shows active=true" log_has "active=true"
+expect "log shows decision=ladder" log_has "decision=ladder"
+end
+
+begin "(e2) red ladder -> blocks 3 times in a row, then lets it stop with a warning"
+for n in 1 2 3; do
+  run_hook stop "$session" "$(stop_retry "$session" smoke-e2)" SMOKE_PNPM_FAIL="-r test"
+  expect "stop $n blocks citing 'block $n of 3'" blocks_with "block $n of 3"
+  expect "stop $n logs decision=blocked:test" log_has "decision=blocked:test"
+done
+run_hook stop "$session" "$(stop_retry "$session" smoke-e2)" SMOKE_PNPM_FAIL="-r test"
+expect "4th stop is not blocked" not_blocked
+expect "4th stop warns the ladder is not green" warns_with "NOT green"
+expect "4th stop logs decision=released:test" log_has "decision=released:test"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e2)" SMOKE_PNPM_FAIL="-r test"
+expect "after the release the count starts over" blocks_with "block 1 of 3"
+end
+
+begin "(e3) a green ladder resets the count"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e3)" SMOKE_PNPM_FAIL="-r test"
+expect "first red stop is block 1" blocks_with "block 1 of 3"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e3)"
+expect "green stop is not blocked" not_blocked
+run_hook stop "$session" "$(stop_retry "$session" smoke-e3)" SMOKE_PNPM_FAIL="kata verify"
+expect "next red stop is block 1 again" blocks_with "block 1 of 3"
+expect "and names the failing step" blocks_with "kata verify failed"
+end
+
+begin "(e4) the count is per session"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e4a)" SMOKE_PNPM_FAIL="-r test"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e4a)" SMOKE_PNPM_FAIL="-r test"
+expect "session A is on block 2" blocks_with "block 2 of 3"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e4b)" SMOKE_PNPM_FAIL="-r test"
+expect "session B starts on block 1" blocks_with "block 1 of 3"
+end
+
+begin "(e5) a clean tree resets the count"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e5)" SMOKE_PNPM_FAIL="-r test"
+clean "$session"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e5)"
+expect "clean stop logs decision=skip-clean" log_has "decision=skip-clean"
+dirty "$session"
+run_hook stop "$session" "$(stop_retry "$session" smoke-e5)" SMOKE_PNPM_FAIL="-r test"
+expect "next red stop is block 1 again" blocks_with "block 1 of 3"
 end
 
 begin "(f) session worktree without node_modules -> block asking for pnpm install"

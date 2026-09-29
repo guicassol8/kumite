@@ -44,10 +44,14 @@ subagent each instead of to a new chat. Same isolation, different boundary —
   in frame or caused friction; otherwise one line in `kata-feedback/LEDGER.csv`.
   See `AGENTS.md` § Kata framework feedback. Never fix kata itself as a side
   effect of a kumite task.
-- Hooks: PostToolUse auto-formats and runs `kata verify` on back edits; Stop
-  runs the full gate ladder (typecheck → verify → tests) and blocks until
-  green. The pre-commit (lefthook) runs format, typecheck and verify only —
-  the test suites run once, in the Stop hook and in CI (#288). In cloud
+- Hooks: PostToolUse auto-formats and runs `kata verify` on back edits. Stop
+  runs the full gate ladder (typecheck → verify → tests) when the session's
+  tree has uncommitted code changes, and blocks up to 3 times in a row while
+  it is red — then it lets the agent stop, with a warning (#399). The
+  pre-commit (lefthook) runs format, typecheck and verify; the pre-push runs
+  the full ladder whenever the push carries code (#399). The pre-push is the
+  one local gate every agent hits, subagents included — so `git push` takes a
+  few minutes: run it in the foreground with a 10-minute Bash timeout. In cloud
   sessions only, SessionStart prepares everything (Docker + Postgres,
   install, `.env` files, migrate, seed) and exports `JWT_SECRET`, the CI
   organizer and `BACK_NOTIFICATIONS_LOG`, so the full E2E runs with nothing
@@ -64,13 +68,14 @@ subagent each instead of to a new chat. Same isolation, different boundary —
   truncate that, so a Stop that fires mid-E2E or mid-hurl in the same tree
   no longer wipes their seed (#392); the ladder itself is unchanged.
   Isolating the E2E's own database without Docker: `docs/workflow.md`
-  § Worktrees. Stop blocks until the worktree has run `pnpm install`.
+  § Worktrees. Stop blocks (up to 3 times in a row, like any red step) until
+  the worktree has run `pnpm install`.
   Each Stop run appends one line (root, DB source, decision — never the URL)
   to `/tmp/kumite-stop-hook.log`: look there first on an `exit 143`.
   `bash scripts/claude-hooks-smoke.sh` proves the behavior with throwaway
   worktrees and a stub `pnpm`. Subagents with `isolation: "worktree"` fire
-  `SubagentStop`, not `Stop`, so the ladder does not gate their worktree —
-  the pre-commit and CI do.
+  `SubagentStop`, not `Stop`, so the Stop ladder does not gate their
+  worktree — the pre-push does (#399), and CI after it.
 - Worktrees: prefer the harness's own isolation — `EnterWorktree` for this
   session's task work, `isolation: "worktree"` when spawning subagents that
   edit files. Manual fallback:

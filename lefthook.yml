@@ -1,11 +1,15 @@
-# Pre-commit gates for the whole monorepo (lefthook runs from the git root).
+# Git hooks for the whole monorepo (lefthook runs from the git root).
 # Bypassing with --no-verify / -n / SKIP is denied for agents (.claude/settings.json).
 #
-# Deliberately without the test suites (#288): they used to run here AND in
-# Claude Code's Stop hook, both truncating the same local Postgres - the
-# source of the OOM-killed commits and the phantom failures. Tests now run
-# once, in the Stop hook (Claude Code) or by hand before the PR (any other
-# agent, docs/workflow.md section Gate ladder), and always in CI.
+# pre-commit: format, typecheck and kata verify — fast, and none of them needs
+# a database. Deliberately without the test suites (#288): they used to run
+# here AND in Claude Code's Stop hook, both truncating the same local Postgres.
+#
+# pre-push: the full gate ladder (typecheck -> kata verify -> tests) before
+# anything reaches the remote (#399). It is the one local gate every agent and
+# every mode goes through, subagents included; scripts/pre-push-ladder.sh
+# skips it when the push carries nothing under back/, front/, blocks/ or
+# package.json.
 pre-commit:
   jobs:
     - name: format
@@ -16,3 +20,14 @@ pre-commit:
       run: pnpm -r typecheck
     - name: kata-verify
       run: pnpm --filter @kumite/back exec kata verify --strict-coverage
+
+pre-push:
+  jobs:
+    # A script job, not `run:`: lefthook skips a `run:` job whenever its own
+    # push-file list (HEAD vs @{push}, existing files only) is empty — a push
+    # that only deletes files, or `git push origin <other branch>`, went
+    # through ungated. The wrapper hands off to scripts/pre-push-ladder.sh.
+    - name: gate-ladder
+      script: gate-ladder.sh
+      runner: bash
+      use_stdin: true

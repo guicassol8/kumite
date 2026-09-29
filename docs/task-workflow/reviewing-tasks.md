@@ -49,6 +49,10 @@ review, after preserving all changes and following the compose cleanup in
 - `gh pr view <PR> --comments` + `gh pr diff <PR>` + the linked issue.
 - Walk the issue's Acceptance line by line and produce a table:
   `✅ met / ❌ not met / 🔲 can't verify from the diff`.
+- **The PR body is a contract** (#403): list every claim it makes — what
+  changed, what is tested, what is out of scope — and check each one
+  against the code. A claim the diff does not back is a finding, the same
+  as an unmet Acceptance line.
 - Any ❌ that's a well-scoped code gap → fix it now (§ Fixing findings), then
   re-walk the table. Any ❌ that turns out to hinge on an ambiguous or
   conflicting Acceptance line (ask, don't assume) → surface the exact tension
@@ -68,6 +72,23 @@ Review the diff only (not the whole repo) for:
 - AI-regression smells: unrelated deletions, ghost imports, weakened
   assertions, swallowed errors, `any`;
 - test quality (asserting behavior, not implementation) and i18n catalog parity.
+
+### Targeted mutants (#403)
+
+The defect that escapes most often is a test that passes with the wrong
+implementation. For each new rule the diff adds — a condition, a guard, a
+boundary, a status code, a filter — make one mutant by hand: invert the
+condition, delete the guard, move the boundary by one. Run only the tests
+that cover it. A mutant no test kills is a finding: add or fix the test
+(§ Fixing findings). Mutate only on a clean tree (commit your fixes first),
+revert every mutant (`git checkout -- <file>`) and confirm `git status` is
+clean before the next one: a surviving mutant passes every gate, so nothing
+but you keeps it out of the next commit. Never commit one.
+
+Cap it at 3–5 mutants per PR, on the rules that matter most. Record the
+score in the Evidence — `mutants: <killed>/<made> killed` — with one line
+per mutant: `file:line`, what changed, the test that killed it. A PR with no
+new rule (docs, config, copy) says `mutants: n/a` and why.
 
 ## Fixing findings
 
@@ -96,6 +117,29 @@ Stage 1 or Stage 2 finding, in the review worktree, on the PR branch:
 A finding that isn't safely fixable in-session (needs a product decision, or
 is large enough to need its own plan) stays a documented gap — say so
 explicitly, don't fix it partially.
+
+## Verifying the fixes (#403)
+
+You wrote those fixes, so you are the worst judge of them: a model misses
+its own errors far more often than the same errors attributed to someone
+else. When any fix you committed touches production code — anything outside
+tests, `e2e/`, docs and `kata-feedback/` — a fresh agent checks those
+commits before the verdict. Note the range: `<head before your first
+fix>..<head after your last fix>`.
+
+- **Standalone review session**: spawn the `fix-verifier` agent
+  (`.claude/agents/fix-verifier.md`) with the PR number and the range.
+- **As a subagent** (batch mode): the orchestrator runs the verifier, not
+  you — even though nesting would let you spawn it — so its report reaches
+  the user without passing through the agent whose fixes it judges
+  (`orchestrating-batch.md` § 4b). Stop before the Verdict: post no verdict,
+  and end your report with the range and `verdict: pending fix
+  verification`. The verifier's result comes back to you as a message; the
+  Verdict follows it.
+
+A defect the verifier reports is fixed and verified again the same way; a
+third round goes to the user. Fixes only to tests, docs or evidence skip
+this step.
 
 ## Stage 3 — Evidence (MANDATORY, blocking)
 
@@ -157,7 +201,8 @@ the Evidence then carries the full local ladder (`pnpm -r typecheck`,
 `pnpm verify`, `pnpm -r test`) run on the PR's head, and the verdict says
 that `check` did not run (#399).
 
-- **Approve**: comment with the compliance table + evidence links (call out
+- **Approve**: comment with the compliance table, the evidence links, the
+  mutant score and the fix verifier's result when it ran (call out
   any fixes made during review, with their commits) then merge only with the
   user's explicit go-ahead: `gh pr merge --squash --delete-branch`.
   `develop` is the default branch (#400), so `Fixes #N` closes the issue on

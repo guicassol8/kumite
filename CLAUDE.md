@@ -30,8 +30,10 @@ ready to paste into a new session. The full chain is in `docs/workflow.md`
 
 `orchestrating-batch` is the deliberate exception: it runs the whole chain in
 one chat, delegating planning, implementation and review to a fresh-context
-subagent each instead of to a new chat. Same isolation, different boundary —
-`docs/workflow.md` § One step, one session.
+subagent each instead of to a new chat — the role agents in `.claude/agents/`
+(`task-planner`, `task-implementer`, `task-reviewer`, `fix-verifier`, #403).
+Same isolation, different boundary — `docs/workflow.md` § One step, one
+session.
 
 ## Claude-specific notes
 

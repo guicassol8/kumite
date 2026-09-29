@@ -89,27 +89,14 @@ gh issue edit <N> --add-assignee @me   # each issue in the batch
 One planning agent per issue, all spawned at once: planning is reading, and
 reading parallelizes safely. Implementation does not (Step 4).
 
-Spawn each as a general-purpose subagent on the default model (see § Model),
-running in the background, with this prompt:
+Spawn each as a **`task-planner`** agent (`.claude/agents/task-planner.md`),
+in the background. The agent carries the batch rules — no Edit/Write, no
+access to the user (questions come back as a `## PERGUNTAS` block, ⚠️ on the
+ones that matter most), the plan posted on the issue **and** returned in
+full — so the prompt only names the issue:
 
 ```text
-Your first action: invoke the planning-tasks skill and follow
-docs/task-workflow/planning-tasks.md to the letter for issue #<N>.
-
-You have NO access to the user. When Step 2 needs a decision you cannot
-resolve from the issue, the repo conventions or code evidence, do not guess
-and do not block: keep investigating everything that does not depend on the
-answer, and end your final report with a `## PERGUNTAS` block — each question
-with 2–4 concrete options and your recommendation.
-
-Post the plan as a `## Plan` comment on the issue AND return its full text in
-your final report; the orchestrator relays it to the user, who cannot see
-your report.
-
-Kata: follow AGENTS.md § Kata framework feedback (where to read kata's docs;
-a `kata-feedback/` report or one LEDGER.csv line).
-
-End with the canonical handoff line from the doc.
+Plan issue #<N>.
 ```
 
 ## Step 3 — Questions, then approval
@@ -137,79 +124,64 @@ merged — before the next one starts.
 
 ### 4a — Implementation
 
-A new agent, in its own worktree — the harness's isolation when it has one:
+A **`task-implementer`** agent (`.claude/agents/task-implementer.md`): it runs
+in its own worktree from `origin/develop` (declared in the agent), renames
+the branch, pushes through the pre-push ladder, opens the PR and reports.
+The prompt names the issue and asserts the approval the agent cannot see:
 
 ```text
-Your first action: invoke the implementing-tasks skill and follow
-docs/task-workflow/implementing-tasks.md for issue #<N>.
-
-The approved plan is the `## Plan` comment on the issue. I confirm the user
-approved it in this session — treat the approval precondition as satisfied.
-
-Worktree: the branch comes from `origin/develop`, the default branch, so a
-worktree the harness creates already starts there (#400); rename its branch
-to `task/<N>-<slug>` right after entering. Run `pnpm install` inside it —
-node_modules are per-worktree. If you need to run the app
-or Postgres, override the ports (`PORT`, `--port`, `VITE_API_URL`, `DB_PORT`
-in that worktree's `.env`); the defaults collide with other worktrees.
-
-Conventional commits. `git push` runs the full gate ladder (pre-push, #399)
-and takes a few minutes: run it in the foreground with a 10-minute timeout. A
-refused push is a real failure — fix it; `--no-verify` is denied. Push the
-branch as often as you need before `gh pr create` (no CI runs yet); after it,
-every push costs CI minutes, so keep them few.
-
-The durable deliverable is the PR on origin (`gh pr create --base develop`,
-body starting with `Fixes #<N>` and ending with `## Evidence`). Push
-everything before you finish — your worktree is disposable.
-
-Final report: the PR number and URL, what changed, which gates passed, and any
-out-of-scope discovery (which becomes a new "Discovered from #<N>" issue,
-never extra scope here).
+Implement issue #<N>. The approved plan is the `## Plan` comment on the
+issue; the user approved it in this session.
 ```
 
 Relay the PR and the summary to the user as soon as it returns.
 
-### 4b — Review
+### 4b — Review, then the fix verifier
 
-A new agent, with no harness-managed isolation — Stage 0 of the review has it
-choose and manage its own worktree:
+A **`task-reviewer`** agent (`.claude/agents/task-reviewer.md`), with no
+harness-managed isolation — Stage 0 of the review has it choose its own
+worktree. The agent carries the rules: evidence attached to the PR, targeted
+mutants, one push for all fixes, `gh pr checks`, never merge.
 
 ```text
-Your first action: invoke the reviewing-tasks skill and follow
-docs/task-workflow/reviewing-tasks.md for PR #<PR>.
-
-Stage 0 says to inspect `git worktree list --porcelain` first: the
-implementation worktree may still exist with that branch checked out. In that
-case use a detached worktree plus an explicit push, never a forced checkout.
-
-Evidence is mandatory and blocking: front → a Playwright walkthrough whose
-screenshots (git-ignored `front/e2e/evidence/<issue>/`) are attached to a PR
-comment with `gh pr comment --attach`, never committed (#402); back →
-trimmed `pnpm -r test` and hurl output.
-
-E2E care in this repo: re-seed (`db:reset`) before each full run — the suite
-asserts on seed state and leaves data behind — and use `--workers=1` for
-probe runs (exit 137 is OOM, not a regression).
-
-Fix every finding you can fix safely, in this same session, on the PR branch.
-Hand back only what needs a fresh plan or a product decision. Push all the
-fixes at once: each push to the open PR costs CI minutes, and the pre-push
-re-runs the ladder anyway. Check `gh pr checks <PR>`: if `check` did not run,
-the Evidence carries the full local ladder on the PR's head.
-
-Do NOT merge — the merge is the user's call and the orchestrator asks for it.
-
-Final report: the Acceptance compliance table, findings and what you fixed,
-the link to the Evidence comment, and the verdict (approved / changes
-requested).
+Review PR #<PR> (fixes issue #<N>).
 ```
 
-Relay the verdict and the Evidence link to the user.
+E2E care to add to that prompt when the PR touches the front: re-seed
+(`db:reset`) before each full run — the suite asserts on seed state and
+leaves data behind — and use `--workers=1` for probe runs (exit 137 is OOM,
+not a regression).
+
+**Fix verifier.** When the reviewer's report carries a fix range (a fix
+touched production code), spawn a **`fix-verifier`** agent
+(`.claude/agents/fix-verifier.md`):
+
+```text
+Verify the review fixes on PR #<PR>: <from>..<to>.
+```
+
+An unverified range is the trigger: any verdict that comes with one is
+provisional until the verifier returns, whatever the reviewer wrote (it
+should say `verdict: pending fix verification`). Send its result to the
+**same** reviewer (`SendMessage`, it keeps the context):
+
+- on `fixes verified`, the reviewer posts the Verdict and reports that range
+  as `verified` — a verified range never triggers the verifier again, so
+  that report is final;
+- on a defect, it fixes it and reports a new range, verified again the same
+  way. A third round goes to the user.
+
+A report is final when it carries no fix range, or only verified ones.
+
+Relay the verdict, the mutant score, the verifier's result and the Evidence
+link to the user.
 
 ### 4c — Merge, on the user's word
 
-Before asking, read `gh pr checks <PR>`: a `check` that did not run (out of
+A review whose report carried a fix range comes here only after the
+verifier's `fixes verified` and the reviewer's final Verdict — never on the
+reviewer's word alone. Before asking, read `gh pr checks <PR>`: a `check`
+that did not run (out of
 Actions minutes) is not green — the merge then rests on the full local
 ladder in the Evidence, and the question says so. Ask explicitly, then:
 

@@ -26,7 +26,8 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
   `docs/workflow.md`. `orchestrating-batch.md` runs 2–3 issues from picking
   to merge in one session, delegating planning, implementation and review
   to a fresh subagent each. The skills in `.claude/skills/` are thin
-  wrappers that import these docs.
+  wrappers that import these docs; the role agents the batch spawns live in
+  `.claude/agents/`.
 - Tasks are GitHub Issues (`gh`); format and labels in `docs/workflow.md`.
 
 ## Verify your work (from the repo root)

@@ -12,11 +12,13 @@ description: Runs a batch of 2–3 GitHub Issues end to end in one session — p
 - **Arguments**: none → assemble the batch from READY work; `#N #M` → validate
   the given issues and batch those.
 - **State**: `batch-state.md` in this session's scratchpad directory.
-- **Subagents**: `Agent` with `subagent_type: "claude"`. Planners
-  (`run_in_background: true`, all at once); implementation with
-  `isolation: "worktree"`; review with no isolation. Answers to a planner's
-  `## PERGUNTAS` go back with `SendMessage` to the same agent — a new `Agent`
-  call starts cold and loses the investigation.
+- **Subagents**: `Agent` with the role agents in `.claude/agents/` —
+  `task-planner` (`run_in_background: true`, all at once), `task-implementer`
+  (its own worktree, declared in the agent), `task-reviewer`, and
+  `fix-verifier` when the review fixed production code. Answers to a
+  planner's `## PERGUNTAS` and a verifier's result go back with
+  `SendMessage` to the same planner or reviewer — a new `Agent` call starts
+  cold and loses the investigation.
 - **Worktree base**: `EnterWorktree` and `isolation: "worktree"` branch from
   the remote's default branch, `develop` (#400); the implementation agent
   only renames its branch to `task/<N>-<slug>`. The worktree is cut from

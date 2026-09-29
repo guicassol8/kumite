@@ -424,7 +424,7 @@ function emptyExport(): EventExport {
   return {
     generatedAt: new Date('2026-09-20T12:00:00Z'),
     rounds: [],
-    ranking: { event: { teams: [] }, rounds: [] },
+    ranking: { event: { rounds: [], teams: [] }, rounds: [] },
     teams: { maxTeamSize: 3, teams: [] },
     removedTeams: [],
     submissions: [],
@@ -483,6 +483,11 @@ function populatedExport(): EventExport {
     rounds: [roundOne, roundTwo],
     ranking: {
       event: {
+        // #383's per-round verdict; the CSV never reads it.
+        rounds: [
+          { roundId: 'round-1', roundName: 'Rodada 1', denominators: 'consistent' },
+          { roundId: 'round-2', roundName: 'Rodada 2', denominators: 'consistent' },
+        ],
         teams: [
           {
             teamId: 't1',

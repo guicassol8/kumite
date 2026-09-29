@@ -227,7 +227,7 @@ describe('useEventStream', () => {
       type: 'ranking.updated',
       serverTime: new Date('2026-09-02T12:05:00.000Z'),
       round: null,
-      event: { teams: [] },
+      event: { rounds: [], teams: [] },
     })
 
     expect(onRankingUpdate).toHaveBeenCalledTimes(1)
@@ -298,7 +298,12 @@ describe('useEventStream', () => {
     expect(result.current.rankingUpdatedAt).toBeNull()
 
     const updatedTime = new Date('2026-09-02T12:05:00.000Z')
-    emit({ type: 'ranking.updated', serverTime: updatedTime, round: null, event: { teams: [] } })
+    emit({
+      type: 'ranking.updated',
+      serverTime: updatedTime,
+      round: null,
+      event: { rounds: [], teams: [] },
+    })
     expect(result.current.rankingUpdatedAt).toEqual(updatedTime)
   })
 

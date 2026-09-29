@@ -38,6 +38,7 @@ const roundRanking: RoundRanking = {
 }
 
 const eventRanking: EventRanking = {
+  rounds: [{ roundId: 'r1', roundName: 'Rodada 1', denominators: 'consistent' }],
   teams: [
     {
       teamId: 't1',
@@ -474,6 +475,28 @@ describe('TelaoBoard — no denominators notice (#318)', () => {
       expect(screen.getByTestId('telao-live-chip')).toBeDefined()
       expect(screen.queryByTestId('leaderboard-denominators-inconsistent')).toBeNull()
       expect(screen.queryByTestId('leaderboard-denominators-unknown')).toBeNull()
+      cleanup()
+      setPresentationActive(false)
+    }
+  })
+
+  // #383: nor the event-wide verdict, when the telão shows the Geral ranking.
+  it('renders no event notice even when a summed round is inconsistent or unknown', () => {
+    for (const denominators of ['inconsistent', 'unknown'] as const) {
+      render(
+        <TelaoBoard
+          {...baseProps()}
+          eventRanking={{
+            ...eventRanking,
+            rounds: [{ roundId: 'r1', roundName: 'Rodada 1', denominators }],
+          }}
+        />,
+      )
+
+      expect(screen.getByTestId('telao-general-badge')).toBeDefined()
+      expect(screen.getByTestId('leaderboard-row-t1')).toBeDefined()
+      expect(screen.queryByTestId('leaderboard-event-denominators-inconsistent')).toBeNull()
+      expect(screen.queryByTestId('leaderboard-event-denominators-unknown')).toBeNull()
       cleanup()
       setPresentationActive(false)
     }

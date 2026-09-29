@@ -104,6 +104,7 @@ const rankingUpdatedWithRound = {
     ],
   },
   event: {
+    rounds: [{ roundId: 'r1', roundName: 'Rodada 1', denominators: 'consistent' }],
     teams: [
       {
         teamId: 't1',
@@ -123,7 +124,7 @@ const rankingUpdatedNoRound = {
   type: 'ranking.updated',
   serverTime: new Date().toISOString(),
   round: null,
-  event: { teams: [] },
+  event: { rounds: [], teams: [] },
 }
 
 describe('connectEventStream', () => {

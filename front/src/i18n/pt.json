@@ -931,6 +931,16 @@
         "description": "Não é possível confirmar que as pontuações desta rodada estão na mesma escala: há submissões anteriores ao registro da escala."
       }
     },
+    "eventDenominators": {
+      "inconsistent": {
+        "title": "O total do evento não é comparável entre os times",
+        "description_one": "Esta soma inclui uma rodada em que um mesmo problema foi pontuado em escalas diferentes: {{rounds}}. Os totais do evento não podem ser comparados entre os times.",
+        "description_other": "Esta soma inclui rodadas em que um mesmo problema foi pontuado em escalas diferentes: {{rounds}}. Os totais do evento não podem ser comparados entre os times."
+      },
+      "unknown": {
+        "description": "Não é possível confirmar que o total do evento está na mesma escala para todos os times: alguma rodada somada tem submissões anteriores ao registro da escala."
+      }
+    },
     "notLiveBadge": "não ao vivo",
     "liveChip": "Ao vivo",
     "noSubmission": "—",

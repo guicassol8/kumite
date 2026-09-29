@@ -69,7 +69,22 @@ export const EventRankingTeamSchema = z.object({
   rounds: z.array(EventRankingRoundEntrySchema),
 })
 
+/**
+ * One summed round's comparability verdict (#383), stated once for the whole
+ * event ranking rather than per team. Same values and semantics as
+ * `RoundRankingSchema.denominators`: the event total adds rounds up, so a
+ * round that is not on one scale makes that total not comparable either.
+ */
+export const EventRankingRoundVerdictSchema = z.object({
+  roundId: z.string(),
+  roundName: z.string(),
+  denominators: DenominatorVerdictSchema,
+})
+
 export const EventRankingSchema = z.object({
+  // Every non-draft round the totals sum, in the same order as each team's
+  // `rounds` (openedAt ascending) — the open one included.
+  rounds: z.array(EventRankingRoundVerdictSchema),
   teams: z.array(EventRankingTeamSchema),
 })
 
@@ -79,5 +94,6 @@ export type RoundRankingTeam = z.infer<typeof RoundRankingTeamSchema>
 export type RoundRanking = z.infer<typeof RoundRankingSchema>
 export type RoundRankingParams = z.infer<typeof RoundRankingParamsSchema>
 export type EventRankingRoundEntry = z.infer<typeof EventRankingRoundEntrySchema>
+export type EventRankingRoundVerdict = z.infer<typeof EventRankingRoundVerdictSchema>
 export type EventRankingTeam = z.infer<typeof EventRankingTeamSchema>
 export type EventRanking = z.infer<typeof EventRankingSchema>

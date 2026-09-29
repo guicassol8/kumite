@@ -239,6 +239,14 @@ jsonpath "$.teams[1].teamName" == "Ranking E2E Time B"
 jsonpath "$.teams[1].rounds[?(@.roundId=='{{round_id}}')].score" == 50
 jsonpath "$.teams[2].teamName" == "Ranking E2E Time C"
 jsonpath "$.teams[2].rounds[?(@.roundId=='{{round_id}}')].score" == 0
+# #383: each summed round states its denominator verdict once, outside the
+# teams. Both submissions above were judged on the same untouched problem, so
+# our round is consistent. (Other files' rounds share the db — hence the
+# filter. `inconsistent` is unreachable through the API since #193's guard;
+# ranking.test.ts covers it.)
+jsonpath "$.rounds" count >= 1
+jsonpath "$.rounds[?(@.roundId=='{{round_id}}')].roundName" == "Ranking E2E Round"
+jsonpath "$.rounds[?(@.roundId=='{{round_id}}')].denominators" == "consistent"
 
 # 9. A malformed round id -> 422 from the params schema, never a db error (#94).
 GET {{host}}/rounds/nao-e-uuid/ranking

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatDate, formatNumber, formatTime } from './format'
+import { formatDate, formatList, formatNumber, formatTime } from './format'
 
 const NUMBER = 1234.5
 const DATE = new Date(2026, 7, 27)
@@ -45,5 +45,28 @@ describe('formatTime', () => {
 
   it('formats as en-US 12h time', () => {
     expect(formatTime(DATE_TIME, 'en')).toBe('01:05 PM')
+  })
+})
+
+// #383: names the rounds that make the event total not comparable.
+describe('formatList', () => {
+  const ROUNDS = ['Rodada 1', 'Rodada 2', 'Rodada 3']
+
+  it('joins with the Portuguese conjunction', () => {
+    expect(formatList(ROUNDS.slice(0, 2), 'pt')).toBe('Rodada 1 e Rodada 2')
+    expect(formatList(ROUNDS, 'pt')).toBe('Rodada 1, Rodada 2 e Rodada 3')
+  })
+
+  it('joins with the Spanish conjunction', () => {
+    expect(formatList(ROUNDS.slice(0, 2), 'es')).toBe('Rodada 1 y Rodada 2')
+  })
+
+  it('joins with the English conjunction', () => {
+    expect(formatList(ROUNDS.slice(0, 2), 'en')).toBe('Rodada 1 and Rodada 2')
+    expect(formatList(ROUNDS, 'en')).toBe('Rodada 1, Rodada 2, and Rodada 3')
+  })
+
+  it('leaves a single item alone', () => {
+    expect(formatList(['Rodada 1'], 'pt')).toBe('Rodada 1')
   })
 })

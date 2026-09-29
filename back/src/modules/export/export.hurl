@@ -76,6 +76,7 @@ header "Content-Type" contains "application/json"
 jsonpath "$.generatedAt" exists
 jsonpath "$.rounds" exists
 jsonpath "$.ranking.event.teams" exists
+jsonpath "$.ranking.event.rounds" exists
 jsonpath "$.ranking.rounds" exists
 jsonpath "$.teams.teams" exists
 jsonpath "$.removedTeams" exists

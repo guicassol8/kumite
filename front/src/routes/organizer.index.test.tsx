@@ -294,7 +294,7 @@ describe('organizer overview', () => {
       type: 'ranking.updated',
       serverTime: new Date('2026-09-02T12:05:00.000Z'),
       round: null,
-      event: { teams: [] },
+      event: { rounds: [], teams: [] },
     })
 
     await waitFor(() =>

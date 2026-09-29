@@ -931,6 +931,16 @@
         "description": "Unable to confirm that the scores in this round are on the same scale: some submissions predate the scale being recorded."
       }
     },
+    "eventDenominators": {
+      "inconsistent": {
+        "title": "The event total is not comparable between teams",
+        "description_one": "This sum includes a round where the same problem was scored on different scales: {{rounds}}. The event totals cannot be compared between teams.",
+        "description_other": "This sum includes rounds where the same problem was scored on different scales: {{rounds}}. The event totals cannot be compared between teams."
+      },
+      "unknown": {
+        "description": "Unable to confirm that the event total is on the same scale for every team: some round in the sum has submissions that predate the scale being recorded."
+      }
+    },
     "notLiveBadge": "not live",
     "liveChip": "Live",
     "noSubmission": "—",

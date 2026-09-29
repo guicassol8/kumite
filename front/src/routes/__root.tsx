@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { VercelAnalytics } from '@/components/analytics'
 import { Footer } from '@/components/footer'
 import { Header } from '@/components/header'
+import { TourProvider } from '@/components/onboarding/tour-provider'
 import { SessionErrorScreen } from '@/components/session-error'
 import { RoundStreamProvider } from '@/hooks/use-round-stream'
 import { useSession } from '@/hooks/use-session'
@@ -56,12 +57,16 @@ function RootComponent() {
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <VercelAnalytics />
       <RoundStreamProvider>
-        <Header />
-        {/* Hydration gave up (#179). The card takes the outlet's place rather
-            than the whole page: header and footer are how the user changes
-            language or reaches the organizers while nothing else works. */}
-        {status === 'error' ? <SessionErrorScreen /> : <Outlet />}
-        <Footer />
+        {/* The guided tour (#213) walks between routes, so it lives above
+            the outlet; the header's menu and the home invite both start it. */}
+        <TourProvider>
+          <Header />
+          {/* Hydration gave up (#179). The card takes the outlet's place rather
+              than the whole page: header and footer are how the user changes
+              language or reaches the organizers while nothing else works. */}
+          {status === 'error' ? <SessionErrorScreen /> : <Outlet />}
+          <Footer />
+        </TourProvider>
       </RoundStreamProvider>
     </div>
   )

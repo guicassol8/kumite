@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Lockup } from '@/components/brand/lockup'
 import { BugReport } from '@/components/bug-report'
 import { LanguageSelector } from '@/components/language-selector'
+import { useTour } from '@/components/onboarding/tour-provider'
 import { RoundCountdown } from '@/components/round-countdown'
 import { Button } from '@/components/ui/button'
 import { DialogTrigger } from '@/components/ui/dialog'
@@ -140,6 +141,7 @@ export function Header() {
   const [bugReportOpen, setBugReportOpen] = useState(false)
   const isAuthenticated = status === 'authenticated' && user != null
   const isPresentation = usePresentationMode()
+  const { startTour } = useTour()
 
   if (isPresentation) return null
 
@@ -159,6 +161,13 @@ export function Header() {
   function openBugReportFromMobileMenu() {
     closeMobileMenu()
     setBugReportOpen(true)
+  }
+
+  // Same reasoning: the sheet closes first, so the tour's popover is not
+  // stacked on top of (or anchored behind) a full-width panel.
+  function startTourFromMobileMenu() {
+    closeMobileMenu()
+    startTour()
   }
 
   return (
@@ -308,10 +317,29 @@ export function Header() {
                           {t('header.changePassword')}
                         </Link>
                       </DropdownMenuItem>
+                      {/* #213: the tour's permanent control, and the page
+                          behind it. In the menu, not on the bar — the bar's
+                          width budget is spent (#297). */}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link to="/how-it-works" data-testid="header-how-it-works-link">
+                          {t('header.howItWorks')}
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem data-testid="header-start-tour" onSelect={startTour}>
+                        {t('header.startTour')}
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : (
                   <>
+                    <Link
+                      to="/how-it-works"
+                      data-testid="header-how-it-works-link"
+                      className="shrink-0 text-sm"
+                    >
+                      {t('header.howItWorks')}
+                    </Link>
                     <Link to="/login" data-testid="header-login-link" className="text-sm">
                       {t('header.login')}
                     </Link>
@@ -453,9 +481,33 @@ export function Header() {
                             >
                               {t('header.changePassword')}
                             </Link>
+                            <Link
+                              to="/how-it-works"
+                              data-testid="header-how-it-works-link"
+                              className="py-2 text-sm"
+                              onClick={closeMobileMenu}
+                            >
+                              {t('header.howItWorks')}
+                            </Link>
+                            <button
+                              type="button"
+                              data-testid="header-start-tour"
+                              className="py-2 text-left text-sm"
+                              onClick={startTourFromMobileMenu}
+                            >
+                              {t('header.startTour')}
+                            </button>
                           </>
                         ) : (
                           <>
+                            <Link
+                              to="/how-it-works"
+                              data-testid="header-how-it-works-link"
+                              className="py-2 text-sm"
+                              onClick={closeMobileMenu}
+                            >
+                              {t('header.howItWorks')}
+                            </Link>
                             <Link
                               to="/login"
                               data-testid="header-login-link"

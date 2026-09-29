@@ -28,7 +28,9 @@
     },
     "nav": {
       "home": "Home"
-    }
+    },
+    "howItWorks": "How it works",
+    "startTour": "Take the tour"
   },
   "footer": {
     "contactLabel": "Questions? Talk to the organizers:",
@@ -36,7 +38,8 @@
       "connected": "Connected",
       "error": "No connection",
       "connecting": "Connecting"
-    }
+    },
+    "howItWorks": "How it works"
   },
   "session": {
     "error": {
@@ -1058,5 +1061,81 @@
     "retry": "Try again",
     "empty": "There are no practice problems available yet.",
     "openProblem": "Open {{title}}"
+  },
+  "onboarding": {
+    "invite": {
+      "title": "First time here?",
+      "body": "Want a quick tour of the platform? We show you where the teams, the round, the block editor, the leaderboard and practice are, without changing anything in your account.",
+      "accept": "Take the tour",
+      "decline": "Not now",
+      "howItWorks": "Read how it works",
+      "hint": "The tour is always available from your user menu."
+    },
+    "saveError": {
+      "message": "We couldn't save your choice; we'll ask again next time you sign in.",
+      "dismiss": "Dismiss notice"
+    },
+    "tour": {
+      "label": "Guided tour",
+      "position": "Step {{current}} of {{total}}",
+      "prev": "Back",
+      "next": "Next",
+      "finish": "Finish",
+      "exit": "Exit the tour",
+      "steps": {
+        "header": {
+          "title": "Menu and language",
+          "body": "The top bar holds the navigation (teams, leaderboard, practice) and your menu. Switch the language here any time: Portuguese, Spanish or English."
+        },
+        "round": {
+          "title": "The round",
+          "body": "When the organizers open a round, it shows up here, with the timer and the button that takes you to the problems."
+        },
+        "teams": {
+          "title": "Teams",
+          "body": "Scores belong to the team. This is where you create a team or join one that already exists."
+        },
+        "editor": {
+          "title": "Block editor",
+          "body": "Every problem is solved by dragging blocks. Each solution starts at the \"solve\" block; use Run to try it against the examples."
+        },
+        "leaderboard": {
+          "title": "Leaderboard",
+          "body": "The round and event leaderboards update live as teams submit solutions."
+        },
+        "practice": {
+          "title": "Practice",
+          "body": "Outside the rounds, train on the practice problems whenever you like: there is no submission or scoring here."
+        }
+      }
+    }
+  },
+  "howItWorks": {
+    "title": "How it works",
+    "intro": "kumite is the block-programming platform for the competition between PUCRS and Universidad de Mérida.",
+    "sections": {
+      "what": {
+        "title": "What kumite is",
+        "body": "A problem appears on screen and you solve it by dragging programming blocks. Your solution goes to the server, which runs it against test cases and scores it automatically."
+      },
+      "teams": {
+        "title": "Teams",
+        "body": "You compete as a team, and the score belongs to the team. The organizers set how many people fit in a team, and teams mixing students from both universities are allowed unless the organizers say otherwise."
+      },
+      "rounds": {
+        "title": "Rounds and scoring",
+        "body": "The organizers open a round and a timer starts. Each problem is worth a number of points, prorated over the hidden test cases your solution passes, and your team's best submission on each problem is the one that counts. On a tie, whoever reached the score first ranks higher, then whoever needed fewer attempts."
+      },
+      "editor": {
+        "title": "The block editor",
+        "body": "Every solution starts at the \"solve\" block: whatever you plug into \"return\" is the answer. Run tries your solution on the visible examples; during a round, Submit sends it to the judge."
+      },
+      "practice": {
+        "title": "Where to practice",
+        "body": "The Practice tab has problems open at any time, with or without a round. There is no submission or scoring there: it is the place to get used to the blocks before the competition."
+      }
+    },
+    "startTour": "Take the guided tour",
+    "practiceLink": "Go to practice"
   }
 }

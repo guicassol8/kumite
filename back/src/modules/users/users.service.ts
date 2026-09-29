@@ -26,6 +26,23 @@ export async function findUserById(db: Db, id: string): Promise<User | null> {
   return user ?? null
 }
 
+// Records that the onboarding-tour invite was answered (#213). The first
+// answer wins: `coalesce` keeps an existing timestamp, so a second call (a
+// double click, a second machine) returns the same value instead of moving
+// it. `updatedAt` moves only on that first write — same as promoteUser, which
+// leaves an unchanged row alone. null when no such user exists.
+export async function markOnboardingPrompted(db: Db, userId: string): Promise<User | null> {
+  const [user] = await db
+    .update(usersTable)
+    .set({
+      onboardingPromptedAt: sql`coalesce(${usersTable.onboardingPromptedAt}, now())`,
+      updatedAt: sql`case when ${usersTable.onboardingPromptedAt} is null then now() else ${usersTable.updatedAt} end`,
+    })
+    .where(eq(usersTable.id, userId))
+    .returning()
+  return user ?? null
+}
+
 const userSummaryColumns = {
   id: usersTable.id,
   email: usersTable.email,

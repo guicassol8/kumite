@@ -21,6 +21,10 @@ export const UserSchema = z.object({
   // Rides along on PublicUserSchema, so GET /me carries it — the front reads
   // it off the session to force the change screen (#143).
   mustChangePassword: z.boolean(),
+  // When the onboarding-tour invite was answered (#213); null = never asked,
+  // which is also every account predating the column. Rides along on GET /me
+  // so the front can decide whether to show the invite.
+  onboardingPromptedAt: z.coerce.date().nullable(),
   // coerce, not date(): kata re-validates the output after JSON serialization,
   // where a Date has already become an ISO string.
   createdAt: z.coerce.date(),
@@ -45,8 +49,12 @@ export type UserClaims = z.infer<typeof UserClaimsSchema>
 // active is omitted: the db column defaults to true, and every user is
 // created active — deactivation is a separate organizer action (T5/T7).
 // mustChangePassword likewise defaults to false; only the organizer reset
-// (#143) ever raises it.
-export type NewUser = Omit<User, 'id' | 'active' | 'mustChangePassword' | 'createdAt' | 'updatedAt'>
+// (#143) ever raises it. onboardingPromptedAt starts null ("never asked",
+// #213); only POST /me/onboarding sets it.
+export type NewUser = Omit<
+  User,
+  'id' | 'active' | 'mustChangePassword' | 'onboardingPromptedAt' | 'createdAt' | 'updatedAt'
+>
 
 // --- Organizer admin DTOs (#52) ---
 

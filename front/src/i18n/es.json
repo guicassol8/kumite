@@ -28,7 +28,9 @@
     },
     "nav": {
       "home": "Inicio"
-    }
+    },
+    "howItWorks": "Cómo funciona",
+    "startTour": "Hacer el recorrido"
   },
   "footer": {
     "contactLabel": "¿Dudas? Habla con la organización:",
@@ -36,7 +38,8 @@
       "connected": "Conectado",
       "error": "Sin conexión",
       "connecting": "Conectando"
-    }
+    },
+    "howItWorks": "Cómo funciona"
   },
   "session": {
     "error": {
@@ -1058,5 +1061,81 @@
     "retry": "Reintentar",
     "empty": "Todavía no hay problemas de práctica disponibles.",
     "openProblem": "Abrir {{title}}"
+  },
+  "onboarding": {
+    "invite": {
+      "title": "¿Primera vez por aquí?",
+      "body": "¿Quieres un recorrido rápido por la plataforma? Te mostramos dónde están los equipos, la ronda, el editor de bloques, la tabla y la práctica, sin tocar nada de tu cuenta.",
+      "accept": "Hacer el recorrido",
+      "decline": "Ahora no",
+      "howItWorks": "Leer cómo funciona",
+      "hint": "El recorrido siempre está disponible en el menú de tu usuario."
+    },
+    "saveError": {
+      "message": "No pudimos guardar tu elección; te preguntaremos de nuevo en el próximo acceso.",
+      "dismiss": "Cerrar aviso"
+    },
+    "tour": {
+      "label": "Recorrido guiado",
+      "position": "Paso {{current}} de {{total}}",
+      "prev": "Anterior",
+      "next": "Siguiente",
+      "finish": "Terminar",
+      "exit": "Salir del recorrido",
+      "steps": {
+        "header": {
+          "title": "Menú e idioma",
+          "body": "Arriba están la navegación (equipos, tabla, práctica) y tu menú. Aquí cambias el idioma cuando quieras: portugués, español o inglés."
+        },
+        "round": {
+          "title": "La ronda",
+          "body": "Cuando la organización abre una ronda, aparece aquí, con el cronómetro y el botón para ir a los problemas."
+        },
+        "teams": {
+          "title": "Equipos",
+          "body": "La puntuación es del equipo. En esta pantalla creas un equipo o te unes a uno que ya existe."
+        },
+        "editor": {
+          "title": "Editor de bloques",
+          "body": "Cada problema se resuelve arrastrando bloques. Toda solución empieza en el bloque \"resolver\"; usa Ejecutar para probar con los ejemplos."
+        },
+        "leaderboard": {
+          "title": "Tabla",
+          "body": "La tabla de la ronda y la del evento se actualizan en vivo mientras los equipos envían soluciones."
+        },
+        "practice": {
+          "title": "Práctica",
+          "body": "Fuera de las rondas, entrena con los problemas de práctica cuando quieras: aquí no hay envío ni puntuación."
+        }
+      }
+    }
+  },
+  "howItWorks": {
+    "title": "Cómo funciona",
+    "intro": "kumite es la plataforma de programación con bloques de la competencia entre la PUCRS y la Universidad de Mérida.",
+    "sections": {
+      "what": {
+        "title": "Qué es kumite",
+        "body": "Aparece un problema en pantalla y lo resuelves arrastrando bloques de programación. La solución va al servidor, que la ejecuta contra casos de prueba y la califica automáticamente."
+      },
+      "teams": {
+        "title": "Equipos",
+        "body": "Compites en equipo, y la puntuación es del equipo. La organización define cuántas personas caben en cada equipo, y se permiten equipos con estudiantes de las dos universidades, salvo que la organización avise lo contrario."
+      },
+      "rounds": {
+        "title": "Rondas y puntuación",
+        "body": "La organización abre una ronda y empieza a correr un cronómetro. Cada problema vale una cantidad de puntos, proporcional a los casos de prueba ocultos que pasa la solución, y cuenta el mejor envío del equipo en cada problema. En caso de empate, va adelante quien llegó antes a la puntuación y, después, quien necesitó menos intentos."
+      },
+      "editor": {
+        "title": "El editor de bloques",
+        "body": "Toda solución empieza en el bloque \"resolver\": lo que encajas en \"devolver\" es la respuesta. Ejecutar prueba la solución con los ejemplos visibles; durante la ronda, Enviar manda la solución al juez."
+      },
+      "practice": {
+        "title": "Dónde practicar",
+        "body": "La pestaña Práctica tiene problemas abiertos en cualquier momento, con o sin ronda. No hay envío ni puntuación: es el lugar para acostumbrarte a los bloques antes de la competencia."
+      }
+    },
+    "startTour": "Hacer el recorrido guiado",
+    "practiceLink": "Ir a la práctica"
   }
 }

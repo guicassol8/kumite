@@ -73,6 +73,11 @@ export const usersTable = pgTable(
     // route answers 403 `password_change_required` except the two escape
     // hatches (GET /me and POST /auth/change-password) — see ADR-0004.
     mustChangePassword: boolean('must_change_password').notNull().default(false),
+    // When the onboarding-tour invite was answered — accepted or declined, the
+    // first answer wins (#213). NULL means "never asked", and that is also what
+    // every account predating the column gets: nullable with no backfill, on
+    // purpose, so users registered before the event still see the invite once.
+    onboardingPromptedAt: timestamp('onboarding_prompted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

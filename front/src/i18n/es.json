@@ -931,6 +931,16 @@
         "description": "No es posible confirmar que los puntajes de esta ronda estén en la misma escala: hay envíos anteriores al registro de la escala."
       }
     },
+    "eventDenominators": {
+      "inconsistent": {
+        "title": "El total del evento no es comparable entre los equipos",
+        "description_one": "Esta suma incluye una ronda en la que un mismo problema se puntuó en escalas diferentes: {{rounds}}. Los totales del evento no se pueden comparar entre los equipos.",
+        "description_other": "Esta suma incluye rondas en las que un mismo problema se puntuó en escalas diferentes: {{rounds}}. Los totales del evento no se pueden comparar entre los equipos."
+      },
+      "unknown": {
+        "description": "No es posible confirmar que el total del evento esté en la misma escala para todos los equipos: alguna ronda sumada tiene envíos anteriores al registro de la escala."
+      }
+    },
     "notLiveBadge": "no en vivo",
     "liveChip": "En vivo",
     "noSubmission": "—",

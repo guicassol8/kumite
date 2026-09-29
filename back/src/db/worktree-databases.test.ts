@@ -1,8 +1,11 @@
-import postgres from 'postgres'
 import { describe, expect, it } from 'vitest'
 
-import { ensureDatabase } from './test-database'
-import { dropDatabases, mainDatabaseUrl, worktreeDatabaseCandidates } from './worktree-databases'
+import {
+  dropDatabases,
+  dropStatement,
+  mainDatabaseUrl,
+  worktreeDatabaseCandidates,
+} from './worktree-databases'
 
 const MAIN = 'postgres://kumite:kumite@localhost:5487/kumite'
 const names = (urls: string[]) =>
@@ -60,35 +63,53 @@ describe('mainDatabaseUrl', () => {
 })
 
 describe('dropDatabases (#395)', () => {
-  it('reports on a dry run, drops for real, skips what does not exist', async () => {
-    const base = process.env['DATABASE_URL'] ?? ''
-    const probe = new URL(base)
-    probe.pathname = `${probe.pathname}_dropprobe`
-    const name = decodeURIComponent(probe.pathname.slice(1))
-    const missing = new URL(base)
-    missing.pathname = `${missing.pathname}_dropprobe_missing`
-    const admin = new URL(base)
-    admin.pathname = '/postgres'
-    const sql = postgres(admin.toString(), { max: 1, onnotice: () => {} })
-    const exists = async () =>
-      (await sql`select 1 from pg_database where datname = ${name}`).length === 1
+  // No real CREATE/DROP DATABASE here: a DROP forces an immediate checkpoint,
+  // and one racing the rest of the suite on WSL took minutes and timed out
+  // every database test beside it (#404). The suite's own database plays the
+  // one that exists; the drop statement is recorded instead of run. The real
+  // drop is proven by hand in the PR's evidence.
+  const base = process.env['DATABASE_URL'] ?? ''
+  const existing = decodeURIComponent(new URL(base).pathname.slice(1))
+  const missing = new URL(base)
+  missing.pathname = `${missing.pathname}_dropprobe_missing`
+  const urls = [base, missing.toString()]
+
+  it('reports what exists on a dry run and runs nothing', async () => {
     const lines: string[] = []
-    try {
-      await ensureDatabase(probe.toString())
-      const urls = [probe.toString(), missing.toString()]
+    const ran: string[] = []
+    const names = await dropDatabases(
+      base,
+      urls,
+      true,
+      (l) => lines.push(l),
+      async (s) => ran.push(s),
+    )
+    expect(names).toEqual([existing])
+    expect(lines).toEqual([`would drop database ${existing}`])
+    expect(ran).toEqual([])
+  })
 
-      expect(await dropDatabases(base, urls, true, (l) => lines.push(l))).toEqual([name])
-      expect(await exists()).toBe(true)
+  it('drops what exists for real, and skips what does not', async () => {
+    const lines: string[] = []
+    const ran: string[] = []
+    const names = await dropDatabases(
+      base,
+      urls,
+      false,
+      (l) => lines.push(l),
+      async (s) => ran.push(s),
+    )
+    expect(names).toEqual([existing])
+    expect(ran).toEqual([dropStatement(existing)])
+    expect(lines).toEqual([`dropped database ${existing}`])
+  })
 
-      expect(await dropDatabases(base, urls, false, (l) => lines.push(l))).toEqual([name])
-      expect(await exists()).toBe(false)
-      expect(lines).toEqual([`would drop database ${name}`, `dropped database ${name}`])
-    } finally {
-      await sql.unsafe(`drop database if exists "${name}"`)
-      await sql.end()
-    }
-    // create/drop database fsyncs a whole template copy: seconds on WSL.
-  }, 30_000)
+  it('quotes the name and forces out leftover sessions', () => {
+    expect(dropStatement('kumite_task404')).toBe(
+      'drop database if exists "kumite_task404" with (force)',
+    )
+    expect(dropStatement('a"b')).toBe('drop database if exists "a""b" with (force)')
+  })
 
   it('refuses a server that is not local', async () => {
     await expect(

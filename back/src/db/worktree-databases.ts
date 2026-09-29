@@ -61,21 +61,33 @@ export function worktreeDatabaseCandidates(input: WorktreeDatabasesInput): strin
   })
 }
 
+/** The statement that drops `name`. WITH (FORCE) (Postgres 13+) ends a
+ * leftover dev server's sessions instead of failing on them. */
+export function dropStatement(name: string): string {
+  return `drop database if exists "${name.replace(/"/g, '""')}" with (force)`
+}
+
 /**
  * Drops each database in `urls` that exists, through the `postgres`
  * maintenance database of `mainUrl`'s server; with `dryRun`, only reports
  * them. Returns the names it dropped (or would drop). Local servers only.
+ * `execute` runs each drop statement — the real connection by default; the
+ * test passes a recorder, because a DROP DATABASE forces an immediate
+ * checkpoint, and one racing the suite's writes on WSL took minutes and
+ * timed out every database test beside it (#404).
  */
 export async function dropDatabases(
   mainUrl: string,
   urls: string[],
   dryRun: boolean,
   log: (line: string) => void = console.log,
+  execute?: (statement: string) => Promise<unknown>,
 ): Promise<string[]> {
   assertLocalDatabaseUrl(mainUrl, 'db:drop-worktree')
   const maintenance = new URL(mainUrl)
   maintenance.pathname = '/postgres'
   const sql = postgres(maintenance.toString(), { max: 1, onnotice: () => {} })
+  const run = execute ?? ((statement: string) => sql.unsafe(statement))
   const names: string[] = []
   try {
     for (const url of urls) {
@@ -85,8 +97,7 @@ export async function dropDatabases(
       if (dryRun) {
         log(`would drop database ${name}`)
       } else {
-        // WITH (FORCE) (Postgres 13+) ends a leftover dev server's sessions.
-        await sql.unsafe(`drop database if exists "${name.replace(/"/g, '""')}" with (force)`)
+        await run(dropStatement(name))
         log(`dropped database ${name}`)
       }
       names.push(name)

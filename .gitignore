@@ -7,7 +7,9 @@ dist/
 lefthook-local.yml
 data/
 
-# Playwright run artifacts (evidence screenshots under front/e2e/evidence/ ARE committed)
+# Playwright run artifacts. The walkthrough screenshots under front/e2e/evidence/
+# are attached to the PR (gh pr comment --attach), never committed (#402).
+front/e2e/evidence/
 front/test-results/
 front/playwright-report/
 front/blob-report/

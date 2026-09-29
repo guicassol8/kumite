@@ -160,13 +160,18 @@ touched production code), spawn a **`fix-verifier`** agent
 Verify the review fixes on PR #<PR>: <from>..<to>.
 ```
 
-The range alone is the trigger: any verdict that comes with one is
+An unverified range is the trigger: any verdict that comes with one is
 provisional until the verifier returns, whatever the reviewer wrote (it
 should say `verdict: pending fix verification`). Send its result to the
-**same** reviewer (`SendMessage`, it keeps the
-context): on `fixes verified` the reviewer posts the Verdict; on a defect it
-fixes it and reports a new range, verified again the same way. A third round
-goes to the user. Only a report with no fix range carries a final verdict.
+**same** reviewer (`SendMessage`, it keeps the context):
+
+- on `fixes verified`, the reviewer posts the Verdict and reports that range
+  as `verified` — a verified range never triggers the verifier again, so
+  that report is final;
+- on a defect, it fixes it and reports a new range, verified again the same
+  way. A third round goes to the user.
+
+A report is final when it carries no fix range, or only verified ones.
 
 Relay the verdict, the mutant score, the verifier's result and the Evidence
 link to the user.

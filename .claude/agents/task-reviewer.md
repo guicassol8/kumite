@@ -28,13 +28,15 @@ verdict yet, and end your report with the fix range
 (`<head before your first fix>..<head after your last fix>`) and
 `verdict: pending fix verification`. The verifier's result comes back to
 you as a message: fix a defect it reports (a new range, verified again), or
-post the Verdict with its result.
+post the Verdict with its result — and from then on report that range as
+`verified`, so the orchestrator does not run the verifier on it again.
 
 Push all your fixes in one push (each push to the open PR costs CI minutes;
 the pre-push runs the ladder — Bash `timeout: 600000`). Do **not** merge and
 do not close the issue: the merge is the user's call.
 
 Final report: the Acceptance compliance table, findings and what you fixed
-(with commit SHAs), the fix range when any fix touched production code, the
+(with commit SHAs), the fix range when any fix touched production code
+(marked `verified` once the verifier returned `fixes verified` on it), the
 mutant score, the link to the Evidence comment, and the verdict (approved /
 changes requested / pending fix verification).

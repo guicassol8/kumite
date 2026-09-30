@@ -4,7 +4,9 @@
 # scripts/worktree-prune.sh's database step (#395).
 #
 # It builds a throwaway repository in a temp dir with the working copy of the
-# scripts (and env-exports.mjs), adds linked worktrees to it, and runs
+# scripts (and env-exports.mjs) and of the repository's own .gitignore — so a
+# file the scripts leave behind that git does not ignore shows up in `git
+# status` here too (#413) — adds linked worktrees to it, and runs
 # them there with a shell that exports PORT, DATABASE_URL and APP_BASE_URL,
 # as this machine's does. A stub `pnpm` on PATH records every call with the
 # DATABASE_URL and PORT it saw, and fails the call whose arguments contain
@@ -93,7 +95,7 @@ cp "$repo/scripts/worktree-env.sh" "$repo/scripts/e2e.sh" "$repo/scripts/env-exp
   "$repo/scripts/worktree-prune.sh" "$main/scripts/"
 cp "$repo/back/.env.example" "$main/back/.env.example"
 echo '{}' >"$main/front/package.json" # git keeps no empty dir: front/ must exist
-printf 'back/.env\nback/.env.bak\nfront/.env\nnode_modules/\n' >"$main/.gitignore"
+cp "$repo/.gitignore" "$main/.gitignore"
 g add -A && g commit -qm init || exit 1
 
 # add_tree <dir> [<branch>]: a linked worktree on a new branch (detached
@@ -377,6 +379,126 @@ expect "db:drop-worktree ran for task-7-a with its back/.env in place" grep -qx 
 expect "never with the back/.env already gone" not grep -q 'env=no' "$pnpm_log.drops"
 expect "docker reached only the stub, and only to look (ps)" grep -q '^ps ' "$tmp/docker.log"
 expect "the stub was never asked to remove anything" not grep -q '^rm ' "$tmp/docker.log"
+end
+
+# --- a back/.env copied from another tree (#413) -------------------------------
+# review-7 (detached) outlived the prune. The copy lands in `review`, whose path
+# is a prefix of review-7's: a marker matched as a substring would pass for its
+# own. Roots come from git, as the script's do (on macOS /tmp is a symlink).
+marker='# worktree:env (#404)'
+toplevel() { git -C "$1" rev-parse --show-toplevel; }
+differs() { [ -n "$1" ] && [ "$1" != "$2" ]; } # differs <value> <other>: set, and not it
+add_tree review
+r_root="$(toplevel "$wt/review")"
+b_root="$(toplevel "$wt/review-7")"
+cp "$wt/review-7/back/.env" "$tmp/review-7.before"
+
+begin "(s) a back/.env copied from another tree -> refused, then its own database and ports"
+cp "$wt/review-7/back/.env" "$wt/review/back/.env"
+cp "$wt/review-7/front/.env" "$wt/review/front/.env"
+: >"$e2e_log"
+out="$(in_tree "$wt/review" env KUMITE_E2E_LOCK_DIR="$tmp/locks" SMOKE_E2E_SECONDS=0 bash scripts/e2e.sh 2>&1)"
+rc=$?
+expect "e2e exits non-zero (rc=$rc)" [ "$rc" != 0 ]
+expect "e2e says whose back/.env it is" says "for $b_root, not for this tree ($r_root)"
+expect "e2e says what to run" says 'run `pnpm worktree:env` here'
+expect "Playwright never started" [ ! -s "$e2e_log" ]
+printed="$(in_tree "$wt/review" bash scripts/worktree-env.sh --print 2>/dev/null)"
+rc=$?
+expect "--print exits non-zero (rc=$rc)" [ "$rc" != 0 ]
+expect "--print leaves nothing to eval" [ -z "$printed" ]
+wenv "$wt/review"
+r_db="$(dbname "$wt/review")"
+r_port="$(env_of "$wt/review" PORT)"
+r_front="$(env_of "$wt/review" FRONT_PORT)"
+expect "exit 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "says whose back/.env it was" says "for $b_root"
+expect "database kumite_review, not review-7's (got $r_db)" [ "$r_db" = kumite_review ]
+expect "back port not review-7's $b_port (got $r_port)" differs "$r_port" "$b_port"
+expect "front port not review-7's $b_front (got $r_front)" differs "$r_front" "$b_front"
+expect "front/.env points at the new back port" grep -qx "VITE_API_URL=http://localhost:$r_port" "$wt/review/front/.env"
+expect "the first line names this tree (got: $(head -n 1 "$wt/review/back/.env"))" \
+  [ "$(head -n 1 "$wt/review/back/.env")" = "$marker tree=$r_root" ]
+expect "the copy is in back/.env.bak" grep -qs kumite_review7 "$wt/review/back/.env.bak"
+expect "every pnpm call saw this tree's database (saw: $dbs)" \
+  [ "$dbs" = "postgres://kumite:kumite@localhost:5487/kumite_review" ]
+expect "db:create" called db:create
+expect "db:migrate" called db:migrate
+expect "db:seed" called db:seed
+expect "review-7's back/.env untouched" cmp -s "$tmp/review-7.before" "$wt/review-7/back/.env"
+expect "review-7's first line names review-7" [ "$(head -n 1 "$wt/review-7/back/.env")" = "$marker tree=$b_root" ]
+expect "git status is clean (got: $(git -C "$wt/review" status --porcelain | tr '\n' ' '))" \
+  [ -z "$(git -C "$wt/review" status --porcelain)" ]
+end
+
+begin "(t) re-run in the rewritten tree keeps its database and ports"
+cp "$wt/review/back/.env.bak" "$tmp/review.bak" 2>/dev/null
+wenv "$wt/review"
+expect "exit 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "says it keeps them" says "keeping this tree's"
+expect "same database" [ "$(dbname "$wt/review")" = "$r_db" ]
+expect "same back port" [ "$(env_of "$wt/review" PORT)" = "$r_port" ]
+expect "same front port" [ "$(env_of "$wt/review" FRONT_PORT)" = "$r_front" ]
+expect "no db:seed" not_called db:seed
+expect "back/.env.bak untouched" cmp -s "$tmp/review.bak" "$wt/review/back/.env.bak"
+end
+
+# print_in <dir>: --print there. Sets printed (stdout), out (stderr), rc.
+print_in() {
+  printed="$(in_tree "$1" bash scripts/worktree-env.sh --print 2>"$tmp/print.err")"
+  rc=$?
+  out="$(cat "$tmp/print.err")"
+}
+
+begin "(u) the #404 marker, with no tree -> refused, then rewritten, same database and ports"
+old404="$marker: this worktree's own database and ports — re-run"
+{ echo "$old404"; sed 1d "$wt/review/back/.env"; } >"$tmp/review.env" && mv "$tmp/review.env" "$wt/review/back/.env"
+print_in "$wt/review"
+expect "--print exits non-zero (rc=$rc)" [ "$rc" != 0 ]
+expect "--print leaves nothing to eval" [ -z "$printed" ]
+expect "--print says the marker named no tree" says "no tree in its marker"
+expect "--print does not call it another tree's (it may be this one's)" not says "not for this tree"
+wenv "$wt/review"
+expect "exit 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "says the marker named no tree" says "no tree in its marker"
+expect "same database" [ "$(dbname "$wt/review")" = "$r_db" ]
+expect "same back port" [ "$(env_of "$wt/review" PORT)" = "$r_port" ]
+expect "same front port" [ "$(env_of "$wt/review" FRONT_PORT)" = "$r_front" ]
+expect "the first line names this tree again" [ "$(head -n 1 "$wt/review/back/.env")" = "$marker tree=$r_root" ]
+expect "the #404 one is in back/.env.bak" grep -qsxF "$old404" "$wt/review/back/.env.bak"
+end
+
+# A back/.env with no marker at all — written by hand, for a Docker Postgres —
+# is not a copy: pnpm e2e only warns, as before #413, and --print exports it.
+begin "(v) a back/.env with no marker -> pnpm e2e only warns, --print exports it"
+add_tree hand
+{
+  grep -v -e '^DATABASE_URL=' -e '^PORT=' "$main/back/.env"
+  echo 'DATABASE_URL=postgres://kumite:kumite@localhost:5487/kumite_hand'
+  echo 'PORT=3990'
+  echo 'FRONT_PORT=5990'
+} >"$wt/hand/back/.env"
+: >"$e2e_log"
+out="$(in_tree "$wt/hand" env KUMITE_E2E_LOCK_DIR="$tmp/locks" SMOKE_E2E_SECONDS=0 bash scripts/e2e.sh 2>&1)"
+rc=$?
+expect "e2e exits 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "e2e warns that worktree:env did not write it" says 'was not written by `pnpm worktree:env`'
+expect "Playwright ran with that back/.env" says "saw PORT=3990 FRONT_PORT=5990 VITE_API_URL=http://localhost:3990 DB=kumite_hand"
+print_in "$wt/hand"
+expect "--print exits 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "--print exports its PORT" grep -qx 'export PORT=3990' <<<"$printed"
+end
+
+# worktree:env never runs in the main checkout, so --print there must not send
+# anyone to it: another tree's marker in the main back/.env changes nothing.
+begin "(w) the main checkout's --print is not refused by another tree's marker"
+cp "$main/back/.env" "$tmp/main.env"
+{ echo "$marker tree=$b_root"; cat "$tmp/main.env"; } >"$main/back/.env"
+print_in "$main"
+expect "--print exits 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "--print exports the main checkout's PORT" grep -qx 'export PORT=3000' <<<"$printed"
+expect "no refusal" not says 'run `pnpm worktree:env` here'
+cp "$tmp/main.env" "$main/back/.env"
 end
 
 echo

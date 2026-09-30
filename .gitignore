@@ -2,6 +2,9 @@ node_modules/
 dist/
 .worktrees/
 .env
+# The old back/.env that `pnpm worktree:env` keeps when it rewrites one (#413):
+# it holds the same secrets (JWT_SECRET, the organizer).
+.env.bak
 *.log
 .DS_Store
 lefthook-local.yml

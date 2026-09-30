@@ -135,8 +135,14 @@ pnpm worktree:env   # its own database and ports (below) — when it runs the ap
   keeps the same database and ports and only migrates (it seeds again when
   the last seed did not complete — a run cut short, or a database created
   anew); `--reset` re-seeds (`db:reset`) — do that before a
-  full E2E or hurl run. The shell's exported `PORT`, `DATABASE_URL` and
-  `APP_BASE_URL` never leak in. `bash scripts/worktree-env-smoke.sh` proves
+  full E2E or hurl run. The first line of `back/.env` names the tree it was
+  written for (`# worktree:env (#404) tree=<root>`, #413): a `back/.env`
+  copied from another worktree, or written by #404 with no tree in its
+  marker, is rewritten with this tree's own database and ports, the old one
+  kept in `back/.env.bak` (gitignored — it holds the secrets). Until that
+  re-run, `pnpm e2e` and `--print` refuse it. The shell's exported `PORT`,
+  `DATABASE_URL` and `APP_BASE_URL` never leak in.
+  `bash scripts/worktree-env-smoke.sh` proves
   all of it, the E2E semaphore included, in a throwaway repository.
   - E2E: `pnpm e2e [playwright args]` (`CI=1 pnpm e2e` for the CI settings)
     runs Playwright with this tree's `back/.env` exported over the shell,

@@ -30,22 +30,16 @@ import {
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { readFieldIssues } from '@/lib/api-issues'
+import {
+  fetchOrganizerTeams,
+  ORGANIZER_TEAMS_QUERY_KEY,
+  type OrganizerTeam,
+} from '@/lib/organizer-teams-query'
 import { displayTeamName, normalizeTeamName } from '@/lib/team-name'
 
 export const Route = createFileRoute('/organizer/teams')({
   component: OrganizerTeamsScreen,
 })
-
-export const ORGANIZER_TEAMS_QUERY_KEY = ['organizer-teams']
-
-async function fetchOrganizerTeams() {
-  const res = await api.organizer.teams.$get()
-  if (!res.ok) throw new Error('failed to load teams')
-  return res.json()
-}
-
-type OrganizerTeamsList = Awaited<ReturnType<typeof fetchOrganizerTeams>>
-type OrganizerTeam = OrganizerTeamsList['teams'][number]
 
 const ROLE_KEYS = {
   participant: 'organizer.teamModeration.role.participant',

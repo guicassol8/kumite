@@ -17,6 +17,8 @@ vi.mock('@/lib/api', () => ({
     }),
     ranking: { $get: vi.fn() },
     problems: { ':id': { $get: vi.fn() } },
+    // Read by the pódio (#284), which the organizer's button opens.
+    organizer: { teams: { $get: vi.fn() } },
   },
 }))
 
@@ -140,10 +142,10 @@ const eventRanking: EventRanking = {
   ],
 }
 
-function renderLeaderboard() {
+function renderLeaderboard(initialEntry = '/leaderboard') {
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ['/leaderboard'] }),
+    history: createMemoryHistory({ initialEntries: [initialEntry] }),
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -1408,5 +1410,105 @@ describe('LeaderboardScreen — event denominators (#383)', () => {
     await waitFor(() => expect(screen.getByTestId('leaderboard-last-closed-label')).toBeDefined())
     expect(screen.queryByTestId(inconsistentId)).toBeNull()
     expect(screen.queryByTestId(unknownId)).toBeNull()
+  })
+})
+
+// #284: the organizer opens the closing ceremony from here, and the pódio
+// hands focus back to that same button when it closes.
+describe('LeaderboardScreen — pódio entry (#284)', () => {
+  const organizer: SessionUser = { ...participant, id: 'u-org', role: 'organizer' }
+  const mockedOrganizerTeams = vi.mocked(api.organizer.teams.$get)
+
+  beforeEach(() => {
+    HTMLElement.prototype.requestFullscreen = vi.fn().mockResolvedValue(undefined)
+    document.exitFullscreen = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null })
+    mockedOrganizerTeams.mockReset()
+    mockedOrganizerTeams.mockResolvedValue(jsonResponse(200, { maxTeamSize: 3, teams: [] }))
+  })
+
+  afterEach(() => {
+    document.documentElement.className = ''
+  })
+
+  it('shows no pódio button to a participant', async () => {
+    renderLeaderboard()
+
+    await waitFor(() => expect(screen.getByTestId('leaderboard-presentation-toggle')).toBeDefined())
+    expect(screen.queryByTestId('leaderboard-podium-link')).toBeNull()
+  })
+
+  it('shows the organizer an outline pódio button next to the telão toggle', async () => {
+    setSession(organizer, 'tok-org')
+    renderLeaderboard()
+
+    const button = await screen.findByTestId('leaderboard-podium-link')
+    expect(button.textContent).toContain('Pódio')
+    // One red button per screen (identity.md § 3): this one is not it.
+    expect(button.className).not.toContain('bg-brand')
+    expect(button.previousElementSibling?.getAttribute('data-testid')).toBe(
+      'leaderboard-presentation-toggle',
+    )
+  })
+
+  it('asks for fullscreen on the document root and opens /leaderboard/podium', async () => {
+    setSession(organizer, 'tok-org')
+    const router = renderLeaderboard()
+
+    fireEvent.click(await screen.findByTestId('leaderboard-podium-link'))
+
+    expect(HTMLElement.prototype.requestFullscreen).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(HTMLElement.prototype.requestFullscreen).mock.contexts[0]).toBe(
+      document.documentElement,
+    )
+    await waitFor(() => expect(router.state.location.pathname).toBe('/leaderboard/podium'))
+    expect(await screen.findByTestId('podium-board')).toBeDefined()
+  })
+
+  it('still opens the pódio when the Fullscreen API refuses', async () => {
+    HTMLElement.prototype.requestFullscreen = vi.fn().mockRejectedValue(new Error('denied'))
+    setSession(organizer, 'tok-org')
+    const router = renderLeaderboard()
+
+    fireEvent.click(await screen.findByTestId('leaderboard-podium-link'))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/leaderboard/podium'))
+  })
+
+  it('focuses the pódio button on the way back and drops the from parameter', async () => {
+    setSession(organizer, 'tok-org')
+    const router = renderLeaderboard('/leaderboard?from=podium')
+
+    const button = await screen.findByTestId('leaderboard-podium-link')
+    await waitFor(() => expect(document.activeElement).toBe(button))
+    await waitFor(() => expect(router.state.location.searchStr).toBe(''))
+    expect(router.state.location.pathname).toBe('/leaderboard')
+  })
+
+  it('ignores an unknown from value instead of failing the route', async () => {
+    setSession(organizer, 'tok-org')
+    const router = renderLeaderboard('/leaderboard?from=elsewhere')
+
+    const button = await screen.findByTestId('leaderboard-podium-link')
+    expect(router.state.location.search).toEqual({})
+    expect(document.activeElement).not.toBe(button)
+  })
+
+  it('goes pódio, Esc, back to the board with focus on the button and the theme restored', async () => {
+    setSession(organizer, 'tok-org')
+    const router = renderLeaderboard()
+
+    fireEvent.click(await screen.findByTestId('leaderboard-podium-link'))
+    await screen.findByTestId('podium-board')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    })
+
+    const button = await screen.findByTestId('leaderboard-podium-link')
+    await waitFor(() => expect(document.activeElement).toBe(button))
+    expect(router.state.location.pathname).toBe('/leaderboard')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
   })
 })

@@ -1,9 +1,10 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Maximize2, TriangleAlert, WifiOff } from 'lucide-react'
+import { Maximize2, TriangleAlert, Trophy, WifiOff } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { z } from 'zod'
 
 import {
   DenominatorsNotice,
@@ -30,6 +31,11 @@ import { fetchTeams, TEAMS_QUERY_KEY } from '@/lib/teams-query'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/leaderboard')({
+  // `from=podium` is how the pódio (#284) says "I just closed": this screen
+  // hands focus back to the button that opened it and drops the parameter.
+  // `.catch` so a hand-edited URL never turns into an error screen.
+  validateSearch: (search: Record<string, unknown>) =>
+    z.object({ from: z.enum(['podium']).optional().catch(undefined) }).parse(search),
   beforeLoad: requireAuth,
   component: LeaderboardScreen,
 })
@@ -174,6 +180,28 @@ function LeaderboardScreen() {
   // read the same payload, but the notices are not theirs to act on — and the
   // telão, projected for everyone, never shows them.
   const isOrganizer = useSession().user?.role === 'organizer'
+
+  // The pódio (#284) is a route of its own, so its trigger cannot get focus
+  // back from a state flip the way the telão toggle does below: the pódio
+  // navigates here with `from=podium` instead. Focus goes to the button that
+  // opened it, then the parameter is dropped so a reload does not refocus.
+  const navigate = Route.useNavigate()
+  const { from } = Route.useSearch()
+  const podiumLinkRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (from !== 'podium') return
+    podiumLinkRef.current?.focus()
+    navigate({ to: '/leaderboard', search: {}, replace: true })
+  }, [from, navigate])
+
+  const openPodium = useCallback(() => {
+    // Fullscreen goes on the document root, not on <main> like the telão:
+    // the request has to be made inside the click, and this <main> is gone
+    // once the route changes, which would drop the projector straight back
+    // out of fullscreen. The pódio degrades like the telão without it.
+    document.documentElement.requestFullscreen?.().catch(() => {})
+    navigate({ to: '/leaderboard/podium' })
+  }, [navigate])
 
   // Exiting is TelaoBoard's job from here (it owns the fullscreenchange and
   // Escape-keydown listeners while mounted) — this effect only hands focus
@@ -493,6 +521,20 @@ function LeaderboardScreen() {
         >
           <Maximize2 className="size-4" />
         </Button>
+        {/* Outline, not red: identity.md § 3 allows one red button per
+            screen, and the closing ceremony is not a competitive action. */}
+        {isOrganizer && (
+          <Button
+            ref={podiumLinkRef}
+            type="button"
+            variant="outline"
+            data-testid="leaderboard-podium-link"
+            onClick={openPodium}
+          >
+            <Trophy className="size-4" />
+            {t('leaderboard.podium.open')}
+          </Button>
+        )}
         {stream.isOffline && (
           <Badge variant="outline" data-testid="leaderboard-not-live-badge">
             {t('leaderboard.notLiveBadge')}

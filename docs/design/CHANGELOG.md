@@ -3,6 +3,29 @@
 Registro datado das decisões de design. Uma entrada por mudança de direção,
 paleta, tipografia ou logo; ajustes de implementação ficam nos PRs.
 
+## v1.5 — 2026-09-30 — o pódio (#284)
+
+O evento terminava numa tabela. O telão ganha um quinto estado, **(e) Pódio**,
+a cerimônia de encerramento que o organizador projeta depois da última
+rodada. Conceito, paleta e tipografia não mudam de direção: o pódio só usa
+papéis e tokens que já existiam.
+
+- **Só quem pontuou sobe.** O placar Geral lista todo time ativo, zerados
+  inclusive; num evento com dois times pontuando, o 3º lugar seria um time
+  zerado escolhido pela ordem alfabética. Pódio e lista mostram só quem tem
+  pontos, e os lugares que sobram ficam em branco — sem placeholder.
+- **Nomes de membros só no pódio.** A listagem pública de times é anônima
+  desde a #122/#173 (só universidade). O pódio é a exceção deliberada, e só
+  para o 1º, o 2º e o 3º; do 4º ao 10º, time, selos e pontos.
+- **Convite sem ano.** "Até a próxima edição", e não "até 2027": a string
+  mora no catálogo e não pode envelhecer a cada edição.
+- **1280×800 é tamanho de projetor**, não só 1920×1080: o pódio foi medido
+  nos dois, nos três idiomas, com o nome de 40 caracteres no topo. Numeral,
+  selos e pontos dividem uma linha para caber.
+- **Confete sem biblioteca nova**, feito com o `motion` que o placar já usa,
+  nas cores de marca, papel e âmbar (preenchimento, Regra 4), e parado com
+  `prefers-reduced-motion`.
+
 ## v1.4 — 2026-09-12 — o card social e o ícone de 192 px (#230)
 
 Duas cascas globais (404, erro do router) e os metadados de compartilhamento

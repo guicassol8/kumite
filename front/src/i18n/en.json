@@ -982,6 +982,18 @@
       "generalBadge": "Overall",
       "waitingNextRound": "Waiting for the next round",
       "pageIndicator": "{{current}} / {{total}} · switches every 15s"
+    },
+    "podium": {
+      "open": "Podium",
+      "title": "Podium",
+      "placeLabel": "Place {{place}}",
+      "points_one": "{{count}} point",
+      "points_other": "{{count}} points",
+      "empty": "No team has scored yet.",
+      "error": "Could not load the podium.",
+      "confetti": "Throw confetti",
+      "invite": "Thanks for taking part — see you at the next edition!",
+      "exitHint": "Esc · exit the podium"
     }
   },
   "roundCountdown": {

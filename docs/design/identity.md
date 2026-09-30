@@ -371,6 +371,47 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   esvaindo — nunca um redraw silencioso. Vale nos três estados e respeita
   `prefers-reduced-motion` (abaixo).
 
+  **(e) Pódio — cerimônia de encerramento** (#284). Rota própria,
+  `/leaderboard/podium`, **só do organizador** (o participante volta para a
+  home com o aviso de rota de organizador), aberta pelo botão **Pódio** em
+  contorno ao lado do gatilho do telão — não é vermelho: a ação competitiva
+  da tela não é esta. É um estado do telão para todos os efeitos: tela
+  cheia, escuro forçado, sem header/rodapé, as duas saídas e as regras de
+  foco de "Acessibilidade e movimento".
+
+  - **Conteúdo.** O 1º, o 2º e o 3º do placar **Geral**, cada um com
+    numeral, nome do time, selos de universidade, nomes dos membros e total
+    de pontos; do **4º ao 10º**, uma lista compacta (posição, nome, selos e
+    pontos, em duas colunas a partir de 1280 px); e, fechando, o convite
+    "Obrigado por participar — até a próxima edição!", sem ano, para não
+    envelhecer entre edições. Só entra quem **pontuou** (> 0): com menos de
+    três times pontuando, aparecem só os lugares que existem, sem lugar
+    vazio desenhado; sem nenhum, um estado vazio.
+  - **Disposição 2–1–3.** O 1º no centro e mais alto, o 2º à esquerda, o 3º
+    à direita. No DOM a ordem é 1, 2, 3 — o leitor de tela lê o pódio de
+    cima para baixo, e cada lugar se anuncia ("1º lugar").
+  - **Tipografia do telão.** Título no papel **título do telão**; numeral em
+    display 800 — `brand-text` só no 1º (o uso de vermelho como texto que a
+    Regra 3 já prevê), `foreground` no 2º e no 3º; nome do time em display
+    700 com **≥ 48 px** (maior no 1º, até três linhas: cabem os 40
+    caracteres que o back aceita); selos com **≥ 20 px**; membros e linhas
+    da lista com **≥ 28 px**. Cabe inteiro em **1920×1080 e em 1280×800**
+    (WXGA, comum em projetor) nos três catálogos, sem rolar: o pódio nunca
+    corta a borda inferior, e se algum dia não couber aparece como rolagem,
+    não como corte silencioso.
+  - **Entrada.** 3º, depois 2º, depois 1º, e por fim a lista e o convite —
+    fade com subida curta, ~0,6 s cada.
+  - **Confete.** Disparado pelo organizador (botão fantasma com ícone e nome
+    acessível), nunca sozinho: retângulos em `brand`, `foreground` e
+    `warning` — o âmbar como preenchimento, o uso que a Regra 4 permite —
+    caindo por 2,5–4 s numa camada que não recebe clique nem foco e some no
+    fim. Cada disparo recomeça a rajada.
+  - **O que nunca aparece:** os avisos de denominador (como no telão, o que
+    é projetado é para a sala inteira), e-mail de membro, membro sem nome
+    (conta anterior à #122) e nome de membro do 4º lugar para baixo.
+
+  Sem prancha própria, como o estado (c): o texto acima é a especificação.
+
 ### Acessibilidade e movimento
 
 - **Sair do telão tem dois caminhos, os dois obrigatórios.** Com
@@ -391,7 +432,9 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   termina em 41 minutos"), atualizado no máximo uma vez por minuto.
 - **`prefers-reduced-motion`**: desliga as transições, a pulsação do ponto "ao
   vivo" e a reordenação animada das linhas. O estado final é idêntico — a linha
-  aparece já na posição nova, e o realce entra e sai sem interpolação.
+  aparece já na posição nova, e o realce entra e sai sem interpolação. No
+  pódio, o primeiro quadro já é o pódio completo, sem entrada; e o confete
+  aparece já espalhado, sem queda nem rotação, e some em ~3 s sem transição.
 
 ## 6. Editor Blockly (`@kumite/blocks`)
 

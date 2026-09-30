@@ -9,6 +9,10 @@ import { type CaseOutcome, EXAMPLE_TIMEOUT_MS, type ExampleCase } from '@/lib/ru
 export type ExampleResultsNotice = 'empty' | { message: string }
 
 export type ExampleResultsProps = {
+  /**
+   * The examples the run was started with — not whatever the problem query
+   * holds now, which a refetch may have changed since (#197).
+   */
   examples: readonly ExampleCase[]
   /** One entry per example, in order; `null` while the case is still running. */
   outcomes: readonly (CaseOutcome | null)[]
@@ -47,7 +51,9 @@ export function ExampleResults({ examples, outcomes, notice, timeoutMs }: Exampl
     )
   }
 
-  const passed = outcomes.filter((outcome) => outcome?.status === 'passed').length
+  // Only outcomes with a row count: the total never exceeds the cases listed
+  // (#197).
+  const passed = examples.filter((_, index) => outcomes[index]?.status === 'passed').length
   const allPassed = examples.length > 0 && passed === examples.length
 
   return (
@@ -69,8 +75,8 @@ export function ExampleResults({ examples, outcomes, notice, timeoutMs }: Exampl
         <ul className="flex flex-col gap-1 text-sm">
           {examples.map((example, index) => (
             <li
-              // Examples are a fixed, ordered list for the problem — the index
-              // is their identity.
+              // `examples` is the list this run was started with, so within it
+              // the index is the case's identity (#197).
               key={index}
               data-testid={`problem-result-${index}`}
               data-status={outcomes[index]?.status ?? 'pending'}

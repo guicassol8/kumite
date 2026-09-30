@@ -11,7 +11,11 @@
 # --print`, which refuses a back/.env that worktree:env wrote for another tree
 # (a copy, #413) or before #413 (no tree in its marker) — so the run stops
 # before Playwright reuses that tree's servers and seeds its database. A
-# back/.env with no marker at all only gets the warning below.
+# back/.env with no marker at all only gets the warning below. Its SES_* are
+# exported too, but the back Playwright starts blanks them
+# (front/playwright.config.ts, #416): the E2E never sends email and the OTP
+# always lands in the BACK_NOTIFICATIONS_LOG. A back already listening on PORT
+# is reused as it is, SES included.
 #
 # Semaphore: every full E2E holds Chromium workers, a Vite and a back —
 # gigabytes of RAM. KUMITE_E2E_SLOTS runs may go at once (default: one per

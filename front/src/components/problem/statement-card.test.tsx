@@ -122,11 +122,14 @@ describe('StatementCard', () => {
         <StatementCard
           problem={problem()}
           hasResults={false}
-          bestScore={{ kind: 'score', score: 70 }}
+          bestScore={{ kind: 'score', score: 70, maxScore: 100 }}
         />,
       )
 
-      expect(screen.getByTestId('problem-best-score-badge').textContent).toBe('Melhor do time: 70')
+      // Beside the maximum this score was computed against (#319).
+      expect(screen.getByTestId('problem-best-score-badge').textContent).toBe(
+        'Melhor do time: 70/100',
+      )
       expect(screen.queryByTestId('problem-no-submission-badge')).toBeNull()
     })
 

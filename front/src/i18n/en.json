@@ -857,7 +857,7 @@
     },
     "closedRound": {
       "notice": "This round has closed — the problem is now read-only.",
-      "bestScore": "Your team's best score: {{score}} ({{attempts}} attempts, on {{date}})",
+      "bestScore": "Your team's best score: {{score}}/{{maxScore}} ({{attempts}} attempts, on {{date}})",
       "neverSubmitted": "Your team never submitted a solution for this problem."
     },
     "results": {
@@ -909,7 +909,7 @@
     },
     "pointsBadge": "{{points}} pts",
     "positionBadge": "Problem {{letter}}",
-    "bestScoreBadge": "Team best: {{score}}",
+    "bestScoreBadge": "Team best: {{score}}/{{maxScore}}",
     "noSubmissionBadge": "No submissions yet",
     "submissionsPaused": {
       "notice": "Submissions are paused by the organizers. The timer keeps running; you can still run the examples."

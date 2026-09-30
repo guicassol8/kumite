@@ -857,7 +857,7 @@
     },
     "closedRound": {
       "notice": "Esta ronda fue cerrada — el problema ahora es de solo lectura.",
-      "bestScore": "Mejor puntuación de tu equipo: {{score}} ({{attempts}} intentos, el {{date}})",
+      "bestScore": "Mejor puntuación de tu equipo: {{score}}/{{maxScore}} ({{attempts}} intentos, el {{date}})",
       "neverSubmitted": "Tu equipo no llegó a enviar una solución para este problema."
     },
     "results": {
@@ -909,7 +909,7 @@
     },
     "pointsBadge": "{{points}} pts",
     "positionBadge": "Problema {{letter}}",
-    "bestScoreBadge": "Mejor del equipo: {{score}}",
+    "bestScoreBadge": "Mejor del equipo: {{score}}/{{maxScore}}",
     "noSubmissionBadge": "Sin envíos",
     "submissionsPaused": {
       "notice": "La organización pausó los envíos. El tiempo sigue corriendo; aún puedes ejecutar los ejemplos."

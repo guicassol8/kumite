@@ -857,7 +857,7 @@
     },
     "closedRound": {
       "notice": "Esta rodada foi encerrada — o problema agora é somente leitura.",
-      "bestScore": "Melhor pontuação do seu time: {{score}} ({{attempts}} tentativas, em {{date}})",
+      "bestScore": "Melhor pontuação do seu time: {{score}}/{{maxScore}} ({{attempts}} tentativas, em {{date}})",
       "neverSubmitted": "Seu time não chegou a submeter uma solução para este problema."
     },
     "results": {
@@ -909,7 +909,7 @@
     },
     "pointsBadge": "{{points}} pts",
     "positionBadge": "Problema {{letter}}",
-    "bestScoreBadge": "Melhor do time: {{score}}",
+    "bestScoreBadge": "Melhor do time: {{score}}/{{maxScore}}",
     "noSubmissionBadge": "Sem submissão",
     "submissionsPaused": {
       "notice": "As submissões estão pausadas pela organização. O tempo continua correndo; você ainda pode executar os exemplos."

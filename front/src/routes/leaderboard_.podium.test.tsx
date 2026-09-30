@@ -29,6 +29,7 @@ vi.mock('@/lib/api', () => ({
 import '@/i18n'
 
 import { api } from '@/lib/api'
+import { ORGANIZER_TEAMS_QUERY_KEY } from '@/lib/organizer-teams-query'
 import { setPresentationActive } from '@/lib/presentation-mode'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import type { EventRanking } from '@/lib/sse-schema'
@@ -97,12 +98,13 @@ const organizerTeams = {
   })),
 }
 
-function renderPodium() {
+function renderPodium(primeCache?: (queryClient: QueryClient) => void) {
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: ['/leaderboard/podium'] }),
   })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  primeCache?.(queryClient)
   render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
@@ -224,6 +226,50 @@ describe('/leaderboard/podium — the ceremony', () => {
 
     await screen.findByTestId('podium-place-1')
     expect(mockedRanking).toHaveBeenCalledTimes(2)
+  })
+
+  // The board's REST fallback fills this same cache entry once, when
+  // /leaderboard loads, and then goes quiet for as long as the stream is live
+  // — by the ceremony it can be hours old. The pódio shows the ranking as of
+  // when it opens, never that one, not even while its own fetch is in flight.
+  const staleRanking: EventRanking = {
+    rounds: [],
+    teams: [{ ...team(1, 40), teamName: 'Time de Ontem' }],
+  }
+  // The member listing is cached too (the organizer came from
+  // /organizer/teams), so only the ranking decides what the board shows.
+  const primeStaleRanking = (queryClient: QueryClient) => {
+    queryClient.setQueryData(['ranking', 'event'], staleRanking, {
+      updatedAt: Date.now() - 60 * 60 * 1000,
+    })
+    queryClient.setQueryData(ORGANIZER_TEAMS_QUERY_KEY, organizerTeams)
+  }
+
+  it('never projects the ranking cached before it opened, while its own fetch is in flight', async () => {
+    let answer: (response: unknown) => void = () => {}
+    mockedRanking.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }) as never,
+    )
+    renderPodium(primeStaleRanking)
+
+    await screen.findByTestId('podium-loading')
+    expect(screen.getByTestId('podium-board').textContent).not.toContain('Time de Ontem')
+
+    answer(jsonResponse(200, eventRanking))
+    const first = await screen.findByTestId('podium-place-1')
+    expect(within(first).getByTestId('podium-team-name-1').textContent).toBe('Time 1')
+    expect(screen.getByTestId('podium-board').textContent).not.toContain('Time de Ontem')
+  })
+
+  it('shows the error, not the cached ranking, when its own fetch fails', async () => {
+    mockedRanking.mockResolvedValue(jsonResponse(500, {}))
+    renderPodium(primeStaleRanking)
+
+    await screen.findByTestId('podium-error')
+    expect(screen.getByTestId('podium-board').textContent).not.toContain('Time de Ontem')
+    expect(screen.queryByTestId('podium-places')).toBeNull()
   })
 })
 

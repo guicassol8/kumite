@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import {
   PodiumBoard,
@@ -25,9 +25,19 @@ export const Route = createFileRoute('/leaderboard_/podium')({
 function PodiumScreen() {
   const navigate = Route.useNavigate()
 
-  // Same cache entry as the leaderboard's REST fallback, so coming from the
-  // board usually paints straight away.
-  const ranking = useQuery({ queryKey: ['ranking', 'event'], queryFn: fetchEventRanking })
+  // Same cache entry as the leaderboard's REST fallback, but never painted
+  // from it: the board fills that entry once, when /leaderboard loads, and
+  // leaves it alone while the stream is live, so by the ceremony it can be
+  // hours old. Only a ranking fetched since this screen opened takes the
+  // stage (`status` below); `refetchOnMount: 'always'` guarantees that fetch
+  // even if a default `staleTime` ever says the cached one is still fresh.
+  const [openedAt] = useState(Date.now)
+  const ranking = useQuery({
+    queryKey: ['ranking', 'event'],
+    queryFn: fetchEventRanking,
+    refetchOnMount: 'always',
+  })
+  const rankingIsCurrent = ranking.data !== undefined && ranking.dataUpdatedAt >= openedAt
   // Members come from the organizer's moderation listing: GET /teams only
   // names the viewer's own team, and would give every other member as null.
   const teams = useQuery({ queryKey: ORGANIZER_TEAMS_QUERY_KEY, queryFn: fetchOrganizerTeams })
@@ -41,16 +51,20 @@ function PodiumScreen() {
     ]),
   )
 
-  // Data first: only the ranking failing takes over the screen. A failed
-  // team listing still shows the podium, just without members and seals.
-  // Waiting for the listing to settle keeps the entry animation from
+  // Data first: only the ranking failing takes over the screen — and only
+  // before a current one arrived; a later background refetch that fails keeps
+  // the podium up. A cached ranking from before this screen opened is not a
+  // fallback: its fetch failing shows the error, never the old podium. A
+  // failed team listing still shows the podium, just without members and
+  // seals. Waiting for the listing to settle keeps the entry animation from
   // starting with the members missing and popping in halfway.
-  const status: PodiumStatus =
-    ranking.isError && !ranking.data
+  const status: PodiumStatus = rankingIsCurrent
+    ? teams.isPending
+      ? 'loading'
+      : 'ready'
+    : ranking.isError
       ? 'error'
-      : ranking.data && !teams.isPending
-        ? 'ready'
-        : 'loading'
+      : 'loading'
 
   function retry() {
     ranking.refetch()

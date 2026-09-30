@@ -443,9 +443,20 @@ expect "no db:seed" not_called db:seed
 expect "back/.env.bak untouched" cmp -s "$tmp/review.bak" "$wt/review/back/.env.bak"
 end
 
-begin "(u) the #404 marker, with no tree -> rewritten, same database and ports"
+# print_in <dir>: --print there. Sets printed (stdout), out (stderr), rc.
+print_in() {
+  printed="$(in_tree "$1" bash scripts/worktree-env.sh --print 2>"$tmp/print.err")"
+  rc=$?
+  out="$(cat "$tmp/print.err")"
+}
+
+begin "(u) the #404 marker, with no tree -> refused, then rewritten, same database and ports"
 old404="$marker: this worktree's own database and ports — re-run"
 { echo "$old404"; sed 1d "$wt/review/back/.env"; } >"$tmp/review.env" && mv "$tmp/review.env" "$wt/review/back/.env"
+print_in "$wt/review"
+expect "--print exits non-zero (rc=$rc)" [ "$rc" != 0 ]
+expect "--print leaves nothing to eval" [ -z "$printed" ]
+expect "--print says the marker named no tree" says "no tree in its marker"
 wenv "$wt/review"
 expect "exit 0 (rc=$rc)" [ "$rc" = 0 ]
 expect "says the marker named no tree" says "no tree in its marker"
@@ -454,6 +465,39 @@ expect "same back port" [ "$(env_of "$wt/review" PORT)" = "$r_port" ]
 expect "same front port" [ "$(env_of "$wt/review" FRONT_PORT)" = "$r_front" ]
 expect "the first line names this tree again" [ "$(head -n 1 "$wt/review/back/.env")" = "$marker tree=$r_root" ]
 expect "the #404 one is in back/.env.bak" grep -qsxF "$old404" "$wt/review/back/.env.bak"
+end
+
+# A back/.env with no marker at all — written by hand, for a Docker Postgres —
+# is not a copy: pnpm e2e only warns, as before #413, and --print exports it.
+begin "(v) a back/.env with no marker -> pnpm e2e only warns, --print exports it"
+add_tree hand
+{
+  grep -v -e '^DATABASE_URL=' -e '^PORT=' "$main/back/.env"
+  echo 'DATABASE_URL=postgres://kumite:kumite@localhost:5487/kumite_hand'
+  echo 'PORT=3990'
+  echo 'FRONT_PORT=5990'
+} >"$wt/hand/back/.env"
+: >"$e2e_log"
+out="$(in_tree "$wt/hand" env KUMITE_E2E_LOCK_DIR="$tmp/locks" SMOKE_E2E_SECONDS=0 bash scripts/e2e.sh 2>&1)"
+rc=$?
+expect "e2e exits 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "e2e warns that worktree:env did not write it" says 'was not written by `pnpm worktree:env`'
+expect "Playwright ran with that back/.env" says "saw PORT=3990 FRONT_PORT=5990 VITE_API_URL=http://localhost:3990 DB=kumite_hand"
+print_in "$wt/hand"
+expect "--print exits 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "--print exports its PORT" grep -qx 'export PORT=3990' <<<"$printed"
+end
+
+# worktree:env never runs in the main checkout, so --print there must not send
+# anyone to it: another tree's marker in the main back/.env changes nothing.
+begin "(w) the main checkout's --print is not refused by another tree's marker"
+cp "$main/back/.env" "$tmp/main.env"
+{ echo "$marker tree=$b_root"; cat "$tmp/main.env"; } >"$main/back/.env"
+print_in "$main"
+expect "--print exits 0 (rc=$rc)" [ "$rc" = 0 ]
+expect "--print exports the main checkout's PORT" grep -qx 'export PORT=3000' <<<"$printed"
+expect "no refusal" not says 'run `pnpm worktree:env` here'
+cp "$tmp/main.env" "$main/back/.env"
 end
 
 echo

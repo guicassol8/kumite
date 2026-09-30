@@ -21,7 +21,12 @@
 #     short (a failed migrate or seed, Ctrl-C) or a database created anew.
 #     back/.env carries a `# worktree:env: seeded` line only while the last
 #     seed or reset has completed.
-# Re-running keeps the database and ports it chose the first time.
+# Re-running keeps the database and ports it chose the first time — as long
+# as back/.env carries this tree's own marker line, `# worktree:env (#404)
+# tree=<this tree's root>` (#413). A back/.env copied from another worktree,
+# or written before #413 with no tree in its marker, is not this tree's: the
+# run says whose it was, keeps it in back/.env.bak and starts over as a first
+# run. Until then, --print (and pnpm e2e with it) refuses it.
 #
 # The shell's own PORT, DATABASE_URL and APP_BASE_URL never leak in: every
 # command runs with this tree's back/.env exported over them.
@@ -50,6 +55,25 @@ cd "$root" || exit 1
 main="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 here="$(basename "$root")"
 marker='# worktree:env (#404)'
+# back/.env is this tree's only with this exact line (grep -x): as a substring,
+# …/review's would match …/review-7's.
+owner="$marker tree=$root"
+
+# foreign: why back/.env is not this tree's although worktree:env wrote it —
+# a copy from another tree, or the #404 marker that named no tree. Prints
+# nothing when back/.env is this tree's, has no marker, or is missing.
+foreign() {
+  [ -f back/.env ] || return 0
+  grep -qF "$marker" back/.env || return 0
+  grep -qxF "$owner" back/.env && return 0
+  local other
+  other="$(awk -v p="$marker tree=" 'index($0, p) == 1 { print substr($0, length(p) + 1); exit }' back/.env)"
+  if [ -n "$other" ]; then
+    echo "back/.env was written by pnpm worktree:env for $other"
+  else
+    echo "back/.env was written by pnpm worktree:env before #413 (no tree in its marker)"
+  fi
+}
 
 # get_var <file> <key>: the parsed value (quotes and comments handled).
 get_var() {
@@ -83,6 +107,14 @@ exports() {
 if [ "$mode" = print ]; then
   if [ ! -f back/.env ]; then
     echo "worktree-env: no back/.env in $root — run \`pnpm worktree:env\` first" >&2
+    exit 1
+  fi
+  # Another tree's back/.env would point this tree's E2E at that tree's ports —
+  # and Playwright reuses whatever server is up there (#413).
+  why="$(foreign)"
+  if [ "$root" != "$main" ] && [ -n "$why" ]; then
+    echo "worktree-env: $why, not for this tree ($root) —" >&2
+    echo "  run \`pnpm worktree:env\` here first: it gives this tree its own database and ports" >&2
     exit 1
   fi
   echo "unset PORT DATABASE_URL APP_BASE_URL FRONT_PORT VITE_API_URL"
@@ -124,12 +156,14 @@ listening() {
   fi
 }
 
-if [ -f back/.env ] && grep -qF "$marker" back/.env; then
+if [ -f back/.env ] && grep -qxF "$owner" back/.env; then
   db_url="$(get_var back/.env DATABASE_URL)"
   port="$(get_var back/.env PORT)"
   front="$(get_var back/.env FRONT_PORT)"
   echo "worktree-env: keeping this tree's database and ports (back/.env from an earlier run)"
 else
+  why="$(foreign)"
+  [ -z "$why" ] || echo "worktree-env: $why — giving this tree its own database and ports"
   # --- what the other trees already use ------------------------------------
   taken=" 3000 5173 "
   taken_dbs=()
@@ -191,7 +225,12 @@ else
   else
     cp back/.env.example back/.env
   fi
-  { echo "$marker: this worktree's own database and ports — re-run"; echo "# pnpm worktree:env instead of editing them by hand."; cat back/.env; } >back/.env.tmp &&
+  {
+    echo "$owner"
+    echo "# This worktree's own database and ports — re-run"
+    echo "# pnpm worktree:env instead of editing them by hand."
+    cat back/.env
+  } >back/.env.tmp &&
     mv back/.env.tmp back/.env
   set_var back/.env DATABASE_URL "$db_url"
   set_var back/.env PORT "$port"

@@ -7,7 +7,11 @@
 # back Playwright starts at another tree's database), plus FRONT_PORT,
 # VITE_API_URL and a BACK_NOTIFICATIONS_LOG, so the organizer and real-OTP
 # specs run instead of skipping. In a linked worktree, `pnpm worktree:env`
-# writes that back/.env first.
+# writes that back/.env first. The exports come from `worktree-env.sh
+# --print`, which refuses a back/.env that worktree:env wrote for another tree
+# (a copy, #413) or before #413 (no tree in its marker) — so the run stops
+# before Playwright reuses that tree's servers and seeds its database. A
+# back/.env with no marker at all only gets the warning below.
 #
 # Semaphore: every full E2E holds Chromium workers, a Vite and a back —
 # gigabytes of RAM. KUMITE_E2E_SLOTS runs may go at once (default: one per

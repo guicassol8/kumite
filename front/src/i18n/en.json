@@ -1070,7 +1070,7 @@
         "soma-lista": {
           "2": "In Variables, \"Create variable...\" creates \"total\", and \"set total to\" stores a value in it.",
           "3": "The total starts at 0: before adding any number, the sum is zero.",
-          "4": "In Loops, \"for each item numero in list\" repeats what is inside once per item.",
+          "4": "In Loops, \"for each item numero in list\" repeats what is inside once per item; on each pass, the variable \"numero\" holds the current item.",
           "5": "The list being walked through is the \"input\".",
           "6": "Inside the loop, another \"set total to\" replaces the total with a new value on every pass.",
           "7": "The new value is \"total + numero\": the sum so far plus the current number.",
@@ -1087,7 +1087,7 @@
   "onboarding": {
     "invite": {
       "title": "First time here?",
-      "body": "Want a quick tour of the platform? We show you where the teams, the round, the block editor, the leaderboard and practice are, without changing anything in your account.",
+      "body": "Want a quick tour of the platform? We show you where the round, the teams, the block editor, the leaderboard and practice are, without changing anything in your account.",
       "accept": "Take the tour",
       "decline": "Not now",
       "howItWorks": "Read how it works",
@@ -1123,11 +1123,11 @@
         },
         "leaderboard": {
           "title": "Leaderboard",
-          "body": "The round and event leaderboards update live as teams submit solutions."
+          "body": "The leaderboard's Round and Overall tabs update live as teams submit solutions."
         },
         "practice": {
           "title": "Practice",
-          "body": "Outside the rounds, train on the practice problems whenever you like: there is no submission or scoring here."
+          "body": "Train on the practice problems whenever you like, with or without a round open: there is no submission or scoring here."
         }
       }
     }
@@ -1142,11 +1142,11 @@
       },
       "teams": {
         "title": "Teams",
-        "body": "You compete as a team, and the score belongs to the team. The organizers set how many people fit in a team, and teams mixing students from both universities are allowed unless the organizers say otherwise."
+        "body": "You compete as a team, and the score belongs to the team. The organizers set the maximum team size and whether teams may mix students from both universities (by default, they may); the Teams screen shows the rules in force. Once your team has made its first submission, no one can leave it."
       },
       "rounds": {
         "title": "Rounds and scoring",
-        "body": "The organizers open a round and a timer starts. Each problem is worth a number of points, prorated over the hidden test cases your solution passes, and your team's best submission on each problem is the one that counts. On a tie, whoever reached the score first ranks higher, then whoever needed fewer attempts."
+        "body": "The organizers open a round and a timer starts; when time runs out, the round closes. Each problem is worth a number of points, and a solution earns the share of them that matches the hidden test cases it passes: the visible examples are worth no points. Your team's best submission on each problem is the one that counts. On a tie, the team that reached its best scores sooner ranks higher (adding up, over each scored problem, the time since the round opened), then the one with fewer submissions."
       },
       "editor": {
         "title": "The block editor",

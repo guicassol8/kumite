@@ -148,8 +148,14 @@ export async function getPublishedProblem(
   // The team's own best, open or closed (#206). Scored inside access.roundId,
   // not across every round that ever used this problem (#176) — that round's
   // leaderboard shows exactly the same number.
+  const stored = teamId === null ? null : await getBestSubmission(db, teamId, id, access.roundId)
+  // The maximum beside the score is the one it was computed against (#319):
+  // the stamp on that row, which a later change to points never touches. A
+  // NULL stamp means the row was judged before the stamp existed (#193); the
+  // current points are then the only number there is — and exactly what the
+  // page showed before this fix.
   const bestSubmission =
-    teamId === null ? null : await getBestSubmission(db, teamId, id, access.roundId)
+    stored === null ? null : { ...stored, maxScore: stored.maxScore ?? problem.points }
 
   if (access.status === 'open') {
     return {

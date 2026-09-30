@@ -583,6 +583,8 @@ describe('getRoundRanking', () => {
 
     // 40, the second round's score — not 100, the best across both rounds.
     expect(pageScore?.score).toBe(40)
+    // And the same stamped maximum the ranking reads just below (#319).
+    expect(pageScore?.maxScore).toBe(100)
     expect(secondRanking?.teams[0]?.problems).toEqual([
       { problemId: problem.id, score: 40, attempts: 1, maxScore: 100 },
     ])

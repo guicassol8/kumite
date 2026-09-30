@@ -20,6 +20,11 @@ import type {
   SubmitSolutionBody,
 } from './submissions.schema'
 
+// The best submission as stored: `maxScore` is the raw stamp (#193), NULL on a
+// row judged before the stamp existed. The API's BestSubmission never carries
+// that NULL — getPublishedProblem resolves it (#319).
+export type StoredBestSubmission = Omit<BestSubmission, 'maxScore'> & { maxScore: number | null }
+
 // "Vale a melhor pontuação": the team's highest score on a problem, the moment
 // it was reached (the tiebreaker) and how many attempts it took. Grouped by
 // team, not user — the score belongs to the team (docs/product.md).
@@ -32,10 +37,12 @@ export async function getBestSubmission(
   teamId: string,
   problemId: string,
   roundId: string,
-): Promise<BestSubmission | null> {
+): Promise<StoredBestSubmission | null> {
   const [best] = await db
     .select({
       score: submissionsTable.score,
+      // The best row's own stamp (#319), read raw like the ranking reads it.
+      maxScore: submissionsTable.maxScore,
       achievedAt: submissionsTable.acceptedAt,
       // Postgres evaluates window functions before LIMIT, so `count(*) over ()`
       // is the full attempt count for this (team, problem, round) — one round

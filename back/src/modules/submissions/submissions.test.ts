@@ -477,6 +477,9 @@ describe('getBestSubmission', () => {
 
     expect(await getBestSubmission(db, team.id, problem.id, problem.roundId)).toEqual({
       score: 80,
+      // These rows carry no stamp, so the legacy NULL arrives raw: resolving
+      // it against the problem's current points is the caller's job (#319).
+      maxScore: null,
       achievedAt: best,
       attempts: 3,
     })
@@ -519,6 +522,7 @@ describe('getBestSubmission', () => {
 
     expect(await getBestSubmission(db, team.id, problem.id, problem.roundId)).toEqual({
       score: 80,
+      maxScore: null,
       achievedAt: earliest,
       attempts: 2,
     })
@@ -577,8 +581,52 @@ describe('getBestSubmission', () => {
 
     expect(await getBestSubmission(db, team.id, problem.id, problem.roundId)).toEqual({
       score: 40,
+      maxScore: null,
       achievedAt: own,
       attempts: 1,
+    })
+  })
+
+  // #319: the maximum shown beside a score is the one *that* score was
+  // computed against — the stamp on the best row, never the latest row's.
+  it('returns the stamp of the best row, not of another one (#319)', async () => {
+    const problem = await insertProblem()
+    const { user, team } = await insertTeamMember()
+    const best = new Date('2026-08-31T11:00:00.000Z')
+    await db.insert(submissionsTable).values([
+      {
+        problemId: problem.id,
+        roundId: problem.roundId,
+        userId: user.id,
+        teamId: team.id,
+        workspace: {},
+        generatedCode: '',
+        caseResults: [],
+        score: 80,
+        maxScore: 100,
+        attemptNumber: 1,
+        acceptedAt: best,
+      },
+      {
+        problemId: problem.id,
+        roundId: problem.roundId,
+        userId: user.id,
+        teamId: team.id,
+        workspace: {},
+        generatedCode: '',
+        caseResults: [],
+        score: 50,
+        maxScore: 250,
+        attemptNumber: 2,
+        acceptedAt: new Date('2026-08-31T12:00:00.000Z'),
+      },
+    ])
+
+    expect(await getBestSubmission(db, team.id, problem.id, problem.roundId)).toEqual({
+      score: 80,
+      maxScore: 100,
+      achievedAt: best,
+      attempts: 2,
     })
   })
 })

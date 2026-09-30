@@ -163,6 +163,30 @@ describe('ProblemPanels', () => {
     expect(screen.getByTestId('statement').style.flexGrow).toBe('40')
   })
 
+  it('gives the whole column to the editor before any result, whatever size was saved (#307)', () => {
+    setMatchMediaMatches(DESKTOP_QUERY, true)
+    // A band the participant dragged taller in an earlier session.
+    const saved = JSON.stringify({ canvas: 60, results: 40 })
+    localStorage.setItem('kumite:problem-layout:react-resizable-panels:problem-v', saved)
+
+    render(
+      <ProblemPanels
+        problem={problem}
+        hasResults={false}
+        editor={<div data-testid="fake-editor" />}
+        actionsBar={<div data-testid="fake-actions" />}
+      />,
+    )
+
+    // No gap reserved for a band with nothing in it...
+    expect(screen.getByTestId('results').style.flexGrow).toBe('0')
+    expect(screen.getByTestId('canvas').style.flexGrow).toBe('100')
+    // ...and the preference itself survives, for the first run to restore.
+    expect(localStorage.getItem('kumite:problem-layout:react-resizable-panels:problem-v')).toBe(
+      saved,
+    )
+  })
+
   // Persisting an actual drag needs a real pointer gesture on the separator
   // (`isUserInteraction: true` is exactly what `onlySaveAfterUserInteractions`
   // gates on, and — correctly — an imperative `.collapse()`/`.expand()` call

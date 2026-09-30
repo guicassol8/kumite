@@ -379,3 +379,101 @@ describe('BlocklyWorkspace theme (#218)', () => {
     })
   })
 })
+
+// #367: Blockly ≥ 12 hangs its popups inside the workspace's `.injectionDiv`
+// (overflow: hidden) unless told otherwise, but positions them against the
+// window — so a menu that fits the window below a block was cut at the
+// canvas edge. Where the div lives is what jsdom can prove; the geometry is
+// `e2e/blockly-popups-edge.spec.ts`.
+describe('Blockly popups live outside the canvas (#367)', () => {
+  afterEach(() => {
+    Blockly.WidgetDiv.hide()
+    Blockly.DropDownDiv.hideWithoutAnimation()
+  })
+
+  it('shows the widget div (context menus, inline editors) on <body>', () => {
+    const workspace = renderWorkspace().handle.getWorkspace()
+    if (!workspace) throw new Error('expected an injected workspace')
+
+    Blockly.WidgetDiv.show({}, false, () => {}, workspace, false)
+
+    const div = Blockly.WidgetDiv.getDiv()
+    expect(div?.parentElement).toBe(document.body)
+    expect(div?.closest('.injectionDiv')).toBeNull()
+  })
+
+  it('shows the dropdown div (field dropdowns) on <body>', () => {
+    const workspace = renderWorkspace().handle.getWorkspace()
+    if (!workspace) throw new Error('expected an injected workspace')
+    const block = workspace.newBlock('logic_compare')
+    block.initSvg()
+    block.render()
+    const field = block.getField('OP')
+    if (!field) throw new Error('expected the = dropdown on logic_compare')
+
+    Blockly.DropDownDiv.showPositionedByField(field, undefined, undefined, false)
+
+    const div = Blockly.DropDownDiv.getContentDiv().parentElement
+    expect(div?.parentElement).toBe(document.body)
+    expect(div?.closest('.injectionDiv')).toBeNull()
+  })
+
+  // Blockly 13 still watches the *canvas* for its popovers losing focus
+  // (`setMainWorkspace` points the popover focus root at the injectionDiv,
+  // parent container or not). With the popovers on <body>, focus moving from
+  // the canvas into a dropdown read as the dropdown losing it — it closed as
+  // it opened — and focus leaving a popover for the page went unseen.
+  describe('focus, with the popovers on <body>', () => {
+    let outside: HTMLButtonElement | undefined
+
+    afterEach(() => {
+      outside?.remove()
+      outside = undefined
+    })
+
+    function focusedWorkspace() {
+      const workspace = renderWorkspace().handle.getWorkspace()
+      if (!workspace) throw new Error('expected an injected workspace')
+      workspace.getFocusableElement().focus()
+      expect(workspace.getInjectionDiv().contains(document.activeElement)).toBe(true)
+      return workspace
+    }
+
+    it('keeps a field dropdown open when it takes the focus from the canvas', () => {
+      const workspace = focusedWorkspace()
+      const block = workspace.newBlock('logic_compare')
+      block.initSvg()
+      block.render()
+      const field = block.getField('OP')
+      if (!field) throw new Error('expected the = dropdown on logic_compare')
+
+      Blockly.DropDownDiv.showPositionedByField(field)
+
+      const div = Blockly.DropDownDiv.getContentDiv().parentElement
+      expect(div?.contains(document.activeElement)).toBe(true)
+      // `hide()` fades out: opacity 0 is the dropdown closing.
+      expect(div?.style.opacity).toBe('1')
+    })
+
+    it('closes a popover when the focus leaves it for the page', () => {
+      const workspace = focusedWorkspace()
+      Blockly.WidgetDiv.show({}, false, () => {}, workspace, true)
+      expect(Blockly.WidgetDiv.isVisible()).toBe(true)
+
+      outside = document.createElement('button')
+      document.body.append(outside)
+      outside.focus()
+
+      expect(Blockly.WidgetDiv.isVisible()).toBe(false)
+    })
+
+    it('keeps a popover open when the focus goes back to its canvas', () => {
+      const workspace = focusedWorkspace()
+      Blockly.WidgetDiv.show({}, false, () => {}, workspace, true)
+
+      workspace.getFocusableElement().focus()
+
+      expect(Blockly.WidgetDiv.isVisible()).toBe(true)
+    })
+  })
+})

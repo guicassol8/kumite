@@ -46,8 +46,12 @@ function noticeFor(state: ExampleRunState): ExampleResultsNotice | undefined {
   return undefined
 }
 
-function outcomesOf(state: ExampleRunState) {
-  return state.status === 'running' || state.status === 'done' ? state.outcomes : []
+// The outcomes together with the examples they ran against — never the
+// examples the query holds now, which a refetch may have changed (#197).
+function pairedResultsOf(state: ExampleRunState) {
+  return state.status === 'running' || state.status === 'done'
+    ? { examples: state.examples, outcomes: state.outcomes }
+    : { examples: [], outcomes: [] }
 }
 
 // The banner shown after a submit attempt that did not produce a verdict —
@@ -448,11 +452,7 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
   const resultsContent = (
     <>
       {runState.status !== 'idle' && (
-        <ExampleResults
-          examples={examples}
-          outcomes={outcomesOf(runState)}
-          notice={noticeFor(runState)}
-        />
+        <ExampleResults {...pairedResultsOf(runState)} notice={noticeFor(runState)} />
       )}
       {verdict && <SubmissionResultPanel result={verdict} />}
     </>

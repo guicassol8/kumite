@@ -124,7 +124,11 @@ describe('useExampleRun', () => {
       finished.push(result.current.run(somaDosPares))
     })
 
-    expect(result.current.state).toEqual({ status: 'running', outcomes: [null, null, null] })
+    expect(result.current.state).toEqual({
+      status: 'running',
+      examples,
+      outcomes: [null, null, null],
+    })
     expect(workers.spawned[0]?.request?.code).toContain('function solve(input)')
 
     await act(async () => {
@@ -132,6 +136,7 @@ describe('useExampleRun', () => {
     })
     expect(result.current.state).toEqual({
       status: 'running',
+      examples,
       outcomes: [{ status: 'passed', actual: 6 }, null, null],
     })
 
@@ -140,6 +145,7 @@ describe('useExampleRun', () => {
     })
     expect(result.current.state).toEqual({
       status: 'running',
+      examples,
       outcomes: [{ status: 'passed', actual: 6 }, { status: 'failed', actual: 1 }, null],
     })
 
@@ -149,6 +155,7 @@ describe('useExampleRun', () => {
     })
     expect(result.current.state).toEqual({
       status: 'done',
+      examples,
       outcomes: [
         { status: 'passed', actual: 6 },
         { status: 'failed', actual: 1 },
@@ -179,6 +186,137 @@ describe('useExampleRun', () => {
       [5, 7, 9],
       [2, 4, 6, 8],
     ])
+  })
+})
+
+// #197: the examples on screen are refetched on window focus, so they can
+// change under a run already on screen. Each run keeps the examples it ran
+// against, and a run that no longer matches the loaded ones is dropped —
+// never paired by index with a list it did not run.
+describe('useExampleRun pairs the outcomes with the examples they ran against (#197)', () => {
+  type Props = { current: readonly ExampleCase[] }
+
+  function renderRun(workers: ReturnType<typeof deferredWorkers>) {
+    return renderHook(({ current }: Props) => useExampleRun(current, 'pt', workers), {
+      initialProps: { current: examples } as Props,
+    })
+  }
+
+  /** Runs the right solution to the end: every case of `examples` passes. */
+  async function runToDone(
+    result: { current: ReturnType<typeof useExampleRun> },
+    workers: ReturnType<typeof deferredWorkers>,
+  ) {
+    let finished: Promise<void> | undefined
+    await act(async () => {
+      finished = result.current.run(somaDosPares)
+    })
+    for (const value of [6, 0, 20]) {
+      await act(async () => {
+        workers.spawned[workers.spawned.length - 1]?.reply({ ok: true, value })
+      })
+    }
+    await act(async () => {
+      await finished
+    })
+    expect(result.current.state.status).toBe('done')
+  }
+
+  it('drops a finished run once the examples are reordered', async () => {
+    const workers = deferredWorkers()
+    const { result, rerender } = renderRun(workers)
+    await runToDone(result, workers)
+
+    const [first, second, third] = examples as [ExampleCase, ExampleCase, ExampleCase]
+    rerender({ current: [second, first, third] })
+
+    expect(result.current.state).toEqual({ status: 'idle' })
+  })
+
+  it('drops a finished run once an example is removed', async () => {
+    const workers = deferredWorkers()
+    const { result, rerender } = renderRun(workers)
+    await runToDone(result, workers)
+
+    rerender({ current: examples.slice(0, 2) })
+
+    expect(result.current.state).toEqual({ status: 'idle' })
+  })
+
+  it('keeps a finished run when the same examples come back as a new array', async () => {
+    const workers = deferredWorkers()
+    const { result, rerender } = renderRun(workers)
+    await runToDone(result, workers)
+    const before = result.current.state
+
+    // What a language switch or an unchanged refetch hands the screen: a new
+    // array, the same content (#178/#183).
+    rerender({ current: structuredClone(examples) })
+
+    expect(result.current.state).toEqual(before)
+  })
+
+  it('does not bring a dropped run back when the old examples return', async () => {
+    const workers = deferredWorkers()
+    const { result, rerender } = renderRun(workers)
+    await runToDone(result, workers)
+
+    rerender({ current: examples.slice(0, 2) })
+    rerender({ current: examples })
+
+    expect(result.current.state).toEqual({ status: 'idle' })
+  })
+
+  it('never lets a dropped run write over the run that replaced it', async () => {
+    const workers = deferredWorkers()
+    const { result, rerender } = renderRun(workers)
+
+    // Run A answers its first case, then the examples change under it.
+    await act(async () => {
+      void result.current.run(somaDosPares)
+    })
+    await act(async () => {
+      workers.spawned[0]?.reply({ ok: true, value: 6 })
+    })
+    const pendingOfA = workers.spawned[1]
+    const edited = examples.slice(0, 2)
+    rerender({ current: edited })
+    expect(result.current.state).toEqual({ status: 'idle' })
+
+    // Run B starts on the new examples; A's worker answers only afterwards,
+    // and A goes on to its last case and finishes.
+    await act(async () => {
+      void result.current.run(somaDosPares)
+    })
+    const firstOfB = workers.spawned[2]
+    await act(async () => {
+      pendingOfA?.reply({ ok: true, value: 0 })
+    })
+    await act(async () => {
+      workers.spawned[3]?.reply({ ok: true, value: 20 })
+    })
+
+    expect(result.current.state).toEqual({
+      status: 'running',
+      examples: edited,
+      outcomes: [null, null],
+    })
+
+    // B itself still lands.
+    await act(async () => {
+      firstOfB?.reply({ ok: true, value: 6 })
+    })
+    await act(async () => {
+      workers.spawned[workers.spawned.length - 1]?.reply({ ok: true, value: 0 })
+    })
+    expect(result.current.state).toEqual({
+      status: 'done',
+      examples: edited,
+      outcomes: [
+        { status: 'passed', actual: 6 },
+        { status: 'passed', actual: 0 },
+      ],
+    })
   })
 })
 

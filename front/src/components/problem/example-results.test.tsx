@@ -37,6 +37,22 @@ describe('ExampleResults', () => {
     expect(summary.dataset.state).toBe('failed')
   })
 
+  // #197: the total never exceeds the examples on screen — an outcome with no
+  // row to sit in is not a case that passed.
+  it('counts only the outcomes that have an example to sit next to', () => {
+    render(
+      <ExampleResults
+        examples={examples.slice(0, 2)}
+        outcomes={[passed(6), passed(0), passed(20)]}
+      />,
+    )
+
+    expect(screen.getByTestId('problem-results-summary').textContent).toBe('2/2 casos')
+    expect(screen.getByTestId('problem-result-0')).not.toBeNull()
+    expect(screen.getByTestId('problem-result-1')).not.toBeNull()
+    expect(screen.queryByTestId('problem-result-2')).toBeNull()
+  })
+
   it('shows expected against obtained on a failing case', () => {
     render(
       <ExampleResults

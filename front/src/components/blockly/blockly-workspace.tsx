@@ -3,6 +3,7 @@ import * as Blockly from 'blockly'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { installBodyPopovers, keepCanvasFocusIntoPopovers } from '@/lib/blockly-popovers'
 import { RecenterControl } from '@/lib/blockly-recenter-control'
 import { cn } from '@/lib/utils'
 
@@ -57,6 +58,12 @@ export type BlocklyWorkspaceProps = {
 // The coloured bar on each toolbox category row: 4px in the identity, 8px in
 // Blockly. A static on the class, so it is set once, before any toolbox renders.
 Blockly.ToolboxCategory.borderWidth = KUMITE_CATEGORY_BAR_PX
+
+// #367: context menus and field dropdowns on <body>, so the canvas edge never
+// cuts them (the why, and the focus handling it takes, in blockly-popovers).
+// Every `Blockly.inject` in the app goes through this module, so this runs
+// before the first one.
+installBodyPopovers()
 
 const defaultOptions: Partial<Blockly.BlocklyOptions> = {
   // Blockly's own default is https://static.blockly.com/media/, which would put
@@ -129,6 +136,7 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       const recenterControl = new RecenterControl(workspace, labelRef.current)
       recenterControlRef.current = recenterControl
       propsRef.current.onReady?.(workspace)
+      const releasePopoverFocus = keepCanvasFocusIntoPopovers(container)
 
       // Restoring a saved workspace is not a user edit: suppress the events
       // altogether, then start listening.
@@ -171,6 +179,7 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       observer.observe(container)
 
       return () => {
+        releasePopoverFocus()
         observer.disconnect()
         workspace.removeChangeListener(listener)
         recenterControl.dispose()
@@ -236,7 +245,8 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
         // `isolate`: Blockly's toolbox (z-index 70) and scrollbars (30) would
         // otherwise compete with the page and paint over the app's dialogs
         // (z-50), e.g. "Criar variável" (#205). Blockly's dropdowns and
-        // widgets live on <body>, outside this box, and are unaffected.
+        // widgets live on <body> — because of `installBodyPopovers` at the
+        // top of this module (#367) — outside this box, and are unaffected.
         className={cn('isolate h-full w-full', className)}
       />
     )

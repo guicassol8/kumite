@@ -166,8 +166,10 @@ pnpm worktree:env   # its own database and ports (below) — when it runs the ap
   `docker run` Postgres, and its databases on the local Postgres — its
   `<db>_test_<dir>` and the one `worktree:env` gave it (#395); never the
   main checkout's, nor one another worktree's `back/.env` names
-  (`--dry-run` lists first). A worktree whose databases could not be
-  dropped is kept for the next prune. Dirty trees and unmerged branches are
+  (`--dry-run` lists first). A worktree whose database step failed
+  (`db:drop-worktree` exited non-zero) is kept for the next prune; with
+  Postgres unreachable the step only reports it, and the worktree still goes —
+  its `worktree:env` database is then left behind, to drop by hand. Dirty trees and unmerged branches are
   always kept — they may be another agent's.
 - Playwright writes every spec's screenshots to `front/e2e/evidence/<n>/`,
   which git ignores (#402): a run never leaves changes behind, and the

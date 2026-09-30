@@ -73,6 +73,17 @@ esac
 exit 0
 STUB
 chmod +x "$tmp/bin/pnpm"
+# A docker stub too (#412 review): worktree-prune.sh removes `docker run`
+# Postgres containers named after each merged worktree. Without the stub, case
+# (r) would reach the machine's real docker and force-remove any container
+# whose name starts with a fixture tree's name (task-7-…) — with its volumes.
+# `ps` answers nothing, so prune never gets an id to remove.
+cat >"$tmp/bin/docker" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$SMOKE_DOCKER_LOG"
+exit 0
+STUB
+chmod +x "$tmp/bin/docker"
 
 g() { git -C "$main" -c user.name=smoke -c user.email=smoke@example.invalid -c commit.gpgsign=false "$@"; }
 
@@ -103,7 +114,7 @@ in_tree() {
   shift
   (cd "$dir" && env "${LEAK[@]}" PATH="$tmp/bin:$PATH" TMPDIR="$tmp" \
     SMOKE_PNPM_LOG="$pnpm_log" SMOKE_DBS="$tmp/dbs" SMOKE_E2E_LOG="$e2e_log" \
-    SMOKE_PNPM_FAIL="${fail:-}" "$@")
+    SMOKE_PNPM_FAIL="${fail:-}" SMOKE_DOCKER_LOG="$tmp/docker.log" "$@")
 }
 # wenv <dir> [args]: worktree-env.sh there. Sets out, rc, calls (the pnpm
 # arguments of this run, one per line), dbs (the DATABASE_URL each saw).
@@ -364,6 +375,8 @@ expect "the merged trees are gone (task-7-a)" [ ! -d "$wt/task-7-a" ]
 expect "the detached review-7 stays" [ -d "$wt/review-7" ]
 expect "db:drop-worktree ran for task-7-a with its back/.env in place" grep -qx 'drop task-7-a env=yes' "$pnpm_log.drops"
 expect "never with the back/.env already gone" not grep -q 'env=no' "$pnpm_log.drops"
+expect "docker reached only the stub, and only to look (ps)" grep -q '^ps ' "$tmp/docker.log"
+expect "the stub was never asked to remove anything" not grep -q '^rm ' "$tmp/docker.log"
 end
 
 echo

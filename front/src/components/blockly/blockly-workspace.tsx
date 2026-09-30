@@ -58,6 +58,17 @@ export type BlocklyWorkspaceProps = {
 // Blockly. A static on the class, so it is set once, before any toolbox renders.
 Blockly.ToolboxCategory.borderWidth = KUMITE_CATEGORY_BAR_PX
 
+// #367: with no container set, Blockly ≥ 12 hangs the WidgetDiv (context
+// menus, inline editors), the DropDownDiv (field dropdowns) and the tooltip
+// inside the main workspace's `.injectionDiv` — which its own CSS gives
+// `overflow: hidden` — while it positions them against the *window*. A menu
+// that fits the window below a block near the bottom of the canvas was drawn
+// there and cut at the canvas edge. On <body> they are clipped by nothing but
+// the viewport, which is what their positioning already measures. Every
+// `Blockly.inject` in the app goes through this module, so setting it here
+// runs before the first one.
+Blockly.common.setParentContainer(document.body)
+
 const defaultOptions: Partial<Blockly.BlocklyOptions> = {
   // Blockly's own default is https://static.blockly.com/media/, which would put
   // the editor's sprites, cursors and sounds behind a third-party CDN on the
@@ -236,7 +247,8 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
         // `isolate`: Blockly's toolbox (z-index 70) and scrollbars (30) would
         // otherwise compete with the page and paint over the app's dialogs
         // (z-50), e.g. "Criar variável" (#205). Blockly's dropdowns and
-        // widgets live on <body>, outside this box, and are unaffected.
+        // widgets live on <body> — because of `setParentContainer` at the top
+        // of this module (#367) — outside this box, and are unaffected.
         className={cn('isolate h-full w-full', className)}
       />
     )

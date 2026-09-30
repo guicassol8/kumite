@@ -379,3 +379,42 @@ describe('BlocklyWorkspace theme (#218)', () => {
     })
   })
 })
+
+// #367: Blockly ≥ 12 hangs its popups inside the workspace's `.injectionDiv`
+// (overflow: hidden) unless told otherwise, but positions them against the
+// window — so a menu that fits the window below a block was cut at the
+// canvas edge. Where the div lives is what jsdom can prove; the geometry is
+// `e2e/blockly-popups-edge.spec.ts`.
+describe('Blockly popups live outside the canvas (#367)', () => {
+  afterEach(() => {
+    Blockly.WidgetDiv.hide()
+    Blockly.DropDownDiv.hideWithoutAnimation()
+  })
+
+  it('shows the widget div (context menus, inline editors) on <body>', () => {
+    const workspace = renderWorkspace().handle.getWorkspace()
+    if (!workspace) throw new Error('expected an injected workspace')
+
+    Blockly.WidgetDiv.show({}, false, () => {}, workspace, false)
+
+    const div = Blockly.WidgetDiv.getDiv()
+    expect(div?.parentElement).toBe(document.body)
+    expect(div?.closest('.injectionDiv')).toBeNull()
+  })
+
+  it('shows the dropdown div (field dropdowns) on <body>', () => {
+    const workspace = renderWorkspace().handle.getWorkspace()
+    if (!workspace) throw new Error('expected an injected workspace')
+    const block = workspace.newBlock('logic_compare')
+    block.initSvg()
+    block.render()
+    const field = block.getField('OP')
+    if (!field) throw new Error('expected the = dropdown on logic_compare')
+
+    Blockly.DropDownDiv.showPositionedByField(field, undefined, undefined, false)
+
+    const div = Blockly.DropDownDiv.getContentDiv().parentElement
+    expect(div?.parentElement).toBe(document.body)
+    expect(div?.closest('.injectionDiv')).toBeNull()
+  })
+})

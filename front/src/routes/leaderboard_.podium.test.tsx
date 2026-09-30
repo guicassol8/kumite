@@ -263,6 +263,38 @@ describe('/leaderboard/podium — the ceremony', () => {
     expect(screen.getByTestId('podium-board').textContent).not.toContain('Time de Ontem')
   })
 
+  // The same holds for a cached failure: a poll of the board's that failed
+  // while the stream was down leaves the entry in error, old data and all,
+  // until something fetches it again. That failure is not the pódio's: while
+  // its own fetch is in flight the projector shows loading, never the alert.
+  it('never projects a failure cached before it opened, while its own fetch is in flight', async () => {
+    let answer: (response: unknown) => void = () => {}
+    mockedRanking.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }) as never,
+    )
+    renderPodium((queryClient) => {
+      primeStaleRanking(queryClient)
+      queryClient
+        .getQueryCache()
+        .find({ queryKey: ['ranking', 'event'] })
+        ?.setState({
+          status: 'error',
+          error: new Error('failed to load event ranking'),
+          errorUpdatedAt: Date.now() - 60 * 60 * 1000,
+        })
+    })
+
+    await screen.findByTestId('podium-loading')
+    expect(screen.queryByTestId('podium-error')).toBeNull()
+
+    answer(jsonResponse(200, eventRanking))
+    const first = await screen.findByTestId('podium-place-1')
+    expect(within(first).getByTestId('podium-team-name-1').textContent).toBe('Time 1')
+    expect(screen.queryByTestId('podium-error')).toBeNull()
+  })
+
   // Data first: once the ceremony is up, a refetch in the background (the
   // projector's window regaining focus, the network coming back) that fails
   // must not swap the podium for the error in front of the room.

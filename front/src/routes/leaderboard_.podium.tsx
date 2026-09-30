@@ -28,9 +28,11 @@ function PodiumScreen() {
   // Same cache entry as the leaderboard's REST fallback, but never painted
   // from it: the board fills that entry once, when /leaderboard loads, and
   // leaves it alone while the stream is live, so by the ceremony it can be
-  // hours old. Only a ranking fetched since this screen opened takes the
-  // stage (`status` below); `refetchOnMount: 'always'` guarantees that fetch
-  // even if a default `staleTime` ever says the cached one is still fresh.
+  // hours old — or left in error by a poll that failed while the stream was
+  // down. Only what happened since this screen opened, a ranking or a
+  // failure, takes the stage (`status` below); `refetchOnMount: 'always'`
+  // guarantees that fetch even if a default `staleTime` ever says the cached
+  // one is still fresh.
   const [openedAt] = useState(Date.now)
   const ranking = useQuery({
     queryKey: ['ranking', 'event'],
@@ -38,6 +40,7 @@ function PodiumScreen() {
     refetchOnMount: 'always',
   })
   const rankingIsCurrent = ranking.data !== undefined && ranking.dataUpdatedAt >= openedAt
+  const rankingFailedSinceOpen = ranking.isError && ranking.errorUpdatedAt >= openedAt
   // Members come from the organizer's moderation listing: GET /teams only
   // names the viewer's own team, and would give every other member as null.
   const teams = useQuery({ queryKey: ORGANIZER_TEAMS_QUERY_KEY, queryFn: fetchOrganizerTeams })
@@ -55,14 +58,16 @@ function PodiumScreen() {
   // before a current one arrived; a later background refetch that fails keeps
   // the podium up. A cached ranking from before this screen opened is not a
   // fallback: its fetch failing shows the error, never the old podium. A
-  // failed team listing still shows the podium, just without members and
-  // seals. Waiting for the listing to settle keeps the entry animation from
-  // starting with the members missing and popping in halfway.
+  // cached failure is not this screen's either: until its own fetch fails,
+  // it shows loading. A failed team listing still shows the podium, just
+  // without members and seals. Waiting for the listing to settle keeps the
+  // entry animation from starting with the members missing and popping in
+  // halfway.
   const status: PodiumStatus = rankingIsCurrent
     ? teams.isPending
       ? 'loading'
       : 'ready'
-    : ranking.isError
+    : rankingFailedSinceOpen
       ? 'error'
       : 'loading'
 

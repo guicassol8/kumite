@@ -263,6 +263,28 @@ describe('/leaderboard/podium — the ceremony', () => {
     expect(screen.getByTestId('podium-board').textContent).not.toContain('Time de Ontem')
   })
 
+  // Data first: once the ceremony is up, a refetch in the background (the
+  // projector's window regaining focus, the network coming back) that fails
+  // must not swap the podium for the error in front of the room.
+  it('keeps the podium up when a later background refetch fails', async () => {
+    let client: QueryClient | undefined
+    renderPodium((queryClient) => {
+      client = queryClient
+    })
+    await screen.findByTestId('podium-place-1')
+
+    mockedRanking.mockResolvedValue(jsonResponse(500, {}))
+    await act(async () => {
+      await client?.refetchQueries({ queryKey: ['ranking', 'event'] })
+      // Let the query's batched notification reach the screen.
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+
+    expect(client?.getQueryState(['ranking', 'event'])?.status).toBe('error')
+    expect(screen.getByTestId('podium-place-1')).toBeDefined()
+    expect(screen.queryByTestId('podium-error')).toBeNull()
+  })
+
   it('shows the error, not the cached ranking, when its own fetch fails', async () => {
     mockedRanking.mockResolvedValue(jsonResponse(500, {}))
     renderPodium(primeStaleRanking)

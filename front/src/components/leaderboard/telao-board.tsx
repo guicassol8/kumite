@@ -9,12 +9,11 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useRankChangeHighlight } from '@/hooks/use-rank-change-highlight'
+import { useTelaoSession } from '@/hooks/use-telao-session'
 import { formatTime } from '@/i18n/format'
-import { setPresentationActive } from '@/lib/presentation-mode'
 import { positionLabel } from '@/lib/round-position'
 import type { EventRanking, RoundRanking } from '@/lib/sse-schema'
 import { displayTeamName } from '@/lib/team-name'
-import { applyTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
@@ -79,40 +78,11 @@ export function TelaoBoard({
   const exitButtonRef = useRef<HTMLButtonElement>(null)
   const prefersReducedMotion = useMediaQuery(REDUCED_MOTION_QUERY)
 
-  // Telão-active signal (hides header/footer regardless of whether real
-  // fullscreen ever engaged) + forced dark, independent of the user's actual
-  // theme choice — never through `setTheme`, which would persist it. Focus
-  // opens on the exit button; the trigger gets it back through leaderboard.tsx's
-  // own effect once this unmounts and the toggle re-renders.
-  useEffect(() => {
-    setPresentationActive(true)
-    document.documentElement.classList.add('dark')
-    exitButtonRef.current?.focus()
-    return () => {
-      setPresentationActive(false)
-      applyTheme()
-    }
-  }, [])
-
-  // Two independent exits, each covering what the other misses (#220
-  // acceptance): `fullscreenchange` fires when the browser itself leaves
-  // fullscreen (Esc consumed by the browser, F11, a system gesture) but
-  // never fires at all without a real `requestFullscreen` — that fallback
-  // path is exactly what the `keydown` listener below catches instead.
-  useEffect(() => {
-    function handleFullscreenChange() {
-      if (!document.fullscreenElement) onExit()
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onExit()
-    }
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [onExit])
+  // Presentation signal, forced dark, focus on the exit button and the two
+  // exits (#220 acceptance) — shared with the pódio since #284. The trigger
+  // gets focus back through leaderboard.tsx's own effect once this unmounts
+  // and the toggle re-renders.
+  useTelaoSession({ onExit, focusRef: exitButtonRef })
 
   // The three states (#220 spec item 5). `justClosedRoundId` is scoped to
   // this telão session on purpose: it is only set by observing the

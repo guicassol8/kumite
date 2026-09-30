@@ -97,9 +97,13 @@ export function PodiumBoard({
   }
 
   return (
+    // No `overflow-hidden` and no `min-h-0` on purpose, unlike the telão
+    // (which pages instead): if the ceremony ever outgrows the screen it must
+    // show as a scroll the E2E measures, never as a 10th place silently cut
+    // off at the bottom edge of the projector.
     <div
       data-testid="podium-board"
-      className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-background px-8 py-6 text-foreground"
+      className="flex flex-1 flex-col gap-5 bg-background px-8 py-6 text-foreground"
     >
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-display font-extrabold text-[84px] uppercase leading-[76px] tracking-[0.01em]">
@@ -175,7 +179,7 @@ export function PodiumBoard({
       )}
 
       {status === 'ready' && !isEmpty && (
-        <div className="flex min-h-0 flex-1 flex-col justify-center">
+        <div className="flex flex-1 flex-col justify-center">
           <ol
             data-testid="podium-places"
             aria-label={t('leaderboard.podium.title')}

@@ -19,6 +19,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TeamsRouteImport } from './routes/teams'
 import { Route as DevErrorProbeRouteImport } from './routes/dev.error-probe'
+import { Route as LeaderboardPodiumRouteImport } from './routes/leaderboard_.podium'
 import { Route as OrganizerIndexRouteImport } from './routes/organizer.index'
 import { Route as OrganizerEventConfigRouteImport } from './routes/organizer.event-config'
 import { Route as OrganizerTeamsRouteImport } from './routes/organizer.teams'
@@ -82,6 +83,11 @@ const TeamsRoute = TeamsRouteImport.update({
 const DevErrorProbeRoute = DevErrorProbeRouteImport.update({
   id: '/dev/error-probe',
   path: '/dev/error-probe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaderboardPodiumRoute = LeaderboardPodiumRouteImport.update({
+  id: '/leaderboard_/podium',
+  path: '/leaderboard/podium',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrganizerIndexRoute = OrganizerIndexRouteImport.update({
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
   '/dev/error-probe': typeof DevErrorProbeRoute
+  '/leaderboard/podium': typeof LeaderboardPodiumRoute
   '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/organizer/teams': typeof OrganizerTeamsRoute
   '/organizer/users': typeof OrganizerUsersRoute
@@ -191,6 +198,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
   '/dev/error-probe': typeof DevErrorProbeRoute
+  '/leaderboard/podium': typeof LeaderboardPodiumRoute
   '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/organizer/teams': typeof OrganizerTeamsRoute
   '/organizer/users': typeof OrganizerUsersRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/teams': typeof TeamsRoute
   '/dev/error-probe': typeof DevErrorProbeRoute
+  '/leaderboard_/podium': typeof LeaderboardPodiumRoute
   '/organizer/event-config': typeof OrganizerEventConfigRoute
   '/organizer/teams': typeof OrganizerTeamsRoute
   '/organizer/users': typeof OrganizerUsersRoute
@@ -246,6 +255,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/teams'
     | '/dev/error-probe'
+    | '/leaderboard/podium'
     | '/organizer/event-config'
     | '/organizer/teams'
     | '/organizer/users'
@@ -271,6 +281,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/teams'
     | '/dev/error-probe'
+    | '/leaderboard/podium'
     | '/organizer/event-config'
     | '/organizer/teams'
     | '/organizer/users'
@@ -297,6 +308,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/teams'
     | '/dev/error-probe'
+    | '/leaderboard_/podium'
     | '/organizer/event-config'
     | '/organizer/teams'
     | '/organizer/users'
@@ -324,6 +336,7 @@ export interface RootRouteChildren {
   SignupRoute: typeof SignupRoute
   TeamsRoute: typeof TeamsRoute
   DevErrorProbeRoute: typeof DevErrorProbeRoute
+  LeaderboardPodiumRoute: typeof LeaderboardPodiumRoute
   PracticeIdRoute: typeof PracticeIdRoute
   ProblemIdRoute: typeof ProblemIdRoute
   RoundsIdRoute: typeof RoundsIdRoute
@@ -400,6 +413,13 @@ declare module '@tanstack/react-router' {
       path: '/dev/error-probe'
       fullPath: '/dev/error-probe'
       preLoaderRoute: typeof DevErrorProbeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaderboard_/podium': {
+      id: '/leaderboard_/podium'
+      path: '/leaderboard/podium'
+      fullPath: '/leaderboard/podium'
+      preLoaderRoute: typeof LeaderboardPodiumRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/organizer/': {
@@ -544,6 +564,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignupRoute: SignupRoute,
   TeamsRoute: TeamsRoute,
   DevErrorProbeRoute: DevErrorProbeRoute,
+  LeaderboardPodiumRoute: LeaderboardPodiumRoute,
   PracticeIdRoute: PracticeIdRoute,
   ProblemIdRoute: ProblemIdRoute,
   RoundsIdRoute: RoundsIdRoute,

@@ -69,8 +69,9 @@ foreign() {
   local other
   other="$(awk -v p="$marker tree=" 'index($0, p) == 1 { print substr($0, length(p) + 1); exit }' back/.env)"
   if [ -n "$other" ]; then
-    echo "back/.env was written by pnpm worktree:env for $other"
+    echo "back/.env was written by pnpm worktree:env for $other, not for this tree ($root)"
   else
+    # Not "another tree's": a #404 back/.env may well be this tree's own.
     echo "back/.env was written by pnpm worktree:env before #413 (no tree in its marker)"
   fi
 }
@@ -113,7 +114,7 @@ if [ "$mode" = print ]; then
   # and Playwright reuses whatever server is up there (#413).
   why="$(foreign)"
   if [ "$root" != "$main" ] && [ -n "$why" ]; then
-    echo "worktree-env: $why, not for this tree ($root) —" >&2
+    echo "worktree-env: $why —" >&2
     echo "  run \`pnpm worktree:env\` here first: it gives this tree its own database and ports" >&2
     exit 1
   fi

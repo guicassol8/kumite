@@ -400,7 +400,7 @@ cp "$wt/review-7/front/.env" "$wt/review/front/.env"
 out="$(in_tree "$wt/review" env KUMITE_E2E_LOCK_DIR="$tmp/locks" SMOKE_E2E_SECONDS=0 bash scripts/e2e.sh 2>&1)"
 rc=$?
 expect "e2e exits non-zero (rc=$rc)" [ "$rc" != 0 ]
-expect "e2e says whose back/.env it is" says "for $b_root"
+expect "e2e says whose back/.env it is" says "for $b_root, not for this tree ($r_root)"
 expect "e2e says what to run" says 'run `pnpm worktree:env` here'
 expect "Playwright never started" [ ! -s "$e2e_log" ]
 printed="$(in_tree "$wt/review" bash scripts/worktree-env.sh --print 2>/dev/null)"
@@ -457,6 +457,7 @@ print_in "$wt/review"
 expect "--print exits non-zero (rc=$rc)" [ "$rc" != 0 ]
 expect "--print leaves nothing to eval" [ -z "$printed" ]
 expect "--print says the marker named no tree" says "no tree in its marker"
+expect "--print does not call it another tree's (it may be this one's)" not says "not for this tree"
 wenv "$wt/review"
 expect "exit 0 (rc=$rc)" [ "$rc" = 0 ]
 expect "says the marker named no tree" says "no tree in its marker"

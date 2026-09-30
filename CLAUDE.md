@@ -22,7 +22,7 @@ These are slash-command wrappers over the process in `docs/task-workflow/`
 | planning-tasks | designing the implementation of an issue |
 | implementing-tasks | coding an approved plan |
 | reviewing-tasks | reviewing a PR + producing mandatory evidence |
-| orchestrating-batch | running 2–3 issues end to end via subagents |
+| orchestrating-batch | running 1–3 issues (or grouped tracks) end to end via subagents |
 
 Each step is its own chat: every skill ends by printing the next step's command,
 ready to paste into a new session. The full chain is in `docs/workflow.md`
@@ -63,9 +63,10 @@ session.
   `<db>_test_<worktree dir>` (`<db>_test` in the main checkout) from it and
   truncate that, so a Stop that fires mid-E2E or mid-hurl in the same tree
   no longer wipes their seed (#392); the ladder itself is unchanged.
-  Isolating the E2E's own database without Docker: `docs/workflow.md`
-  § Worktrees. Stop blocks (up to 3 times in a row, like any red step) until
-  the worktree has run `pnpm install`.
+  A worktree's own E2E/hurl database and ports: `pnpm worktree:env`, then
+  `pnpm e2e` (#404, `docs/workflow.md` § Worktrees). Stop blocks (up to 3
+  times in a row, like any red step) until the worktree has run
+  `pnpm install`.
   Each Stop run appends one line (root, DB source, decision — never the URL)
   to `/tmp/kumite-stop-hook.log`: look there first on an `exit 143`.
   `bash scripts/claude-hooks-smoke.sh` proves the behavior with throwaway

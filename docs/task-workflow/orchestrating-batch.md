@@ -1,13 +1,14 @@
 # Orchestrating a batch
 
-Run **2–3 issues end to end in one session** by delegating every step that
+Run **1–3 issues end to end in one session** by delegating every step that
 plans, writes code or reviews to a subagent with a fresh context. Conventions
 in `docs/workflow.md`; what each step actually does stays in its own doc —
 this one only says who runs it, in what order, and where the user is asked.
 
-**Not for:** a single task (run the five steps, one session each), and never
-for doing a step yourself. The orchestrator does not plan, does not write
-code and does not review.
+**A batch of one** is fine (#404): the same isolation — a fresh agent per
+step — without pasting a command into a new chat for each step. **Never** for
+doing a step yourself: the orchestrator does not plan, does not write code
+and does not review.
 
 ## Why this does not break "one step, one session"
 
@@ -68,11 +69,24 @@ decision. Two `gh list` calls plus one `gh issue view <n> --json state` per
 "Blocked by" reference: that last check is what keeps a blocked issue out of
 the batch, so do not skip it.
 
-Then apply the **coherence test**, which is what makes a batch a batch: no
-two issues may touch the same files, modules, screens or migrations — or they
-must overlap so completely that they belong on one track. The cost of getting
-this wrong is a merge conflict and rework in the middle of a sequential run.
-Target 2–3; hand back 2 rather than forcing a colliding third.
+Then apply the **coherence test**, which is what makes a batch a batch — the
+implementations run in parallel (Step 4), so:
+
+- no two issues may touch the same files, modules or screens;
+- at most **one** issue in the batch carries a migration (two would race
+  for the same migration number);
+- the i18n catalogs (`front/src/i18n/*`) are the one allowed overlap: two
+  issues may both add keys, and the later PR resolves the merge (the
+  parity test catches a slip).
+
+**Grouped track** (#404). Small issues that touch the *same* files are not
+split across the batch — they become one track: one plan covering all of
+them, one implementer, one review, one PR with a `Fixes #N` per issue (they
+all close on merge; develop is the default branch). Keep a track to about 5
+issues or ~400 changed lines: big PRs are the ones reviews get wrong. The
+issues keep their own Acceptance; the plan and the review walk each one.
+
+Target 2–3 tracks; hand back 2 rather than forcing a colliding third.
 
 Report: each issue (`#N — title`, priority, stack), what it unblocks, **why
 the set holds together as a batch**, and the runner-ups in one line each. Ask
@@ -86,8 +100,8 @@ gh issue edit <N> --add-assignee @me   # each issue in the batch
 
 ## Step 2 — Plan, in parallel
 
-One planning agent per issue, all spawned at once: planning is reading, and
-reading parallelizes safely. Implementation does not (Step 4).
+One planning agent per track, all spawned at once: planning is reading, and
+reading parallelizes safely.
 
 Spawn each as a **`task-planner`** agent (`.claude/agents/task-planner.md`),
 in the background. The agent carries the batch rules — no Edit/Write, no
@@ -115,12 +129,27 @@ comment (`gh issue comment --edit-last`) — never a second `## Plan`.
 No issue advances to Step 4 without the user's explicit approval. Record each
 approval in the state file; it is what the implementation prompt asserts.
 
-## Step 4 — Implement → review → merge, one issue at a time
+## Step 4 — Implement and review in parallel, merge one at a time
 
-**Never run two implementations in parallel.** Worktrees share CPU, RAM and,
-for the E2E, hurl and dev server, the local Postgres (#392 isolated only the
-back suite). Each issue completes the whole cycle — implemented, reviewed,
-merged — before the next one starts.
+The approved tracks are implemented **in parallel** (#404): the coherence
+test keeps them off each other's files, and each implementer runs
+`pnpm worktree:env`, so every worktree has its own database and ports and
+`pnpm e2e` queues the heavy runs on the machine's E2E semaphore
+(`docs/workflow.md` § Worktrees). The user's attention is the scarce
+resource, not the machine — so the merges stay one at a time, each on the
+user's word.
+
+- Spawn one implementer per approved track at once (4a). Each review starts
+  as soon as its own implementation returns (4b) — never wait for the
+  others.
+- At most **4 agents alive at once** (implementers + reviewers + a
+  verifier); a fifth waits for one to finish. More hits the account's
+  session limits.
+- Merge in the order the reviews approve (4c). Before each merge after the
+  first, the PR takes the new develop in: its reviewer (still alive, via
+  `SendMessage`) or a fresh one runs `git fetch origin && git merge
+  origin/develop`, resolves an i18n conflict if there is one, and pushes —
+  the pre-push re-runs the ladder on the merged result.
 
 ### 4a — Implementation
 
@@ -147,10 +176,11 @@ mutants, one push for all fixes, `gh pr checks`, never merge.
 Review PR #<PR> (fixes issue #<N>).
 ```
 
-E2E care to add to that prompt when the PR touches the front: re-seed
-(`db:reset`) before each full run — the suite asserts on seed state and
-leaves data behind — and use `--workers=1` for probe runs (exit 137 is OOM,
-not a regression).
+E2E care to add to that prompt when the PR touches the front: re-seed with
+`pnpm worktree:env --reset` before each full run — the suite asserts on seed
+state and leaves data behind, and a bare `db:reset` in a shell that exports
+`DATABASE_URL` resets the shared database instead of the worktree's — and use
+`--workers=1` for probe runs (exit 137 is OOM, not a regression).
 
 **Fix verifier.** When the reviewer's report carries a fix range (a fix
 touched production code), spawn a **`fix-verifier`** agent
@@ -199,7 +229,8 @@ implementation worktree is usually still around, so drop the flag and let
 so `Fixes #N` closes the issue on merge; `gh issue close <N> --reason
 completed` only if it stayed open.
 
-Update the state file to `merged` before starting the next issue.
+Update the state file to `merged`, then bring the next approved PR up to
+date with develop before its merge (Step 4).
 
 ### When the review requests changes
 

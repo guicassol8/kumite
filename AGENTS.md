@@ -23,9 +23,10 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
   the tokens, never the other way around.
 - `docs/task-workflow/` — the canonical task process (create → pick → plan
   → implement → review); conventions (labels, worktrees, branches/PRs) in
-  `docs/workflow.md`. `orchestrating-batch.md` runs 2–3 issues from picking
-  to merge in one session, delegating planning, implementation and review
-  to a fresh subagent each. The skills in `.claude/skills/` are thin
+  `docs/workflow.md`. `orchestrating-batch.md` runs 1–3 issues (or grouped
+  tracks) from picking to merge in one session, delegating planning,
+  implementation and review to a fresh subagent each — implementations in
+  parallel, merges one at a time. The skills in `.claude/skills/` are thin
   wrappers that import these docs; the role agents the batch spawns live in
   `.claude/agents/`.
 - Tasks are GitHub Issues (`gh`); format and labels in `docs/workflow.md`.
@@ -36,19 +37,19 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
 - `pnpm verify` — `kata verify --strict-coverage` on `back/`.
 - `pnpm -r test` — vitest in both packages.
 - `pnpm format` — biome, single config at the root.
-- Everything: `pnpm check`. Browser E2E: `pnpm --filter @kumite/front e2e`
-  (boots back+front itself; a running Postgres first for db-backed flows).
-  Organizer flows need `ORGANIZER_EMAIL`/`ORGANIZER_PASSWORD` in the
-  environment plus `db:seed`, and the reset-password happy path needs
-  `BACK_NOTIFICATIONS_LOG`; without them those specs skip. Claude Code cloud
-  sessions get all of it from `.claude/hooks/session-start.sh`.
+- Everything: `pnpm check`. Browser E2E: `pnpm e2e` (#404) — boots back +
+  front itself with this tree's `back/.env` exported over the shell, the
+  organizer credentials and a `BACK_NOTIFICATIONS_LOG`, and waits for a slot
+  in the machine's E2E semaphore. In a linked worktree, `pnpm worktree:env`
+  first (its own database and ports; `--reset` re-seeds). Without the
+  organizer credentials or a seed, the gated specs skip silently. Claude
+  Code cloud sessions get all of it from `.claude/hooks/session-start.sh`.
 - The back suite never shares a database (#392): it runs against its own
   `<db>_test` (main checkout, CI) or `<db>_test_<worktree dir>`, created and
   migrated by its vitest globalSetup, so the tests never wipe an E2E's seed.
-  The E2E, hurl and dev server do share `DATABASE_URL`'s database: a worktree
-  whose migrations differ from the main checkout's needs its own database for
-  those (`db:create`, `docs/workflow.md` § Worktrees, no Docker needed) —
-  otherwise each side's E2E/hurl fails against the other's schema.
+  The E2E, hurl and dev server use `DATABASE_URL`'s database: `pnpm
+  worktree:env` gives each linked worktree its own (#404, no Docker needed),
+  and `pnpm worktree:prune` drops it after the merge (#395).
 - `git push` runs the full ladder (lefthook pre-push, #399) whenever the push
   carries code, so it takes a few minutes — push with a long timeout, in the
   foreground. The Stop hook and CI are the other gates (`docs/workflow.md`

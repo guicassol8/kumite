@@ -123,8 +123,10 @@ explicitly, don't fix it partially.
 You wrote those fixes, so you are the worst judge of them: a model misses
 its own errors far more often than the same errors attributed to someone
 else. When any fix you committed touches production code — anything outside
-tests, `e2e/`, docs and `kata-feedback/` — a fresh agent checks those
-commits before the verdict. Note the range: `<head before your first
+tests, `e2e/`, `docs/` and `kata-feedback/`; the harness counts as code
+(`scripts/`, `.claude/` agents, skills and hooks, `lefthook.yml`), since it
+changes what runs or what agents do — a fresh agent checks those commits
+before the verdict. Note the range: `<head before your first
 fix>..<head after your last fix>`.
 
 - **Standalone review session**: spawn the `fix-verifier` agent
@@ -144,9 +146,10 @@ this step.
 ## Stage 3 — Evidence (MANDATORY, blocking)
 
 **Front-touching PRs — visual walkthrough** (all inside the review worktree):
-1. Boot the stack (`docker compose up -d`; Playwright's webServer boots
-   back + front on its own). If another instance is already running, override
-   the ports in this worktree's `.env` files.
+1. `pnpm worktree:env --reset` in the review worktree: its own database,
+   freshly seeded, and its own ports (`docs/workflow.md` § Worktrees).
+   `pnpm e2e` runs Playwright with that env — its webServer boots back +
+   front on its own — under the machine's E2E semaphore.
 2. Drive every changed flow via a Playwright spec in `front/e2e/`
    (extend or add one), asserting through `data-testid`.
 3. Screenshot each meaningful final state to
@@ -171,20 +174,22 @@ this step.
    outputs. The review comment itself may carry the attachments.
 5. No regression elsewhere: CI no longer runs the e2e suite on a PR push
    (#378, `docs/workflow.md` § Gate ladder), so you prove it. Run the
-   **whole** suite locally with `CI=1` on the PR's head (organizer
-   credentials exported, freshly seeded database, or the gated specs skip
-   silently), or dispatch it with `gh workflow run CI --ref <branch>` when
-   the workflow is enabled. Paste the pass/flaky/skip counts in the
+   **whole** suite locally on the PR's head: `pnpm worktree:env --reset`,
+   then `CI=1 pnpm e2e` (the organizer credentials come from `back/.env`; a
+   dirty database or missing credentials make the gated specs skip
+   silently). `gh workflow run CI --ref <branch>` only if the user asks —
+   it costs Actions minutes. Paste the pass/flaky/skip counts in the
    Evidence and name any flaky spec.
 
 **Back-touching PRs:**
 1. `pnpm -r test` — paste trimmed output.
-2. `pnpm --filter @kumite/back db:reset` — the hurl suite is not re-runnable
-   on a dirty database (it asserts on seed state, and vitest leaves rounds,
-   teams and `event_config` behind). The script refuses any non-local
-   `DATABASE_URL`, so it is safe to run without checking first.
-3. Server up (`pnpm dev:back`) → `pnpm --filter @kumite/back hurl` — paste
-   trimmed output. Start that server *fresh*: `db:reset` empties the database,
+2. `pnpm worktree:env --reset` — the hurl suite is not re-runnable on a
+   dirty database (it asserts on seed state). It resets this worktree's own
+   database, never another tree's; `db:reset` refuses any non-local
+   `DATABASE_URL`.
+3. `eval "$(bash scripts/worktree-env.sh --print)"`, server up
+   (`pnpm dev:back`), then `HURL_HOST=http://localhost:$PORT pnpm --filter
+   @kumite/back hurl` — paste trimmed output. Start that server *fresh*: `db:reset` empties the database,
    not the API process, and the anti-abuse windows (the per-IP bug-report
    cooldown, the password-reset ones) live in memory. Re-running the suite
    against a warm server fails `bug-reports.hurl` on the cooldown alone, with

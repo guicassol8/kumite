@@ -48,7 +48,7 @@ implementation starts.
 
 **The one exception — batch mode.** What this rule protects is *context
 isolation*: no step may inherit the working context of the step before it.
-`docs/task-workflow/orchestrating-batch.md` takes 2–3 issues from picking to
+`docs/task-workflow/orchestrating-batch.md` takes 1–3 issues from picking to
 merge in a single session by moving that boundary from the session to the
 subagent — planning, implementation and review each run in an agent spawned
 fresh for them and discarded after, while the orchestrating session holds
@@ -114,6 +114,7 @@ git fetch origin
 git worktree add .worktrees/task-<N>-<slug> -b task/<N>-<slug> origin/develop
 cd .worktrees/task-<N>-<slug>
 pnpm install        # node_modules are per-worktree, not shared
+pnpm worktree:env   # its own database and ports (below) — when it runs the app
 ```
 
 - `.worktrees/` is gitignored; never nest a worktree anywhere else.
@@ -121,36 +122,38 @@ pnpm install        # node_modules are per-worktree, not shared
   branch's dedicated worktree if clean and idle; otherwise coordinate ownership.
   Create `.worktrees/review-<PR>` only when the branch is not checked out
   elsewhere. See `docs/task-workflow/reviewing-tasks.md` § Stage 0.
-- Running the app in parallel worktrees: the default ports (3000 back,
-  5173 front) collide — override with `PORT` / `--port` and `VITE_API_URL`
-  in that worktree's `.env` files. A front on a port other than 5173 also
-  needs `APP_BASE_URL=http://localhost:<that port>` in the worktree's
-  `back/.env`: it is the back's CORS allowlist (#273), and any other origin
-  is refused. The Browser E2E does this for the back it starts itself
-  (`FRONT_PORT` → `APP_BASE_URL`, `front/playwright.config.ts`).
-- Postgres is shared unless you isolate it. **The back test suite already
-  isolates itself** (#392): `pnpm test` in `back/` runs against its own
-  database, derived from `DATABASE_URL` — `<db>_test` in the main checkout
-  and CI, `<db>_test_<worktree dir>` in a linked worktree (`TEST_DATABASE_URL`
-  overrides it) — which its vitest globalSetup creates and migrates. So the
-  Stop hook's ladder never truncates the database an E2E, hurl or dev server
-  is using. Those three still share whatever `DATABASE_URL` points at: to give
-  a worktree's E2E/hurl a database of its own on a **shared native Postgres
-  (no Docker)**:
-  1. In that worktree's `back/.env`: `DATABASE_URL` naming a new database
-     (`postgres://kumite:kumite@localhost:5487/kumite_task<N>`), a free
-     `PORT`, and `APP_BASE_URL=http://localhost:<front port>`; in
-     `front/.env`, `VITE_API_URL=http://localhost:<that PORT>`.
-  2. `unset PORT DATABASE_URL` in the shell you run from — a shell that
-     exports them wins, because `back/.env` never overrides a variable
-     already set, and `db:reset` would land on the shared database.
-  3. `pnpm --filter @kumite/back db:create` (creates it; a no-op when it
-     exists; needs no `createdb`/`psql`), then `db:migrate` and `db:reset`
-     (or `db:seed`).
-  4. `set -a; . back/.env; set +a` (the organizer credentials and `PORT`),
-     `export FRONT_PORT=<front port>`, then `pnpm --filter @kumite/front e2e`.
-  5. After the PR merges, drop `kumite_task<N>` and `kumite_test_<worktree
-     dir>` (`dropdb`, or `psql -d postgres -c 'drop database …'`).
+- **Its own database and ports: `pnpm worktree:env`** (#404), once, right
+  after `pnpm install`. On the shared native Postgres (no Docker) it gives the
+  worktree a database of its own — `kumite_task<N>` on a `task/<N>-…`
+  branch, `kumite_review<PR>` in `.worktrees/review-<PR>`, with a `_2`
+  suffix when another tree's `back/.env` already names it — plus a back port
+  3xxx and a front port 5xxx from the same number (skipping any port that is
+  listening or already named by another tree's `back/.env`), writes
+  `back/.env` (the main checkout's, with `DATABASE_URL`, `PORT`,
+  `APP_BASE_URL` and `FRONT_PORT` replaced) and `front/.env`
+  (`VITE_API_URL`), and runs `db:create` + `db:migrate` + `db:seed`. Re-running
+  keeps the same database and ports and only migrates (it seeds again when
+  the last seed did not complete — a run cut short, or a database created
+  anew); `--reset` re-seeds (`db:reset`) — do that before a
+  full E2E or hurl run. The shell's exported `PORT`, `DATABASE_URL` and
+  `APP_BASE_URL` never leak in. `bash scripts/worktree-env-smoke.sh` proves
+  all of it, the E2E semaphore included, in a throwaway repository.
+  - E2E: `pnpm e2e [playwright args]` (`CI=1 pnpm e2e` for the CI settings)
+    runs Playwright with this tree's `back/.env` exported over the shell,
+    `FRONT_PORT`, `VITE_API_URL` and a `BACK_NOTIFICATIONS_LOG`, so the
+    organizer and real-OTP specs run instead of skipping.
+  - Anything else with this tree's env (dev server, hurl):
+    `eval "$(bash scripts/worktree-env.sh --print)"` in your shell, then
+    `pnpm dev:back`, or `HURL_HOST=http://localhost:$PORT pnpm --filter
+    @kumite/back hurl`.
+  - **The E2E semaphore.** Every full E2E holds Chromium workers, a Vite and
+    a back. `pnpm e2e` takes one of `KUMITE_E2E_SLOTS` slots (default: one
+    per 5 GB of the machine's RAM, at least one — `flock` locks in
+    `$TMPDIR`); a run that finds them all busy waits and says so.
+  - The back test suite isolates itself anyway (#392): `pnpm test` runs
+    against its own `<db>_test_<worktree dir>` (`<db>_test` in the main
+    checkout and CI; `TEST_DATABASE_URL` overrides), created and migrated by
+    its vitest globalSetup, so no ladder truncates an E2E's seed.
 
   With Docker (cloud sessions, a machine that has it): set `DB_PORT` to a
   free port in a root `.env` copied from `.env.example`, `docker compose up
@@ -160,8 +163,14 @@ pnpm install        # node_modules are per-worktree, not shared
 - After the PR merges: `pnpm worktree:prune` from the main checkout. It
   removes every worktree whose branch is already in `origin/develop` and
   whose tree is clean, together with that worktree's compose project and
-  `docker run` Postgres (`--dry-run` lists first). Dirty trees and unmerged
-  branches are always kept — they may be another agent's.
+  `docker run` Postgres, and its databases on the local Postgres — its
+  `<db>_test_<dir>` and the one `worktree:env` gave it (#395); never the
+  main checkout's, nor one another worktree's `back/.env` names
+  (`--dry-run` lists first). A worktree whose database step failed
+  (`db:drop-worktree` exited non-zero) is kept for the next prune; with
+  Postgres unreachable the step only reports it, and the worktree still goes —
+  its `worktree:env` database is then left behind, to drop by hand. Dirty trees and unmerged branches are
+  always kept — they may be another agent's.
 - Playwright writes every spec's screenshots to `front/e2e/evidence/<n>/`,
   which git ignores (#402): a run never leaves changes behind, and the
   review attaches its own issue's folder to the PR instead of committing it.

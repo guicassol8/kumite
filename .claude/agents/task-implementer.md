@@ -20,9 +20,10 @@ approval — treat that precondition as satisfied.
 
 Worktree: yours starts from `origin/develop`, the default branch (#400).
 Rename its branch to `task/<N>-<slug>` right after you start, then run
-`pnpm install` (node_modules are per-worktree). If you need the app, the E2E
-or hurl, give the worktree its own database and ports (`docs/workflow.md`
-§ Worktrees) — the defaults collide with other worktrees.
+`pnpm install` (node_modules are per-worktree). Implementations run in
+parallel, so before you run the app, the E2E or hurl, `pnpm worktree:env`
+gives your worktree its own database and ports; then `pnpm e2e` (it waits for
+a free E2E slot when the machine is busy) — `docs/workflow.md` § Worktrees.
 
 Gates: `git push` runs the full ladder (pre-push, #399) — foreground, Bash
 `timeout: 600000`; a refused push is a real failure, never `--no-verify`.

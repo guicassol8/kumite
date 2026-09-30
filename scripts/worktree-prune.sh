@@ -13,6 +13,14 @@
 # variants from docs/workflow.md § Worktrees). Nothing else in Docker is
 # touched — never the root compose project, never another worktree's.
 #
+# On a shared native Postgres (no Docker), its databases go too (#395): the
+# back suite's `<db>_test_<dir>` and the database `pnpm worktree:env` gave it,
+# through `pnpm db:drop-worktree` (back/src/db/worktree-databases.ts) — never
+# the main checkout's database or its `<db>_test`, never a remote server.
+# `--dry-run` lists them. A drop that fails unexpectedly keeps the worktree
+# (its back/.env is what names its database), for the next prune to retry;
+# Postgres down is only reported.
+#
 # Usage: pnpm worktree:prune [--dry-run]
 set -uo pipefail
 
@@ -58,6 +66,15 @@ is_merged() {
   [ "${merged:-0}" -gt 0 ] 2>/dev/null
 }
 
+# drop_databases <worktree> [--dry-run]: its local Postgres databases (#395).
+# Returns db:drop-worktree's status: non-zero only when it failed unexpectedly
+# (Postgres down is reported and returns 0); $drop_status keeps it.
+drop_databases() {
+  (cd "$main/back" && pnpm -s db:drop-worktree "$@" 2>&1) | sed 's/^/        /'
+  drop_status="${PIPESTATUS[0]}"
+  return "$drop_status"
+}
+
 removed=0
 kept=0
 while IFS= read -r line; do
@@ -89,11 +106,19 @@ while IFS= read -r line; do
 
   if [ "$dry_run" = 1 ]; then
     echo "would remove  $name  ($branch merged, clean)"
+    drop_databases "$path" --dry-run ||
+      echo "        db:drop-worktree failed (exit $drop_status) — a real run would keep it"
     removed=$((removed + 1))
     continue
   fi
 
   echo "remove  $name  ($branch merged, clean)"
+  # First, while the worktree's back/.env still names its own database.
+  if ! drop_databases "$path"; then
+    echo "        kept instead: db:drop-worktree failed (exit $drop_status) — the next prune retries"
+    kept=$((kept + 1))
+    continue
+  fi
   if [ -f "$path/docker-compose.yml" ]; then
     docker compose --project-directory "$path" -f "$path/docker-compose.yml" down -v --remove-orphans >/dev/null 2>&1 || true
   fi

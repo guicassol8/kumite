@@ -982,6 +982,18 @@
       "generalBadge": "Geral",
       "waitingNextRound": "Aguardando a próxima rodada",
       "pageIndicator": "{{current}} / {{total}} · troca a cada 15 s"
+    },
+    "podium": {
+      "open": "Pódio",
+      "title": "Pódio",
+      "placeLabel": "{{place}}º lugar",
+      "points_one": "{{count}} ponto",
+      "points_other": "{{count}} pontos",
+      "empty": "Nenhum time pontuou ainda.",
+      "error": "Não foi possível carregar o pódio.",
+      "confetti": "Soltar confete",
+      "invite": "Obrigado por participar — até a próxima edição!",
+      "exitHint": "Esc · sair do pódio"
     }
   },
   "roundCountdown": {

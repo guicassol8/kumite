@@ -27,6 +27,8 @@ const evidence = (name: string) => `e2e/evidence/7/${name}.png`
 const evidence206 = (name: string) => `e2e/evidence/206/${name}.png`
 // #280: the verdict panel names the attempt within the round.
 const evidence280 = (name: string) => `e2e/evidence/280/${name}.png`
+// #319: the best score keeps the maximum it was judged against.
+const evidence319 = (name: string) => `e2e/evidence/319/${name}.png`
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -120,10 +122,10 @@ test.describe('problem screen (#7)', () => {
     roundSlot,
   }) => {
     // Two signups (the team member and, for #206, a teamless participant) and
-    // a real judge run, on top of three editor mounts: the row link into the
-    // problem, the teamless participant's row link and the reload once the
-    // round closes.
-    test.setTimeout(editorTestTimeout(3, 90_000))
+    // a real judge run, on top of four editor mounts: the row link into the
+    // problem, the teamless participant's row link, the reload once the round
+    // closes and, for #319, the reload after the points change.
+    test.setTimeout(editorTestTimeout(4, 90_000))
     const auth = await organizerAuthHeader()
     const problemId = await apiCreatePublishedProblem()
     const roundId = await createRound(auth, {
@@ -198,9 +200,10 @@ test.describe('problem screen (#7)', () => {
     await page.screenshot({ path: evidence280('01-veredito-com-tentativa') })
 
     // #206: the 201 refreshes the team's best in place — no reload — while
-    // the round is still open.
+    // the round is still open. #319: beside the maximum it was judged against,
+    // the problem's 100 points of the moment.
     const bestBadge = page.getByTestId('problem-best-score-badge')
-    await expect(bestBadge).toHaveText(/Melhor do time: \d+/)
+    await expect(bestBadge).toHaveText(/Melhor do time: \d+\/100/)
     await expect(page.getByTestId('problem-no-submission-badge')).toHaveCount(0)
     const bestScore = (await bestBadge.textContent())?.match(/\d+/)?.[0]
     if (!bestScore) throw new Error('expected a number on the best score badge')
@@ -257,5 +260,26 @@ test.describe('problem screen (#7)', () => {
       path: evidence206('04-rodada-encerrada-sem-regressao'),
       fullPage: true,
     })
+
+    // #319: with the round closed the organizer may change the points again
+    // (#193). The header follows — it says what the problem is worth now —
+    // but the team's best keeps the maximum it was judged against: "/100",
+    // never "/250".
+    const closedBest = page.getByTestId('problem-closed-best-score')
+    await expect(page.getByTestId('problem-points-badge')).toHaveText('100 pts')
+    await expect(closedBest).toContainText(`${bestScore}/100`)
+    await page.screenshot({ path: evidence319('01-encerrada-antes-da-edicao'), fullPage: true })
+    const repriced = await fetch(`${BACK_URL}/organizer/problems/${problemId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...auth },
+      body: JSON.stringify({ points: 250 }),
+    })
+    expect(repriced.status).toBe(200)
+    await page.reload()
+    await expectBlocklyInjected(page)
+    await expect(page.getByTestId('problem-points-badge')).toHaveText('250 pts')
+    await expect(closedBest).toContainText(`${bestScore}/100`)
+    await expect(closedBest).not.toContainText('250')
+    await page.screenshot({ path: evidence319('02-pontos-250-maximo-carimbado'), fullPage: true })
   })
 })

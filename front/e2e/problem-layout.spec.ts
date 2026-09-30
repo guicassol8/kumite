@@ -24,6 +24,7 @@ import {
 // the fix: jsdom measures nothing, so `problem.$id.test.tsx` pins the skeleton
 // and everything about *height* is asserted here.
 const evidence = (name: string) => `e2e/evidence/155/${name}.png`
+const evidence366 = (name: string) => `e2e/evidence/366/${name}.png`
 
 type Box = { x: number; y: number; width: number; height: number }
 
@@ -172,6 +173,25 @@ test.describe('/problem/$id — barra ancorada, rodada encerrada (#155)', () => 
       await expectNoPageScroll(page)
       await expectFooterBelowMain(page)
       await page.screenshot({ path: evidence(`${results}-${label}-resultados-na-faixa`) })
+
+      // #366: the band opens tall enough to *read* a case, not just its
+      // header — without a drag or a scroll. `toBeInViewport` measures with
+      // an IntersectionObserver, which the band's own overflow clips, so a
+      // case hidden below the band's fold fails here even though it is in
+      // the DOM (what the testid assertions above were blind to). The band
+      // keeps the canvas above its floor (asserted above, #155).
+      if (label === 'desktop') {
+        const firstCase = page.getByTestId('problem-result-0')
+        await expect(firstCase).toBeInViewport({ ratio: 1 })
+        const caseBox = await boxOf(page, 'problem-result-0')
+        expect(caseBox.y).toBeGreaterThanOrEqual(band.y - 1)
+        expect(caseBox.y + caseBox.height).toBeLessThanOrEqual(band.y + band.height + 1)
+        test.info().annotations.push({
+          type: 'heights (#366)',
+          description: `band ${Math.round(band.height)}px, canvas ${Math.round(canvasAfter.height)}px (was ${Math.round(canvasBefore.height)}px) at ${size.width}x${size.height}`,
+        })
+        await page.screenshot({ path: evidence366('01-desktop-primeiro-caso-visivel') })
+      }
     })
   }
 

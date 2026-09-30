@@ -191,6 +191,9 @@ test.describe('running examples locally (#5)', () => {
       )
     }
     await expect(page.getByTestId('problem-result-0')).toContainText('Tempo esgotado (2s)')
+    // #366: the message is what the participant came to read — on screen,
+    // inside the band, without dragging it open.
+    await expect(page.getByTestId('problem-result-0')).toBeInViewport({ ratio: 1 })
     await expect(page.getByTestId('problem-run-button')).toBeEnabled()
     await page.screenshot({ path: evidence('03-timeout') })
   })
@@ -211,6 +214,7 @@ test.describe('running examples locally (#5)', () => {
     }
     await expect(page.getByTestId('problem-result-0')).toContainText('Erro:')
     await expect(page.getByTestId('problem-result-0')).toContainText('shift')
+    await expect(page.getByTestId('problem-result-0')).toBeInViewport({ ratio: 1 })
     await page.screenshot({ path: evidence('04-erro-runtime') })
   })
 

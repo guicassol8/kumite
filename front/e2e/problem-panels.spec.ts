@@ -17,6 +17,10 @@ import {
 // against a real, closed round (this spec never submits, so it must not hold
 // the single-open-round slot — #150).
 const evidence = (name: string) => `e2e/evidence/203/${name}.png`
+const evidence307 = (name: string) => `e2e/evidence/307/${name}.png`
+
+/** Where `useDefaultLayout` keeps the canvas/results split (`layoutStorage`). */
+const RESULTS_LAYOUT_KEY = 'kumite:problem-layout:react-resizable-panels:problem-v'
 
 type Box = { x: number; y: number; width: number; height: number }
 
@@ -47,6 +51,19 @@ async function dragHandle(page: Page, testId: string, dx: number, dy: number): P
  */
 async function settle(page: Page): Promise<void> {
   await page.waitForTimeout(200)
+}
+
+/** The `results` share of the saved split, or `undefined` if nothing was saved. */
+async function savedResultsSize(page: Page): Promise<number | undefined> {
+  const saved = await page.evaluate((key) => window.localStorage.getItem(key), RESULTS_LAYOUT_KEY)
+  return saved ? (JSON.parse(saved) as Record<string, number>).results : undefined
+}
+
+/** Executar, and wait until the three cases are back. */
+async function runExamples(page: Page): Promise<void> {
+  await page.getByTestId('problem-run-button').click()
+  await expect(page.getByTestId('problem-results-summary')).toHaveText('3/3 casos')
+  await settle(page)
 }
 
 test.describe('/problem/$id — painéis colapsáveis e redimensionáveis no desktop (#203)', () => {
@@ -267,5 +284,70 @@ test.describe('/problem/$id — painéis colapsáveis e redimensionáveis no des
       'false',
     )
     await page.screenshot({ path: evidence('08-modo-escuro') })
+  })
+
+  // #307 + #366, acceptance 3: the size the participant dragged the band to is
+  // a preference for *results* — never a gap reserved before there are any,
+  // and what every later run opens at. No init script touches the layout key,
+  // so the reload below reads back exactly what the drag saved.
+  test('o tamanho escolhido da faixa só vale quando há resultados (#307)', async ({ page }) => {
+    test.setTimeout(editorTestTimeout(2, 120_000))
+    await page.setViewportSize({ width: 1280, height: 720 })
+    await page.goto(`/problem/${problemId}`)
+    await expectBlocklyInjected(page)
+
+    // The default size, then a taller one chosen by dragging.
+    await runExamples(page)
+    const defaultHeight = (await boxOf(page, 'problem-results-band')).height
+    // 40px, not more: at 720px tall the canvas's 50% floor (#155) stops the
+    // band only ~40px above its default.
+    await dragHandle(page, 'problem-results-handle', 0, -40)
+    const chosenHeight = (await boxOf(page, 'problem-results-band')).height
+    expect(chosenHeight).toBeGreaterThan(defaultHeight + 20)
+    const chosen = await savedResultsSize(page)
+    expect(chosen).toBeGreaterThan(0)
+
+    // 01 — Acceptance 1 of #307: a fresh screen with that preference saved
+    // gives the whole column to the editor. No gap, no toggle, and the
+    // preference itself is left alone.
+    await page.reload()
+    await expectBlocklyInjected(page)
+    await settle(page)
+    expect((await boxOf(page, 'results')).height).toBeLessThanOrEqual(1)
+    const column = await boxOf(page, 'problem-v')
+    const canvas = await boxOf(page, 'blockly-workspace')
+    expect(column.height - canvas.height).toBeLessThanOrEqual(3)
+    await expect(page.getByTestId('problem-results-toggle')).toHaveCount(0)
+    expect(await savedResultsSize(page)).toBe(chosen)
+    await page.screenshot({ path: evidence307('01-sem-resultados-sem-vao') })
+
+    // 02 — Acceptance 2 of #307 (and 3 of #366): the first run restores the
+    // chosen size, not the default — and opening the band saves nothing.
+    await runExamples(page)
+    expect(
+      Math.abs((await boxOf(page, 'problem-results-band')).height - chosenHeight),
+    ).toBeLessThanOrEqual(2)
+    expect(await savedResultsSize(page)).toBe(chosen)
+    await page.screenshot({ path: evidence307('02-tamanho-salvo-restaurado') })
+
+    // The toggle reopens at the same size.
+    await page.getByTestId('problem-results-toggle').click()
+    await settle(page)
+    await page.getByTestId('problem-results-toggle').click()
+    await settle(page)
+    expect(
+      Math.abs((await boxOf(page, 'problem-results-band')).height - chosenHeight),
+    ).toBeLessThanOrEqual(2)
+
+    // 03 — A band dragged shut is no preference (#366, premise 2): the next
+    // run opens it at the default again.
+    await dragHandle(page, 'problem-results-handle', 0, 2000)
+    expect((await boxOf(page, 'results')).height).toBeLessThanOrEqual(1)
+    expect(await savedResultsSize(page)).toBe(0)
+    await runExamples(page)
+    expect(
+      Math.abs((await boxOf(page, 'problem-results-band')).height - defaultHeight),
+    ).toBeLessThanOrEqual(2)
+    await page.screenshot({ path: evidence307('03-recolhida-volta-ao-padrao') })
   })
 })

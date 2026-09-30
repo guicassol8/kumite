@@ -170,6 +170,10 @@ test.describe('leaderboard podium (#284)', () => {
   test.skip(!hasOrganizerCredentials, 'Requires the local seeded organizer')
 
   test('the organizer runs the closing ceremony on the projector', async ({ page, request }) => {
+    // Ten steps and eight loads, each waiting out the ~2.4 s entry, plus the
+    // confetti's ~4.8 s lifetime: 28–30 s on an idle machine, which is the
+    // whole default budget — it failed on it once in review (#284).
+    test.setTimeout(90_000)
     const current = { data: full }
     await stubPodiumData(page, current)
     await asOrganizer(page, request)

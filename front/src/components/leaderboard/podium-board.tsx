@@ -34,8 +34,8 @@ export type PodiumStatus = 'loading' | 'error' | 'ready'
 // so a podium of one or two keeps the winner in the middle instead of
 // sliding into the first free cell.
 const PLACE_LAYOUT: Record<number, { column: string; entryStep: number; raise: string }> = {
-  1: { column: 'col-start-2', entryStep: 2, raise: 'pb-12' },
-  2: { column: 'col-start-1', entryStep: 1, raise: 'pb-6' },
+  1: { column: 'col-start-2', entryStep: 2, raise: 'pb-8' },
+  2: { column: 'col-start-1', entryStep: 1, raise: 'pb-4' },
   3: { column: 'col-start-3', entryStep: 0, raise: 'pb-0' },
 }
 
@@ -103,7 +103,7 @@ export function PodiumBoard({
     // off at the bottom edge of the projector.
     <div
       data-testid="podium-board"
-      className="flex flex-1 flex-col gap-5 bg-background px-8 py-6 text-foreground"
+      className="flex flex-1 flex-col gap-4 bg-background px-8 py-6 text-foreground"
     >
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-display font-extrabold text-[84px] uppercase leading-[76px] tracking-[0.01em]">
@@ -206,37 +206,28 @@ export function PodiumBoard({
                   <span className="sr-only">
                     {t('leaderboard.podium.placeLabel', { place: team.rank })}
                   </span>
-                  <div className="flex items-end justify-between gap-4">
+                  {/* Numeral, seals and points share one row: a 1280×800
+                      projector (WXGA) has no height to spare for a row of
+                      seals of their own under a three-line name. */}
+                  <div className="flex items-end gap-4">
                     <span
                       aria-hidden="true"
                       data-testid={`podium-numeral-${team.rank}`}
+                      // `leading-none` goes after the size: tailwind-merge
+                      // drops a line-height that precedes a font-size (a
+                      // `text-*` can set both), and the numeral would
+                      // silently take 1.5× its height.
                       className={cn(
-                        'font-display font-extrabold leading-none tabular-nums',
+                        'font-display font-extrabold tabular-nums',
                         isWinner
                           ? 'text-[96px] text-brand-text 2xl:text-[120px]'
                           : 'text-[72px] text-foreground 2xl:text-[88px]',
+                        'leading-none',
                       )}
                     >
                       {team.rank}
                     </span>
-                    <span
-                      data-testid={`podium-points-${team.rank}`}
-                      className="pb-2 font-display font-semibold text-[28px] tabular-nums 2xl:text-[32px]"
-                    >
-                      {t('leaderboard.podium.points', { count: team.totalScore })}
-                    </span>
-                  </div>
-                  <span
-                    data-testid={`podium-team-name-${team.rank}`}
-                    className={cn(
-                      'line-clamp-2 wrap-anywhere font-bold font-display leading-[1.05]',
-                      isWinner ? 'text-[56px] 2xl:text-[72px]' : 'text-[48px] 2xl:text-[56px]',
-                    )}
-                  >
-                    {displayTeamName(team.teamName, t('teams.unnamed'))}
-                  </span>
-                  {members.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex min-w-0 flex-1 flex-wrap gap-2 pb-2">
                       {universitiesOf(members).map((university) => (
                         <UniversityBadge
                           key={university}
@@ -245,7 +236,26 @@ export function PodiumBoard({
                         />
                       ))}
                     </div>
-                  )}
+                    <span
+                      data-testid={`podium-points-${team.rank}`}
+                      className="shrink-0 pb-2 font-display font-semibold text-[28px] tabular-nums 2xl:text-[32px]"
+                    >
+                      {t('leaderboard.podium.points', { count: team.totalScore })}
+                    </span>
+                  </div>
+                  {/* Three lines hold the longest name the back accepts (40
+                      characters) at these sizes, so the clamp never cuts a
+                      real one; `wrap-anywhere` covers a name with no spaces. */}
+                  <span
+                    data-testid={`podium-team-name-${team.rank}`}
+                    className={cn(
+                      'line-clamp-3 wrap-anywhere font-bold font-display',
+                      isWinner ? 'text-[56px] 2xl:text-[72px]' : 'text-[48px] 2xl:text-[56px]',
+                      'leading-none',
+                    )}
+                  >
+                    {displayTeamName(team.teamName, t('teams.unnamed'))}
+                  </span>
                   {named.length > 0 && (
                     <ul
                       data-testid={`podium-members-${team.rank}`}

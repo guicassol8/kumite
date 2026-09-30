@@ -121,6 +121,17 @@ describe('PodiumBoard — the three places', () => {
     expect(screen.getByTestId('podium-members-1').className).toContain('text-[28px]')
   })
 
+  // tailwind-merge drops a `leading-*` placed before a `text-*` in `cn`: the
+  // big numeral and name would take 1.5× their height and push the 10th
+  // place off a 1280×800 projector.
+  it('keeps the tight line height on the numeral and the name through cn', () => {
+    render(<PodiumBoard {...props()} />)
+
+    for (const id of ['podium-numeral-1', 'podium-numeral-2', 'podium-team-name-1']) {
+      expect(screen.getByTestId(id).className.split(/\s+/)).toContain('leading-none')
+    }
+  })
+
   it('leaves a member with no name (or a blank one) out', () => {
     const withBlank = new Map(members)
     withBlank.set('t2', [

@@ -2,9 +2,15 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { type PanelImperativeHandle, useDefaultLayout } from 'react-resizable-panels'
+import {
+  type GroupImperativeHandle,
+  type Layout,
+  type LayoutChangedMeta,
+  type PanelImperativeHandle,
+  useDefaultLayout,
+} from 'react-resizable-panels'
 
-import { ResultsPanel, ResultsToggle } from '@/components/problem/results-band'
+import { ResultsPanel, ResultsToggle, resultsOpenSize } from '@/components/problem/results-band'
 import { StatementCard, type TeamBestScore } from '@/components/problem/statement-card'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
@@ -39,6 +45,11 @@ export type ProblemPanelsProps = {
 // Below this, the stacked (mobile) layout of #155/#178 is untouched — the
 // collapsible/resizable panels only apply on md+ (#199 covers the phone).
 const DESKTOP_QUERY = '(min-width: 768px)'
+
+// Where the canvas/results split always starts: the band closed, whatever size
+// the participant saved (#307). A module constant, so the Group never sees a
+// new `defaultLayout` and never re-registers over it.
+const RESULTS_CLOSED_LAYOUT: Layout = { canvas: 100, results: 0 }
 
 /**
  * `/problem/$id`'s body: the statement, the editor, the results band and the
@@ -137,32 +148,68 @@ function DesktopPanels({
   const statementPanelRef = useRef<PanelImperativeHandle>(null)
   const [resultsCollapsed, setResultsCollapsed] = useState(false)
   const resultsPanelRef = useRef<PanelImperativeHandle>(null)
+  const resultsGroupRef = useRef<GroupImperativeHandle>(null)
 
   // One participant preference, not per-problem (`layoutStorage`, #203, T9).
   // `onlySaveAfterUserInteractions` is what keeps a window resize — or the
-  // reopen effect above, an imperative call with no pointer/keyboard behind
-  // it — from overwriting a size the participant actually chose.
+  // band opening and closing below, imperative calls with no pointer/keyboard
+  // behind them — from overwriting a size the participant actually chose.
   const { defaultLayout: statementDefaultLayout, onLayoutChanged: onStatementLayoutChanged } =
     useDefaultLayout({
       id: 'problem-h',
       storage: layoutStorage,
       onlySaveAfterUserInteractions: true,
     })
-  const { defaultLayout: resultsDefaultLayout, onLayoutChanged: onResultsLayoutChanged } =
+  const { defaultLayout: savedResultsLayout, onLayoutChanged: saveResultsLayout } =
     useDefaultLayout({
       id: 'problem-v',
       storage: layoutStorage,
       onlySaveAfterUserInteractions: true,
     })
 
-  // Reopens the band on every fresh run or submission, even one the
-  // participant collapsed earlier — `expand()` is a no-op if already open.
-  // Depends on `resultsVersion` rather than `hasResults`, which flips true
-  // only once (on the very first run) and would never fire again after that.
-  useEffect(() => {
-    if (!hasResults) return
-    resultsPanelRef.current?.expand()
+  // The saved split is never the Group's `defaultLayout` — that would open the
+  // band onto emptiness before any run (#307) — only the size `openResults`
+  // restores. A ref, kept in step with what the hook just wrote: read at call
+  // time, it never makes the effect below re-fire, which would reopen a band
+  // the participant had just collapsed by dragging it shut.
+  const savedResultsRef = useRef(savedResultsLayout)
+  const onResultsLayoutChanged = (layout: Layout, meta: LayoutChangedMeta) => {
+    saveResultsLayout(layout, meta)
+    // The same rule the hook saves by (`onlySaveAfterUserInteractions`).
+    if (meta.isUserInteraction) savedResultsRef.current = layout
+  }
+
+  // The results Panel, once its Group has been measured. jsdom never measures
+  // it (`getLayout()` answers `{}` until the Group has a size) and a resize
+  // there would divide by 0, so unit tests see only the toggle state below;
+  // the geometry is e2e's (problem-layout, problem-panels).
+  function measuredResultsPanel() {
+    const group = resultsGroupRef.current
+    const panel = resultsPanelRef.current
+    return group && panel && Object.keys(group.getLayout()).length > 0 ? panel : null
+  }
+
+  // Opens a closed band at the participant's size, or the default (#366). A
+  // band already open stays as it is.
+  function openResults() {
+    const panel = measuredResultsPanel()
+    if (panel?.isCollapsed()) panel.resize(resultsOpenSize(savedResultsRef.current))
     setResultsCollapsed(false)
+  }
+
+  // Opens the band on every fresh run or submission, even one the participant
+  // collapsed earlier. Depends on `resultsVersion` too: `hasResults` flips
+  // true only once (on the very first run) and would never fire again after
+  // that. With nothing left to show — a run discarded because the examples
+  // changed under it (#197) and no verdict — it closes again. `openResults`
+  // is left out of the deps on purpose: it only touches refs and a setter.
+  useEffect(() => {
+    if (hasResults) {
+      openResults()
+      return
+    }
+    const panel = measuredResultsPanel()
+    if (panel && !panel.isCollapsed()) panel.collapse()
   }, [resultsVersion, hasResults])
 
   return (
@@ -242,17 +289,19 @@ function DesktopPanels({
               not there are results yet — react-resizable-panels does not
               expect a Group's panel *count* to change after mount (it threw
               "No layout data found for index" the one time this tried
-              conditionally adding the results Panel later). Before the
-              first run, `results` is `undefined` and the results Panel
-              starts at 0% (disabled, so there's nothing to drag open onto
-              emptiness) — visually identical to no split at all, and the
-              canvas itself never remounts, which is the one thing #178
-              already fixed this file to avoid. */}
+              conditionally adding the results Panel later). The split
+              starts closed (`RESULTS_CLOSED_LAYOUT`, whatever was saved —
+              #307) with the results Panel disabled, so there's nothing to
+              drag open onto emptiness — visually identical to no split at
+              all, and the canvas itself never remounts, which is the one
+              thing #178 already fixed this file to avoid. A run opens the
+              band with an imperative `resize()` (`openResults` above). */}
           <ResizablePanelGroup
             orientation="vertical"
             id="problem-v"
             className="min-h-0 grow"
-            defaultLayout={resultsDefaultLayout}
+            groupRef={resultsGroupRef}
+            defaultLayout={RESULTS_CLOSED_LAYOUT}
             onLayoutChanged={onResultsLayoutChanged}
           >
             <ResizablePanel id="canvas" minSize="50%" className="flex h-full min-h-0">
@@ -261,7 +310,6 @@ function DesktopPanels({
             <ResizableHandle withHandle id="problem-results-handle" disabled={!hasResults} />
             <ResultsPanel
               disabled={!hasResults}
-              defaultSize={hasResults ? '25%' : '0%'}
               panelRef={resultsPanelRef}
               onResize={(panelSize) => setResultsCollapsed(panelSize.asPercentage === 0)}
             >
@@ -273,8 +321,10 @@ function DesktopPanels({
               collapsed={resultsCollapsed}
               onToggle={() => {
                 if (resultsCollapsed) {
-                  resultsPanelRef.current?.expand()
-                  setResultsCollapsed(false)
+                  // The same rule as a fresh run: the saved size or the
+                  // default — never `expand()`'s 10% `minSize` fallback
+                  // after a band collapsed by a drag.
+                  openResults()
                 } else {
                   resultsPanelRef.current?.collapse()
                   setResultsCollapsed(true)

@@ -288,13 +288,28 @@ test.describe('/problem/$id no celular (#199)', () => {
       await close.click()
       await expect(flyout).toBeHidden()
       await expect(close).toHaveCount(0)
+      // The button is gone, and the focus it held went to the canvas, not to
+      // <body> (#199 review).
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            Boolean(document.activeElement?.closest('[data-testid="blockly-workspace"]')),
+          ),
+        )
+        .toBe(true)
       await page.screenshot({ path: evidence('04-celular-flyout-fechado') })
 
-      // The implicit way keeps working, and the button follows it.
+      // The implicit ways keep working, and the button follows them: the
+      // same category again, and Esc.
       await category(page, 'Matemática').click()
       await expect(flyout).toBeVisible()
       await expect(close).toBeVisible()
       await category(page, 'Matemática').click()
+      await expect(flyout).toBeHidden()
+      await expect(close).toHaveCount(0)
+      await category(page, 'Matemática').click()
+      await expect(close).toBeVisible()
+      await page.keyboard.press('Escape')
       await expect(flyout).toBeHidden()
       await expect(close).toHaveCount(0)
 

@@ -886,6 +886,9 @@ describe('ProblemScreen', () => {
         jsonResponse(
           200,
           participantProblem({
+            // The guard (#193) keeps an open round's points equal to the
+            // stamp; 20 here only proves the badge reads the stamp (#319).
+            points: 20,
             bestSubmission: {
               score: 7,
               maxScore: 10,

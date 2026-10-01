@@ -120,13 +120,15 @@ describe('StatementCard', () => {
     it('shows the team best score when given one', () => {
       render(
         <StatementCard
-          problem={problem()}
+          problem={problem({ points: 250 })}
           hasResults={false}
           bestScore={{ kind: 'score', score: 70, maxScore: 100 }}
         />,
       )
 
-      // Beside the maximum this score was computed against (#319).
+      // Beside the maximum this score was computed against (#319), never the
+      // problem's points: 250 here only so the two cannot be told apart by
+      // accident.
       expect(screen.getByTestId('problem-best-score-badge').textContent).toBe(
         'Melhor do time: 70/100',
       )

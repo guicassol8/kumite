@@ -128,6 +128,13 @@ async function touchDrag(page: Page, from: Point, to: Point): Promise<() => Prom
   }
 }
 
+/** Whether the page's focus is inside the editor's canvas — not on <body>. */
+function focusIsOnCanvas(page: Page): Promise<boolean> {
+  return page.evaluate(() =>
+    Boolean(document.activeElement?.closest('[data-testid="blockly-workspace"]')),
+  )
+}
+
 /** Toolbox category by its visible name. */
 function category(page: Page, name: string) {
   return page.locator('.blocklyToolbox').getByRole('treeitem', { name })
@@ -285,18 +292,18 @@ test.describe('/problem/$id no celular (#199)', () => {
       expect(onTop).toBe(true)
       await page.screenshot({ path: evidence('03-celular-flyout-com-fechar') })
 
-      await close.click()
+      // A human press, held for a few frames: the button takes the focus on
+      // mousedown, Blockly closes the flyout under it and React unmounts it
+      // before the release — no click ever reaches it (#199 review).
+      await page.mouse.move(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2)
+      await page.mouse.down()
+      await page.waitForTimeout(150)
+      await page.mouse.up()
       await expect(flyout).toBeHidden()
       await expect(close).toHaveCount(0)
       // The button is gone, and the focus it held went to the canvas, not to
-      // <body> (#199 review).
-      await expect
-        .poll(() =>
-          page.evaluate(() =>
-            Boolean(document.activeElement?.closest('[data-testid="blockly-workspace"]')),
-          ),
-        )
-        .toBe(true)
+      // <body>.
+      await expect.poll(() => focusIsOnCanvas(page)).toBe(true)
       await page.screenshot({ path: evidence('04-celular-flyout-fechado') })
 
       // The implicit ways keep working, and the button follows them: the
@@ -328,8 +335,10 @@ test.describe('/problem/$id no celular (#199)', () => {
         buttonBox.y < closeOnVariables.y + closeOnVariables.height &&
         closeOnVariables.y < buttonBox.y + buttonBox.height
       expect(overlaps, 'Fechar covers "Criar variável..."').toBe(false)
+      // A quick click lands the focus on the canvas too.
       await close.click()
       await expect(flyout).toBeHidden()
+      await expect.poll(() => focusIsOnCanvas(page)).toBe(true)
 
       // How wide each flyout is at this width, for the record.
       const widths: string[] = []

@@ -6,12 +6,14 @@ import {
   kumiteTheme,
   kumiteThemeDark,
 } from '@kumite/blocks'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import * as Blockly from 'blockly'
 import { createRef, StrictMode } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { DESKTOP_QUERY } from '@/hooks/use-media-query'
 import i18n from '@/i18n'
+import { setMatchMediaMatches } from '@/test/match-media-jsdom'
 import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
@@ -263,6 +265,105 @@ describe('BlocklyWorkspace', () => {
     expect(handle.serialize().blocks.blocks[0].type).toBe('math_number')
     await flushBlocklyEvents()
     expect(onChange).not.toHaveBeenCalled()
+  })
+})
+
+// #199: on a phone the open flyout covers the canvas, and every way to put it
+// away was implicit (the category again, the bare toolbox, Esc, the covered
+// canvas). Below md an explicit "Fechar" sits over the editor while it is
+// open. The geometry — on screen, inside the editor, 44px — is
+// e2e/problem-mobile.spec.ts's.
+describe('the flyout close button (#199)', () => {
+  // Blockly fires its queue from a requestAnimationFrame and then a
+  // setTimeout (`core/events/utils.ts`), so a bare setTimeout flush returns
+  // before the toolbox event lands. Registered after Blockly's own, these
+  // run after it.
+  function flushToolboxEvents() {
+    return act(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0))),
+    )
+  }
+
+  afterEach(() => {
+    setMatchMediaMatches(DESKTOP_QUERY, false)
+  })
+
+  function toolboxOf(handle: BlocklyWorkspaceHandle) {
+    const toolbox = handle.getWorkspace()?.getToolbox()
+    if (!toolbox) throw new Error('expected a toolbox')
+    return toolbox as Blockly.Toolbox
+  }
+
+  async function openCategory(handle: BlocklyWorkspaceHandle, position: number) {
+    act(() => {
+      toolboxOf(handle).selectItemByPosition(position)
+    })
+    await flushToolboxEvents()
+  }
+
+  it('shows while a category is open below md, and closes the flyout on a click', async () => {
+    const onChange = vi.fn()
+    const { handle } = renderWorkspace({ onChange })
+    expect(screen.queryByTestId('editor-flyout-close')).toBeNull()
+
+    await openCategory(handle, 0)
+    expect(handle.getWorkspace()?.getFlyout()?.isVisible()).toBe(true)
+    const close = screen.getByTestId('editor-flyout-close')
+    expect(close.getAttribute('aria-label')).toBe('Fechar a lista de blocos')
+    expect(close.textContent).toBe('Fechar')
+
+    fireEvent.click(close)
+    await flushToolboxEvents()
+
+    expect(handle.getWorkspace()?.getFlyout()?.isVisible()).toBe(false)
+    expect(toolboxOf(handle).getSelectedItem()).toBeNull()
+    expect(screen.queryByTestId('editor-flyout-close')).toBeNull()
+    // Opening and closing the box of blocks is not an edit.
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('follows the flyout when it is closed the implicit way', async () => {
+    const { handle } = renderWorkspace()
+    await openCategory(handle, 0)
+    expect(screen.getByTestId('editor-flyout-close')).not.toBeNull()
+
+    // The same category again is Blockly's own toggle.
+    await openCategory(handle, 0)
+
+    expect(handle.getWorkspace()?.getFlyout()?.isVisible()).toBe(false)
+    expect(screen.queryByTestId('editor-flyout-close')).toBeNull()
+  })
+
+  it('stays out of the way on md+', async () => {
+    setMatchMediaMatches(DESKTOP_QUERY, true)
+    const { handle } = renderWorkspace()
+
+    await openCategory(handle, 0)
+
+    expect(handle.getWorkspace()?.getFlyout()?.isVisible()).toBe(true)
+    expect(screen.queryByTestId('editor-flyout-close')).toBeNull()
+  })
+
+  it('never shows on a canvas without a toolbox', async () => {
+    renderWorkspace({ toolbox: undefined, options: { readOnly: true } })
+    await flushToolboxEvents()
+
+    expect(screen.queryByTestId('editor-flyout-close')).toBeNull()
+  })
+
+  it('relabels with the language', async () => {
+    const { handle } = renderWorkspace()
+    await openCategory(handle, 0)
+
+    await act(async () => {
+      await i18n.changeLanguage('en')
+    })
+    const close = screen.getByTestId('editor-flyout-close')
+    expect(close.getAttribute('aria-label')).toBe('Close the block list')
+    expect(close.textContent).toBe('Close')
+    await act(async () => {
+      await i18n.changeLanguage('pt')
+    })
   })
 })
 

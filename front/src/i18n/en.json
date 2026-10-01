@@ -119,6 +119,10 @@
   "editor": {
     "workspaceLabel": "Blocks area",
     "recenter": "Center the solution",
+    "flyoutClose": {
+      "label": "Close",
+      "aria": "Close the block list"
+    },
     "createVariable": {
       "title": "Create variable",
       "label": "Variable name",

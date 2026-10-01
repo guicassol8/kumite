@@ -1,8 +1,11 @@
 import { KUMITE_CATEGORY_BAR_PX, kumiteGridOptions } from '@kumite/blocks'
 import * as Blockly from 'blockly'
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { X } from 'lucide-react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '@/components/ui/button'
+import { DESKTOP_QUERY, useMediaQuery } from '@/hooks/use-media-query'
 import { installBodyPopovers, keepCanvasFocusIntoPopovers } from '@/lib/blockly-popovers'
 import { RecenterControl } from '@/lib/blockly-recenter-control'
 import { cn } from '@/lib/utils'
@@ -108,6 +111,11 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
     const recenterLabel = t('editor.recenter')
     const labelRef = useRef(recenterLabel)
     labelRef.current = recenterLabel
+    // Whether a toolbox category has its flyout open — what the phone's
+    // "Fechar" follows (#199). Never true on a canvas without a toolbox.
+    const [flyoutOpen, setFlyoutOpen] = useState(false)
+    const isDesktop = useMediaQuery(DESKTOP_QUERY)
+    const flyoutCloseRef = useRef<HTMLButtonElement>(null)
 
     // The workspace is injected once, so the injection effect reads the props
     // from here instead of depending on them.
@@ -157,6 +165,27 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       }
       workspace.addChangeListener(listener)
 
+      // Every way the toolbox flyout opens or closes goes through a category
+      // selection — a tap on a category, the same one again, the bare
+      // toolbox, Esc, the canvas, the drag that takes a block out — and each
+      // fires TOOLBOX_ITEM_SELECT on this workspace. A UI event, so the
+      // listener above never reports it as an edit.
+      const flyoutListener = (event: Blockly.Events.Abstract) => {
+        if (event.type !== Blockly.Events.TOOLBOX_ITEM_SELECT) return
+        const open = Boolean(workspace.getFlyout()?.isVisible())
+        // A press on Fechar can close the flyout before any click does: the
+        // button takes the focus on mousedown, the FocusManager blurs the
+        // toolbox and its autoHide closes the flyout — and the button, about
+        // to unmount, would drop that focus on <body>. It goes to the canvas
+        // first, where the click would have put it (#199 review).
+        const close = flyoutCloseRef.current
+        if (!open && close?.contains(document.activeElement)) {
+          Blockly.getFocusManager().focusNode(workspace)
+        }
+        setFlyoutOpen(open)
+      }
+      workspace.addChangeListener(flyoutListener)
+
       // The window may never change size while the container does (the editor
       // layout collapsing on mobile, a panel opening) — observe the box, not
       // the viewport, or Blockly keeps its stale size and clips blocks.
@@ -182,6 +211,7 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
         releasePopoverFocus()
         observer.disconnect()
         workspace.removeChangeListener(listener)
+        workspace.removeChangeListener(flyoutListener)
         recenterControl.dispose()
         recenterControlRef.current = null
         workspace.dispose()
@@ -238,17 +268,48 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
     )
 
     return (
-      <div
-        ref={containerRef}
-        aria-label={label ?? t('editor.workspaceLabel')}
-        data-testid={testId}
-        // `isolate`: Blockly's toolbox (z-index 70) and scrollbars (30) would
-        // otherwise compete with the page and paint over the app's dialogs
-        // (z-50), e.g. "Criar variável" (#205). Blockly's dropdowns and
-        // widgets live on <body> — because of `installBodyPopovers` at the
-        // top of this module (#367) — outside this box, and are unaffected.
-        className={cn('isolate h-full w-full', className)}
-      />
+      <div className={cn('relative h-full w-full', className)}>
+        <div
+          ref={containerRef}
+          aria-label={label ?? t('editor.workspaceLabel')}
+          data-testid={testId}
+          // `isolate`: Blockly's toolbox (z-index 70) and scrollbars (30)
+          // would otherwise compete with the page and paint over the app's
+          // dialogs (z-50), e.g. "Criar variável" (#205). Blockly's dropdowns
+          // and widgets live on <body> — because of `installBodyPopovers` at
+          // the top of this module (#367) — outside this box, and are
+          // unaffected.
+          className="isolate h-full w-full"
+        />
+        {/* #199: on a phone the open flyout covers the canvas, and every way
+            to put it away was implicit. Below md this button sits over it
+            (z-10, above the isolated canvas) for as long as it is open, in
+            the bottom-right corner: clear of the category list and of the
+            top of the flyout, where "Criar variável..." and the first blocks
+            are. The desktop keeps Blockly as it was. */}
+        {flyoutOpen && !isDesktop && (
+          <Button
+            ref={flyoutCloseRef}
+            type="button"
+            variant="outline"
+            data-testid="editor-flyout-close"
+            aria-label={t('editor.flyoutClose.aria')}
+            onClick={() => {
+              const workspace = workspaceRef.current
+              if (!workspace) return
+              workspace.getToolbox()?.clearSelection()
+              // The button unmounts with the flyout, and the focus it holds
+              // would fall to <body>. It goes where a tap on the canvas
+              // leaves it: the workspace itself, never a block (#199 review).
+              Blockly.getFocusManager().focusNode(workspace)
+            }}
+            className="absolute right-3 bottom-3 z-10 h-11 bg-card px-4 text-card-foreground shadow-md"
+          >
+            <X aria-hidden="true" />
+            {t('editor.flyoutClose.label')}
+          </Button>
+        )}
+      </div>
     )
   },
 )

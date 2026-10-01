@@ -2,10 +2,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import '@/i18n'
+import { DESKTOP_QUERY } from '@/hooks/use-media-query'
 import { setMatchMediaMatches } from '@/test/match-media-jsdom'
 import { ProblemPanels } from './problem-panels'
-
-const DESKTOP_QUERY = '(min-width: 768px)'
 
 const problem = {
   id: 'p1',
@@ -43,6 +42,93 @@ describe('ProblemPanels', () => {
     expect(screen.queryByTestId('problem-statement-handle')).toBeNull()
     expect(screen.queryByTestId('problem-statement-collapse')).toBeNull()
     expect(screen.queryByTestId('problem-statement-rail')).toBeNull()
+  })
+
+  // #199: on the phone the statement folds down to its header strip and the
+  // canvas takes the height. Every problem opens unfolded, and nothing of it
+  // is stored (Q3).
+  describe('folding the statement on < md (#199)', () => {
+    function renderStacked(current = problem) {
+      return render(
+        <ProblemPanels
+          problem={current}
+          hasResults={false}
+          editor={<div data-testid="fake-editor" />}
+          actionsBar={<div data-testid="fake-actions" />}
+        />,
+      )
+    }
+
+    it('starts unfolded, folds on a click and unfolds on the next', () => {
+      renderStacked()
+      const toggle = screen.getByTestId('problem-statement-toggle')
+
+      expect(toggle.getAttribute('aria-expanded')).toBe('true')
+      expect(toggle.getAttribute('aria-label')).toBe('Recolher enunciado')
+      expect(screen.getByTestId('problem-statement-body')).not.toBeNull()
+
+      fireEvent.click(toggle)
+
+      expect(toggle.getAttribute('aria-expanded')).toBe('false')
+      expect(toggle.getAttribute('aria-label')).toBe('Mostrar enunciado')
+      expect(screen.queryByTestId('problem-statement-body')).toBeNull()
+      expect(screen.getByTestId('problem-statement-panel').textContent).toContain('Soma dos Pares')
+
+      fireEvent.click(toggle)
+
+      expect(toggle.getAttribute('aria-expanded')).toBe('true')
+      expect(screen.getByTestId('problem-statement-body')).not.toBeNull()
+    })
+
+    it('never remounts the editor to fold or unfold (#178)', () => {
+      renderStacked()
+      const editor = screen.getByTestId('fake-editor')
+
+      fireEvent.click(screen.getByTestId('problem-statement-toggle'))
+      expect(screen.getByTestId('fake-editor')).toBe(editor)
+
+      fireEvent.click(screen.getByTestId('problem-statement-toggle'))
+      expect(screen.getByTestId('fake-editor')).toBe(editor)
+    })
+
+    it('keeps the focus on the toggle across the switch', () => {
+      renderStacked()
+      const toggle = screen.getByTestId('problem-statement-toggle')
+      toggle.focus()
+
+      fireEvent.click(toggle)
+
+      expect(screen.getByTestId('problem-statement-toggle')).toBe(toggle)
+      expect(document.activeElement).toBe(toggle)
+    })
+
+    it('opens the next problem unfolded, whatever the last one was left at', () => {
+      const { rerender } = renderStacked()
+      fireEvent.click(screen.getByTestId('problem-statement-toggle'))
+
+      rerender(
+        <ProblemPanels
+          problem={{ ...problem, id: 'p2', title: 'Contar Negativos' }}
+          hasResults={false}
+          editor={<div data-testid="fake-editor" />}
+          actionsBar={<div data-testid="fake-actions" />}
+        />,
+      )
+
+      expect(screen.getByTestId('problem-statement-toggle').getAttribute('aria-expanded')).toBe(
+        'true',
+      )
+      expect(screen.getByTestId('problem-statement-body')).not.toBeNull()
+      expect(localStorage.length).toBe(0)
+    })
+
+    it('has no fold toggle on md+, which keeps its own collapse (#203)', () => {
+      setMatchMediaMatches(DESKTOP_QUERY, true)
+      renderStacked()
+
+      expect(screen.queryByTestId('problem-statement-toggle')).toBeNull()
+      expect(screen.getByTestId('problem-statement-collapse')).not.toBeNull()
+    })
   })
 
   it('renders the handle and the collapse button on md+', () => {

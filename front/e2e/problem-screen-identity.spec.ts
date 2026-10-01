@@ -364,6 +364,17 @@ test.describe('problem screen identity (#219)', () => {
     await expectOnScreen(page, 'problem-actions-bar')
     await expectOnScreen(page, 'problem-submit-button')
     await page.screenshot({ path: evidence('06-celular-390'), fullPage: true })
+    // #199: with the statement folded the canvas takes the height — and the
+    // bar, Submeter included, stays exactly where #160 anchored it.
+    const toggle = page.getByTestId('problem-statement-toggle')
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expectOnScreen(page, 'problem-actions-bar')
+    await expectOnScreen(page, 'problem-submit-button')
+    expect(await bar.evaluate((node) => node.getBoundingClientRect().bottom)).toBeLessThanOrEqual(
+      844,
+    )
+    await page.screenshot({ path: 'e2e/evidence/199/08-celular-rodada-aberta-recolhido.png' })
     await page.setViewportSize({ width: 1280, height: 800 })
 
     // 07 — round closed: the read-only notice reads as an alert with its icon,

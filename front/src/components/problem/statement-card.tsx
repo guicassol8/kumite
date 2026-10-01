@@ -15,8 +15,12 @@ type Problem = Awaited<ReturnType<typeof fetchProblem>>
  * `score` once it submitted, `none` when it has a team that never did.
  * Absent means there is no team best to speak of (no team, or the round is
  * closed, where the closed notice already carries it) — no badge then.
+ *
+ * `maxScore` is the maximum *that* score was computed against — the stamp on
+ * the submission (#319) — not the problem's points of now, which the "N pts"
+ * badge shows and which may have changed since.
  */
-export type TeamBestScore = { kind: 'score'; score: number } | { kind: 'none' }
+export type TeamBestScore = { kind: 'score'; score: number; maxScore: number } | { kind: 'none' }
 
 export type StatementCardProps = {
   problem: Problem
@@ -99,7 +103,10 @@ export function StatementCard({
             )}
             {bestScore?.kind === 'score' && (
               <Badge data-testid="problem-best-score-badge" variant="outline">
-                {t('problem.bestScoreBadge', { score: bestScore.score })}
+                {t('problem.bestScoreBadge', {
+                  score: bestScore.score,
+                  maxScore: bestScore.maxScore,
+                })}
               </Badge>
             )}
             {bestScore?.kind === 'none' && (

@@ -460,7 +460,12 @@ describe('ProblemScreen', () => {
         participantProblem({
           roundStatus: 'closed',
           roundId: null,
-          bestSubmission: { score: 8, achievedAt: '2026-09-02T13:00:00.000Z', attempts: 2 },
+          bestSubmission: {
+            score: 8,
+            maxScore: 10,
+            achievedAt: '2026-09-02T13:00:00.000Z',
+            attempts: 2,
+          },
         }),
       ),
     )
@@ -470,6 +475,35 @@ describe('ProblemScreen', () => {
     expect(await screen.findByTestId('problem-closed-notice')).toBeDefined()
     expect(screen.getByTestId('problem-closed-best-score').textContent).toContain('8')
     expect(screen.queryByTestId('problem-submit-button')).toBeNull()
+  })
+
+  // #319: once the round closes the organizer may change the points (#193).
+  // The header says what the problem is worth now; the best score keeps the
+  // maximum it was judged against.
+  it('shows the closed best score over its stamped maximum, not the current points', async () => {
+    mockedGet.mockResolvedValue(
+      jsonResponse(
+        200,
+        participantProblem({
+          points: 250,
+          roundStatus: 'closed',
+          roundId: null,
+          bestSubmission: {
+            score: 50,
+            maxScore: 100,
+            achievedAt: '2026-09-02T13:00:00.000Z',
+            attempts: 2,
+          },
+        }),
+      ),
+    )
+
+    renderProblem()
+
+    const best = await screen.findByTestId('problem-closed-best-score')
+    expect(best.textContent).toContain('50/100')
+    expect(best.textContent).not.toContain('250')
+    expect(screen.getByTestId('problem-points-badge').textContent).toBe('250 pts')
   })
 
   it('shows the never-submitted message for a closed round the team never submitted', async () => {
@@ -852,14 +886,25 @@ describe('ProblemScreen', () => {
         jsonResponse(
           200,
           participantProblem({
-            bestSubmission: { score: 7, achievedAt: '2026-09-02T12:05:00.000Z', attempts: 1 },
+            // The guard (#193) keeps an open round's points equal to the
+            // stamp; 20 here only proves the badge reads the stamp (#319).
+            points: 20,
+            bestSubmission: {
+              score: 7,
+              maxScore: 10,
+              achievedAt: '2026-09-02T12:05:00.000Z',
+              attempts: 1,
+            },
           }),
         ),
       )
 
       renderProblem()
 
-      expect((await screen.findByTestId('problem-best-score-badge')).textContent).toContain('7')
+      // Exact: the score beside the maximum it was computed against (#319).
+      expect((await screen.findByTestId('problem-best-score-badge')).textContent).toBe(
+        'Melhor do time: 7/10',
+      )
       expect(screen.queryByTestId('problem-no-submission-badge')).toBeNull()
     })
 
@@ -892,7 +937,12 @@ describe('ProblemScreen', () => {
           participantProblem({
             roundStatus: 'closed',
             roundId: null,
-            bestSubmission: { score: 8, achievedAt: '2026-09-02T13:00:00.000Z', attempts: 2 },
+            bestSubmission: {
+              score: 8,
+              maxScore: 10,
+              achievedAt: '2026-09-02T13:00:00.000Z',
+              attempts: 2,
+            },
           }),
         ),
       )
@@ -928,7 +978,12 @@ describe('ProblemScreen', () => {
         jsonResponse(
           200,
           participantProblem({
-            bestSubmission: { score: 20, achievedAt: '2026-09-02T12:10:00.000Z', attempts: 1 },
+            bestSubmission: {
+              score: 20,
+              maxScore: 20,
+              achievedAt: '2026-09-02T12:10:00.000Z',
+              attempts: 1,
+            },
           }),
         ),
       )

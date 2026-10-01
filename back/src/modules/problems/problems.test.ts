@@ -188,12 +188,46 @@ describe('ParticipantProblemSchema', () => {
       visibility: 'round',
       roundId: '9f3f1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
       roundStatus: 'open',
-      bestSubmission: { score: 80, achievedAt: new Date().toISOString(), attempts: 2 },
+      bestSubmission: {
+        score: 80,
+        maxScore: 100,
+        achievedAt: new Date().toISOString(),
+        attempts: 2,
+      },
       demoKey: null,
     })
 
     expect(parsed.roundStatus).toBe('open')
-    expect(parsed.bestSubmission).toMatchObject({ score: 80, attempts: 2 })
+    expect(parsed.bestSubmission).toMatchObject({ score: 80, maxScore: 100, attempts: 2 })
+  })
+
+  // #319: the page never gets to guess the maximum — the back resolves the
+  // legacy fallback, so a best submission without one is a broken response.
+  it('rejects a bestSubmission without its maxScore (#319)', () => {
+    const withBest = (bestSubmission: Record<string, unknown>) => ({
+      id: '3f0c1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+      points: 100,
+      difficulty: 'easy',
+      locale: 'pt',
+      title: 'Soma',
+      statementMd: 'Some dois números.',
+      examples: [],
+      visibility: 'round',
+      roundId: '9f3f1b52-9a6e-4c1f-8c2f-0d2f5a9b7e11',
+      roundStatus: 'open',
+      bestSubmission,
+      demoKey: null,
+    })
+    const achievedAt = new Date().toISOString()
+
+    expect(
+      ParticipantProblemSchema.safeParse(withBest({ score: 80, achievedAt, attempts: 2 })).success,
+    ).toBe(false)
+    expect(
+      ParticipantProblemSchema.safeParse(
+        withBest({ score: 80, maxScore: null, achievedAt, attempts: 2 }),
+      ).success,
+    ).toBe(false)
   })
 
   it('accepts a practice problem with no round at all (#209)', () => {
@@ -947,6 +981,7 @@ describe('problems.service', () => {
         generatedCode: '',
         caseResults: [],
         score: 60,
+        maxScore: 150,
         attemptNumber: 1,
         acceptedAt: achievedAt,
       })
@@ -955,7 +990,7 @@ describe('problems.service', () => {
 
       expect(problem?.roundStatus).toBe('open')
       expect(problem?.roundId).toBe(roundId)
-      expect(problem?.bestSubmission).toEqual({ score: 60, achievedAt, attempts: 1 })
+      expect(problem?.bestSubmission).toEqual({ score: 60, maxScore: 150, achievedAt, attempts: 1 })
     })
 
     it('reports bestSubmission null on the open round when the team never submitted', async () => {
@@ -985,6 +1020,7 @@ describe('problems.service', () => {
         generatedCode: '',
         caseResults: [],
         score: 80,
+        maxScore: 150,
         attemptNumber: 1,
         acceptedAt: achievedAt,
         // Deliberately different from acceptedAt: proves bestSubmission reads
@@ -996,7 +1032,70 @@ describe('problems.service', () => {
 
       expect(problem?.roundStatus).toBe('closed')
       expect(problem?.roundId).toBeNull()
-      expect(problem?.bestSubmission).toEqual({ score: 80, achievedAt, attempts: 1 })
+      expect(problem?.bestSubmission).toEqual({ score: 80, maxScore: 150, achievedAt, attempts: 1 })
+    })
+
+    // #319 AC1 + AC3: once the round closes the organizer may change points
+    // again (#193), and the maximum beside a judged score must not follow.
+    it('keeps the stamped maximum after the points change on a closed round (#319)', async () => {
+      const { id, roundId } = await publishSample()
+      const user = await insertUser()
+      const team = await insertTeamMember(user.id)
+      await db.insert(submissionsTable).values({
+        problemId: id,
+        roundId,
+        userId: user.id,
+        teamId: team.id,
+        workspace: {},
+        generatedCode: '',
+        caseResults: [],
+        score: 75,
+        maxScore: 150,
+        attemptNumber: 1,
+        acceptedAt: new Date(),
+      })
+      const closed = await closeRound(db, roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+      const updated = await updateProblem(db, id, { points: 250 })
+      if (!updated.ok) throw new Error(`expected the update to succeed, got '${updated.error}'`)
+
+      const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+      expect(problem?.roundStatus).toBe('closed')
+      // What the problem is worth now...
+      expect(problem?.points).toBe(250)
+      // ...and what this score was computed against, unchanged.
+      expect(problem?.bestSubmission).toMatchObject({ score: 75, maxScore: 150 })
+    })
+
+    // #319 AC2: a row judged before the stamp (#193) has maxScore NULL; the
+    // current points are the only number left, which is what the page showed
+    // before this fix.
+    it('falls back to the current points for a submission without a stamp (#319)', async () => {
+      const { id, roundId } = await publishSample()
+      const user = await insertUser()
+      const team = await insertTeamMember(user.id)
+      await db.insert(submissionsTable).values({
+        problemId: id,
+        roundId,
+        userId: user.id,
+        teamId: team.id,
+        workspace: {},
+        generatedCode: '',
+        caseResults: [],
+        score: 75,
+        maxScore: null,
+        attemptNumber: 1,
+        acceptedAt: new Date(),
+      })
+      const closed = await closeRound(db, roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+      const updated = await updateProblem(db, id, { points: 250 })
+      if (!updated.ok) throw new Error(`expected the update to succeed, got '${updated.error}'`)
+
+      const problem = await getPublishedProblem(db, id, 'pt', user.id)
+
+      expect(problem?.bestSubmission).toMatchObject({ score: 75, maxScore: 250 })
     })
 
     it('reports bestSubmission null on a closed round when the team never submitted', async () => {

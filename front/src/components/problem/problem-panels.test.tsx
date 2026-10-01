@@ -203,13 +203,13 @@ describe('ProblemPanels', () => {
     render(
       <ProblemPanels
         problem={problem}
-        bestScore={{ kind: 'score', score: 5 }}
+        bestScore={{ kind: 'score', score: 5, maxScore: 10 }}
         hasResults={false}
         editor={<div data-testid="fake-editor" />}
         actionsBar={<div data-testid="fake-actions" />}
       />,
     )
 
-    expect(screen.getByTestId('problem-best-score-badge').textContent).toContain('5')
+    expect(screen.getByTestId('problem-best-score-badge').textContent).toContain('5/10')
   })
 })

@@ -336,13 +336,15 @@ jsonpath "$.error" == "submission_throttled"
 
 # 6b. The team sees its own best while the round is still open (#206): the
 #     participant read of the problem and of the round both carry the 100
-#     from step 5. The teamless participant still gets null, with no error.
+#     from step 5, beside the maximum stamped when it was judged (#319).
+#     The teamless participant still gets null, with no error.
 GET {{host}}/problems/{{problem_id}}
 Authorization: Bearer {{token}}
 HTTP 200
 [Asserts]
 jsonpath "$.roundStatus" == "open"
 jsonpath "$.bestSubmission.score" == 100
+jsonpath "$.bestSubmission.maxScore" == 100
 jsonpath "$.bestSubmission.attempts" == 1
 
 GET {{host}}/rounds/{{round_id}}
@@ -398,3 +400,24 @@ Content-Type: application/json
 HTTP 404
 [Asserts]
 jsonpath "$.error" == "no_active_round"
+
+# 10. The round is closed, so the organizer may change the points again
+#     (#193). The problem is now worth 250, but the team's 100 was judged
+#     over 100 — and the maximum beside it stays the stamped one (#319),
+#     never the points read now.
+PATCH {{host}}/organizer/problems/{{problem_id}}
+Authorization: Bearer {{organizer_token}}
+Content-Type: application/json
+{ "points": 250 }
+HTTP 200
+[Asserts]
+jsonpath "$.points" == 250
+
+GET {{host}}/problems/{{problem_id}}
+Authorization: Bearer {{token}}
+HTTP 200
+[Asserts]
+jsonpath "$.roundStatus" == "closed"
+jsonpath "$.points" == 250
+jsonpath "$.bestSubmission.score" == 100
+jsonpath "$.bestSubmission.maxScore" == 100

@@ -857,7 +857,7 @@
     },
     "closedRound": {
       "notice": "Esta rodada foi encerrada — o problema agora é somente leitura.",
-      "bestScore": "Melhor pontuação do seu time: {{score}} ({{attempts}} tentativas, em {{date}})",
+      "bestScore": "Melhor pontuação do seu time: {{score}}/{{maxScore}} ({{attempts}} tentativas, em {{date}})",
       "neverSubmitted": "Seu time não chegou a submeter uma solução para este problema."
     },
     "results": {
@@ -909,7 +909,7 @@
     },
     "pointsBadge": "{{points}} pts",
     "positionBadge": "Problema {{letter}}",
-    "bestScoreBadge": "Melhor do time: {{score}}",
+    "bestScoreBadge": "Melhor do time: {{score}}/{{maxScore}}",
     "noSubmissionBadge": "Sem submissão",
     "submissionsPaused": {
       "notice": "As submissões estão pausadas pela organização. O tempo continua correndo; você ainda pode executar os exemplos."
@@ -1070,7 +1070,7 @@
         "soma-lista": {
           "2": "Em Variáveis, \"Criar variável...\" cria \"total\", e \"definir total para\" guarda um valor nela.",
           "3": "O total começa em 0: antes de somar qualquer número, a soma é zero.",
-          "4": "Em Laços, \"para cada item numero na lista\" repete o que está dentro uma vez por item.",
+          "4": "Em Laços, \"para cada item numero na lista\" repete o que está dentro uma vez por item; a cada volta, a variável \"numero\" guarda o item da vez.",
           "5": "A lista percorrida é a \"entrada\".",
           "6": "Dentro do laço, outro \"definir total para\" troca o total por um valor novo a cada volta.",
           "7": "O valor novo é \"total + numero\": a soma até aqui mais o número da vez.",
@@ -1087,7 +1087,7 @@
   "onboarding": {
     "invite": {
       "title": "Primeira vez por aqui?",
-      "body": "Quer um tour rápido pela plataforma? Mostramos onde ficam os times, a rodada, o editor de blocos, o placar e a prática, sem mexer em nada da sua conta.",
+      "body": "Quer um tour rápido pela plataforma? Mostramos onde ficam a rodada, os times, o editor de blocos, o placar e a prática, sem mexer em nada da sua conta.",
       "accept": "Fazer o tour",
       "decline": "Agora não",
       "howItWorks": "Ler como funciona",
@@ -1123,11 +1123,11 @@
         },
         "leaderboard": {
           "title": "Placar",
-          "body": "O placar da rodada e o do evento se atualizam ao vivo enquanto os times enviam soluções."
+          "body": "As abas Rodada e Geral do placar se atualizam ao vivo enquanto os times submetem soluções."
         },
         "practice": {
           "title": "Prática",
-          "body": "Fora das rodadas, treine com os problemas de prática quando quiser: aqui não há envio nem pontuação."
+          "body": "Treine com os problemas de prática quando quiser, com ou sem rodada aberta: aqui não há submissão nem pontuação."
         }
       }
     }
@@ -1142,19 +1142,19 @@
       },
       "teams": {
         "title": "Times",
-        "body": "Você compete em time, e a pontuação é do time. A organização define quantas pessoas cabem em cada time, e times com estudantes das duas universidades são permitidos, a menos que a organização avise o contrário."
+        "body": "Você compete em time, e a pontuação é do time. A organização define o tamanho máximo dos times e se eles podem misturar estudantes das duas universidades (por padrão, podem); a tela Times mostra as regras em vigor. Depois da primeira submissão do time, ninguém pode mais sair dele."
       },
       "rounds": {
         "title": "Rodadas e pontuação",
-        "body": "A organização abre uma rodada e um cronômetro começa a contar. Cada problema vale uma quantidade de pontos, proporcional aos casos de teste ocultos que a solução passa, e conta a melhor submissão do time em cada problema. No empate, fica à frente quem chegou antes à pontuação e, depois, quem precisou de menos tentativas."
+        "body": "A organização abre uma rodada e um cronômetro começa a contar; quando o tempo acaba, a rodada fecha. Cada problema vale um número de pontos, e a solução ganha a parte deles proporcional aos casos de teste ocultos que passa: os exemplos visíveis não valem pontos. Conta a melhor submissão do time em cada problema. No empate, fica à frente o time que chegou antes às suas melhores pontuações (somando, em cada problema pontuado, o tempo desde a abertura da rodada) e, depois, o que fez menos submissões."
       },
       "editor": {
         "title": "O editor de blocos",
-        "body": "Toda solução começa no bloco \"resolver\": o que você encaixa em \"retornar\" é a resposta. Executar testa a solução com os exemplos visíveis; durante a rodada, Enviar manda a solução para o juiz."
+        "body": "Toda solução começa no bloco \"resolver\": o que você encaixa em \"retornar\" é a resposta. Executar testa a solução com os exemplos visíveis; durante a rodada, Submeter manda a solução para o juiz."
       },
       "practice": {
         "title": "Onde praticar",
-        "body": "A aba Prática tem problemas abertos a qualquer momento, com ou sem rodada. Não há envio nem pontuação: é o lugar para se acostumar com os blocos antes da competição."
+        "body": "A aba Prática tem problemas abertos a qualquer momento, com ou sem rodada. Não há submissão nem pontuação: é o lugar para se acostumar com os blocos antes da competição."
       }
     },
     "startTour": "Fazer o tour guiado",

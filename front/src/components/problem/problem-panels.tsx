@@ -14,7 +14,7 @@ import { ResultsPanel, ResultsToggle, resultsOpenSize } from '@/components/probl
 import { StatementCard, type TeamBestScore } from '@/components/problem/statement-card'
 import { Button } from '@/components/ui/button'
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable'
-import { useMediaQuery } from '@/hooks/use-media-query'
+import { DESKTOP_QUERY, useMediaQuery } from '@/hooks/use-media-query'
 import { layoutStorage } from '@/lib/layout-storage'
 import type { fetchProblem } from '@/lib/problems-query'
 import { cn } from '@/lib/utils'
@@ -41,10 +41,6 @@ export type ProblemPanelsProps = {
    */
   resultsVersion?: number
 }
-
-// Below this, the stacked (mobile) layout of #155/#178 is untouched — the
-// collapsible/resizable panels only apply on md+ (#199 covers the phone).
-const DESKTOP_QUERY = '(min-width: 768px)'
 
 // Where the canvas/results split always starts: the band closed, whatever size
 // the participant saved (#307). A module constant, so the Group never sees a

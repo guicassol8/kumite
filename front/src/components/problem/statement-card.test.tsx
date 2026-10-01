@@ -116,6 +116,68 @@ describe('StatementCard', () => {
     expect(screen.getByTestId('problem-statement-panel')).toBeDefined()
   })
 
+  // #199: on the phone the card folds down to a strip, so the canvas gets the
+  // height back. The strip still says which problem this is.
+  describe('collapsed (#199)', () => {
+    it('keeps only the header strip: the letter, the title and the header action', () => {
+      render(
+        <StatementCard
+          problem={problem()}
+          hasResults={false}
+          positionLabel="B"
+          bestScore={{ kind: 'score', score: 70, maxScore: 100 }}
+          collapsed
+          headerAction={<button type="button" data-testid="fake-toggle" />}
+        />,
+      )
+
+      const panel = screen.getByTestId('problem-statement-panel')
+      expect(panel.getAttribute('aria-label')).toBe('Enunciado do problema')
+      expect(within(panel).getByText('Soma dos Pares')).toBeDefined()
+      expect(screen.getByTestId('problem-position-badge').textContent).toBe('Problema B')
+      expect(screen.getByTestId('fake-toggle')).toBeDefined()
+      expect(screen.queryByTestId('problem-statement-body')).toBeNull()
+      expect(screen.queryByTestId('problem-example-0')).toBeNull()
+      expect(screen.queryByTestId('problem-difficulty-badge')).toBeNull()
+      expect(screen.queryByTestId('problem-points-badge')).toBeNull()
+      expect(screen.queryByTestId('problem-best-score-badge')).toBeNull()
+    })
+
+    it('drops the stacked height clamps, which only bound a card with a body', () => {
+      render(<StatementCard problem={problem()} hasResults collapsed />)
+
+      const panel = screen.getByTestId('problem-statement-panel')
+      expect(panel.className).not.toContain('max-h-36')
+      expect(panel.className).not.toContain('max-h-64')
+    })
+
+    it('keeps the header action the last child of the header in both states', () => {
+      const { rerender } = render(
+        <StatementCard
+          problem={problem()}
+          hasResults={false}
+          headerAction={<button type="button" data-testid="fake-toggle" />}
+        />,
+      )
+      const before = screen.getByTestId('fake-toggle')
+      expect(before.parentElement?.lastElementChild).toBe(before)
+
+      rerender(
+        <StatementCard
+          problem={problem()}
+          hasResults={false}
+          collapsed
+          headerAction={<button type="button" data-testid="fake-toggle" />}
+        />,
+      )
+
+      // The same node, not a new one: React kept it, and with it the focus.
+      const after = screen.getByTestId('fake-toggle')
+      expect(after).toBe(before)
+      expect(after.parentElement?.lastElementChild).toBe(after)
+    })
+  })
+
   describe('team best score badge (#206)', () => {
     it('shows the team best score when given one', () => {
       render(

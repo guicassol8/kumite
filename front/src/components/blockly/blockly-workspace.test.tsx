@@ -338,6 +338,57 @@ describe('the flyout close button (#199)', () => {
     expect(screen.getByTestId('blockly-workspace').contains(document.activeElement)).toBe(true)
   })
 
+  it('keeps the focus on the canvas when a press on the button closes the flyout first', async () => {
+    const { handle } = renderWorkspace()
+    await openCategory(handle, 0)
+    const category = toolboxOf(handle).getSelectedItem()
+    if (!category) throw new Error('expected an open category')
+    // Where a tap on the category leaves the focus.
+    act(() => {
+      Blockly.getFocusManager().focusNode(category as unknown as Blockly.IFocusableNode)
+    })
+    const close = screen.getByTestId('editor-flyout-close')
+
+    // A held mouse press: the button takes the focus on mousedown, Blockly's
+    // FocusManager blurs the toolbox, which closes the flyout and unmounts
+    // the button before any click reaches it.
+    act(() => {
+      close.focus()
+    })
+    await flushToolboxEvents()
+
+    expect(handle.getWorkspace()?.getFlyout()?.isVisible()).toBe(false)
+    expect(screen.queryByTestId('editor-flyout-close')).toBeNull()
+    expect(Blockly.getFocusManager().getFocusedNode()).toBe(handle.getWorkspace())
+    expect(screen.getByTestId('blockly-workspace').contains(document.activeElement)).toBe(true)
+  })
+
+  it('leaves the focus alone when the flyout closes because it went elsewhere', async () => {
+    const { handle } = renderWorkspace()
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    try {
+      await openCategory(handle, 0)
+      const category = toolboxOf(handle).getSelectedItem()
+      if (!category) throw new Error('expected an open category')
+      act(() => {
+        Blockly.getFocusManager().focusNode(category as unknown as Blockly.IFocusableNode)
+      })
+
+      // Tab or a tap on another control: the toolbox blurs and the flyout
+      // closes — the focus belongs where the participant put it.
+      act(() => {
+        outside.focus()
+      })
+      await flushToolboxEvents()
+
+      expect(handle.getWorkspace()?.getFlyout()?.isVisible()).toBe(false)
+      expect(document.activeElement).toBe(outside)
+    } finally {
+      outside.remove()
+    }
+  })
+
   it('follows the flyout when it is closed the implicit way', async () => {
     const { handle } = renderWorkspace()
     await openCategory(handle, 0)

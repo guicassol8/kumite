@@ -115,6 +115,7 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
     // "Fechar" follows (#199). Never true on a canvas without a toolbox.
     const [flyoutOpen, setFlyoutOpen] = useState(false)
     const isDesktop = useMediaQuery(DESKTOP_QUERY)
+    const flyoutCloseRef = useRef<HTMLButtonElement>(null)
 
     // The workspace is injected once, so the injection effect reads the props
     // from here instead of depending on them.
@@ -171,7 +172,17 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       // listener above never reports it as an edit.
       const flyoutListener = (event: Blockly.Events.Abstract) => {
         if (event.type !== Blockly.Events.TOOLBOX_ITEM_SELECT) return
-        setFlyoutOpen(Boolean(workspace.getFlyout()?.isVisible()))
+        const open = Boolean(workspace.getFlyout()?.isVisible())
+        // A press on Fechar can close the flyout before any click does: the
+        // button takes the focus on mousedown, the FocusManager blurs the
+        // toolbox and its autoHide closes the flyout — and the button, about
+        // to unmount, would drop that focus on <body>. It goes to the canvas
+        // first, where the click would have put it (#199 review).
+        const close = flyoutCloseRef.current
+        if (!open && close?.contains(document.activeElement)) {
+          Blockly.getFocusManager().focusNode(workspace)
+        }
+        setFlyoutOpen(open)
       }
       workspace.addChangeListener(flyoutListener)
 
@@ -278,6 +289,7 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
             are. The desktop keeps Blockly as it was. */}
         {flyoutOpen && !isDesktop && (
           <Button
+            ref={flyoutCloseRef}
             type="button"
             variant="outline"
             data-testid="editor-flyout-close"

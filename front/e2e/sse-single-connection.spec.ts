@@ -1,5 +1,6 @@
 import type { Page, Request } from '@playwright/test'
 
+import { editorTestTimeout, expectBlocklyInjected } from './support/blockly'
 import {
   BACK_URL,
   createRound,
@@ -24,6 +25,11 @@ import {
 // `roundSlot` handles the single open-round slot (#150). No `withRoundLock`:
 // nothing here asserts on event-wide round state ("no round is running", "mine
 // closed last") — only on this tab's own network traffic.
+//
+// Both visits to `/problem/$id` mount the Blockly editor, so the test runs on
+// the editor budget and waits for each injection with `expectBlocklyInjected`
+// (#418) — on the default 30 s the second mount ran the test out of time
+// before the in-app navigation's connections were ever counted.
 const evidence = (name: string) => `e2e/evidence/274/${name}.png`
 
 const PASSWORD = 'supersecret'
@@ -130,6 +136,11 @@ test.describe('one SSE connection per tab (#274)', () => {
     page,
     roundSlot,
   }) => {
+    // Two editor mounts (the cold load of /problem/$id and the in-app arrival
+    // there), plus a signup through the UI, up to 20 s queued for the single
+    // open-round slot, four cold loads, four in-app navigations and five
+    // full-page shots.
+    test.setTimeout(editorTestTimeout(2, 60_000))
     const auth = await organizerAuthHeader()
     const problemId = await apiCreatePublishedProblem()
     const roundId = await createRound(auth, {
@@ -175,7 +186,8 @@ test.describe('one SSE connection per tab (#274)', () => {
     // 03 — /problem/$id. Held a second connection before #274.
     sse.reset()
     await page.goto(`/problem/${problemId}`)
-    await expect(page.getByTestId('problem-statement-panel')).toBeVisible({ timeout: 30_000 })
+    await expectBlocklyInjected(page)
+    await expect(page.getByTestId('problem-statement-panel')).toBeVisible()
     await expectExactlyOneLiveConnection('/problem/$id')
     await page.screenshot({ path: evidence('03-problema-uma-conexao'), fullPage: true })
 
@@ -208,7 +220,8 @@ test.describe('one SSE connection per tab (#274)', () => {
 
     await page.getByTestId(`round-problem-${problemId}`).getByRole('link').first().click()
     await expect(page).toHaveURL(new RegExp(`/problem/${problemId}$`))
-    await expect(page.getByTestId('problem-statement-panel')).toBeVisible({ timeout: 30_000 })
+    await expectBlocklyInjected(page)
+    await expect(page.getByTestId('problem-statement-panel')).toBeVisible()
 
     await page.getByTestId('header-leaderboard-link').first().click()
     await expect(page).toHaveURL(/\/leaderboard$/)

@@ -147,7 +147,12 @@ pnpm worktree:env   # its own database and ports (below) — when it runs the ap
   - E2E: `pnpm e2e [playwright args]` (`CI=1 pnpm e2e` for the CI settings)
     runs Playwright with this tree's `back/.env` exported over the shell,
     `FRONT_PORT`, `VITE_API_URL` and a `BACK_NOTIFICATIONS_LOG`, so the
-    organizer and real-OTP specs run instead of skipping.
+    organizer and real-OTP specs run instead of skipping. The back Playwright
+    starts always runs without SES (`SES_*` blanked in
+    `front/playwright.config.ts`, #416), even when `back/.env` has real
+    credentials: the E2E never sends email, and the OTP always lands in the
+    `BACK_NOTIFICATIONS_LOG`. A back already listening on `PORT` is reused
+    as it is, SES included.
   - Anything else with this tree's env (dev server, hurl):
     `eval "$(bash scripts/worktree-env.sh --print)"` in your shell, then
     `pnpm dev:back`, or `HURL_HOST=http://localhost:$PORT pnpm --filter

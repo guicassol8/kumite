@@ -11,6 +11,7 @@ const frontPort = process.env.FRONT_PORT ?? '5173'
 // reset-password.spec.ts reads the OTP from the back's stdout (the SES-less
 // console.log fallback), so when BACK_NOTIFICATIONS_LOG names a file the back
 // also tees its output there. Unset, the back boots exactly as before (#333).
+// That fallback is guaranteed: the back below always boots without SES (#416).
 const notificationsLog = process.env.BACK_NOTIFICATIONS_LOG
 const backCommand = notificationsLog
   ? `pnpm --filter @kumite/back dev 2>&1 | tee '${notificationsLog}'`
@@ -69,7 +70,22 @@ export default defineConfig({
       // Only applies to a back Playwright starts itself: with
       // reuseExistingServer an already-running back keeps its own
       // APP_BASE_URL — set it in back/.env (docs/workflow.md § Worktrees).
-      env: { APP_BASE_URL: `http://localhost:${frontPort}` },
+      //
+      // No SES, ever (#416). back/.env may carry real SES credentials —
+      // `pnpm e2e` exports it and `pnpm worktree:env` copies it from the main
+      // checkout — and with them the back mails the specs' throwaway
+      // addresses and the organizers' bug-report inbox, and never logs the
+      // OTP the real-OTP specs wait for. Blanked, not deleted: config.ts's
+      // loadEnvFile() fills in only names absent from process.env, so a
+      // delete would be undone by back/.env, while an empty value counts as
+      // unset (optionalNonEmptyString) — the same move as back/vitest.setup.ts.
+      // Like APP_BASE_URL, this only reaches a back Playwright starts itself.
+      env: {
+        APP_BASE_URL: `http://localhost:${frontPort}`,
+        SES_REGION: '',
+        SES_ACCESS_KEY_ID: '',
+        SES_SECRET_ACCESS_KEY: '',
+      },
     },
     {
       command: `pnpm --filter @kumite/front dev --port ${frontPort} --strictPort`,

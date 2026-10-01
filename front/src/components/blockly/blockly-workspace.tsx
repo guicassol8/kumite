@@ -282,7 +282,15 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
             variant="outline"
             data-testid="editor-flyout-close"
             aria-label={t('editor.flyoutClose.aria')}
-            onClick={() => workspaceRef.current?.getToolbox()?.clearSelection()}
+            onClick={() => {
+              const workspace = workspaceRef.current
+              if (!workspace) return
+              workspace.getToolbox()?.clearSelection()
+              // The button unmounts with the flyout, and the focus it holds
+              // would fall to <body>. It goes where a tap on the canvas
+              // leaves it: the workspace itself, never a block (#199 review).
+              Blockly.getFocusManager().focusNode(workspace)
+            }}
             className="absolute right-3 bottom-3 z-10 h-11 bg-card px-4 text-card-foreground shadow-md"
           >
             <X aria-hidden="true" />

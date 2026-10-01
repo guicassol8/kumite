@@ -322,6 +322,22 @@ describe('the flyout close button (#199)', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('hands the focus to the canvas instead of dropping it on <body>', async () => {
+    const { handle } = renderWorkspace()
+    await openCategory(handle, 0)
+    const close = screen.getByTestId('editor-flyout-close')
+    // A browser focuses the button it activates; the button then unmounts.
+    close.focus()
+
+    fireEvent.click(close)
+    await flushToolboxEvents()
+
+    expect(screen.queryByTestId('editor-flyout-close')).toBeNull()
+    // Where a tap on the canvas leaves it: the workspace itself, not a block.
+    expect(Blockly.getFocusManager().getFocusedNode()).toBe(handle.getWorkspace())
+    expect(screen.getByTestId('blockly-workspace').contains(document.activeElement)).toBe(true)
+  })
+
   it('follows the flyout when it is closed the implicit way', async () => {
     const { handle } = renderWorkspace()
     await openCategory(handle, 0)

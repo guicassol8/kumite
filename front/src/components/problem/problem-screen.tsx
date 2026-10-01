@@ -328,7 +328,11 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
     isPractice || isClosed
       ? undefined
       : data.bestSubmission
-        ? { kind: 'score', score: data.bestSubmission.score }
+        ? {
+            kind: 'score',
+            score: data.bestSubmission.score,
+            maxScore: data.bestSubmission.maxScore,
+          }
         : hasTeam
           ? { kind: 'none' }
           : undefined
@@ -404,6 +408,7 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
           <span data-testid="problem-closed-best-score">
             {t('problem.closedRound.bestScore', {
               score: data.bestSubmission.score,
+              maxScore: data.bestSubmission.maxScore,
               attempts: data.bestSubmission.attempts,
               date: formatDate(new Date(data.bestSubmission.achievedAt), lang),
             })}

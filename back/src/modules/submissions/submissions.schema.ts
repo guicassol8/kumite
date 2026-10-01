@@ -35,6 +35,12 @@ export const SubmissionSchema = z.object({
 // there (the tiebreaker) and how many attempts it took.
 export const BestSubmissionSchema = z.object({
   score: z.number().int(),
+  // The maximum *this* score was computed against — the stamp #193 writes on
+  // the row at judging time, never the problem's points read now, which the
+  // organizer may change once the round closes (#319). Never null here: for a
+  // row judged before the stamp existed, getPublishedProblem resolves it to
+  // the current points.
+  maxScore: z.number().int(),
   achievedAt: z.coerce.date(),
   attempts: z.number().int().positive(),
 })

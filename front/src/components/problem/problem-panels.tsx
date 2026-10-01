@@ -1,4 +1,4 @@
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -64,9 +64,19 @@ export function ProblemPanels({
   actionsBar,
   resultsVersion,
 }: ProblemPanelsProps) {
+  const { t } = useTranslation()
   const isDesktop = useMediaQuery(DESKTOP_QUERY)
+  // The problem whose statement the participant folded on the phone (#199),
+  // by id: the next problem opens unfolded with no effect to reset it, and
+  // nothing is stored — every problem opens with its statement on screen.
+  const [foldedProblemId, setFoldedProblemId] = useState<string | null>(null)
+  const folded = foldedProblemId === problem.id
 
   if (!isDesktop) {
+    // Below md the column is stacked (#155/#178): statement, editor, results
+    // band, actions bar. On a phone the statement can fold down to its header
+    // strip, handing ~190px to the canvas (#199); unfolded, it is exactly the
+    // stacked card of #155.
     return (
       <>
         <StatementCard
@@ -74,6 +84,28 @@ export function ProblemPanels({
           positionLabel={positionLabel}
           bestScore={bestScore}
           hasResults={hasResults}
+          collapsed={folded}
+          headerAction={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              // 44px: a touch target, on the one screen that is all touch.
+              className="size-11 shrink-0"
+              data-testid="problem-statement-toggle"
+              aria-expanded={!folded}
+              aria-label={t(
+                folded ? 'problem.panels.expandStatement' : 'problem.panels.collapseStatement',
+              )}
+              onClick={() => setFoldedProblemId(folded ? null : problem.id)}
+            >
+              {folded ? (
+                <ChevronDown className="size-5" aria-hidden="true" />
+              ) : (
+                <ChevronUp className="size-5" aria-hidden="true" />
+              )}
+            </Button>
+          }
         />
         <div
           data-testid="problem-workspace-panel"

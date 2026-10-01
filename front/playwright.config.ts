@@ -56,6 +56,16 @@ export default defineConfig({
     // there is no first retry, so no trace is ever recorded there.
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // No audio output device (#425). Blockly's WorkspaceAudio builds a
+    // `new AudioContext()` on every injection, and headless Chromium blocks
+    // the main thread in that constructor for up to ~30 s when another one
+    // was just closed — so the second editor mount in a browser (in-app
+    // navigation, a reload, a new context) stalled ~28 s before any request.
+    // `--mute-audio` does not help: Playwright already passes it to every
+    // headless Chromium, and muting keeps the output device. The flag is
+    // browser-wide, so it covers every context a spec opens. A spec's own
+    // `test.use({ launchOptions })` replaces these args and must repeat it.
+    launchOptions: { args: ['--disable-audio-output'] },
   },
   webServer: [
     {

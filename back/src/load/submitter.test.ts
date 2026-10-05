@@ -6,7 +6,8 @@ import { k } from '../context'
 import { resetDatabase } from '../db/reset'
 
 import { createRecorder } from './recorder'
-import { runSubmissions } from './submitter'
+import type { FetchLike } from './sse-client'
+import { MAX_THROTTLE_RETRIES, runSubmissions } from './submitter'
 import { createTransport } from './transport'
 import { infiniteLoopWorkspace, somaDosPares } from './workspaces'
 import { loginOrganizer, setupWorld } from './world'
@@ -87,6 +88,80 @@ describe('runSubmissions', { timeout: 120_000 }, () => {
     const snapshot = recorder.snapshot()
     expect(snapshot.verdicts).toEqual({ matrix: { loop: { timeout: 1 } }, incoherent: 0 })
     expect(snapshot.actions['submission']).toEqual({ started: 1, completed: 1 })
+  })
+
+  // The first `count` POST /submissions answer 429 the way the back's throttle
+  // does; everything else reaches the app.
+  function throttlingFirst(count: number): FetchLike {
+    let left = count
+    return async (input, init) => {
+      if (init?.method === 'POST' && new URL(input).pathname === '/submissions' && left > 0) {
+        left -= 1
+        return Response.json(
+          { error: 'submission_throttled', message: 'throttled' },
+          { status: 429 },
+        )
+      }
+      return app.request(input, init)
+    }
+  }
+
+  it('waits and retries a 429, then counts the verdict of the retry', async () => {
+    const { recorder, built } = await world('retry', 1)
+    const transport = createTransport({
+      baseUrl: 'http://localhost',
+      recorder,
+      requestTimeoutMs: 60_000,
+      fetch: throttlingFirst(MAX_THROTTLE_RETRIES),
+    })
+
+    await runSubmissions({
+      transport,
+      recorder,
+      world: built,
+      config: { submissions: 1, badFraction: 0, cooldownMs: 0 },
+      deadline: Date.now() + 60_000,
+    })
+
+    const snapshot = recorder.snapshot()
+    expect(snapshot.verdicts).toEqual({ matrix: { correct: { accepted: 1 } }, incoherent: 0 })
+    expect(snapshot.actions['submission']).toEqual({ started: 1, completed: 1 })
+    expect(snapshot.http.load?.['POST /submissions']?.byStatus).toEqual({
+      '201': 1,
+      '429:submission_throttled': MAX_THROTTLE_RETRIES,
+    })
+    expect(snapshot.unexpected).toEqual([])
+  })
+
+  it('gives up after the last retry and counts the submission as rejected', async () => {
+    const { recorder, built } = await world('giveup', 1)
+    const transport = createTransport({
+      baseUrl: 'http://localhost',
+      recorder,
+      requestTimeoutMs: 60_000,
+      fetch: throttlingFirst(MAX_THROTTLE_RETRIES + 1),
+    })
+
+    await runSubmissions({
+      transport,
+      recorder,
+      world: built,
+      config: { submissions: 1, badFraction: 0, cooldownMs: 0 },
+      deadline: Date.now() + 60_000,
+    })
+
+    const snapshot = recorder.snapshot()
+    // A 429 is never an unexpected status; running out of retries shows up
+    // as an incoherent verdict instead, which fails the run.
+    expect(snapshot.verdicts).toEqual({
+      matrix: { correct: { 'rejected:submission_throttled': 1 } },
+      incoherent: 1,
+    })
+    expect(snapshot.actions['submission']).toEqual({ started: 1, completed: 1 })
+    expect(snapshot.http.load?.['POST /submissions']?.byStatus).toEqual({
+      '429:submission_throttled': MAX_THROTTLE_RETRIES + 1,
+    })
+    expect(snapshot.unexpected).toEqual([])
   })
 
   it('starts nothing once the deadline has passed', async () => {

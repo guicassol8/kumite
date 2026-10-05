@@ -215,18 +215,30 @@ async function clearOpenRounds(
   return closed
 }
 
+/**
+ * Ctrl-C during setup: no new signup, team or round is started (the ones in
+ * flight finish), and the setup stops with this error instead of building
+ * a world nobody will use — at 8 signups/s, a 300-user setup would
+ * otherwise keep going for another minute.
+ */
+function stopIfAborted(signal: AbortSignal | undefined) {
+  if (signal?.aborted) throw new Error('aborted (SIGINT) before the setup finished')
+}
+
 export async function setupWorld({
   transport,
   recorder,
   config,
   runId,
   organizerToken,
+  signal,
 }: {
   transport: Transport
   recorder: Recorder
   config: WorldConfig
   runId: string
   organizerToken: string
+  signal?: AbortSignal
 }): Promise<World> {
   const org = transport.api(organizerToken)
 
@@ -266,21 +278,24 @@ export async function setupWorld({
     { length: config.teams * membersPerTeam },
     (_, i) => `${LOAD_PREFIX}${runId}-u${i}@${emailSuffix}`,
   )
-  const users = await mapLimit(emails, config.setupConcurrency, (email, i) =>
-    signUpAndLogIn(transport, recorder, email, i, code.code),
-  )
+  const users = await mapLimit(emails, config.setupConcurrency, async (email, i) => {
+    stopIfAborted(signal)
+    return signUpAndLogIn(transport, recorder, email, i, code.code)
+  })
 
   const groups = Array.from({ length: config.teams }, (_, t) =>
     users.slice(t * membersPerTeam, (t + 1) * membersPerTeam),
   )
-  const teams = await mapLimit(groups, config.setupConcurrency, (members, t) =>
-    formTeam(transport, recorder, `${LOAD_PREFIX}${runId}-t${t}`, members),
-  )
+  const teams = await mapLimit(groups, config.setupConcurrency, async (members, t) => {
+    stopIfAborted(signal)
+    return formTeam(transport, recorder, `${LOAD_PREFIX}${runId}-t${t}`, members)
+  })
 
   let round: World['round'] = null
   let problemId: string | null = null
   const closedLeftoverRounds: string[] = []
   if (config.submissions > 0) {
+    stopIfAborted(signal)
     problemId = await findProblemId(transport, recorder, organizerToken, config.problemId)
     closedLeftoverRounds.push(...(await clearOpenRounds(transport, recorder, organizerToken)))
     for (const name of closedLeftoverRounds) {

@@ -144,6 +144,42 @@ describe('setupWorld', { timeout: 120_000 }, () => {
     ).rejects.toThrow('"Rodada 1"')
   })
 
+  it('stops scheduling signups once aborted, and opens no round', async () => {
+    // Ctrl-C mid-setup: the signups already in flight finish, no new one
+    // starts, and the setup stops before the teams and the round.
+    const controller = new AbortController()
+    const recorder = createRecorder()
+    recorder.setPhase('setup')
+    let signups = 0
+    const transport = createTransport({
+      baseUrl: 'http://localhost',
+      recorder,
+      requestTimeoutMs: 30_000,
+      fetch: async (input, init) => {
+        const res = await app.request(input, init)
+        if (new URL(input).pathname === '/auth/signup' && ++signups === 2) controller.abort()
+        return res
+      },
+    })
+    const organizerToken = await loginOrganizer(transport, recorder, ORGANIZER)
+
+    await expect(
+      setupWorld({
+        transport,
+        recorder,
+        organizerToken,
+        runId: 'rune',
+        config: { ...BASE, setupConcurrency: 1, teams: 5, members: 1, submissions: 1 },
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow('aborted')
+
+    expect(recorder.snapshot().actions['signup']).toEqual({ started: 2, completed: 2 })
+    expect(recorder.snapshot().actions['create-team']).toBeUndefined()
+    const rounds = await db.select().from(roundsTable)
+    expect(rounds.filter((round) => round.name === roundNameFor('rune'))).toEqual([])
+  })
+
   it('opens no round when the run has no submissions', async () => {
     const { recorder, transport } = harness()
     const organizerToken = await loginOrganizer(transport, recorder, ORGANIZER)

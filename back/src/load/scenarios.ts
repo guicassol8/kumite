@@ -132,7 +132,7 @@ export async function runScenario({
     if (!signal?.aborted) {
       recorder.setPhase('setup')
       log(`setup: ${config.teams} team(s) × ${config.members} member(s)`)
-      world = await setupWorld({ transport, recorder, config, runId, organizerToken })
+      world = await setupWorld({ transport, recorder, config, runId, organizerToken, signal })
     }
 
     if (world && !signal?.aborted) {

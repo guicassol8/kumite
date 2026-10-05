@@ -1,4 +1,5 @@
 import * as Blockly from 'blockly'
+import { javascriptGenerator } from 'blockly/javascript'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { defineKumiteBlocks, INPUT_BLOCK_TYPE, ROOT_BLOCK_TYPE } from './blocks'
@@ -120,6 +121,35 @@ describe('generateSolution leaves the block registry alone (#380)', () => {
     expect(registry().root).toBe(first.root)
     expect(registry().input).toBe(first.input)
     expect(labelsOfNewBlocks()).toEqual(labelsOf('pt'))
+  })
+
+  it.each([ROOT_BLOCK_TYPE, INPUT_BLOCK_TYPE])(
+    'registers both blocks when only %s is missing',
+    (missing) => {
+      defineKumiteBlocks('pt')
+      const expected = generateSolution(somaDosPares)
+      delete Blockly.Blocks[missing]
+
+      expect(generateSolution(somaDosPares, 'en')).toBe(expected)
+      expect(Blockly.Blocks[missing]).toBeDefined()
+      expect(labelsOfNewBlocks()).toEqual(labelsOf('pt'))
+    },
+  )
+
+  it('registers the generators on every call, not only with the definitions', () => {
+    // The registry may hold the blocks without their generators — filled by
+    // something other than `defineKumiteBlocks`, or with `forBlock` reset since.
+    // Codegen must not depend on whoever set the registry up.
+    defineKumiteBlocks('pt')
+    const expected = generateSolution(somaDosPares)
+    defineKumiteBlocks('es')
+    const before = registry()
+    delete javascriptGenerator.forBlock[ROOT_BLOCK_TYPE]
+    delete javascriptGenerator.forBlock[INPUT_BLOCK_TYPE]
+
+    expect(generateSolution(somaDosPares)).toBe(expected)
+    expect(registry().root).toBe(before.root)
+    expect(registry().input).toBe(before.input)
   })
 
   it.each<[string, WorkspaceState]>([

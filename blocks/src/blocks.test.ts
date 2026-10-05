@@ -144,9 +144,10 @@ describe('defineKumiteBlocks', () => {
 
   it('registers the reserved names once, however often it is called', () => {
     // `addReservedWords` is `RESERVED_WORDS_ += words + ','` — it appends
-    // unconditionally. `defineKumiteBlocks` runs on every `generateSolution`
-    // call, so without a guard the list grows by two entries per codegen for
-    // the life of the process, and `init()` re-splits it every time.
+    // unconditionally. The registration runs on every `generateSolution` call
+    // (`ensureKumiteBlocks`, #380) and every #57 relabel, so without a guard the
+    // list grows by two entries per codegen for the life of the process, and
+    // `init()` re-splits it every time.
     defineKumiteBlocks()
     defineKumiteBlocks('en')
     defineKumiteBlocks('es')
@@ -215,8 +216,9 @@ describe('defineKumiteBlocks', () => {
   })
 
   it('strips the denied options once, however often it is called', () => {
-    // `defineKumiteBlocks` runs on every `generateSolution` call and #57 calls
-    // it again to relabel. Without a guard each call would wrap the previous
+    // The registration runs on every `generateSolution` call
+    // (`ensureKumiteBlocks`, #380) and #57 calls `defineKumiteBlocks` again to
+    // relabel. Without a guard each call would wrap the previous
     // `init`, so the chain — and the work every new block does — would grow
     // without bound in the judge process.
     defineKumiteBlocks()

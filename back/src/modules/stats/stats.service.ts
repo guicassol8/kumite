@@ -1,3 +1,5 @@
+import { type EventLoopUtilization, performance } from 'node:perf_hooks'
+
 import { and, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 
 import { JUDGE_CONCURRENCY } from '../../config'
@@ -15,7 +17,13 @@ import { findOpenRound, reapExpiredRound } from '../rounds/rounds.service'
 import type { SseBus } from '../sse/sse.service'
 import { getSubmissionLoad } from '../submissions/submissions.service'
 
-import type { EventStats, LiveStats, StatsRoundRef } from './stats.schema'
+import type {
+  EventLoopWindow,
+  EventStats,
+  LiveStats,
+  ProcessStats,
+  StatsRoundRef,
+} from './stats.schema'
 
 type RoundRow = typeof roundsTable.$inferSelect
 
@@ -152,5 +160,133 @@ export function getLiveStats(bus: Pick<SseBus, 'connections'>, now = Date.now())
     judge: { ...getJudgeLoad(), concurrency: JUDGE_CONCURRENCY },
     sse: { connections: bus.connections() },
     submissions: getSubmissionLoad(now),
+  }
+}
+
+// --- Process metrics for the load harness (#136) ---
+//
+// Process-local, like the live card's counters: one back process
+// (docker-compose.prod.yml runs no replicas) and nothing persisted. One
+// sampler at a time; starting a second one stops the first.
+
+type ProcessSampler = {
+  windowMs: number
+  windows: EventLoopWindow[]
+  stop: () => void
+}
+
+let activeSampler: ProcessSampler | null = null
+
+function clampUnit(value: number): number {
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0
+}
+
+// Nearest-rank percentile of an ascending list; 0 for an empty one, so a
+// window with no sample never reports NaN.
+function nearestRank(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0
+  const rank = Math.max(1, Math.ceil((p / 100) * sorted.length))
+  return sorted[Math.min(sorted.length, rank) - 1] ?? 0
+}
+
+/**
+ * Starts closing one event-loop window every `windowMs`: the lag (p50, p99,
+ * max) and the utilization over that window, keeping the last `keep`. Wired
+ * in main.ts; the timer is unref'd so it never holds the process open.
+ * Returns the function that stops it and empties the ring.
+ *
+ * The lag is measured here, not with `monitorEventLoopDelay`: that histogram
+ * is fed by its own timer, and on Node 24 a window closed (and the histogram
+ * reset) in the same timers pass that follows a block lost the block's
+ * sample — the 120 ms stall the test provokes vanished. A single timer that
+ * both samples and closes the window keeps the order deterministic: the
+ * sample of a late tick is always recorded before its window closes.
+ */
+export function startProcessSampler({
+  windowMs = 1000,
+  keep = 120,
+}: {
+  windowMs?: number
+  keep?: number
+} = {}): () => void {
+  activeSampler?.stop()
+
+  // A tick every 10 ms, or more often for the tests' short windows, so a
+  // window always holds several samples. Lag = how late a tick ran.
+  const resolutionMs = Math.max(1, Math.min(10, Math.floor(windowMs / 5)))
+  let lastElu: EventLoopUtilization = performance.eventLoopUtilization()
+  let windowStart = performance.now()
+  let expected = windowStart + resolutionMs
+  let lags: number[] = []
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let stopped = false
+
+  const windows: EventLoopWindow[] = []
+
+  const closeWindow = (now: number) => {
+    const elu = performance.eventLoopUtilization()
+    const delta = performance.eventLoopUtilization(elu, lastElu)
+    lastElu = elu
+    const sorted = lags.sort((a, b) => a - b)
+    windows.push({
+      endedAt: Date.now(),
+      durationMs: now - windowStart,
+      delayP50Ms: nearestRank(sorted, 50),
+      delayP99Ms: nearestRank(sorted, 99),
+      delayMaxMs: sorted.at(-1) ?? 0,
+      utilization: clampUnit(delta.utilization),
+    })
+    if (windows.length > keep) windows.splice(0, windows.length - keep)
+    lags = []
+    windowStart = now
+  }
+
+  const tick = () => {
+    if (stopped) return
+    const now = performance.now()
+    lags.push(Math.max(0, now - expected))
+    if (now - windowStart >= windowMs) closeWindow(now)
+    expected = now + resolutionMs
+    timer = setTimeout(tick, resolutionMs)
+    timer.unref()
+  }
+  timer = setTimeout(tick, resolutionMs)
+  timer.unref()
+
+  const sampler: ProcessSampler = {
+    windowMs,
+    windows,
+    stop: () => {
+      stopped = true
+      clearTimeout(timer)
+      windows.length = 0
+      if (activeSampler === sampler) activeSampler = null
+    },
+  }
+  activeSampler = sampler
+  return sampler.stop
+}
+
+/**
+ * CPU (cumulative), memory and the closed event-loop windows, read from
+ * process memory only — no database, like getLiveStats.
+ */
+export function getProcessStats(): ProcessStats {
+  const cpu = process.cpuUsage()
+  const memory = process.memoryUsage()
+  return {
+    sampledAt: Date.now(),
+    uptimeSeconds: process.uptime(),
+    cpu: { userMicros: cpu.user, systemMicros: cpu.system },
+    memory: {
+      rss: memory.rss,
+      heapUsed: memory.heapUsed,
+      heapTotal: memory.heapTotal,
+      external: memory.external,
+    },
+    eventLoop: {
+      windowMs: activeSampler?.windowMs ?? null,
+      windows: activeSampler ? [...activeSampler.windows] : [],
+    },
   }
 }

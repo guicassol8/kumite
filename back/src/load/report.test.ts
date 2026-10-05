@@ -93,7 +93,7 @@ describe('buildFailures', () => {
     stats.networkErrors = 2
     stats.timeouts = 1
     expect(buildFailures({ recorder, sse: cleanSse(), aborted: false })).toEqual([
-      '2× network error on POST /submissions (load), 1 of them timeouts',
+      '2× network error on POST /submissions (load), 1 of them timeouts: {}',
     ])
   })
 

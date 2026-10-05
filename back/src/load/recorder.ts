@@ -31,6 +31,21 @@ export type HttpRecord = {
   ms: number
   // 'timeout', or the error's code/message.
   networkError?: string | null
+  networkDetail?: NetworkErrorDetail
+}
+
+export type NetworkErrorDetail = {
+  // 'timeout', the error's code (undici: on `cause`), else its message.
+  reason: string
+  message: string
+  // Failed before any response arrived, or while reading the body.
+  stage: 'request' | 'body'
+  // The socket's counters, when the error carries it; null otherwise.
+  socketBytesWritten: number | null
+  socketBytesRead: number | null
+  // Bytes already read on a socket whose request failed before its own
+  // response: earlier responses, so a reused keep-alive socket.
+  reusedSocket: boolean | null
 }
 
 export type RouteStats = {
@@ -41,6 +56,9 @@ export type RouteStats = {
   latencyMs: Summary
   networkErrors: number
   timeouts: number
+  // #138: network errors by `reason · stage · reused`, and the first few.
+  networkReasons: Record<string, number>
+  networkSamples: NetworkErrorDetail[]
 }
 
 export type UnexpectedStatus = {
@@ -87,6 +105,17 @@ type RouteBucket = {
   latencies: number[]
   networkErrors: number
   timeouts: number
+  networkReasons: Record<string, number>
+  networkSamples: NetworkErrorDetail[]
+}
+
+const MAX_NETWORK_SAMPLES = 5
+
+/** `UND_ERR_SOCKET · request · reused`: the key network errors are counted by. */
+export function networkReasonKey(detail: NetworkErrorDetail): string {
+  const reuse =
+    detail.reusedSocket === null ? 'socket unknown' : detail.reusedSocket ? 'reused' : 'fresh'
+  return `${detail.reason} · ${detail.stage} · ${reuse}`
 }
 
 export function createRecorder({ clock = () => Date.now() }: { clock?: () => number } = {}) {
@@ -109,7 +138,15 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
     }
     let bucket = byRoute.get(route)
     if (!bucket) {
-      bucket = { count: 0, byStatus: {}, latencies: [], networkErrors: 0, timeouts: 0 }
+      bucket = {
+        count: 0,
+        byStatus: {},
+        latencies: [],
+        networkErrors: 0,
+        timeouts: 0,
+        networkReasons: {},
+        networkSamples: [],
+      }
       byRoute.set(route, bucket)
     }
     return bucket
@@ -143,6 +180,17 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
       if (record.status === null) {
         bucket.networkErrors += 1
         if (record.networkError === 'timeout') bucket.timeouts += 1
+        const detail: NetworkErrorDetail = record.networkDetail ?? {
+          reason: record.networkError ?? 'unknown',
+          message: record.networkError ?? 'unknown',
+          stage: 'request',
+          socketBytesWritten: null,
+          socketBytesRead: null,
+          reusedSocket: null,
+        }
+        const key = networkReasonKey(detail)
+        bucket.networkReasons[key] = (bucket.networkReasons[key] ?? 0) + 1
+        if (bucket.networkSamples.length < MAX_NETWORK_SAMPLES) bucket.networkSamples.push(detail)
         bucket.byStatus['network'] = (bucket.byStatus['network'] ?? 0) + 1
         return
       }
@@ -213,6 +261,8 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
             latencyMs: summarize(bucket.latencies),
             networkErrors: bucket.networkErrors,
             timeouts: bucket.timeouts,
+            networkReasons: { ...bucket.networkReasons },
+            networkSamples: bucket.networkSamples.map((sample) => ({ ...sample })),
           }
         }
         httpOut[phase] = routes

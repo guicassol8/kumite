@@ -567,7 +567,7 @@ export function buildFailures(input: {
       }
       if (stats.networkErrors > 0) {
         failures.push(
-          `${stats.networkErrors}× network error on ${route} (${phase}), ${stats.timeouts} of them timeouts`,
+          `${stats.networkErrors}× network error on ${route} (${phase}), ${stats.timeouts} of them timeouts: ${JSON.stringify(stats.networkReasons)}`,
         )
       }
     }

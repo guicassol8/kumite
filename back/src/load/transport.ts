@@ -6,7 +6,7 @@ import { hc } from 'hono/client'
 // would load ../config.ts and demand the back's own environment).
 import type { AppType } from '../app'
 
-import type { Recorder } from './recorder'
+import type { NetworkErrorDetail, Recorder } from './recorder'
 import type { FetchLike } from './sse-client'
 
 // Every request the harness makes goes through here (#136): timed until the
@@ -20,6 +20,55 @@ function describeNetworkError(error: unknown): string {
     return typeof code === 'string' ? code : error.message
   }
   return String(error)
+}
+
+function socketCounter(socket: unknown, key: 'bytesWritten' | 'bytesRead'): number | null {
+  if (!socket || typeof socket !== 'object' || !(key in socket)) return null
+  const value = (socket as Record<string, unknown>)[key]
+  return typeof value === 'number' ? value : null
+}
+
+/**
+ * What a failed request can tell about itself (#138): the code (undici puts
+ * it on `cause`), the message, whether it failed before any response
+ * (`request`) or while reading the body (`body`), and the socket's byte
+ * counters when undici attaches the socket to the error. A socket that had
+ * already read bytes when a request failed before its own response had
+ * carried earlier responses: it was a reused keep-alive socket.
+ */
+export function networkErrorDetail(
+  error: unknown,
+  stage: NetworkErrorDetail['stage'],
+): NetworkErrorDetail {
+  const reason = describeNetworkError(error)
+  const cause =
+    error instanceof Error && error.cause && typeof error.cause === 'object'
+      ? (error.cause as { message?: unknown; socket?: unknown })
+      : null
+  const socket = cause?.socket
+  const bytesRead = socketCounter(socket, 'bytesRead')
+  return {
+    reason,
+    message:
+      typeof cause?.message === 'string'
+        ? cause.message
+        : error instanceof Error
+          ? error.message
+          : String(error),
+    stage,
+    socketBytesWritten: socketCounter(socket, 'bytesWritten'),
+    socketBytesRead: bytesRead,
+    reusedSocket: bytesRead === null ? null : stage === 'request' && bytesRead > 0,
+  }
+}
+
+// The detail of each error the transport rethrew, for the caller to decide
+// on (the submitter's retry); a WeakMap, so the error itself is untouched.
+const details = new WeakMap<object, NetworkErrorDetail>()
+
+/** The detail recorded for an error `timedFetch` rethrew, if any. */
+export function detailOf(error: unknown): NetworkErrorDetail | undefined {
+  return error && typeof error === 'object' ? details.get(error) : undefined
 }
 
 function errorCodeOf(text: string): string | null {
@@ -64,6 +113,7 @@ export function createTransport({
     const timeout = AbortSignal.timeout(requestTimeoutMs)
     const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout
     const started = performance.now()
+    let stage: NetworkErrorDetail['stage'] = 'request'
     try {
       // hc calls fetch(url, init); a Request is unwrapped for completeness.
       const requestInit: RequestInit =
@@ -76,6 +126,7 @@ export function createTransport({
             }
           : { ...init, signal }
       const res = await fetch(url, requestInit)
+      stage = 'body'
       const text = await res.text()
       recorder.recordHttp({
         method,
@@ -90,13 +141,16 @@ export function createTransport({
         headers: res.headers,
       })
     } catch (error) {
+      const detail = networkErrorDetail(error, stage)
+      if (error && typeof error === 'object') details.set(error, detail)
       recorder.recordHttp({
         method,
         url,
         status: null,
         errorCode: null,
         ms: performance.now() - started,
-        networkError: describeNetworkError(error),
+        networkError: detail.reason,
+        networkDetail: detail,
       })
       throw error
     }

@@ -1,12 +1,12 @@
-import { serve } from '@hono/node-server'
-
 import { app } from './app'
 import { env } from './config'
 import { k } from './context'
+import { serveApp } from './lib/http-server'
 import { runExpiryTick, runRankingTick } from './modules/sse/sse.service'
 import { startProcessSampler } from './modules/stats/stats.service'
 
-serve({ fetch: app.fetch, port: env.PORT }, (info) => {
+// Keep-alive and header timeouts tuned against Caddy's upstream pool (#438).
+serveApp(app.fetch, env.PORT, (info) => {
   console.log('kumite api: listening on http://localhost:' + info.port)
 })
 

@@ -12,6 +12,7 @@ import { raizDesabilitada } from './fixtures/raiz-desabilitada'
 import { somaDosPares } from './fixtures/soma-dos-pares'
 import { variavelChamadaInput } from './fixtures/variavel-chamada-input'
 import { generateSolution } from './generate'
+import type { BlockLocale } from './messages'
 import { allowedBlockTypes, emptyWorkspaceState, type WorkspaceState } from './toolbox'
 
 const LINE_TERMINATORS = [
@@ -19,6 +20,31 @@ const LINE_TERMINATORS = [
   String.fromCharCode(0x2028),
   String.fromCharCode(0x2029),
 ]
+
+/**
+ * A text field carrying U+000D, which Blockly's `quote_` does not escape: the
+ * source keeps the `solve` signature and still fails to parse.
+ */
+const textoQueNaoParseia: WorkspaceState = {
+  blocks: {
+    languageVersion: 0,
+    blocks: [
+      {
+        type: ROOT_BLOCK_TYPE,
+        id: 'raiz',
+        inputs: {
+          RETURN: {
+            block: {
+              type: 'text',
+              id: 'texto',
+              fields: { TEXT: `a${LINE_TERMINATORS[0]}b` },
+            },
+          },
+        },
+      },
+    ],
+  },
+}
 
 type Solver = (input: unknown) => unknown
 
@@ -296,6 +322,18 @@ describe('generateSolution', () => {
     expect(error.code).toBe('disabled-block')
   })
 
+  // #419: the es texts say "tú", like the rest of the product — no voseo.
+  it.each<[BlockLocale, string]>([
+    ['pt', 'Há um bloco desabilitado na sua solução. Reative-o para continuar.'],
+    ['es', 'Hay un bloque deshabilitado en tu solución. Reactívalo para continuar.'],
+    ['en', 'There is a disabled block in your solution. Re-enable it to continue.'],
+  ])('refuses a disabled root in %s with the exact text', (locale, message) => {
+    const error = expectBlocksError(() => generateSolution(raizDesabilitada, locale))
+
+    expect(error.code).toBe('disabled-block')
+    expect(error.message).toBe(message)
+  })
+
   it('rejects the legacy "enabled: false" serialization too', () => {
     const error = expectBlocksError(() =>
       generateSolution({
@@ -358,30 +396,21 @@ describe('generateSolution', () => {
     // line terminator JS honours — so a text field carrying one emits
     // `return 'a<CR>b';`: signature intact, `SyntaxError` on instantiation.
     // Reachable through a forged workspace, which is the trust boundary here.
-    const error = expectBlocksError(() =>
-      generateSolution({
-        blocks: {
-          languageVersion: 0,
-          blocks: [
-            {
-              type: ROOT_BLOCK_TYPE,
-              id: 'raiz',
-              inputs: {
-                RETURN: {
-                  block: {
-                    type: 'text',
-                    id: 'texto',
-                    fields: { TEXT: `a${LINE_TERMINATORS[0]}b` },
-                  },
-                },
-              },
-            },
-          ],
-        },
-      }),
-    )
+    const error = expectBlocksError(() => generateSolution(textoQueNaoParseia))
 
     expect(error.code).toBe('invalid-generated-code')
+  })
+
+  // #419: the es text says "tú", like the rest of the product — no voseo.
+  it.each<[BlockLocale, string]>([
+    ['pt', 'A sua solução não pôde ser gerada. Revise os blocos e tente de novo.'],
+    ['es', 'Tu solución no se pudo generar. Revisa los bloques e inténtalo de nuevo.'],
+    ['en', 'Your solution could not be generated. Check the blocks and try again.'],
+  ])('refuses a source that does not parse in %s with the exact text', (locale, message) => {
+    const error = expectBlocksError(() => generateSolution(textoQueNaoParseia, locale))
+
+    expect(error.code).toBe('invalid-generated-code')
+    expect(error.message).toBe(message)
   })
 
   it('accepts the real source it produces', () => {

@@ -116,7 +116,7 @@ test.describe('Executar keeps the block locale (#183)', () => {
 
       // 05 — the codegen error is localized with the UI's locale.
       await expect(page.getByTestId('problem-results-invalid')).toHaveText(
-        'Hay un bloque deshabilitado en tu solución. Reactivalo para continuar.',
+        'Hay un bloque deshabilitado en tu solución. Reactívalo para continuar.',
       )
       await page.screenshot({ path: evidence('05-es-mensagem-de-recusa') })
     })

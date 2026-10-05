@@ -361,7 +361,7 @@ describe('useExampleRun keeps the block locale (#183)', () => {
     },
     {
       locale: 'es',
-      message: 'Hay un bloque deshabilitado en tu solución. Reactivalo para continuar.',
+      message: 'Hay un bloque deshabilitado en tu solución. Reactívalo para continuar.',
       root: 'devolver',
       input: 'entrada',
       notRoot: 'retornar',

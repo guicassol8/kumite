@@ -762,7 +762,7 @@ describe('ProblemScreen', () => {
       },
       {
         language: 'es',
-        message: 'Hay un bloque deshabilitado en tu solución. Reactivalo para continuar.',
+        message: 'Hay un bloque deshabilitado en tu solución. Reactívalo para continuar.',
         root: ['resolver', 'devolver'],
         input: 'entrada',
       },

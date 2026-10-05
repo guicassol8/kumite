@@ -181,9 +181,10 @@ describe('createTransport', () => {
         if (next) throw next()
         return app.request(input, init)
       },
+      resendStale: true,
     })
     const health = () =>
-      resendIfStale(recorder, 'GET', '/health', () => transport.api().health.$get())
+      resendIfStale(transport, recorder, 'GET', '/health', () => transport.api().health.$get())
 
     await expect(health()).rejects.toThrow('fetch failed')
     expect((await health()).status).toBe(200)
@@ -195,5 +196,14 @@ describe('createTransport', () => {
         count: 1,
       },
     ])
+
+    // Off (the default): the stale socket's error goes straight through.
+    errors.push(stale)
+    await expect(
+      resendIfStale({ resendStale: false }, recorder, 'GET', '/health', () =>
+        transport.api().health.$get(),
+      ),
+    ).rejects.toThrow('fetch failed')
+    expect(recorder.snapshot().retries[0]?.count).toBe(1)
   })
 })

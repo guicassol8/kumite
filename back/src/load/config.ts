@@ -44,6 +44,10 @@ export const LoadConfigSchema = z.object({
   // Closed rounds created before the run's own, each with one correct
   // submission per team: getEventRanking's cost grows with them (#138).
   pastRounds: nonNegativeInt,
+  // Send a request again once after the back closed a reused keep-alive
+  // socket under it (#138). Off: Caddy, in front of the back in production,
+  // does not resend a POST either, so the harness models it.
+  resendStale: z.boolean(),
   restSeconds: z.coerce.number().nonnegative(),
   durationSeconds: z.coerce.number().positive(),
   setupConcurrency: positiveInt,
@@ -81,6 +85,7 @@ const COMMON = {
   storm: false,
   stormWindowSeconds: 0,
   pastRounds: 0,
+  resendStale: false,
 } as const
 
 export const PRESETS: Record<ScenarioName, Preset> = {
@@ -156,6 +161,7 @@ const FLAGS = {
 const TOGGLES = {
   'until-done': 'untilDone',
   storm: 'storm',
+  'resend-stale': 'resendStale',
 } as const satisfies Record<string, keyof LoadConfig>
 
 export const USAGE = `Usage: pnpm load <baseline|smoke|burst> [flags]
@@ -172,6 +178,7 @@ export const USAGE = `Usage: pnpm load <baseline|smoke|burst> [flags]
   --[no-]until-done           load ends when every submission is over (--duration: start deadline)
   --[no-]storm                after the load, close every stream and reopen as many
   --storm-window <s>          spread the storm's reconnects over s seconds (0 = at once)
+  --[no-]resend-stale         resend once after a stale keep-alive socket (masks the Caddy→back race)
   --rest <s>                  idle seconds before setup
   --duration <s>              seconds of idle SSE (baseline) or load (smoke, burst)
   --setup-concurrency <n>     signups/logins in flight

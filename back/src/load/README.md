@@ -36,6 +36,7 @@ pnpm load --help
 | `--past-rounds` (closed rounds before the run's) | 0 | 0 | 0 |
 | `--until-done` / `--no-until-done` | off | off | on |
 | `--storm` / `--no-storm` · `--storm-window` s | off · 0 | off · 0 | on · 0 |
+| `--resend-stale` / `--no-resend-stale` (masks the Caddy→back race, below) | off | off | off |
 | `--rest` s / `--duration` s | 60 / 120 | 10 / 90 | 30 / 600 |
 | `--request-timeout` ms | 60000 | 60000 | 290000 |
 | `--setup-concurrency` · `--sse-ramp` (connections/s) · `--sample-interval` ms · `--cooldown` ms | 4 · 50 · 1000 · 5000 | same | same |
@@ -238,7 +239,7 @@ Only these, each counted and listed — the run never stops at the first:
 Latency, queue wait, spawn, CPU, memory, lag, bytes and heartbeat cadence
 are observations: they never fail a run.
 
-### The one retry (#138)
+### The stale-socket resend, off by default (#138)
 
 Node's server closes a keep-alive socket after 5 s idle
 (`keepAliveTimeout`), and a team's next submission comes after a 5 s
@@ -246,8 +247,16 @@ cooldown: the harness can reuse a socket at the moment the back closes it.
 undici then fails the POST with `UND_ERR_SOCKET` ("other side closed")
 before any byte of a response — the request never reached a handler. A
 browser silently resends a request in exactly that case; undici does not.
-So a submission — and likewise one of the harness's own reads (the
-sampler's polls, settle's checks) — is sent again **once**, only for
-`UND_ERR_SOCKET` or `ECONNRESET` on a reused socket before any response. Every retry is counted
+**This race is a finding, not a harness defect.** In production the
+browsers talk to Caddy, and Caddy keeps its own keep-alive pool to the back
+(`reverse_proxy back:3000`): like undici, it does not resend a POST that
+fails on a reused connection, so a participant would likely get a 502 (see
+`docs/load/138-sse-fanout.md` and its issue). The harness therefore leaves
+it visible by default.
+
+`--resend-stale` **masks the Caddy→back race**: a submission — and likewise
+one of the harness's own reads (the sampler's polls, settle's checks) — is
+sent again **once**, only for `UND_ERR_SOCKET` or `ECONNRESET` on a reused
+socket before any response. It is off so the harness models production. Every retry is counted
 in the report's `Retries` section and stays in the HTTP table as the network
 error it answered; a second failure is not retried and fails the run.

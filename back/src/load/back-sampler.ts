@@ -95,7 +95,7 @@ export function startBackSampler({
 
   const readProcess = async (): Promise<ProcessStats | null> => {
     try {
-      const res = await resendIfStale(recorder, 'GET', '/organizer/stats/process', () =>
+      const res = await resendIfStale(transport, recorder, 'GET', '/organizer/stats/process', () =>
         api.organizer.stats.process.$get({ query: since === undefined ? {} : { since } }),
       )
       if (res.status === 200) {
@@ -120,7 +120,7 @@ export function startBackSampler({
 
   const readLive = async (): Promise<LiveStats | null> => {
     try {
-      const res = await resendIfStale(recorder, 'GET', '/organizer/stats/live', () =>
+      const res = await resendIfStale(transport, recorder, 'GET', '/organizer/stats/live', () =>
         api.organizer.stats.live.$get(),
       )
       if (res.status === 200) return await res.json()

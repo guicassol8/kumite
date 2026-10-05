@@ -79,6 +79,7 @@ describe('presets', () => {
       storm: false,
       stormWindowSeconds: 0,
       pastRounds: 0,
+      resendStale: false,
     }
     expect(PRESETS.baseline).toEqual({
       ...common,
@@ -121,6 +122,7 @@ describe('presets', () => {
       storm: true,
       stormWindowSeconds: 0,
       pastRounds: 0,
+      resendStale: false,
       cooldownMs: 5000,
       sseRamp: 50,
     })
@@ -149,8 +151,12 @@ describe('presets', () => {
       storm: false,
       untilDone: false,
     })
-    const smoke = parse(['smoke', '--storm', '--until-done'])
-    expect(smoke.ok && smoke.config).toMatchObject({ storm: true, untilDone: true })
+    const smoke = parse(['smoke', '--storm', '--until-done', '--resend-stale'])
+    expect(smoke.ok && smoke.config).toMatchObject({
+      storm: true,
+      untilDone: true,
+      resendStale: true,
+    })
   })
 
   it('refuses a memory share outside [0, 1] with the flag named', () => {

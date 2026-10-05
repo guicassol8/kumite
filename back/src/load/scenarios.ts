@@ -110,6 +110,7 @@ export async function runScenario({
     recorder,
     requestTimeoutMs: config.requestTimeoutMs,
     fetch,
+    resendStale: config.resendStale,
   })
 
   let world: World | null = null

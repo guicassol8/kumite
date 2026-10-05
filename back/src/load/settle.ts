@@ -86,11 +86,11 @@ export async function waitForDrain({
   for (;;) {
     try {
       const [live, proc] = await Promise.all([
-        resendIfStale(recorder, 'GET', '/organizer/stats/live', () =>
+        resendIfStale(transport, recorder, 'GET', '/organizer/stats/live', () =>
           api.organizer.stats.live.$get(),
         ),
         // A cut in the future: only the counters are wanted, not the rings.
-        resendIfStale(recorder, 'GET', '/organizer/stats/process', () =>
+        resendIfStale(transport, recorder, 'GET', '/organizer/stats/process', () =>
           api.organizer.stats.process.$get({ query: { since: Date.now() + 3_600_000 } }),
         ),
       ])
@@ -125,11 +125,11 @@ async function readApiDigest(
   try {
     const [round, event] = await Promise.all([
       roundId
-        ? resendIfStale(recorder, 'GET', `/rounds/${roundId}/ranking`, () =>
+        ? resendIfStale(transport, recorder, 'GET', `/rounds/${roundId}/ranking`, () =>
             api.rounds[':id'].ranking.$get({ param: { id: roundId } }),
           )
         : null,
-      resendIfStale(recorder, 'GET', '/ranking', () => api.ranking.$get()),
+      resendIfStale(transport, recorder, 'GET', '/ranking', () => api.ranking.$get()),
     ])
     if (event.status !== 200 || (round && round.status !== 200)) return null
     return rankingDigest({

@@ -243,13 +243,14 @@ describe('runSubmissions', { timeout: 120_000 }, () => {
     }
   }
 
-  async function submitThrough(fetch: FetchLike, runId: string) {
+  async function submitThrough(fetch: FetchLike, runId: string, resendStale = true) {
     const { recorder, built } = await world(runId, 1)
     const transport = createTransport({
       baseUrl: 'http://localhost',
       recorder,
       requestTimeoutMs: 60_000,
       fetch,
+      resendStale,
     })
     await runSubmissions({
       transport,
@@ -278,6 +279,13 @@ describe('runSubmissions', { timeout: 120_000 }, () => {
       networkErrors: 1,
       byStatus: { '201': 1, network: 1 },
     })
+  })
+
+  it('does not resend at all without --resend-stale: the failure stands, as through Caddy', async () => {
+    const snapshot = await submitThrough(failingFirst([staleSocket]), 'nostale', false)
+
+    expect(snapshot.actions['submission']).toEqual({ started: 1, completed: 0 })
+    expect(snapshot.retries).toEqual([])
   })
 
   it('retries only once: a second stale socket leaves the submission unfinished', async () => {

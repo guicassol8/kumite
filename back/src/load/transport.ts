@@ -89,11 +89,12 @@ export function isStaleSocket(detail: NetworkErrorDetail | undefined): boolean {
 }
 
 /**
- * `send()`, and once more if it failed on a stale keep-alive socket, the
- * retry recorded. For the harness's own reads (the sampler, settle); the
- * submitter applies the same rule inline.
+ * `send()`, and — only with `--resend-stale` — once more if it failed on a
+ * stale keep-alive socket, the retry recorded. For the harness's own reads
+ * (the sampler, settle); the submitter applies the same rule inline.
  */
 export async function resendIfStale<T>(
+  transport: { resendStale: boolean },
   recorder: Pick<Recorder, 'recordRetry'>,
   method: string,
   path: string,
@@ -103,7 +104,7 @@ export async function resendIfStale<T>(
     return await send()
   } catch (error) {
     const detail = detailOf(error)
-    if (!detail || !isStaleSocket(detail)) throw error
+    if (!transport.resendStale || !detail || !isStaleSocket(detail)) throw error
     recorder.recordRetry({ method, url: path, detail })
     return send()
   }
@@ -131,11 +132,15 @@ export function createTransport({
   recorder,
   requestTimeoutMs,
   fetch = (input, init) => globalThis.fetch(input, init),
+  resendStale = false,
 }: {
   baseUrl: string
   recorder: Pick<Recorder, 'recordHttp'>
   requestTimeoutMs: number
   fetch?: FetchLike
+  // --resend-stale: send a request again once after a stale keep-alive
+  // socket. Off by default, so the harness models Caddy (see README).
+  resendStale?: boolean
 }) {
   /**
    * fetch, timed and recorded. Reads the whole body before returning (so the
@@ -196,6 +201,7 @@ export function createTransport({
 
   return {
     baseUrl,
+    resendStale,
     timedFetch,
     /** The typed RPC client, as `token` (or anonymous), over timedFetch. */
     api: (token?: string) =>

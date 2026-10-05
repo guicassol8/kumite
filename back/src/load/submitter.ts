@@ -52,11 +52,12 @@ async function submitOne({
         json: { problemId: target.problemId, roundId: target.roundId, workspace: WORKSPACES[kind] },
       })
     } catch (error) {
-      // Network error or timeout: recorded by the transport. A stale
-      // keep-alive socket is resent once, and the retry counted; anything
-      // else leaves the action started-not-completed, a failure.
+      // Network error or timeout: recorded by the transport. With
+      // --resend-stale, a stale keep-alive socket is resent once and the
+      // retry counted; anything else leaves the action started-not-completed,
+      // a failure.
       const detail = detailOf(error)
-      if (!resent && detail && isStaleSocket(detail) && !signal?.aborted) {
+      if (transport.resendStale && !resent && detail && isStaleSocket(detail) && !signal?.aborted) {
         resent = true
         recorder.recordRetry({ method: 'POST', url: '/submissions', detail })
         continue

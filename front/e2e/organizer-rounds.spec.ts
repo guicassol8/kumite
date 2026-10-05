@@ -67,9 +67,10 @@ test.describe('organizer rounds', () => {
     page,
     roundSlot,
   }) => {
-    // Up to 60s waiting for another spec to free the open-round slot before
-    // step 04 (`withNoOpenRound`, NO_OPEN_ROUND_WAIT_MS), on top of the flow
-    // itself — the same budget as leaderboard-tab-persistence.spec.ts (#389).
+    // The flow itself — the same budget as leaderboard-tab-persistence.spec.ts
+    // (#389). Waiting for another spec to free the open-round slot before
+    // step 04 (`withNoOpenRound`) extends this timeout by its own length
+    // (support/rounds.ts, #382), so it is not budgeted here.
     test.setTimeout(120_000)
     const auth = await organizerAuthHeader()
     await loginAsOrganizer(page)

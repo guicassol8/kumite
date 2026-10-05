@@ -345,8 +345,8 @@ test.describe('/problem/$id — barra ancorada, rodada aberta (#155)', () => {
   })
 
   test('mantém Enviar, o veredito e o banner de erro ancorados', async ({ page, roundSlot }) => {
-    // Judging three cases in a real sandbox, plus the open retries, on top of
-    // the injection budget.
+    // Judging three cases in a real sandbox, on top of the injection budget.
+    // A wait for the open-round slot extends this by itself (#382).
     test.setTimeout(editorTestTimeout(1, 60_000))
     const auth = await organizerAuthHeader()
     await roundSlot.open(auth, roundId)

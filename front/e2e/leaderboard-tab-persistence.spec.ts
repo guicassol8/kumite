@@ -160,9 +160,10 @@ test.describe
       page,
       roundSlot,
     }) => {
-      // Up to 60s waiting for the slot in 04–05 (`withNoOpenRound`), up to
-      // ~20s of `roundSlot.open` retries in 06, plus signup and team — the
-      // 30s default fits none of the waits it would take to be contended.
+      // Signup, team and the flow itself — past the 30s default. Waiting for
+      // another spec to free the slot (`withNoOpenRound` in 04–05,
+      // `roundSlot.open` in 06) is not in here: the wait extends this
+      // timeout by its own length (support/rounds.ts, #382).
       test.setTimeout(120_000)
       const auth = await organizerAuthHeader()
       await signupThroughUi(page, `leaderboard-tab-e2e-${stamp}-b@edu.pucrs.br`)

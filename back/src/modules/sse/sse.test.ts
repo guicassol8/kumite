@@ -27,6 +27,25 @@ vi.mock('../submissions/submissions.service', async (importOriginal) => {
   return { ...actual, hasJudgingInFlight: (roundId: string) => judging.rounds.has(roundId) }
 })
 
+// #138: lets one /sse connect fail while building its snapshot, so the test
+// below can prove the failed connect still releases the snapshot counter.
+// Every other call goes to the real builder.
+const snapshot = vi.hoisted(() => ({ failNext: false }))
+
+vi.mock('./sse.service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./sse.service')>()
+  return {
+    ...actual,
+    buildStateSyncEvent: (...args: Parameters<typeof actual.buildStateSyncEvent>) => {
+      if (snapshot.failNext) {
+        snapshot.failNext = false
+        return Promise.reject(new Error('snapshot failed (test)'))
+      }
+      return actual.buildStateSyncEvent(...args)
+    },
+  }
+})
+
 import type { SseBusEvent, SseEvent } from './sse.schema'
 import {
   HeartbeatEventSchema,
@@ -55,6 +74,8 @@ import {
   ROUND_CLOSE_ANNOUNCE_MAX_WAIT_MS,
   runExpiryTick,
   runRankingTick,
+  sseConnectFinished,
+  sseConnectStarted,
 } from './sse.service'
 
 describe('sse.schema', () => {
@@ -882,6 +903,40 @@ describe('GET /sse', () => {
     }
 
     await frames.cancel()
+  })
+
+  it('releases the snapshot counter when building the snapshot fails (#138)', async () => {
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email: `sse-${crypto.randomUUID()}@example.com`,
+        passwordHash: 'hash',
+        role: 'participant',
+        university: 'pucrs',
+      })
+      .returning()
+    if (!user) throw new Error('expected fixture')
+    // The counter is only readable by taking a slot: what the next connect
+    // would report as `concurrent`, released at once.
+    const probe = () => {
+      const concurrent = sseConnectStarted()
+      sseConnectFinished(null)
+      return concurrent
+    }
+    const before = probe()
+    const recorded = getSseTimings().connects.at(-1)?.seq ?? 0
+    snapshot.failNext = true
+
+    const res = await app.request('/sse', {
+      headers: { Authorization: `Bearer ${await tokenFor(user)}` },
+    })
+    // The handler throws inside the stream, which ends it with no frame.
+    await res.body?.cancel()
+
+    await vi.waitFor(() => expect(snapshot.failNext).toBe(false))
+    await vi.waitFor(() => expect(probe()).toBe(before))
+    // A failed connect is not recorded as one.
+    expect(getSseTimings().connects.at(-1)?.seq ?? 0).toBe(recorded)
   })
 
   it('delivers an event published while the initial snapshot is still being built', async () => {

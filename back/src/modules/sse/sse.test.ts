@@ -45,6 +45,7 @@ import {
   buildRankingUpdatedEvent,
   buildStateSyncEvent,
   createSseBus,
+  getSseTimings,
   markRankingDirty,
   publishRoundClosed,
   publishRoundExtended,
@@ -694,6 +695,49 @@ describe('sse.service', () => {
         await expect(runRankingTick(failingDb, bus)).resolves.toBeUndefined()
       })
     })
+
+    // #138: what each emission cost, read by the load harness through
+    // GET /organizer/stats/process. Shapes and counts only (#431).
+    describe('getSseTimings', () => {
+      const lastEmission = () => getSseTimings().emissions.at(-1)
+
+      it('records a ranking emission with its stages and subscriber count when dirty', async () => {
+        const bus = createSseBus()
+        bus.subscribe(() => {})
+        bus.subscribe(() => {})
+        const before = lastEmission()?.seq ?? 0
+        markRankingDirty()
+
+        await runRankingTick(db, bus)
+
+        const emission = lastEmission()
+        expect(emission?.seq).toBeGreaterThan(before)
+        expect(emission).toMatchObject({ kind: 'ranking', subscribers: 2 })
+        expect(emission?.publishMs).toBeGreaterThanOrEqual(0)
+        expect(emission?.stages?.openRoundMs).toBeGreaterThanOrEqual(0)
+        expect(emission?.stages?.roundRankingMs).toBeGreaterThanOrEqual(0)
+        expect(emission?.stages?.eventRankingMs).toBeGreaterThanOrEqual(0)
+      })
+
+      it('records nothing when the ranking was not dirty', async () => {
+        const bus = createSseBus()
+        await runRankingTick(db, bus)
+        const before = lastEmission()?.seq ?? 0
+
+        await runRankingTick(db, bus)
+
+        expect(lastEmission()?.seq ?? 0).toBe(before)
+      })
+
+      it('records every heartbeat, with no stages', async () => {
+        const bus = createSseBus()
+        bus.subscribe(() => {})
+
+        await runExpiryTick(db, bus)
+
+        expect(lastEmission()).toMatchObject({ kind: 'heartbeat', subscribers: 1, stages: null })
+      })
+    })
   })
 })
 
@@ -795,6 +839,47 @@ describe('GET /sse', () => {
 
     const third = await frames.next()
     expect(third).toContain('event: heartbeat')
+
+    await frames.cancel()
+  })
+
+  it('records what building the connect snapshot cost (#138)', async () => {
+    const [user] = await db
+      .insert(usersTable)
+      .values({
+        email: `sse-${crypto.randomUUID()}@example.com`,
+        passwordHash: 'hash',
+        role: 'participant',
+        university: 'pucrs',
+      })
+      .returning()
+    if (!user) throw new Error('expected fixture')
+    const before = getSseTimings().connects.at(-1)?.seq ?? 0
+
+    const res = await app.request('/sse', {
+      headers: { Authorization: `Bearer ${await tokenFor(user)}` },
+    })
+    if (!res.body) throw new Error('expected a streamed body')
+    const frames = createFrameReader(res.body)
+    await frames.next()
+    await frames.next()
+
+    // Recorded once the ranking frame went out, which can trail the client
+    // reading it by a tick.
+    await vi.waitFor(() =>
+      expect(getSseTimings().connects.at(-1)?.seq ?? 0).toBeGreaterThan(before),
+    )
+    const connect = getSseTimings().connects.at(-1)
+    expect(connect?.concurrent).toBeGreaterThanOrEqual(1)
+    for (const key of [
+      'stateSyncMs',
+      'openRoundMs',
+      'roundRankingMs',
+      'eventRankingMs',
+      'totalMs',
+    ] as const) {
+      expect(connect?.[key]).toBeGreaterThanOrEqual(0)
+    }
 
     await frames.cancel()
   })

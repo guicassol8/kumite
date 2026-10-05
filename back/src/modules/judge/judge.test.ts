@@ -321,6 +321,10 @@ describe('generateJudgeSource', () => {
     expect(generateJudgeSource(raizDesabilitadaWorkspace, 'en')).toMatchObject({
       message: 'There is a disabled block in your solution. Re-enable it to continue.',
     })
+    // #419: the es refusal says "tú", like the rest of the product — no voseo.
+    expect(generateJudgeSource(raizDesabilitadaWorkspace, 'es')).toMatchObject({
+      message: 'Hay un bloque deshabilitado en tu solución. Reactívalo para continuar.',
+    })
   })
 
   it('refuses a workspace whose source carries the signature but does not parse', () => {

@@ -13,11 +13,12 @@ export const ROOT_BLOCK_TYPE = 'kumite_solve'
 export const INPUT_BLOCK_TYPE = 'kumite_input'
 
 /**
- * Guards the one part of `defineKumiteBlocks` that is not idempotent.
+ * Guards the one part of `registerCodegen` that is not idempotent.
  * `addReservedWords` is `RESERVED_WORDS_ += words + ','`: it appends
- * unconditionally, and this function runs on every `generateSolution` call, so
- * without this the list would grow by two entries per codegen for the life of
- * the process — and `init()` re-splits the whole string every time.
+ * unconditionally, and `registerCodegen` runs on every `generateSolution` call
+ * and every `defineKumiteBlocks` relabel, so without this the list would grow
+ * by two entries per codegen for the life of the process — and `init()`
+ * re-splits the whole string every time.
  */
 let reservedNamesRegistered = false
 
@@ -68,13 +69,12 @@ function stripDeniedFieldOptions(): void {
 }
 
 /**
- * Registers the two kumite blocks and their JS generators. Idempotent by
- * construction — assigning into `Blockly.Blocks` re-registers instead of
- * throwing, so #57 can call it again with another locale to relabel.
+ * The half of the registration that does not depend on the locale and that
+ * code generation needs: the reserved names, the denied dropdown options and
+ * the two JS generators. Safe to run on every call — the two non-idempotent
+ * steps carry their own guard, and the generators are plain reassignments.
  */
-export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
-  const messages = messagesFor(locale)
-
+function registerCodegen(): void {
   // The generator already reserves every ECMAScript keyword and every name on
   // `globalThis`, but not the two the solution contract owns. Without this, a
   // participant variable named `input` *is* the `solve` parameter — same
@@ -87,6 +87,28 @@ export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
   }
 
   stripDeniedFieldOptions()
+
+  javascriptGenerator.forBlock[ROOT_BLOCK_TYPE] = (block, generator) => {
+    const body = generator.statementToCode(block, 'BODY')
+    const value = generator.valueToCode(block, 'RETURN', Order.NONE) || 'null'
+    return `function ${SOLUTION_FUNCTION_NAME}(${SOLUTION_PARAM_NAME}) {\n${body}  return ${value};\n}\n`
+  }
+
+  // The parameter name is the code contract, not the localized label.
+  javascriptGenerator.forBlock[INPUT_BLOCK_TYPE] = () => [SOLUTION_PARAM_NAME, Order.ATOMIC]
+}
+
+/**
+ * Registers the two kumite blocks, labelled in `locale`, and their JS
+ * generators. This is the editor's call: assigning into `Blockly.Blocks`
+ * re-registers instead of throwing, so #57 calls it again with another locale
+ * to relabel. Code generation never calls it on a registry that already holds
+ * the blocks — see `ensureKumiteBlocks` (#380).
+ */
+export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
+  const messages = messagesFor(locale)
+
+  registerCodegen()
 
   Blockly.Blocks[ROOT_BLOCK_TYPE] = {
     init(this: Blockly.Block) {
@@ -114,13 +136,21 @@ export function defineKumiteBlocks(locale: BlockLocale = DEFAULT_LOCALE): void {
       this.setTooltip(messages.inputTooltip)
     },
   }
+}
 
-  javascriptGenerator.forBlock[ROOT_BLOCK_TYPE] = (block, generator) => {
-    const body = generator.statementToCode(block, 'BODY')
-    const value = generator.valueToCode(block, 'RETURN', Order.NONE) || 'null'
-    return `function ${SOLUTION_FUNCTION_NAME}(${SOLUTION_PARAM_NAME}) {\n${body}  return ${value};\n}\n`
+/**
+ * What code generation needs, without ever relabelling the editor (#380).
+ *
+ * The generators and the guards are (re)registered on every call, but the two
+ * labelled definitions only when one is missing — the judge, or a process
+ * nobody set up — and then in `DEFAULT_LOCALE`. The labels never reach the
+ * generated code, so the source is the same whatever locale the registry is
+ * in. Internal to the package: deliberately not exported from `index.ts`.
+ */
+export function ensureKumiteBlocks(): void {
+  if (!Blockly.Blocks[ROOT_BLOCK_TYPE] || !Blockly.Blocks[INPUT_BLOCK_TYPE]) {
+    defineKumiteBlocks(DEFAULT_LOCALE)
+    return
   }
-
-  // The parameter name is the code contract, not the localized label.
-  javascriptGenerator.forBlock[INPUT_BLOCK_TYPE] = () => [SOLUTION_PARAM_NAME, Order.ATOMIC]
+  registerCodegen()
 }

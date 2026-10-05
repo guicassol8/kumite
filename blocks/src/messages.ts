@@ -92,9 +92,9 @@ export const messages: Record<BlockLocale, BlockMessages> = {
     errorBlockNotAllowed: 'El bloque "{type}" no está permitido en esta solución.',
     errorFieldValueNotAllowed:
       'El bloque "{type}" tiene una opción que no está permitida: tu solución tiene que dar siempre el mismo resultado.',
-    errorDisabledBlock: 'Hay un bloque deshabilitado en tu solución. Reactivalo para continuar.',
+    errorDisabledBlock: 'Hay un bloque deshabilitado en tu solución. Reactívalo para continuar.',
     errorInvalidGeneratedCode:
-      'Tu solución no se pudo generar. Revisá los bloques e intentalo de nuevo.',
+      'Tu solución no se pudo generar. Revisa los bloques e inténtalo de nuevo.',
   },
   en: {
     solveTitle: 'solve',

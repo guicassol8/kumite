@@ -48,7 +48,7 @@ function jsonResponse(status: number, body: unknown): any {
 }
 
 // GET /teams tells the screen whether the caller has a team (#206): with one,
-// a null bestScore means "no submissions"; without, it is just unavailable.
+// a null bestSubmission means "no submissions"; without, it is just unavailable.
 function withTeam() {
   mockedTeamsGet.mockResolvedValue(jsonResponse(200, { myTeamId: 't1', teams: [] }))
 }
@@ -82,7 +82,7 @@ function roundDetail(overrides: Record<string, unknown> = {}) {
         title: 'Soma',
         difficulty: 'easy',
         points: 10,
-        bestScore: null,
+        bestSubmission: null,
       },
     ],
     ...overrides,
@@ -186,7 +186,7 @@ describe('RoundDetailScreen', () => {
               title: 'Soma',
               difficulty: 'easy',
               points: 10,
-              bestScore: 8,
+              bestSubmission: { score: 8, maxScore: 20 },
             },
             {
               problemId: 'p2',
@@ -194,7 +194,7 @@ describe('RoundDetailScreen', () => {
               title: 'Produto',
               difficulty: 'medium',
               points: 20,
-              bestScore: null,
+              bestSubmission: null,
             },
           ],
         }),
@@ -204,7 +204,7 @@ describe('RoundDetailScreen', () => {
     renderRound()
 
     expect(await screen.findByTestId('round-problem-p1')).toBeDefined()
-    expect(screen.getByTestId('round-problem-p1').textContent).toContain('8')
+    expect(screen.getByTestId('round-problem-best-score-p1').textContent).toMatch(/\b8\/20$/)
     expect(screen.getByTestId('round-problem-p2').textContent).toContain('—')
     expect(screen.queryByTestId('round-countdown')).toBeNull()
     expect(screen.getByTestId('round-problem-p1').querySelector('a')?.getAttribute('href')).toBe(
@@ -227,7 +227,7 @@ describe('RoundDetailScreen', () => {
             title: 'Soma',
             difficulty: 'easy',
             points: 10,
-            bestScore: 8,
+            bestSubmission: { score: 8, maxScore: 20 },
           },
           {
             problemId: 'p2',
@@ -235,7 +235,7 @@ describe('RoundDetailScreen', () => {
             title: 'Produto',
             difficulty: 'medium',
             points: 20,
-            bestScore: null,
+            bestSubmission: null,
           },
         ],
       })
@@ -248,7 +248,41 @@ describe('RoundDetailScreen', () => {
       renderRound()
 
       const cell = await screen.findByTestId('round-problem-best-score-p1')
-      expect(cell.textContent).toContain('8')
+      expect(cell.textContent).toMatch(/\b8\/20$/)
+      expect(cell.getAttribute('data-state')).toBe('score')
+    })
+
+    // #421: the cell's maximum is the one the score was judged against, not
+    // the points column beside it — which says what the problem is worth now,
+    // after the organizer changed it on the closed round.
+    it('shows score/stamped maximum beside the current points once closed', async () => {
+      withTeam()
+      mockedGet.mockResolvedValue(
+        jsonResponse(
+          200,
+          roundDetail({
+            status: 'closed',
+            closedAt: '2026-09-02T13:00:00.000Z',
+            problems: [
+              {
+                problemId: 'p1',
+                position: 0,
+                title: 'Soma',
+                difficulty: 'easy',
+                points: 250,
+                bestSubmission: { score: 50, maxScore: 100 },
+              },
+            ],
+          }),
+        ),
+      )
+
+      renderRound()
+
+      const cell = await screen.findByTestId('round-problem-best-score-p1')
+      expect(screen.getByTestId('round-problem-points-p1').textContent).toMatch(/\b250$/)
+      expect(cell.textContent).toMatch(/\b50\/100$/)
+      expect(cell.textContent).not.toContain('250')
       expect(cell.getAttribute('data-state')).toBe('score')
     })
 
@@ -279,7 +313,7 @@ describe('RoundDetailScreen', () => {
           'none',
         ),
       )
-      expect(screen.getByTestId('round-problem-best-score-p1').textContent).toContain('8')
+      expect(screen.getByTestId('round-problem-best-score-p1').textContent).toMatch(/\b8\/20$/)
     })
 
     it('shows the unavailable placeholder when the participant has no team', async () => {
@@ -302,7 +336,7 @@ describe('RoundDetailScreen', () => {
       const cell = await screen.findByTestId('round-problem-best-score-p2')
       await waitFor(() => expect(mockedTeamsGet).toHaveBeenCalled())
       expect(cell.getAttribute('data-state')).toBe('unavailable')
-      expect(screen.getByTestId('round-problem-best-score-p1').textContent).toContain('8')
+      expect(screen.getByTestId('round-problem-best-score-p1').textContent).toMatch(/\b8\/20$/)
       expect(screen.queryByTestId('round-detail-load-error')).toBeNull()
     })
   })
@@ -428,7 +462,7 @@ describe('RoundDetailScreen', () => {
               title: 'Produto',
               difficulty: 'medium',
               points: 20,
-              bestScore: null,
+              bestSubmission: null,
             },
             {
               problemId: 'p1',
@@ -436,7 +470,7 @@ describe('RoundDetailScreen', () => {
               title: 'Soma',
               difficulty: 'easy',
               points: 10,
-              bestScore: null,
+              bestSubmission: null,
             },
           ],
         }),

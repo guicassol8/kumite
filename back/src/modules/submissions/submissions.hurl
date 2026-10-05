@@ -352,7 +352,8 @@ Authorization: Bearer {{token}}
 HTTP 200
 [Asserts]
 jsonpath "$.status" == "open"
-jsonpath "$.problems[0].bestScore" == 100
+jsonpath "$.problems[0].bestSubmission.score" == 100
+jsonpath "$.problems[0].bestSubmission.maxScore" == 100
 
 GET {{host}}/problems/{{problem_id}}
 Authorization: Bearer {{noteam_token}}
@@ -365,7 +366,7 @@ GET {{host}}/rounds/{{round_id}}
 Authorization: Bearer {{noteam_token}}
 HTTP 200
 [Asserts]
-jsonpath "$.problems[0].bestScore" == null
+jsonpath "$.problems[0].bestSubmission" == null
 
 # 7. No token -> 401 from the auth middleware, before anything else runs.
 POST {{host}}/submissions
@@ -403,8 +404,9 @@ jsonpath "$.error" == "no_active_round"
 
 # 10. The round is closed, so the organizer may change the points again
 #     (#193). The problem is now worth 250, but the team's 100 was judged
-#     over 100 — and the maximum beside it stays the stamped one (#319),
-#     never the points read now.
+#     over 100 — and the maximum beside it stays the stamped one, on the
+#     problem screen (#319) and in the round list (#421), never the points
+#     read now.
 PATCH {{host}}/organizer/problems/{{problem_id}}
 Authorization: Bearer {{organizer_token}}
 Content-Type: application/json
@@ -421,3 +423,12 @@ jsonpath "$.roundStatus" == "closed"
 jsonpath "$.points" == 250
 jsonpath "$.bestSubmission.score" == 100
 jsonpath "$.bestSubmission.maxScore" == 100
+
+GET {{host}}/rounds/{{round_id}}
+Authorization: Bearer {{token}}
+HTTP 200
+[Asserts]
+jsonpath "$.status" == "closed"
+jsonpath "$.problems[0].points" == 250
+jsonpath "$.problems[0].bestSubmission.score" == 100
+jsonpath "$.problems[0].bestSubmission.maxScore" == 100

@@ -16,7 +16,8 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
-import { archiveProblem, getPublishedProblem } from '../problems/problems.service'
+import { archiveProblem, getPublishedProblem, updateProblem } from '../problems/problems.service'
+import { ParticipantRoundProblemSchema } from './rounds.schema'
 import {
   closeRound,
   createRound,
@@ -887,6 +888,9 @@ describe('rounds.service', () => {
       problemId: string,
       score: number,
       attemptNumber: number,
+      // No options: an unstamped row (max_score NULL, judged before #193) and
+      // acceptedAt = now, as before #421.
+      options: { maxScore?: number; acceptedAt?: Date; createdAt?: Date } = {},
     ) {
       await db.insert(submissionsTable).values({
         problemId,
@@ -897,9 +901,115 @@ describe('rounds.service', () => {
         generatedCode: '// generated',
         score,
         attemptNumber,
-        acceptedAt: new Date(),
+        acceptedAt: options.acceptedAt ?? new Date(),
+        ...(options.maxScore === undefined ? {} : { maxScore: options.maxScore }),
+        ...(options.createdAt === undefined ? {} : { createdAt: options.createdAt }),
       })
     }
+
+    async function openRoundWith(problemId: string) {
+      const created = await createRound(db, {
+        name: 'Round 1',
+        durationMinutes: 30,
+        problemIds: [problemId],
+      })
+      if (!created.ok) throw new Error('expected create to succeed')
+      const opened = await openRound(db, created.round.id)
+      if (!opened.ok) throw new Error('expected open to succeed')
+      return created.round.id
+    }
+
+    // #421: the list cell is score/maxScore, where maxScore is the stamp the
+    // row was judged against (#193) — never the points read now.
+    it('reports the stamped maxScore, not the current points (#421)', async () => {
+      const user = await insertUser()
+      const team = await insertTeamFor(user.id)
+      const problem = await insertPublishedProblemWithTranslations({ points: 10 })
+      const roundId = await openRoundWith(problem.id)
+      await insertSubmission(roundId, team.id, user.id, problem.id, 7, 1, { maxScore: 100 })
+
+      const detail = await getParticipantRound(db, roundId, 'pt', user.id)
+
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({
+          problemId: problem.id,
+          points: 10,
+          bestSubmission: { score: 7, maxScore: 100 },
+        }),
+      ])
+    })
+
+    it('keeps the stamped maxScore after the organizer changes points on a closed round (#421)', async () => {
+      const user = await insertUser()
+      const team = await insertTeamFor(user.id)
+      const problem = await insertPublishedProblemWithTranslations({ points: 10 })
+      const roundId = await openRoundWith(problem.id)
+      await insertSubmission(roundId, team.id, user.id, problem.id, 5, 1, { maxScore: 10 })
+      const closed = await closeRound(db, roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+      const updated = await updateProblem(db, problem.id, { points: 250 })
+      if (!updated.ok) throw new Error('expected the points change to succeed on a closed round')
+
+      const detail = await getParticipantRound(db, roundId, 'pt', user.id)
+
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({
+          problemId: problem.id,
+          points: 250,
+          bestSubmission: { score: 5, maxScore: 10 },
+        }),
+      ])
+    })
+
+    it('falls back to the current points for a row judged before the stamp existed (#421)', async () => {
+      const user = await insertUser()
+      const team = await insertTeamFor(user.id)
+      const problem = await insertPublishedProblemWithTranslations({ points: 10 })
+      const roundId = await openRoundWith(problem.id)
+      await insertSubmission(roundId, team.id, user.id, problem.id, 5, 1)
+      const closed = await closeRound(db, roundId)
+      if (!closed.ok) throw new Error('expected close to succeed')
+      const updated = await updateProblem(db, problem.id, { points: 250 })
+      if (!updated.ok) throw new Error('expected the points change to succeed on a closed round')
+
+      const detail = await getParticipantRound(db, roundId, 'pt', user.id)
+
+      expect(detail?.problems).toEqual([
+        expect.objectContaining({
+          problemId: problem.id,
+          points: 250,
+          bestSubmission: { score: 5, maxScore: 250 },
+        }),
+      ])
+    })
+
+    it('picks the same row as the problem screen on a score tie: earliest acceptedAt (#421)', async () => {
+      const user = await insertUser()
+      const team = await insertTeamFor(user.id)
+      const problem = await insertPublishedProblemWithTranslations({ points: 10 })
+      const roundId = await openRoundWith(problem.id)
+      const t0 = new Date(Date.now() - 30_000)
+      const t1 = new Date(Date.now() - 20_000)
+      const t2 = new Date(Date.now() - 10_000)
+      // A was accepted first but its row was created last; B is the other way
+      // round. Ordering by createdAt would pick B.
+      await insertSubmission(roundId, team.id, user.id, problem.id, 9, 1, {
+        maxScore: 100,
+        acceptedAt: t0,
+        createdAt: t2,
+      })
+      await insertSubmission(roundId, team.id, user.id, problem.id, 9, 2, {
+        maxScore: 250,
+        acceptedAt: t1,
+        createdAt: t1,
+      })
+
+      const detail = await getParticipantRound(db, roundId, 'pt', user.id)
+      const published = await getPublishedProblem(db, problem.id, 'pt', user.id)
+
+      expect(detail?.problems[0]?.bestSubmission).toEqual({ score: 9, maxScore: 100 })
+      expect(published?.bestSubmission?.maxScore).toBe(100)
+    })
 
     it('returns null for an unknown id', async () => {
       const user = await insertUser()
@@ -940,7 +1050,10 @@ describe('rounds.service', () => {
 
       expect(detail?.status).toBe('open')
       expect(detail?.problems).toEqual([
-        expect.objectContaining({ problemId: problem.id, bestScore: 7 }),
+        expect.objectContaining({
+          problemId: problem.id,
+          bestSubmission: { score: 7, maxScore: 10 },
+        }),
       ])
     })
 
@@ -962,11 +1075,14 @@ describe('rounds.service', () => {
       const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
 
       expect(detail?.problems).toEqual([
-        expect.objectContaining({ problemId: problem.id, bestScore: 8 }),
+        expect.objectContaining({
+          problemId: problem.id,
+          bestSubmission: { score: 8, maxScore: 10 },
+        }),
       ])
     })
 
-    it('reports bestScore null while open when the team never submitted', async () => {
+    it('reports bestSubmission null while open when the team never submitted', async () => {
       const user = await insertUser()
       await insertTeamFor(user.id)
       const problem = await insertPublishedProblemWithTranslations()
@@ -982,11 +1098,11 @@ describe('rounds.service', () => {
       const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
 
       expect(detail?.problems).toEqual([
-        expect.objectContaining({ problemId: problem.id, bestScore: null }),
+        expect.objectContaining({ problemId: problem.id, bestSubmission: null }),
       ])
     })
 
-    it('reports bestScore null while open when the user has no team at all', async () => {
+    it('reports bestSubmission null while open when the user has no team at all', async () => {
       const user = await insertUser()
       const problem = await insertPublishedProblemWithTranslations()
       const created = await createRound(db, {
@@ -1001,11 +1117,11 @@ describe('rounds.service', () => {
       const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
 
       expect(detail?.problems).toEqual([
-        expect.objectContaining({ problemId: problem.id, bestScore: null }),
+        expect.objectContaining({ problemId: problem.id, bestSubmission: null }),
       ])
     })
 
-    it('reports the real best score (score desc, earliest createdAt on a tie) once the round is closed', async () => {
+    it('reports the real best score (score desc, earliest acceptedAt on a tie) once the round is closed', async () => {
       const user = await insertUser()
       const team = await insertTeamFor(user.id)
       const problem = await insertPublishedProblemWithTranslations()
@@ -1027,11 +1143,14 @@ describe('rounds.service', () => {
 
       expect(detail?.status).toBe('closed')
       expect(detail?.problems).toEqual([
-        expect.objectContaining({ problemId: problem.id, bestScore: 9 }),
+        expect.objectContaining({
+          problemId: problem.id,
+          bestSubmission: { score: 9, maxScore: 10 },
+        }),
       ])
     })
 
-    it('reports bestScore null once closed when the team never submitted', async () => {
+    it('reports bestSubmission null once closed when the team never submitted', async () => {
       const user = await insertUser()
       await insertTeamFor(user.id)
       const problem = await insertPublishedProblemWithTranslations()
@@ -1049,11 +1168,11 @@ describe('rounds.service', () => {
       const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
 
       expect(detail?.problems).toEqual([
-        expect.objectContaining({ problemId: problem.id, bestScore: null }),
+        expect.objectContaining({ problemId: problem.id, bestSubmission: null }),
       ])
     })
 
-    it('reports bestScore null once closed when the user has no team at all', async () => {
+    it('reports bestSubmission null once closed when the user has no team at all', async () => {
       const user = await insertUser()
       const problem = await insertPublishedProblemWithTranslations()
       const created = await createRound(db, {
@@ -1070,7 +1189,7 @@ describe('rounds.service', () => {
       const detail = await getParticipantRound(db, created.round.id, 'pt', user.id)
 
       expect(detail?.problems).toEqual([
-        expect.objectContaining({ problemId: problem.id, bestScore: null }),
+        expect.objectContaining({ problemId: problem.id, bestSubmission: null }),
       ])
     })
 
@@ -1139,7 +1258,7 @@ describe('rounds.service', () => {
         expect.objectContaining({
           problemId: problemB.id,
           position: positionOf.get(problemB.id),
-          bestScore: 7,
+          bestSubmission: { score: 7, maxScore: 10 },
         }),
       ])
     })
@@ -1331,5 +1450,39 @@ describe('rounds.route — publishes to the sse bus on lifecycle transitions (#3
     expect(res.status).toBe(409)
     expect(fn).not.toHaveBeenCalled()
     unsubscribe()
+  })
+})
+
+describe('ParticipantRoundProblemSchema (#421)', () => {
+  const base = {
+    problemId: 'p1',
+    position: 0,
+    title: 'Soma',
+    difficulty: 'easy',
+    points: 10,
+  }
+
+  it('accepts a best submission with its stamped maxScore, or null', () => {
+    expect(
+      ParticipantRoundProblemSchema.safeParse({
+        ...base,
+        bestSubmission: { score: 5, maxScore: 10 },
+      }).success,
+    ).toBe(true)
+    expect(ParticipantRoundProblemSchema.safeParse({ ...base, bestSubmission: null }).success).toBe(
+      true,
+    )
+  })
+
+  it('rejects a score without its maxScore', () => {
+    expect(
+      ParticipantRoundProblemSchema.safeParse({ ...base, bestSubmission: { score: 5 } }).success,
+    ).toBe(false)
+    expect(
+      ParticipantRoundProblemSchema.safeParse({
+        ...base,
+        bestSubmission: { score: 5, maxScore: null },
+      }).success,
+    ).toBe(false)
   })
 })

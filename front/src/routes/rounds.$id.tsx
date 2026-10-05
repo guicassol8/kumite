@@ -28,14 +28,18 @@ function toApiLocale(language: string): 'pt' | 'es' | 'en' {
   return language === 'es' || language === 'en' ? language : 'pt'
 }
 
-// What the best-score cell shows (#206): the team's number, "no submissions"
-// when the caller has a team that never submitted the problem, or "—" when
-// there is no team best to speak of (no team, organizer, or GET /teams not
-// answered yet / failed).
+// What the best-score cell shows (#206): the team's score over the maximum it
+// was judged against — the stamped one, never the points column beside it,
+// which the organizer may change once the round closes (#421) — "no
+// submissions" when the caller has a team that never submitted the problem, or
+// "—" when there is no team best to speak of (no team, organizer, or GET
+// /teams not answered yet / failed).
 type BestScoreState = 'score' | 'none' | 'unavailable'
 
-function bestScoreState(score: number | null, hasTeam: boolean): BestScoreState {
-  if (score !== null) return 'score'
+type TeamBest = Awaited<ReturnType<typeof fetchRound>>['problems'][number]['bestSubmission']
+
+function bestScoreState(best: TeamBest, hasTeam: boolean): BestScoreState {
+  if (best !== null) return 'score'
   return hasTeam ? 'none' : 'unavailable'
 }
 
@@ -269,13 +273,17 @@ function RoundDetailScreen() {
                       {t(`roundDetail.difficulty.${problem.difficulty}`)}
                     </Badge>
                   </span>
-                  <span role="cell" className="tabular-nums">
+                  <span
+                    role="cell"
+                    data-testid={`round-problem-points-${problem.problemId}`}
+                    className="tabular-nums"
+                  >
                     <span className="sr-only md:hidden">{t('roundDetail.columns.points')}: </span>
                     {problem.points}
                   </span>
                   <BestScoreCell
                     problemId={problem.problemId}
-                    score={problem.bestScore}
+                    best={problem.bestSubmission}
                     hasTeam={hasTeam}
                   />
                 </div>
@@ -289,15 +297,15 @@ function RoundDetailScreen() {
 
 function BestScoreCell({
   problemId,
-  score,
+  best,
   hasTeam,
 }: {
   problemId: string
-  score: number | null
+  best: TeamBest
   hasTeam: boolean
 }) {
   const { t } = useTranslation()
-  const state = bestScoreState(score, hasTeam)
+  const state = bestScoreState(best, hasTeam)
   return (
     <span
       role="cell"
@@ -306,8 +314,8 @@ function BestScoreCell({
       className={cn('tabular-nums', state !== 'score' && 'text-muted-foreground')}
     >
       <span className="sr-only md:hidden">{t('roundDetail.columns.bestScore')}: </span>
-      {state === 'score'
-        ? score
+      {best !== null
+        ? t('roundDetail.bestScore.score', { score: best.score, maxScore: best.maxScore })
         : state === 'none'
           ? t('roundDetail.bestScore.none')
           : t('roundDetail.bestScore.unavailable')}

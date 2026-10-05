@@ -1,7 +1,12 @@
 import { defineRoute } from '../../context'
 import { requireOrganizer, requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
-import { EventStatsSchema, LiveStatsSchema, ProcessStatsSchema } from './stats.schema'
+import {
+  EventStatsSchema,
+  LiveStatsSchema,
+  ProcessStatsQuerySchema,
+  ProcessStatsSchema,
+} from './stats.schema'
 import { getEventStats, getLiveStats, getProcessStats } from './stats.service'
 
 // 401/403 aren't declared: both are middleware short-circuits, never this
@@ -29,12 +34,13 @@ export const getLiveStatsRoute = defineRoute({
 // Polled once a second by the load harness (#136, back/src/load/) for CPU,
 // memory and event-loop lag — what cannot be measured from outside the
 // process. Same guards as /live; never shown on a screen. A read resets
-// nothing, so it coexists with any other poller.
+// nothing, so it coexists with any other poller. `?since=` (#137/#138) trims
+// the judge and SSE timing rings to what ended after the caller's last read.
 export const getProcessStatsRoute = defineRoute({
   method: 'GET',
   path: '/organizer/stats/process',
   use: [requireUser, requirePasswordUpToDate, requireOrganizer],
-  input: {},
+  input: { query: ProcessStatsQuerySchema },
   output: ProcessStatsSchema,
-  handler: async () => getProcessStats(),
+  handler: async (c) => getProcessStats(c.input.query),
 })

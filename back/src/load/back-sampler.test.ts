@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { ProcessStats } from '../modules/stats/stats.schema'
 
 import { type BackSample, cpuPercent, mergeWindows } from './back-sampler'
+import { emptyTimings } from './fixtures'
 
 function processStats(
   sampledAt: number,
@@ -26,6 +27,7 @@ function processStats(
         utilization: 0.1,
       })),
     },
+    ...emptyTimings(),
   }
 }
 

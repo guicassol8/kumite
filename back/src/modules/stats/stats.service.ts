@@ -11,10 +11,11 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
+import { endedSince } from '../../lib/ring'
 import { getEventConfig } from '../event-config/event-config.service'
-import { getJudgeLoad } from '../judge/judge.service'
+import { getJudgeLoad, getJudgeTimings } from '../judge/judge.service'
 import { findOpenRound, reapExpiredRound } from '../rounds/rounds.service'
-import type { SseBus } from '../sse/sse.service'
+import { getSseTimings, type SseBus } from '../sse/sse.service'
 import { getSubmissionLoad } from '../submissions/submissions.service'
 
 import type {
@@ -22,6 +23,7 @@ import type {
   EventStats,
   LiveStats,
   ProcessStats,
+  ProcessStatsQuery,
   StatsRoundRef,
 } from './stats.schema'
 
@@ -268,12 +270,15 @@ export function startProcessSampler({
 }
 
 /**
- * CPU (cumulative), memory and the closed event-loop windows, read from
- * process memory only — no database, like getLiveStats.
+ * CPU (cumulative), memory, the closed event-loop windows and the judge's and
+ * SSE's timing rings, read from process memory only — no database, like
+ * getLiveStats. `since` filters the rings (see ProcessStatsQuerySchema).
  */
-export function getProcessStats(): ProcessStats {
+export function getProcessStats({ since }: ProcessStatsQuery = {}): ProcessStats {
   const cpu = process.cpuUsage()
   const memory = process.memoryUsage()
+  const judge = getJudgeTimings()
+  const sse = getSseTimings()
   return {
     sampledAt: Date.now(),
     uptimeSeconds: process.uptime(),
@@ -287,6 +292,11 @@ export function getProcessStats(): ProcessStats {
     eventLoop: {
       windowMs: activeSampler?.windowMs ?? null,
       windows: activeSampler ? [...activeSampler.windows] : [],
+    },
+    judge: { ...judge, runs: endedSince(judge.runs, since) },
+    sse: {
+      emissions: endedSince(sse.emissions, since),
+      connects: endedSince(sse.connects, since),
     },
   }
 }

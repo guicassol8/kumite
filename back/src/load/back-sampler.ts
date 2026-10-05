@@ -62,7 +62,7 @@ export function startBackSampler({
 
   const readProcess = async (): Promise<ProcessStats | null> => {
     try {
-      const res = await api.organizer.stats.process.$get()
+      const res = await api.organizer.stats.process.$get({ query: {} })
       if (res.status === 200) return await res.json()
       const errorCode = await readErrorCode(res)
       if (res.status < 500) {

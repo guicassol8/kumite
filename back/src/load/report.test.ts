@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { BackSample } from './back-sampler'
 import { PRESETS } from './config'
+import { emptyTimings } from './fixtures'
 import { createRecorder, type RecorderSnapshot } from './recorder'
 import {
   buildFailures,
@@ -175,6 +176,7 @@ describe('summarizePhases', () => {
         cpu: { userMicros: cpuMicros, systemMicros: 0 },
         memory: { rss, heapUsed: rss / 2, heapTotal: rss, external: 0 },
         eventLoop: { windowMs: 1000, windows: [] },
+        ...emptyTimings(),
       },
       live: {
         judge: { inFlight: 0, waiting, concurrency: 4 },
@@ -335,6 +337,7 @@ describe('buildReport timeline', () => {
         cpu: { userMicros: 0, systemMicros: 0 },
         memory: { rss: 1, heapUsed: 1, heapTotal: 1, external: 0 },
         eventLoop: { windowMs: 1000, windows: ends.map(window) },
+        ...emptyTimings(),
       },
       live: null,
     })

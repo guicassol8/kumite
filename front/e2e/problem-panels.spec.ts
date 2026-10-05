@@ -59,10 +59,19 @@ async function savedResultsSize(page: Page): Promise<number | undefined> {
   return saved ? (JSON.parse(saved) as Record<string, number>).results : undefined
 }
 
-/** Executar, and wait until the three cases are back. */
+/**
+ * Executar, and wait until the run is over: the three cases back AND Executar
+ * enabled again — it is `disabled` exactly while `runState.status` is
+ * `running` (`actions-bar.tsx`), so that is the terminal state. The band
+ * opening is not: one run opens it twice, once when it starts and again when
+ * it finishes (`resultsVersion` bumps on `running → done`, #203's "every run
+ * reopens the band"). A collapse clicked between the two is undone by the
+ * second (#375) — so anything that collapses the band after a run waits here.
+ */
 async function runExamples(page: Page): Promise<void> {
   await page.getByTestId('problem-run-button').click()
   await expect(page.getByTestId('problem-results-summary')).toHaveText('3/3 casos')
+  await expect(page.getByTestId('problem-run-button')).toBeEnabled()
   await settle(page)
 }
 
@@ -129,11 +138,11 @@ test.describe('/problem/$id — painéis colapsáveis e redimensionáveis no des
     await page.screenshot({ path: evidence('02-enunciado-restaurado') })
 
     // 02 — Aceite 2: running, then collapsing the results, grows the canvas
-    // and leaves Executar/Limpar/Submeter exactly where they were.
+    // and leaves Executar/Limpar/Submeter exactly where they were. The
+    // collapse waits for the run to finish: its end reopens the band (#375).
     const barBefore = await boxOf(page, 'problem-actions-bar')
-    await page.getByTestId('problem-run-button').click()
+    await runExamples(page)
     await expect(page.getByTestId('problem-results-band')).toBeVisible()
-    await settle(page)
     const canvasBeforeResultsCollapse = await boxOf(page, 'blockly-workspace')
     await page.getByTestId('problem-results-toggle').click()
     await settle(page)
@@ -269,11 +278,10 @@ test.describe('/problem/$id — painéis colapsáveis e redimensionáveis no des
     // 08 — the collapsed layout in dark mode: the rail, the results toggle
     // and the divider both need contrast in both modes. The statement stays
     // collapsed (rail on screen); a run is needed for the results toggle to
-    // exist at all, immediately collapsed back so the strip — not the full
-    // band — is what's captured.
-    await page.getByTestId('problem-run-button').click()
+    // exist at all, collapsed back once that run is over (its end reopens the
+    // band, #375) so the strip — not the full band — is what's captured.
+    await runExamples(page)
     await expect(page.getByTestId('problem-results-band')).toBeVisible()
-    await settle(page)
     await page.getByTestId('problem-results-toggle').click()
     await settle(page)
     await page.getByTestId('header-theme-toggle').click()

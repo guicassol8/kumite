@@ -19,6 +19,25 @@ const TEST_TIMEOUT_MS = 15_000
 const testConfig: JudgeConfig = { timeoutMs: 2000, memoryMb: 64, concurrency: 4 }
 const CRASH_WORKER_URL = new URL('../../judge-test-worker.mjs', import.meta.url)
 
+/** The worker double under a URL of its own: the pool is keyed by URL
+ * (#277), so a test reading spawn counts starts from an empty pool. */
+function isolatedWorkerUrl(): URL {
+  return new URL(`../../judge-test-worker.mjs?pool=${randomUUID()}`, import.meta.url)
+}
+
+/** Every live worker is an idle pooled one. terminate() is fire-and-forget:
+ * a discarded worker's exit lands a moment after its submission returns, so
+ * this is waited for, never assumed. */
+function allAliveIdle(): Promise<void> {
+  return vi.waitFor(
+    () => {
+      const { alive, idle } = getJudgeTimings().workers
+      expect(alive).toBe(idle)
+    },
+    { timeout: 10_000, interval: 20 },
+  )
+}
+
 // The fixture is typed WorkspaceState (Record<string, unknown>) by the blocks
 // package; parsing it is how it becomes a Workspace here — the same step the
 // route (#21) performs on the incoming body, never a cast.
@@ -134,11 +153,12 @@ describe('runJudge', () => {
   //
   // The worker double (judge-test-worker.mjs), not QuickJS: the sandbox
   // blocks require and has no channel between workers, and the semaphore
-  // plus one-worker-per-submission live in runJudgeAgainstWorker, which
-  // runJudge only delegates to — the same seam the crash and getJudgeLoad
-  // tests use. The double closes its channel before replying, and the
-  // second submission's worker only spawns after that reply when the limit
-  // is 1, so the serial control can never meet a stale first worker.
+  // plus the worker pool live in runJudgeAgainstWorker, which runJudge only
+  // delegates to — the same seam the crash and getJudgeLoad tests use. The
+  // double closes its channel before replying, and with the limit at 1 the
+  // second submission only starts after that reply — on the first one's
+  // pooled worker (#277) — so the serial control can never meet a stale
+  // first barrier.
   async function runBarrierPair(concurrency: number, waitMs: number): Promise<JudgeCaseResult[]> {
     const barrier = randomUUID()
     const cases: JudgeCase[] = [{ input: { barrier, waitMs }, expected: 'together' }]
@@ -195,6 +215,146 @@ describe('runJudge', () => {
       expect(results[0]).toEqual({ outcome: 'passed', ms: 0 })
       expect(results[1]?.outcome).toBe('runtime_error')
       expect(results[2]?.outcome).toBe('runtime_error')
+    },
+    TEST_TIMEOUT_MS,
+  )
+})
+
+// #277: a worker whose submission ended clean goes back to the pool, and the
+// next submission reuses it instead of paying the spawn and the QuickJS load.
+describe('worker pool', () => {
+  const spawned = () => getJudgeTimings().workers.spawned
+  const single = { ...testConfig, concurrency: 1 }
+  const okCase: JudgeCase[] = [{ input: 'ok', expected: 'ok' }]
+
+  it(
+    'reuses a warm worker: no spawn and a spawn time of 0 for the next submissions',
+    async () => {
+      const source = sourceOf(somaDosParesWorkspace)
+      const cases: JudgeCase[] = [{ input: [1, 2, 3, 4], expected: 6 }]
+      await runJudge(source, cases, testConfig)
+
+      const before = spawned()
+      const first = await runJudge(source, cases, testConfig)
+      const second = await runJudge(source, cases, testConfig)
+
+      expect([...first, ...second].map((result) => result.outcome)).toEqual(['passed', 'passed'])
+      expect(spawned()).toBe(before)
+      expect(
+        getJudgeTimings()
+          .runs.slice(-2)
+          .map((run) => run.spawnMs),
+      ).toEqual([0, 0])
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'discards a worker that died mid-submission: the next submission gets a fresh one',
+    async () => {
+      const workerUrl = isolatedWorkerUrl()
+      const before = spawned()
+
+      const warm = await runJudgeAgainstWorker(workerUrl, 'unused', okCase, single)
+      const crashed = await runJudgeAgainstWorker(
+        workerUrl,
+        'unused',
+        [
+          { input: 'a', expected: 'a' },
+          { input: '__crash__', expected: null },
+          { input: 'c', expected: 'c' },
+        ],
+        single,
+      )
+      const after = await runJudgeAgainstWorker(workerUrl, 'unused', okCase, single)
+
+      expect(warm.map((result) => result.outcome)).toEqual(['passed'])
+      expect(crashed.map((result) => result.outcome)).toEqual([
+        'passed',
+        'runtime_error',
+        'runtime_error',
+      ])
+      expect(after.map((result) => result.outcome)).toEqual(['passed'])
+      // One for the warm-up, reused by the crash; one more after it.
+      expect(spawned()).toBe(before + 2)
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'discards a worker that never replied: the watchdog, then a fresh worker',
+    async () => {
+      const workerUrl = isolatedWorkerUrl()
+      const config = { ...single, timeoutMs: 100 }
+      const before = spawned()
+
+      const hung = await runJudgeAgainstWorker(
+        workerUrl,
+        'unused',
+        [{ input: '__hang__', expected: null }],
+        config,
+      )
+      const after = await runJudgeAgainstWorker(workerUrl, 'unused', okCase, config)
+
+      expect(hung).toEqual([
+        { outcome: 'runtime_error', detail: 'no reply from worker (watchdog)', ms: 5100 },
+      ])
+      expect(after.map((result) => result.outcome)).toEqual(['passed'])
+      expect(spawned()).toBe(before + 2)
+      await allAliveIdle()
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it.each(['__memory__', '__error__'])(
+    'discards a worker after a %s outcome: the next submission gets a fresh one',
+    async (input) => {
+      const workerUrl = isolatedWorkerUrl()
+      const before = spawned()
+
+      const [bad] = await runJudgeAgainstWorker(
+        workerUrl,
+        'unused',
+        [{ input, expected: null }],
+        single,
+      )
+      const after = await runJudgeAgainstWorker(workerUrl, 'unused', okCase, single)
+
+      expect(bad?.outcome).toBe('runtime_error')
+      expect(after.map((result) => result.outcome)).toEqual(['passed'])
+      expect(spawned()).toBe(before + 2)
+      await allAliveIdle()
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'leaks no guest global between cases or submissions on the same worker',
+    async () => {
+      const cases = (count: number): JudgeCase[] =>
+        Array.from({ length: count }, (_, input) => ({ input, expected: 'undefined' }))
+      await runJudge(sourceOf(somaDosParesWorkspace), [{ input: [], expected: 0 }], testConfig)
+      const before = spawned()
+
+      const writes = await runJudge(
+        'function solve(input) { const seen = typeof vazou; globalThis.vazou = 42; return seen }',
+        cases(2),
+        testConfig,
+      )
+      const reads = await runJudge(
+        'function solve(input) { return typeof vazou }',
+        cases(1),
+        testConfig,
+      )
+
+      expect([...writes, ...reads].map((result) => result.outcome)).toEqual([
+        'passed',
+        'passed',
+        'passed',
+      ])
+      // The same warm worker served both: the isolation is the fresh runtime
+      // and context per case, not a fresh worker.
+      expect(spawned()).toBe(before)
     },
     TEST_TIMEOUT_MS,
   )
@@ -299,27 +459,21 @@ describe('getJudgeTimings', () => {
   )
 
   it(
-    'counts every spawned worker as exited once its submission is over',
+    'keeps every clean worker idle in the pool and leaves no other alive (#277)',
     async () => {
-      // terminate() is fire-and-forget: an exit lands a moment after its
-      // submission returns, so "none alive" is waited for, never assumed.
-      const settled = () =>
-        vi.waitFor(() => expect(getJudgeTimings().workers.alive).toBe(0), {
-          timeout: 10_000,
-          interval: 20,
-        })
-      await settled()
+      const workerUrl = isolatedWorkerUrl()
       const before = getJudgeTimings().workers
       const cases: JudgeCase[] = [{ input: 'a', expected: 'a' }]
       await Promise.all(
         Array.from({ length: 3 }, () =>
-          runJudgeAgainstWorker(CRASH_WORKER_URL, 'unused', cases, testConfig),
+          runJudgeAgainstWorker(workerUrl, 'unused', cases, testConfig),
         ),
       )
 
-      expect(getJudgeTimings().workers.spawned).toBe(before.spawned + 3)
-      await settled()
-      expect(getJudgeTimings().workers.exited).toBe(before.exited + 3)
+      const after = getJudgeTimings().workers
+      expect(after.spawned).toBe(before.spawned + 3)
+      expect(after.idle).toBe(before.idle + 3)
+      await allAliveIdle()
     },
     TEST_TIMEOUT_MS,
   )

@@ -69,10 +69,11 @@ export const JudgeRunSchema = z.object({
   waitingAtArrival: count,
   // Arrival to slot.
   queueMs: nonNegative,
-  // Slot to the worker's `ready` (QuickJS loaded); null when the worker
-  // never announced it (it died first).
+  // Slot to the worker's `ready` (QuickJS loaded): 0 on a warm pooled
+  // worker (#277), null when the worker never announced it (it died first).
   spawnMs: nonNegative.nullable(),
-  // `ready` (else the slot) to the last case's reply.
+  // `ready` (else the slot; the slot on a warm worker) to the last case's
+  // reply.
   execMs: nonNegative,
   // The sum of the per-case times the worker itself measured.
   caseMs: nonNegative,
@@ -85,9 +86,10 @@ export const JudgeTimingsSchema = z.object({
   // What this process judges with (JUDGE_CONCURRENCY and friends): proves an
   // override took.
   config: JudgeConfigSchema,
-  // `alive = spawned - exited`; anything above zero with nothing in flight
-  // is a leaked worker.
-  workers: z.object({ spawned: count, exited: count, alive: count }),
+  // `alive = spawned - exited`; `idle` the pooled workers waiting for a
+  // submission (#277). `alive - idle` above zero with nothing in flight is a
+  // leaked worker.
+  workers: z.object({ spawned: count, exited: count, alive: count, idle: count }),
   // Oldest first, the last 512.
   runs: z.array(JudgeRunSchema),
 })

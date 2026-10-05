@@ -336,8 +336,10 @@ function registryLabels(): { root: string; input: string } {
   }
 }
 
-// #183: `generateSolution` re-registers the kumite blocks globally, so a run
-// without the UI locale used to flip every block created afterwards to pt.
+// #183: `generateSolution` used to re-register the kumite blocks globally, so a
+// run without the UI locale flipped every block created afterwards to pt.
+// Since #380 codegen never touches the registry; these stay as a regression
+// lock.
 describe('useExampleRun keeps the block locale (#183)', () => {
   afterEach(() => {
     defineKumiteBlocks('pt')

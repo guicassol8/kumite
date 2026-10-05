@@ -338,7 +338,7 @@ describe('generateSolution', () => {
   })
 
   it('refuses a "successful" generation that defines no solve function', () => {
-    // The seam has to be `finish`: `generateSolution` calls `defineKumiteBlocks`
+    // The seam has to be `finish`: `generateSolution` calls `ensureKumiteBlocks`
     // first, which overwrites `forBlock`, so patching the root generator would
     // be undone before it ran. This stands in for the next empty-success path
     // nobody has found yet — the one the guard exists for.

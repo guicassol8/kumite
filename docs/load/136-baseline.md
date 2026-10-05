@@ -46,7 +46,7 @@ Some notes on these runs:
 - The committed `report.json` files differ from the originals in one way:
   each sample's copy of the event-loop ring is emptied. That is the same
   transform the harness now applies itself (`withoutRing` in
-  `report.ts`), and it took the baseline JSON from 9 MB to 0.4 MB. The
+  `report.ts`), and it took the baseline JSON from 9 MB to 0.3 MB. The
   deduplicated windows (`timeline.windows`) and every number are untouched.
 
 ## At rest and with idle SSE connections

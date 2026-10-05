@@ -1,13 +1,17 @@
 import type { LoadConfig } from './config'
 import type { Recorder } from './recorder'
-import { mapLimit } from './schedule'
+import { mapLimit, sleep } from './schedule'
 import { readErrorCode, type Transport } from './transport'
+import { classifyVerdict } from './verdict'
+import { WORKSPACES } from './workspaces'
 
 // The world a run plays in (#136), built through the public API exactly as
 // the event would: organizer login, signups and logins (argon2, so bounded
 // concurrency — 400 at once would exhaust a 4 GB back), teams, and for a run
 // with submissions a round of its own. Everything carries the run's id, so
 // two runs never collide even without a reset. Nothing is ever deleted.
+// #137/#138 add clones of the problem, so the round has several, and closed
+// rounds before the run's own, so the event ranking has several to sum.
 
 export type LoadUser = { id: string; email: string; token: string; teamId: string | null }
 
@@ -24,7 +28,12 @@ export type World = {
   // What already existed before this run's setup (GET /organizer/stats).
   before: { participants: number; teams: number }
   round: { id: string; name: string } | null
+  // The base problem; null without submissions.
   problemId: string | null
+  // Every problem in the run's round: the base one first, then its clones.
+  problemIds: string[]
+  // Closed before the run's round opened, oldest first (--past-rounds).
+  pastRounds: { id: string; name: string }[]
   // Leftover open `load-*` rounds this setup closed (an aborted run's).
   closedLeftoverRounds: string[]
 }
@@ -32,7 +41,8 @@ export type World = {
 export type WorldConfig = Pick<
   LoadConfig,
   'teams' | 'members' | 'setupConcurrency' | 'submissions' | 'durationSeconds' | 'problemId'
->
+> &
+  Partial<Pick<LoadConfig, 'problems' | 'pastRounds' | 'cooldownMs'>>
 
 // The harness's own accounts all share it: they are throwaway, and the
 // organizer can still reset any of them from the Painel.
@@ -51,6 +61,17 @@ export function newRunId(now = Date.now()): string {
 export function roundNameFor(runId: string): string {
   return `${LOAD_PREFIX}${runId}`
 }
+
+export function problemCloneTitle(runId: string, k: number): string {
+  return `${LOAD_PREFIX}${runId}-p${k}`
+}
+
+export function pastRoundNameFor(runId: string, j: number): string {
+  return `${LOAD_PREFIX}${runId}-r${j}`
+}
+
+// Retries of a 429 for a past round's submission, as the submitter does.
+const PAST_THROTTLE_RETRIES = 3
 
 /** Minutes the run's round stays open: the load window plus two minutes. */
 export function roundMinutesFor(durationSeconds: number): number {
@@ -216,6 +237,121 @@ async function clearOpenRounds(
 }
 
 /**
+ * `k` copies of the base problem, each published with the base's cases and
+ * statements and the title `load-<runId>-p<i>`, so the correct solution
+ * scores on every one of them.
+ */
+async function cloneProblem(
+  transport: Transport,
+  recorder: Recorder,
+  organizerToken: string,
+  baseId: string,
+  runId: string,
+  count: number,
+): Promise<string[]> {
+  if (count === 0) return []
+  const org = transport.api(organizerToken).organizer.problems
+  const baseRes = await org[':id'].$get({ param: { id: baseId } })
+  if (baseRes.status !== 200) {
+    return unexpected(recorder, 'GET', `/organizer/problems/${baseId}`, baseRes, 'read problem')
+  }
+  const base = await baseRes.json()
+  const ids: string[] = []
+  for (let k = 1; k <= count; k++) {
+    const title = problemCloneTitle(runId, k)
+    const created = await org.$post({
+      json: { difficulty: base.difficulty, points: base.points, visibility: 'round' },
+    })
+    if (created.status !== 201) {
+      return unexpected(recorder, 'POST', '/organizer/problems', created, `create ${title}`)
+    }
+    const { id } = await created.json()
+    const patched = await org[':id'].$patch({
+      param: { id },
+      json: {
+        testCases: base.testCases,
+        translations: base.translations.map((t) => ({
+          locale: t.locale,
+          title,
+          statementMd: t.statementMd,
+        })),
+      },
+    })
+    if (patched.status !== 200) {
+      return unexpected(recorder, 'PATCH', `/organizer/problems/${id}`, patched, `fill ${title}`)
+    }
+    const published = await org[':id'].publish.$post({ param: { id } })
+    if (published.status !== 200) {
+      return unexpected(
+        recorder,
+        'POST',
+        `/organizer/problems/${id}/publish`,
+        published,
+        `publish ${title}`,
+      )
+    }
+    ids.push(id)
+  }
+  return ids
+}
+
+/** Creates and opens a round on `problemIds`; returns it. */
+async function openRound(
+  transport: Transport,
+  recorder: Recorder,
+  organizerToken: string,
+  name: string,
+  durationMinutes: number,
+  problemIds: string[],
+): Promise<{ id: string; name: string }> {
+  const org = transport.api(organizerToken)
+  const created = await org.organizer.rounds.$post({
+    json: { name, durationMinutes, problemIds },
+  })
+  if (created.status !== 201) {
+    return unexpected(recorder, 'POST', '/organizer/rounds', created, `create round ${name}`)
+  }
+  const { id } = await created.json()
+  const opened = await org.organizer.rounds[':id'].open.$post({ param: { id } })
+  if (opened.status !== 200) {
+    return unexpected(recorder, 'POST', `/organizer/rounds/${id}/open`, opened, `open ${name}`)
+  }
+  return { id, name }
+}
+
+/**
+ * One correct submission by `member` in a past round. Anything but an
+ * accepted verdict stops the setup: a past round that did not score would
+ * leave the event ranking smaller than the run claims.
+ */
+async function submitPast(
+  transport: Transport,
+  recorder: Recorder,
+  member: LoadUser,
+  target: { roundId: string; problemId: string },
+  cooldownMs: number,
+): Promise<void> {
+  recorder.actionStarted('past-submission')
+  const api = transport.api(member.token)
+  for (let attempt = 0; ; attempt++) {
+    const res = await api.submissions.$post({ json: { ...target, workspace: WORKSPACES.correct } })
+    if (res.status === 201) {
+      const verdict = classifyVerdict(await res.json())
+      if (verdict !== 'accepted') {
+        throw new Error(`a past round's correct submission came back ${verdict}`)
+      }
+      recorder.actionCompleted('past-submission')
+      return
+    }
+    if (res.status === 429 && attempt < PAST_THROTTLE_RETRIES) {
+      await sleep(Math.max(cooldownMs, 1000))
+      continue
+    }
+    return unexpected(recorder, 'POST', '/submissions', res, 'past-round submission')
+  }
+}
+
+/**
  * Ctrl-C during setup: no new signup, team or round is started (the ones in
  * flight finish), and the setup stops with this error instead of building
  * a world nobody will use — at 8 signups/s, a 300-user setup would
@@ -293,32 +429,61 @@ export async function setupWorld({
 
   let round: World['round'] = null
   let problemId: string | null = null
+  const problemIds: string[] = []
+  const pastRounds: World['pastRounds'] = []
   const closedLeftoverRounds: string[] = []
   if (config.submissions > 0) {
     stopIfAborted(signal)
     problemId = await findProblemId(transport, recorder, organizerToken, config.problemId)
+    problemIds.push(
+      problemId,
+      ...(await cloneProblem(
+        transport,
+        recorder,
+        organizerToken,
+        problemId,
+        runId,
+        (config.problems ?? 1) - 1,
+      )),
+    )
     closedLeftoverRounds.push(...(await clearOpenRounds(transport, recorder, organizerToken)))
     for (const name of closedLeftoverRounds) {
       recorder.recordWarning(`closed a leftover open round from an earlier run: ${name}`)
     }
 
-    const name = roundNameFor(runId)
-    const created = await org.organizer.rounds.$post({
-      json: {
-        name,
-        durationMinutes: roundMinutesFor(config.durationSeconds),
-        problemIds: [problemId],
-      },
-    })
-    if (created.status !== 201) {
-      return unexpected(recorder, 'POST', '/organizer/rounds', created, `create round ${name}`)
+    for (let j = 0; j < (config.pastRounds ?? 0); j++) {
+      stopIfAborted(signal)
+      const past = await openRound(
+        transport,
+        recorder,
+        organizerToken,
+        pastRoundNameFor(runId, j),
+        roundMinutesFor(config.durationSeconds),
+        problemIds,
+      )
+      await mapLimit(teams, teams.length, async (team) => {
+        const member = team.members[j % team.members.length] as LoadUser
+        await submitPast(
+          transport,
+          recorder,
+          member,
+          { roundId: past.id, problemId: problemIds[j % problemIds.length] as string },
+          config.cooldownMs ?? 5000,
+        )
+      })
+      await teardownWorld({ transport, recorder, organizerToken, round: past })
+      pastRounds.push(past)
     }
-    const { id } = await created.json()
-    const opened = await org.organizer.rounds[':id'].open.$post({ param: { id } })
-    if (opened.status !== 200) {
-      return unexpected(recorder, 'POST', `/organizer/rounds/${id}/open`, opened, `open ${name}`)
-    }
-    round = { id, name }
+
+    stopIfAborted(signal)
+    round = await openRound(
+      transport,
+      recorder,
+      organizerToken,
+      roundNameFor(runId),
+      roundMinutesFor(config.durationSeconds),
+      problemIds,
+    )
   }
 
   return {
@@ -331,6 +496,8 @@ export async function setupWorld({
     before,
     round,
     problemId,
+    problemIds,
+    pastRounds,
     closedLeftoverRounds,
   }
 }

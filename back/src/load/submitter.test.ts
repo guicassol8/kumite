@@ -4,6 +4,8 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { app } from '../app'
 import { k } from '../context'
 import { resetDatabase } from '../db/reset'
+import { submissionsTable } from '../db/schema'
+import { resetSubmissionThrottle } from '../modules/submissions/submissions.service'
 
 import { createRecorder } from './recorder'
 import type { FetchLike } from './sse-client'
@@ -35,14 +37,23 @@ describe('workspaces', () => {
   })
 })
 
-async function world(runId: string, teams: number) {
+// The back's per-team cooldown is not what these tests are about: lifted
+// before each submission, so a team can send several in a row.
+const withoutCooldown: FetchLike = async (input, init) => {
+  if (init?.method === 'POST' && new URL(input).pathname === '/submissions') {
+    resetSubmissionThrottle()
+  }
+  return app.request(input, init)
+}
+
+async function world(runId: string, teams: number, problems = 1) {
   const recorder = createRecorder()
   recorder.setPhase('setup')
   const transport = createTransport({
     baseUrl: 'http://localhost',
     recorder,
     requestTimeoutMs: 60_000,
-    fetch: async (input, init) => app.request(input, init),
+    fetch: withoutCooldown,
   })
   const organizerToken = await loginOrganizer(transport, recorder, ORGANIZER)
   const built = await setupWorld({
@@ -50,7 +61,14 @@ async function world(runId: string, teams: number) {
     recorder,
     organizerToken,
     runId,
-    config: { teams, members: 1, setupConcurrency: 4, submissions: 1, durationSeconds: 60 },
+    config: {
+      teams,
+      members: 1,
+      setupConcurrency: 4,
+      submissions: 1,
+      durationSeconds: 60,
+      problems,
+    },
   })
   recorder.setPhase('load')
   return { recorder, transport, built }
@@ -70,8 +88,47 @@ describe('runSubmissions', { timeout: 120_000 }, () => {
 
     const snapshot = recorder.snapshot()
     expect(snapshot.verdicts).toEqual({ matrix: { correct: { accepted: 2 } }, incoherent: 0 })
+    expect(snapshot.submissions.latencyMs.correct?.count).toBe(2)
     expect(snapshot.actions['submission']).toEqual({ started: 2, completed: 2 })
     expect(snapshot.http.load?.['POST /submissions']?.byStatus).toEqual({ '201': 2 })
+  })
+
+  it('rotates each team’s submissions over the round’s problems (#138)', async () => {
+    const { recorder, transport, built } = await world('rota', 2, 3)
+
+    await runSubmissions({
+      transport,
+      recorder,
+      world: built,
+      config: { submissions: 6, badFraction: 0, memoryShare: 0, cooldownMs: 0 },
+      deadline: Date.now() + 60_000,
+    })
+
+    expect(recorder.snapshot().verdicts).toEqual({
+      matrix: { correct: { accepted: 6 } },
+      incoherent: 0,
+    })
+    const rows = await db.select().from(submissionsTable)
+    for (const team of built.teams) {
+      const problems = rows.filter((row) => row.teamId === team.id).map((row) => row.problemId)
+      expect(problems.sort()).toEqual([...built.problemIds].sort())
+    }
+  })
+
+  it('sends the memory bomb and gets a coherent runtime error back (#137)', async () => {
+    const { recorder, transport, built } = await world('bomb', 1)
+
+    await runSubmissions({
+      transport,
+      recorder,
+      world: built,
+      config: { submissions: 1, badFraction: 1, memoryShare: 1, cooldownMs: 0 },
+      deadline: Date.now() + 60_000,
+    })
+
+    const snapshot = recorder.snapshot()
+    expect(snapshot.verdicts).toEqual({ matrix: { memory: { runtime_error: 1 } }, incoherent: 0 })
+    expect(snapshot.submissions.latencyMs.memory?.count).toBe(1)
   })
 
   it('sends the infinite loop and gets a coherent timeout back', async () => {

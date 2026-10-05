@@ -1,10 +1,17 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { app } from '../app'
 import { k } from '../context'
 import { resetDatabase } from '../db/reset'
-import { roundProblemsTable, roundsTable, teamMembersTable } from '../db/schema'
+import {
+  problemsTable,
+  problemTranslationsTable,
+  roundProblemsTable,
+  roundsTable,
+  submissionsTable,
+  teamMembersTable,
+} from '../db/schema'
 
 import { createRecorder } from './recorder'
 import { createTransport } from './transport'
@@ -178,6 +185,75 @@ describe('setupWorld', { timeout: 120_000 }, () => {
     expect(recorder.snapshot().actions['create-team']).toBeUndefined()
     const rounds = await db.select().from(roundsTable)
     expect(rounds.filter((round) => round.name === roundNameFor('rune'))).toEqual([])
+  })
+
+  it('puts the base problem and its published clones in the round, same cases (#138)', async () => {
+    const { recorder, transport } = harness()
+    const organizerToken = await loginOrganizer(transport, recorder, ORGANIZER)
+
+    const world = await setupWorld({
+      transport,
+      recorder,
+      organizerToken,
+      runId: 'runp',
+      config: { ...BASE, teams: 1, members: 1, submissions: 1, problems: 3 },
+    })
+
+    if (!world.round) throw new Error('expected a round')
+    expect(world.problemIds).toHaveLength(3)
+    expect(world.problemIds[0]).toBe(world.problemId)
+    const inRound = await db
+      .select()
+      .from(roundProblemsTable)
+      .where(eq(roundProblemsTable.roundId, world.round.id))
+    expect(inRound.map((row) => row.problemId).sort()).toEqual([...world.problemIds].sort())
+
+    const rows = await db
+      .select()
+      .from(problemsTable)
+      .where(inArray(problemsTable.id, world.problemIds))
+    const base = rows.find((row) => row.id === world.problemId)
+    expect(rows).toHaveLength(3)
+    for (const row of rows) {
+      expect(row.status).toBe('published')
+      expect(row.visibility).toBe('round')
+      expect(row.testCases).toEqual(base?.testCases)
+    }
+    const clone = world.problemIds[1] as string
+    const titles = await db
+      .select()
+      .from(problemTranslationsTable)
+      .where(eq(problemTranslationsTable.problemId, clone))
+    expect(titles.map((t) => t.locale).sort()).toEqual(['en', 'es', 'pt'])
+    expect(titles.every((t) => t.title === 'load-runp-p1')).toBe(true)
+  })
+
+  it('closes its past rounds with one correct submission per team before opening the run’s (#138)', async () => {
+    const { recorder, transport } = harness()
+    const organizerToken = await loginOrganizer(transport, recorder, ORGANIZER)
+
+    const world = await setupWorld({
+      transport,
+      recorder,
+      organizerToken,
+      runId: 'runr',
+      config: { ...BASE, teams: 2, members: 1, submissions: 1, pastRounds: 1, cooldownMs: 0 },
+    })
+
+    expect(world.pastRounds.map((round) => round.name)).toEqual(['load-runr-r0'])
+    const past = world.pastRounds[0]
+    if (!past || !world.round) throw new Error('expected a past round and a round')
+    const rounds = await db.select().from(roundsTable)
+    expect(rounds.find((round) => round.id === past.id)?.status).toBe('closed')
+    expect(rounds.find((round) => round.id === world.round?.id)?.status).toBe('open')
+    const submissions = await db
+      .select()
+      .from(submissionsTable)
+      .where(eq(submissionsTable.roundId, past.id))
+    expect(submissions.map((row) => row.teamId).sort()).toEqual(
+      world.teams.map((team) => team.id).sort(),
+    )
+    expect(recorder.snapshot().actions['past-submission']).toEqual({ started: 2, completed: 2 })
   })
 
   it('opens no round when the run has no submissions', async () => {

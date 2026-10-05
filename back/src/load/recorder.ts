@@ -62,6 +62,9 @@ export type RecorderSnapshot = {
     matrix: Partial<Record<SubmissionKind, Partial<Record<Verdict, number>>>>
     incoherent: number
   }
+  // #137: HTTP latency of the POST that got the 201, by what was sent — the
+  // time a participant waits for a verdict.
+  submissions: { latencyMs: Partial<Record<SubmissionKind, Summary>> }
   errors: { phase: Phase; message: string }[]
   warnings: string[]
 }
@@ -94,6 +97,7 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
   const actions: Record<string, { started: number; completed: number }> = {}
   const matrix: RecorderSnapshot['verdicts']['matrix'] = {}
   let incoherent = 0
+  const submissionLatencies: Partial<Record<SubmissionKind, number[]>> = {}
   const errors: { phase: Phase; message: string }[] = []
   const warnings: string[] = []
 
@@ -184,6 +188,11 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
       if (!isCoherent(kind, verdict)) incoherent += 1
     },
 
+    /** The latency of a submission's 201, by kind. */
+    recordSubmissionLatency(kind: SubmissionKind, ms: number) {
+      ;(submissionLatencies[kind] ??= []).push(ms)
+    },
+
     /** An error that stopped the run in the current phase (setup, ramp...). */
     recordError(message: string) {
       errors.push({ phase: current, message })
@@ -214,6 +223,11 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
         unexpected: [...unexpected.values()].map((entry) => ({ ...entry })),
         actions: structuredClone(actions),
         verdicts: { matrix: structuredClone(matrix), incoherent },
+        submissions: {
+          latencyMs: Object.fromEntries(
+            Object.entries(submissionLatencies).map(([kind, values]) => [kind, summarize(values)]),
+          ),
+        },
         errors: errors.map((error) => ({ ...error })),
         warnings: [...warnings],
       }

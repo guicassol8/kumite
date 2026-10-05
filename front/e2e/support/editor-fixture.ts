@@ -36,11 +36,12 @@ export const PARTICIPANT_PASSWORD = 'supersecret'
 const TOKEN_KEY = 'kumite-token'
 
 /**
- * `beforeAll` inherits the 30s test timeout, which is shorter than the open
- * retry window — the hook would die before the retries did. Every fixture
- * consumer raises it to this instead. 60s covers the ~20s of retries in
- * `openRoundWithRetry` plus the six requests around them; it used to be 120s,
- * back when that window was ~90s.
+ * The `beforeAll` budget of every fixture consumer: each one calls
+ * `test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)` before `seedEditorFixture`. It
+ * pays for the requests only. Waiting for another spec to free the
+ * open-round slot extends the hook by the time waited (`openRoundWithRetry`,
+ * up to `SLOT_WAIT_MS`, #382), which is why `seedEditorFixture` passes this
+ * value on: Playwright has no public read of a hook's own timeout.
  */
 export const EDITOR_FIXTURE_TIMEOUT_MS = 60_000
 
@@ -122,8 +123,10 @@ export async function seedEditorFixture(label: string): Promise<EditorFixture> {
   // `beforeAll`, where Playwright offers no test fixtures — so the safety here
   // is that nothing may sit between these two lines. A round left open holds
   // the single-open-round slot for its whole 30min duration (#150), and
-  // `closeRound` throws instead of failing in silence.
-  await openRoundWithRetry(auth, roundId)
+  // `closeRound` throws instead of failing in silence. Every caller is a
+  // `beforeAll` that set itself to EDITOR_FIXTURE_TIMEOUT_MS, which the wait
+  // for the slot extends.
+  await openRoundWithRetry(auth, roundId, { hookTimeoutMs: EDITOR_FIXTURE_TIMEOUT_MS })
   await closeRound(auth, roundId)
 
   const { token: participantToken, id: participantId } = await seedParticipant(label)

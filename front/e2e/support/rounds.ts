@@ -2,7 +2,7 @@ import { rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { test as base } from '@playwright/test'
+import { test as base, type TestInfo } from '@playwright/test'
 
 // The round lifecycle every spec that needs an open round used to copy by hand
 // (#150). Three things live here that a per-spec copy cannot provide:
@@ -38,14 +38,29 @@ export const E2E_PARTICIPANT_NAME = 'E2E Participante'
 export type AuthHeader = Record<string, string>
 
 /**
- * Opening is the one step that contends: only one round may be open at a time.
- * What can hold the slot is now always short-lived — another spec's round, for
- * as long as that spec runs — because `globalSetup` closes the leftovers
- * (`db:seed`'s own "Round 1", a round from a previous run) before any worker
- * starts. ~20s is enough for that; longer only delays a real failure.
+ * Opening is the one step that contends: only one round may be open at a time,
+ * and whoever holds the slot holds it for as long as its spec takes to close —
+ * not a few seconds. `globalSetup` closes the leftovers (`db:seed`'s own
+ * "Round 1", a round from a previous run) before any worker starts, so the
+ * holder is always another spec, and some hold it far past the ten 2s retries
+ * this used to allow (#382): `problem-attempt-in-round` across two
+ * rounds and their submission cooldowns, `sse-single-connection` for ~34s
+ * with a 180s ceiling (`editorTestTimeout(2, 60_000)`). So a waiter waits by
+ * deadline, not by attempts: 180s, the longest healthy hold cited in #382. A
+ * holder stuck to its own ceiling is a real failure already, and the error
+ * this one throws after it names that holder.
+ *
+ * The time spent waiting is added to the running test's (or hook's) timeout
+ * as it passes (`timeoutExtender`), so no spec budgets for another spec's
+ * round — a `beforeAll` with 60s survives a 70s holder.
  */
-const OPEN_ATTEMPTS = 10
-const OPEN_RETRY_MS = 2_000
+const SLOT_WAIT_MS = 180_000
+/**
+ * With two workers the race is always one holder against one waiter, and the
+ * holder may close one round and open its next within a couple of seconds — a
+ * 2s poll used to miss those gaps; 500ms rarely does.
+ */
+const SLOT_POLL_MS = 500
 
 let organizerToken: string | undefined
 
@@ -80,7 +95,7 @@ export type NewRound = {
 /**
  * Creates a `draft` round. Fails loudly on a missing id: letting it travel as
  * the literal "undefined" only moves the error to `/organizer/rounds/undefined/open`
- * a full retry window later, pointing at the wrong request.
+ * after a whole wait for the slot, pointing at the wrong request.
  */
 export async function createRound(auth: AuthHeader, round: NewRound): Promise<string> {
   const res = await fetch(`${BACK_URL}/organizer/rounds`, {
@@ -113,18 +128,96 @@ export async function describeOpenRound(auth: AuthHeader): Promise<string | null
   return `"${open.name}" (${open.id}, closes at ${open.closesAt ?? 'unknown'})`
 }
 
-export async function openRoundWithRetry(auth: AuthHeader, roundId: string): Promise<void> {
+/**
+ * Returns a function that adds `ms` to the timeout of whatever test or hook is
+ * running, so a wait for another spec's round is not paid out of this one's
+ * budget. Outside a test (`globalSetup`) there is nothing to extend, and a
+ * timeout of 0 is none.
+ *
+ * In a test body, `testInfo.timeout` is the running timeout and is simply
+ * raised. In a `beforeAll`/`afterAll` it is NOT: those run on a timeout slot
+ * of their own, while `testInfo.timeout` keeps reading the test's (Playwright
+ * 1.62.1, `TimeoutManager.defaultSlot()`) — so `setTimeout(timeout + ms)`
+ * there would set a 60s hook to the 30s test default plus the wait, shrinking
+ * it (#382). Playwright has no public read of a hook's timeout, so a hook says
+ * what it set itself to: `hookTimeoutMs`.
+ */
+function timeoutExtender(hookTimeoutMs?: number): (ms: number) => void {
+  let hookTimeout = hookTimeoutMs
+  return (ms) => {
+    if (ms <= 0) return
+    let info: TestInfo
+    try {
+      info = base.info()
+    } catch {
+      return
+    }
+    if (hookTimeout !== undefined) {
+      if (hookTimeout === 0) return
+      hookTimeout += ms
+      info.setTimeout(hookTimeout)
+      return
+    }
+    if (info.timeout === 0) return
+    info.setTimeout(info.timeout + ms)
+  }
+}
+
+/**
+ * Polls, outside the lock, until no round holds the slot. Every poll that
+ * found it held passes the time it took to `extend`. Past `deadline` it throws
+ * `failure`, naming the holder and how long it waited.
+ */
+async function waitForFreeSlot(
+  auth: AuthHeader,
+  wait: { startedAt: number; deadline: number; extend: (ms: number) => void },
+  failure: string,
+): Promise<void> {
+  for (;;) {
+    const polledAt = Date.now()
+    const holder = await describeOpenRound(auth)
+    if (holder === null) return
+    if (Date.now() > wait.deadline) {
+      const waited = Math.round((Date.now() - wait.startedAt) / 1000)
+      throw new Error(`${failure} — the slot is still held by ${holder} after ${waited}s`)
+    }
+    await new Promise((r) => setTimeout(r, SLOT_POLL_MS))
+    wait.extend(Date.now() - polledAt)
+  }
+}
+
+function startSlotWait(hookTimeoutMs?: number) {
+  const startedAt = Date.now()
+  return { startedAt, deadline: startedAt + SLOT_WAIT_MS, extend: timeoutExtender(hookTimeoutMs) }
+}
+
+export type SlotWaitOptions = {
+  /**
+   * Called from a `beforeAll`/`afterAll`? The timeout that hook set for itself
+   * (`test.setTimeout(...)`), which the wait then extends — see
+   * `timeoutExtender` for why it cannot be read. Leave it out in a test body.
+   */
+  hookTimeoutMs?: number
+}
+
+export async function openRoundWithRetry(
+  auth: AuthHeader,
+  roundId: string,
+  options: SlotWaitOptions = {},
+): Promise<void> {
   // Nested, this would hold the lock the current holder needs in order to
-  // close — 20s of retries that cannot possibly succeed. Say so instead.
+  // close — a wait that cannot possibly succeed. Say so instead.
   if (lockDepth > 0) {
     throw new Error(
       `openRoundWithRetry called inside withRoundLock (round ${roundId}) — open outside the lock, it is the close that has to wait`,
     )
   }
-  for (let attempt = 1; attempt <= OPEN_ATTEMPTS; attempt++) {
-    // One attempt per acquisition, never the whole retry loop: a spec reading
-    // the just-closed state holds the lock, and this must not take the slot
-    // out from under it.
+  const wait = startSlotWait(options.hookTimeoutMs)
+  for (;;) {
+    await waitForFreeSlot(auth, wait, `could not open round ${roundId}: another_round_open`)
+    // One attempt per acquisition, never the whole wait: a spec reading the
+    // just-closed state holds the lock, and this must not take the slot out
+    // from under it.
     const outcome = await withRoundLock(async () => {
       const res = await fetch(`${BACK_URL}/organizer/rounds/${roundId}/open`, {
         method: 'POST',
@@ -140,17 +233,14 @@ export async function openRoundWithRetry(auth: AuthHeader, roundId: string): Pro
     })
     if (outcome.opened) return
     // Waiting only ever helps against the contended slot. A 401, a 404 or a
-    // round that is no longer a draft answers the same way in 20s as it does
-    // now, and retrying it just buries the real cause under a timeout.
+    // round that is no longer a draft answers the same way in three minutes
+    // as it does now, and waiting on it just buries the real cause.
     if (outcome.error !== 'another_round_open') {
       throw new Error(`could not open round ${roundId}: ${outcome.error} (HTTP ${outcome.status})`)
     }
-    if (attempt < OPEN_ATTEMPTS) await new Promise((r) => setTimeout(r, OPEN_RETRY_MS))
+    // Another worker took the freed slot first. Losing that race is not a
+    // failure: back to waiting, on the same deadline.
   }
-  const holder = (await describeOpenRound(auth).catch(() => null)) ?? 'no round (it just closed)'
-  throw new Error(
-    `could not open round ${roundId} after ${OPEN_ATTEMPTS} attempts: another_round_open — the slot is held by ${holder}`,
-  )
 }
 
 // The open-round slot serializes specs only while a round is open. It says
@@ -217,7 +307,7 @@ async function acquireLock(): Promise<void> {
  * `roundSlot.open` must stay OUTSIDE: it waits for whoever holds the slot to
  * close, and that close needs this same lock — `openRoundWithRetry` therefore
  * takes the lock per attempt and drops it between them, and refuses to run
- * nested (below) rather than hanging until the retries run out.
+ * nested (below) rather than hanging until its wait runs out.
  */
 export async function withRoundLock<T>(body: () => Promise<T>): Promise<T> {
   if (lockDepth > 0) {
@@ -239,14 +329,6 @@ export async function withRoundLock<T>(body: () => Promise<T>): Promise<T> {
 }
 
 /**
- * How long `withNoOpenRound` waits for whoever holds the slot to close. Another
- * spec's round lives for as long as that spec takes to reach its close — well
- * under this on a healthy run; past it, the error names the holder.
- */
-const NO_OPEN_ROUND_WAIT_MS = 60_000
-const NO_OPEN_ROUND_POLL_MS = 500
-
-/**
  * Runs `body` under `withRoundLock` with no round open, and none opening until
  * it returns — the third state the lock alone cannot give: "the slot is free,
  * and stays free while I read". For reads that depend on *no* round being live
@@ -257,6 +339,8 @@ const NO_OPEN_ROUND_POLL_MS = 500
  * re-checked: someone may have opened in between, in which case the lock is
  * dropped and the wait starts over. Keep `body` well under `LOCK_STALE_MS` —
  * it holds the lock throughout, and a hold older than that is taken over.
+ * Call it from a test body: the wait extends the test's timeout, which a hook
+ * cannot have read back (`timeoutExtender`).
  */
 export async function withNoOpenRound<T>(auth: AuthHeader, body: () => Promise<T>): Promise<T> {
   // Nested, the wait below would hold the lock the slot's owner needs in order
@@ -266,18 +350,11 @@ export async function withNoOpenRound<T>(auth: AuthHeader, body: () => Promise<T
       'withNoOpenRound called inside withRoundLock — it waits for a close, and that close needs the lock',
     )
   }
-  const deadline = Date.now() + NO_OPEN_ROUND_WAIT_MS
+  // The same wait and deadline as an open (`SLOT_WAIT_MS`): with a shorter or
+  // slower one, every gap between two rounds would go to the waiting opens.
+  const wait = startSlotWait()
   for (;;) {
-    let holder = await describeOpenRound(auth)
-    while (holder !== null) {
-      if (Date.now() > deadline) {
-        throw new Error(
-          `no round closed within ${NO_OPEN_ROUND_WAIT_MS}ms — the slot is still held by ${holder}`,
-        )
-      }
-      await new Promise((r) => setTimeout(r, NO_OPEN_ROUND_POLL_MS))
-      holder = await describeOpenRound(auth)
-    }
+    await waitForFreeSlot(auth, wait, 'withNoOpenRound: no round closed in time')
     const outcome = await withRoundLock(async () => {
       if ((await describeOpenRound(auth)) !== null) return { ran: false as const }
       return { ran: true as const, value: await body() }

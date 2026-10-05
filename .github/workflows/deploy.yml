@@ -44,10 +44,23 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_SSH_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # Disk cleanup (#429): the back image is ~2 GB and the VM disk 9.7 GB.
+          # - The image prune removes only dangling images (untagged, used by no
+          #   container). Never add the all flag (-a), a system-wide prune or
+          #   pruning of volumes: they would take the images and volumes of
+          #   db, backup and caddy.
+          # - It runs before the pull, for the leftover of an aborted deploy,
+          #   and after the seed, for the image `up -d` just replaced.
+          # - `set -e`: ssh-action v1.2+ has no `script_stop`, so without it the
+          #   job status is the last command's and a failed pull, migrate or
+          #   seed would end green behind the final prune.
           script: |
+            set -e
             cd ~/kumite
             git pull
+            docker image prune -f
             docker compose -f docker-compose.prod.yml pull back
             docker compose -f docker-compose.prod.yml up -d
             docker compose -f docker-compose.prod.yml exec -T back pnpm --filter @kumite/back db:migrate
             docker compose -f docker-compose.prod.yml exec -T back pnpm --filter @kumite/back db:seed
+            docker image prune -f

@@ -210,8 +210,9 @@ docker images                    # one kumite-back, plus postgres:17-alpine and 
 df -h /
 ```
 
-**Rolling back.** Pin the previous release's commit sha in the root `.env`,
-then pull and recreate:
+**Rolling back.** Pin the previous release's full 40-character commit sha
+(the tag `deploy.yml` pushes; a short sha matches no tag) in the root `.env`,
+then pull, recreate and untag the bad `latest`:
 ```bash
 # in ~/kumite/.env
 TAG=<sha>
@@ -219,14 +220,23 @@ TAG=<sha>
 ```bash
 docker compose -f docker-compose.prod.yml pull back
 docker compose -f docker-compose.prod.yml up -d
+docker image rm ghcr.io/<owner>/kumite-back:latest
 ```
 The image comes from GHCR, not from the VM: the deploy prune already removed
 the previous local copy. The pull needs the login from §7. It works because
 `deploy.yml` publishes every release as both `:latest` and `:<sha>`, and
-nothing deletes the sha tags. Rolling the image back does not undo migrations. Remove `TAG` from
-`.env` before the next release (while it is pinned, the deploy pulls the pinned
-sha, not the new `latest`). Then delete the sha image by hand, since a tagged
-image is never dangling and the prune keeps it:
+nothing deletes the sha tags. Rolling the image back does not undo migrations.
+
+The `docker image rm` of `:latest` is not optional. After `up -d` no container
+uses that image, but it still has its tag, so it is not dangling and no prune
+removes it. Left there, the next release holds three back images during its
+`pull` (that `latest`, the pinned sha in use and the new one), and three no
+longer fit on the disk.
+
+Remove `TAG` from `.env` before the next release (while it is pinned, the
+deploy pulls the pinned sha, not the new `latest`). Once that release is up,
+delete the sha image by hand: it is tagged, so the prune keeps it, and before
+that release it is still in use, so `docker image rm` refuses it:
 ```bash
 docker image rm ghcr.io/<owner>/kumite-back:<sha>
 ```

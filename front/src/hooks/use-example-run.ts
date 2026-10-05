@@ -32,10 +32,12 @@ export type UseExampleRunOptions = {
  * crosses into a worker: a workspace the curated toolbox refuses is rejected
  * before any worker starts, and the worker bundle stays free of Blockly.
  *
- * `locale` is required, not defaulted: `generateSolution` re-registers the
- * kumite blocks globally in the locale it gets, the same registry the editor
- * draws from, so a run without the UI locale flipped every block created
- * afterwards back to pt (#183).
+ * `locale` is required, not defaulted: it localizes a refusal of the
+ * workspace, which the participant reads in the UI's language. It used to
+ * matter for the editor too — `generateSolution` re-registered the kumite
+ * blocks globally in the locale it got, so a run without it flipped every
+ * block created afterwards back to pt (#183) — but since #380 codegen never
+ * touches the block registry.
  *
  * `examples` can change under a run already on screen: the problem query
  * refetches on window focus, and an organizer may have edited them (#197).

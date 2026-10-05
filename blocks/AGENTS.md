@@ -35,5 +35,5 @@ Node headless). The one sanctioned runtime cross-package dependency
 | `src/theme.ts` | `kumiteTheme` / `kumiteThemeDark`, the grid options and the token mirror (`KUMITE_TOKENS`, checked against `tokens.css` by the front's design-parity test) |
 | `src/toolbox.ts` | curated categories, derived `allowedBlockTypes`, empty workspace |
 | `src/errors.ts` | `BlocksError` and its discriminating `code` |
-| `src/generate.ts` | `generateSolution` — validate, then emit `solve(input)` |
+| `src/generate.ts` | `generateSolution` — validate, then emit `solve(input)`; never relabels the block registry (#380) |
 | `src/fixtures/` | canonical workspaces shared with the front and the judge |

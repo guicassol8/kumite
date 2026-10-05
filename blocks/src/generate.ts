@@ -1,7 +1,7 @@
 import * as Blockly from 'blockly'
 import { javascriptGenerator } from 'blockly/javascript'
 
-import { defineKumiteBlocks, ROOT_BLOCK_TYPE } from './blocks'
+import { ensureKumiteBlocks, ROOT_BLOCK_TYPE } from './blocks'
 import { SOLUTION_FUNCTION_NAME, SOLUTION_PARAM_NAME } from './contract'
 import { deniedFieldValues } from './denied'
 import { BlocksError } from './errors'
@@ -138,12 +138,17 @@ function assertParses(source: string, message: string): void {
  *
  * Variable declarations land above `solve`, so a caller that needs runs to be
  * independent instantiates the source once per run — that is #20's job.
+ *
+ * Never relabels the block registry (#380): in the browser that registry is
+ * the editor's, so the kumite blocks are only registered here when they are
+ * missing (the judge), and in `DEFAULT_LOCALE`. `locale` only picks the
+ * language of a `BlocksError` refusal — the labels never reach the code.
  */
 export function generateSolution(
   state: WorkspaceState,
   locale: BlockLocale = DEFAULT_LOCALE,
 ): string {
-  defineKumiteBlocks(locale)
+  ensureKumiteBlocks()
   const messages = messagesFor(locale)
   const workspace = new Blockly.Workspace()
 

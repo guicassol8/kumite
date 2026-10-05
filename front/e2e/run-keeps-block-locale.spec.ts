@@ -11,12 +11,13 @@ import {
 } from './support/editor-fixture'
 
 // Visual evidence for #183: Executar generated the code without the UI
-// locale, and `generateSolution` re-registers the kumite blocks globally — so
-// in an es or en UI every block created after the click came out in pt: the
-// input block of the Variables flyout (`input` → `entrada`) and the fresh root
-// of "Limpar blocos" (`return`/`devolver` → `retornar`). The blocks already on
-// the canvas never changed, which is why the checks below always create a new
-// block after the run.
+// locale, and `generateSolution` used to re-register the kumite blocks
+// globally — so in an es or en UI every block created after the click came out
+// in pt: the input block of the Variables flyout (`input` → `entrada`) and the
+// fresh root of "Limpar blocos" (`return`/`devolver` → `retornar`). The blocks
+// already on the canvas never changed, which is why the checks below always
+// create a new block after the run. Since #380 codegen never touches the
+// registry; this spec stays as a regression lock.
 //
 // Submeter is covered by the screen test (problem.$id.test.tsx): the fixture
 // closes its round, and opening one would take the single open-round slot
@@ -115,7 +116,7 @@ test.describe('Executar keeps the block locale (#183)', () => {
 
       // 05 — the codegen error is localized with the UI's locale.
       await expect(page.getByTestId('problem-results-invalid')).toHaveText(
-        'Hay un bloque deshabilitado en tu solución. Reactivalo para continuar.',
+        'Hay un bloque deshabilitado en tu solución. Reactívalo para continuar.',
       )
       await page.screenshot({ path: evidence('05-es-mensagem-de-recusa') })
     })

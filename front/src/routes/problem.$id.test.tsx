@@ -730,10 +730,11 @@ describe('ProblemScreen', () => {
   })
 
   // #183: Executar generated the code without the UI locale, and
-  // `generateSolution` re-registers the kumite blocks globally, so every block
-  // created afterwards (the Variables flyout, the fresh root of "Limpar
+  // `generateSolution` used to re-register the kumite blocks globally, so every
+  // block created afterwards (the Variables flyout, the fresh root of "Limpar
   // blocos") came out in pt. Submeter sends the locale to the back and never
-  // touched the front registry.
+  // touched the front registry. Since #380 codegen never touches the registry;
+  // these stay as a regression lock.
   describe('the block labels after Executar and Submeter (#183)', () => {
     /** What a block created from the global registry now would read. */
     function registryLabels(): { root: string; input: string } {
@@ -761,7 +762,7 @@ describe('ProblemScreen', () => {
       },
       {
         language: 'es',
-        message: 'Hay un bloque deshabilitado en tu solución. Reactivalo para continuar.',
+        message: 'Hay un bloque deshabilitado en tu solución. Reactívalo para continuar.',
         root: ['resolver', 'devolver'],
         input: 'entrada',
       },

@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto'
+
 import { indiceAleatorio, raizDesabilitada, somaDosPares } from '@kumite/blocks'
 import { javascriptGenerator } from 'blockly/javascript'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { JudgeCase, JudgeConfig, Workspace } from './judge.schema'
+import type { JudgeCase, JudgeCaseResult, JudgeConfig, Workspace } from './judge.schema'
 import { WorkspaceSchema } from './judge.schema'
 import { generateJudgeSource, getJudgeLoad, runJudge, runJudgeAgainstWorker } from './judge.service'
 
@@ -113,36 +115,59 @@ describe('runJudge', () => {
     expect(result?.outcome).toBe('runtime_error')
   })
 
+  // #120 wants the judge to run submissions in parallel: the second
+  // submission's worker is alive while the first one's still is. #294
+  // replaced a wall-clock check (parallel pair < 0.75 × serial pair) that
+  // timed two pairs at two different moments: a runner that got busier
+  // between them failed it (418 ms parallel vs 542 ms serial on CI), and its
+  // busy-loop stopped on the clock, not on CPU, so it never measured
+  // parallelism anyway. These tests read the overlap itself, with no
+  // stopwatch: each submission's worker meets the other at a barrier (a
+  // BroadcastChannel named per pair) and answers 'together' if the other
+  // showed up, 'alone' if it waited waitMs in vain.
+  //
+  // The worker double (judge-test-worker.mjs), not QuickJS: the sandbox
+  // blocks require and has no channel between workers, and the semaphore
+  // plus one-worker-per-submission live in runJudgeAgainstWorker, which
+  // runJudge only delegates to — the same seam the crash and getJudgeLoad
+  // tests use. The double closes its channel before replying, and the
+  // second submission's worker only spawns after that reply when the limit
+  // is 1, so the serial control can never meet a stale first worker.
+  async function runBarrierPair(concurrency: number, waitMs: number): Promise<JudgeCaseResult[]> {
+    const barrier = randomUUID()
+    const cases: JudgeCase[] = [{ input: { barrier, waitMs }, expected: 'together' }]
+    const config = { ...testConfig, concurrency }
+    const [first, second] = await Promise.all([
+      runJudgeAgainstWorker(CRASH_WORKER_URL, 'unused', cases, config),
+      runJudgeAgainstWorker(CRASH_WORKER_URL, 'unused', cases, config),
+    ])
+    return [...first, ...second]
+  }
+
+  // waitMs only matters on regression: healthy workers meet as soon as the
+  // second one arrives. 5000 ms stays under the per-case watchdog
+  // (timeoutMs 2000 + 5000 slack) and is ~5× the worst arrival gap measured
+  // with 24 CPU hogs on one core (953 ms). On regression both submissions
+  // wait it out in turn, hence the 20 s budget.
+  it('runs two submissions at once when the concurrency limit allows it', {
+    timeout: 20_000,
+  }, async () => {
+    const results = await runBarrierPair(2, 5000)
+    expect(results).toEqual([
+      { outcome: 'passed', ms: 0 },
+      { outcome: 'passed', ms: 0 },
+    ])
+  })
+
+  // The control proves the barrier can say no: one that always answered
+  // 'together' would pass the test above without proving anything. Any
+  // waitMs yields 'alone' here, so 300 ms keeps it fast.
   it(
-    'distinguishes parallel execution from serial by relative timing, not a fixed margin',
+    'runs them one at a time when the limit is 1, so the barrier can tell them apart',
     async () => {
-      // A short busy-loop, well under timeoutMs, so ordering can be read
-      // straight off wall-clock elapsed time without any side channel.
-      const source =
-        'function solve(input) { const until = Date.now() + 200; while (Date.now() < until) {} return 1 }'
-      const cases: JudgeCase[] = [{ input: [], expected: 1 }]
-
-      async function runPair(concurrency: number): Promise<number> {
-        const start = Date.now()
-        const [a, b] = await Promise.all([
-          runJudge(source, cases, { ...testConfig, concurrency }),
-          runJudge(source, cases, { ...testConfig, concurrency }),
-        ])
-        expect(a[0]?.outcome).toBe('passed')
-        expect(b[0]?.outcome).toBe('passed')
-        return Date.now() - start
-      }
-
-      // concurrency:1 forces the second submission to wait for the first
-      // worker's slot (serial baseline); concurrency:2 lets both spawn a
-      // worker at once (parallel). Both runs pay the same worker-spawn
-      // overhead, so comparing parallel to a fraction of the serial baseline
-      // (#120) holds regardless of how fast/slow the runner is, unlike an
-      // absolute margin.
-      const serialElapsed = await runPair(1)
-      const parallelElapsed = await runPair(2)
-
-      expect(parallelElapsed).toBeLessThan(serialElapsed * 0.75)
+      const results = await runBarrierPair(1, 300)
+      const alone = { outcome: 'failed', expected: 'together', actual: 'alone', ms: 0 }
+      expect(results).toEqual([alone, alone])
     },
     TEST_TIMEOUT_MS,
   )
@@ -295,6 +320,10 @@ describe('generateJudgeSource', () => {
     )
     expect(generateJudgeSource(raizDesabilitadaWorkspace, 'en')).toMatchObject({
       message: 'There is a disabled block in your solution. Re-enable it to continue.',
+    })
+    // #419: the es refusal says "tú", like the rest of the product — no voseo.
+    expect(generateJudgeSource(raizDesabilitadaWorkspace, 'es')).toMatchObject({
+      message: 'Hay un bloque deshabilitado en tu solución. Reactívalo para continuar.',
     })
   })
 

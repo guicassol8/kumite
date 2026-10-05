@@ -12,7 +12,7 @@ Each run measures:
 - whether every connection ends with the same ranking as the API, both after
   the load and after a reconnect storm (every stream closed and reopened).
 
-All the runs are local. **Pendente: VPS (#139).** The raw reports are in
+All the runs are local. **Pending: confirmation on the VPS (#139).** The raw reports are in
 [`138/`](138/).
 
 ## Verdict
@@ -266,4 +266,4 @@ for R8 and 47.3 s for R9.
   submissions.** The back closes idle sockets at 5 s, below what Caddy keeps
   them for. #438 fixes the timeouts; #439 removes the stalls.
 
-Pendente: VPS (#139).
+Pending: confirmation on the VPS (#139).

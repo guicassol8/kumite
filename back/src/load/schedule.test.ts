@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isBadAt, mapLimit, sleep } from './schedule'
+import { isBadAt, kindAt, mapLimit, sleep } from './schedule'
 
 describe('isBadAt', () => {
   it('marks exactly 3 of 30 submissions bad at f = 0.1, always the same ones', () => {
@@ -20,6 +20,30 @@ describe('isBadAt', () => {
   it('spreads the bad ones evenly at f = 0.25', () => {
     const bad = Array.from({ length: 8 }, (_, i) => isBadAt(i, 0.25))
     expect(bad.flatMap((b, i) => (b ? [i] : []))).toEqual([3, 7])
+  })
+})
+
+describe('kindAt', () => {
+  const kinds = (n: number, bad: number, memoryShare: number) =>
+    Array.from({ length: n }, (_, i) => kindAt(i, bad, memoryShare))
+
+  it('makes 30 of 100 bad at 0.3, half of them memory bombs, always the same ones', () => {
+    const first = kinds(100, 0.3, 0.5)
+
+    expect(first.filter((kind) => kind !== 'correct')).toHaveLength(30)
+    expect(first.filter((kind) => kind === 'memory')).toHaveLength(15)
+    expect(first.filter((kind) => kind === 'loop')).toHaveLength(15)
+    expect(kinds(100, 0.3, 0.5)).toEqual(first)
+  })
+
+  it('sends the #136 sequence when no bad submission is a memory bomb', () => {
+    const expected = Array.from({ length: 30 }, (_, i) => (isBadAt(i, 0.1) ? 'loop' : 'correct'))
+    expect(kinds(30, 0.1, 0)).toEqual(expected)
+  })
+
+  it('turns every bad one into a memory bomb at a share of 1', () => {
+    expect(kinds(10, 0.2, 1).filter((kind) => kind === 'memory')).toHaveLength(2)
+    expect(kinds(10, 0.2, 1)).not.toContain('loop')
   })
 })
 

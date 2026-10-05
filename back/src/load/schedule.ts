@@ -1,3 +1,5 @@
+import type { SubmissionKind } from './verdict'
+
 // Scheduling helpers for the load harness (#136). Pure apart from timers.
 
 // Absorbs the float error in `i * f` (30 * 0.1 is 3.0000000000000004), so
@@ -12,6 +14,18 @@ const EPSILON = 1e-9
  */
 export function isBadAt(i: number, f: number): boolean {
   return Math.floor((i + 1) * f + EPSILON) > Math.floor(i * f + EPSILON)
+}
+
+/**
+ * The kind of submission `i` (#137): bad at `badFraction` as in `isBadAt`,
+ * and among the bad ones the b-th (0-based) is a memory bomb when
+ * `isBadAt(b, memoryShare)`, otherwise an infinite loop. Deterministic, and
+ * with `memoryShare` 0 it is #136's sequence exactly.
+ */
+export function kindAt(i: number, badFraction: number, memoryShare: number): SubmissionKind {
+  if (!isBadAt(i, badFraction)) return 'correct'
+  const ordinal = Math.floor(i * badFraction + EPSILON)
+  return isBadAt(ordinal, memoryShare) ? 'memory' : 'loop'
 }
 
 /**

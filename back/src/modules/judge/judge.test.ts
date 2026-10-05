@@ -6,7 +6,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { JudgeCase, JudgeCaseResult, JudgeConfig, Workspace } from './judge.schema'
 import { WorkspaceSchema } from './judge.schema'
-import { generateJudgeSource, getJudgeLoad, runJudge, runJudgeAgainstWorker } from './judge.service'
+import {
+  generateJudgeSource,
+  getJudgeLoad,
+  getJudgeTimings,
+  runJudge,
+  runJudgeAgainstWorker,
+} from './judge.service'
 
 const TEST_TIMEOUT_MS = 15_000
 
@@ -214,6 +220,117 @@ describe('getJudgeLoad', () => {
     },
     TEST_TIMEOUT_MS,
   )
+})
+
+// #137: one entry per judged submission, read by the load harness through
+// GET /organizer/stats/process. Only shapes and counts are asserted — never a
+// duration against another, nor against a bound (#431).
+describe('getJudgeTimings', () => {
+  const lastRun = () => getJudgeTimings().runs.at(-1)
+
+  it(
+    'records a passed run on the real worker, with its spawn, execution and every case',
+    async () => {
+      const cases: JudgeCase[] = [
+        { input: [1, 2, 3, 4], expected: 6 },
+        { input: [], expected: 0 },
+      ]
+      const before = getJudgeTimings().runs.at(-1)?.seq ?? 0
+      await runJudge(sourceOf(somaDosParesWorkspace), cases, testConfig)
+
+      const run = lastRun()
+      expect(run?.seq).toBeGreaterThan(before)
+      expect(run).toMatchObject({
+        outcome: 'passed',
+        cases: 2,
+        waitingAtArrival: 0,
+        spawnMs: expect.any(Number),
+        execMs: expect.any(Number),
+        queueMs: expect.any(Number),
+        caseMs: expect.any(Number),
+      })
+      expect(run?.spawnMs).toBeGreaterThanOrEqual(0)
+      expect(run?.execMs).toBeGreaterThanOrEqual(0)
+      expect(run?.endedAt).toBeGreaterThanOrEqual(run?.arrivedAt ?? Number.POSITIVE_INFINITY)
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'counts the queue position, not time: the second of two at concurrency 1 waited behind one',
+    async () => {
+      const cases: JudgeCase[] = [{ input: 'a', expected: 'a' }]
+      const config = { ...testConfig, concurrency: 1 }
+      const before = getJudgeTimings().runs.at(-1)?.seq ?? 0
+      await Promise.all([
+        runJudgeAgainstWorker(CRASH_WORKER_URL, 'unused', cases, config),
+        runJudgeAgainstWorker(CRASH_WORKER_URL, 'unused', cases, config),
+      ])
+
+      const runs = getJudgeTimings().runs.filter((run) => run.seq > before)
+      expect(runs.map((run) => run.waitingAtArrival).sort()).toEqual([0, 1])
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'records a worker that died before ready as runtime_error with no spawn time',
+    async () => {
+      // The double never sends `ready`, so there is no spawn to measure.
+      const cases: JudgeCase[] = [{ input: '__crash__', expected: null }]
+      await runJudgeAgainstWorker(CRASH_WORKER_URL, 'unused', cases, testConfig)
+      expect(lastRun()).toMatchObject({ outcome: 'runtime_error', spawnMs: null, cases: 1 })
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'reports the worst case as the outcome: a timeout beats a pass',
+    async () => {
+      const source = 'function solve(input) { if (input === 1) { while (true) {} } return input }'
+      const cases: JudgeCase[] = [
+        { input: 0, expected: 0 },
+        { input: 1, expected: 1 },
+      ]
+      await runJudge(source, cases, { ...testConfig, timeoutMs: 200 })
+      expect(lastRun()?.outcome).toBe('timeout')
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it(
+    'counts every spawned worker as exited once its submission is over',
+    async () => {
+      // terminate() is fire-and-forget: an exit lands a moment after its
+      // submission returns, so "none alive" is waited for, never assumed.
+      const settled = () =>
+        vi.waitFor(() => expect(getJudgeTimings().workers.alive).toBe(0), {
+          timeout: 10_000,
+          interval: 20,
+        })
+      await settled()
+      const before = getJudgeTimings().workers
+      const cases: JudgeCase[] = [{ input: 'a', expected: 'a' }]
+      await Promise.all(
+        Array.from({ length: 3 }, () =>
+          runJudgeAgainstWorker(CRASH_WORKER_URL, 'unused', cases, testConfig),
+        ),
+      )
+
+      expect(getJudgeTimings().workers.spawned).toBe(before.spawned + 3)
+      await settled()
+      expect(getJudgeTimings().workers.exited).toBe(before.exited + 3)
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it('reports the configuration the process judges with', () => {
+    expect(getJudgeTimings().config).toEqual({
+      concurrency: expect.any(Number),
+      timeoutMs: expect.any(Number),
+      memoryMb: expect.any(Number),
+    })
+  })
 })
 
 describe('WorkspaceSchema', () => {

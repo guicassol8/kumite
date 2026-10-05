@@ -1,8 +1,8 @@
 import { defineRoute } from '../../context'
 import { requireOrganizer, requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
-import { EventStatsSchema, LiveStatsSchema } from './stats.schema'
-import { getEventStats, getLiveStats } from './stats.service'
+import { EventStatsSchema, LiveStatsSchema, ProcessStatsSchema } from './stats.schema'
+import { getEventStats, getLiveStats, getProcessStats } from './stats.service'
 
 // 401/403 aren't declared: both are middleware short-circuits, never this
 // handler's own outcomes (ADR-0011), same as every other organizer route.
@@ -24,4 +24,17 @@ export const getLiveStatsRoute = defineRoute({
   input: {},
   output: LiveStatsSchema,
   handler: async (c) => getLiveStats(c.get('sseBus')),
+})
+
+// Polled once a second by the load harness (#136, back/src/load/) for CPU,
+// memory and event-loop lag — what cannot be measured from outside the
+// process. Same guards as /live; never shown on a screen. A read resets
+// nothing, so it coexists with any other poller.
+export const getProcessStatsRoute = defineRoute({
+  method: 'GET',
+  path: '/organizer/stats/process',
+  use: [requireUser, requirePasswordUpToDate, requireOrganizer],
+  input: {},
+  output: ProcessStatsSchema,
+  handler: async () => getProcessStats(),
 })

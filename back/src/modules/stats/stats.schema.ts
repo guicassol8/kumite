@@ -80,3 +80,51 @@ export const LiveStatsSchema = z.object({
 })
 
 export type LiveStats = z.infer<typeof LiveStatsSchema>
+
+// --- Process metrics for the load harness (#136) ---
+//
+// What only the process itself can measure: CPU, memory and event-loop lag.
+// Read by `back/src/load/` while it drives load, never shown on a screen. A
+// read resets nothing — CPU is cumulative and the windows are a ring — so
+// two pollers (the harness and an organizer tab) never steal each other's
+// samples. The harness derives CPU % from the difference between two reads
+// and merges windows by `endedAt`.
+const nonNegative = z.number().nonnegative()
+
+// One closed event-loop window. Delays are in milliseconds; a window in which
+// the histogram recorded nothing reports zeros, never NaN or a sentinel.
+export const EventLoopWindowSchema = z.object({
+  // Epoch milliseconds at which the window closed.
+  endedAt: z.number().int().nonnegative(),
+  durationMs: nonNegative,
+  delayP50Ms: nonNegative,
+  delayP99Ms: nonNegative,
+  delayMaxMs: nonNegative,
+  // Event-loop utilization over the window, in [0, 1].
+  utilization: z.number().min(0).max(1),
+})
+
+export type EventLoopWindow = z.infer<typeof EventLoopWindowSchema>
+
+export const ProcessStatsSchema = z.object({
+  sampledAt: z.number().int().nonnegative(),
+  uptimeSeconds: nonNegative,
+  // Cumulative since the process started (process.cpuUsage()), and therefore
+  // including the judge's worker threads.
+  cpu: z.object({ userMicros: nonNegative, systemMicros: nonNegative }),
+  // Bytes, straight from process.memoryUsage().
+  memory: z.object({
+    rss: nonNegative,
+    heapUsed: nonNegative,
+    heapTotal: nonNegative,
+    external: nonNegative,
+  }),
+  // `windowMs` is null when no sampler runs (unit tests, a script that only
+  // imports the app); `windows` is then empty. Oldest first.
+  eventLoop: z.object({
+    windowMs: z.number().int().positive().nullable(),
+    windows: z.array(EventLoopWindowSchema),
+  }),
+})
+
+export type ProcessStats = z.infer<typeof ProcessStatsSchema>

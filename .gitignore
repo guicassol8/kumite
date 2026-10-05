@@ -27,3 +27,7 @@ __pycache__/
 
 # venv do gerador da identidade (docs/design/canvas/generate/requirements.txt)
 .venv/
+
+# Load-harness runs (back/src/load, #136): report.md + report.json per run.
+# The reports worth keeping are copied into docs/load/ on purpose.
+load-results/

@@ -12,6 +12,10 @@ Task workflow: `docs/workflow.md` · Visual identity: `docs/design/identity.md`.
 - `back/` — API on the **kata** framework (Hono). Has its own `AGENTS.md` with
   the mandatory module layout — read it before touching back code.
 - `front/` — React SPA (Vite, TanStack, Tailwind v4 + shadcn). Own `AGENTS.md`.
+- `back/src/load/` — the load harness (`pnpm load:baseline`, `pnpm load:smoke`,
+  #136): builds its own world through the API, holds SSE open, submits, and
+  reports; how to run and reset in its `README.md`. Measured reports go in
+  `docs/load/`.
 - `blocks/` — `@kumite/blocks`: shared Blockly block definitions (root block,
   curated toolbox, JS generators) used by both `front/` (editor) and `back/`
   (headless codegen). The one sanctioned runtime cross-package exception

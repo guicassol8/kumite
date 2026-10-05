@@ -23,8 +23,8 @@ import {
 } from '../submissions/submissions.service'
 import type { Role, University } from '../users/users.schema'
 
-import { LiveStatsSchema } from './stats.schema'
-import { getEventStats, getLiveStats } from './stats.service'
+import { LiveStatsSchema, ProcessStatsSchema } from './stats.schema'
+import { getEventStats, getLiveStats, getProcessStats, startProcessSampler } from './stats.service'
 
 // Runs against the real dockerized Postgres (docker compose up -d), same as
 // the other DB-backed service suites.
@@ -413,5 +413,155 @@ describe('GET /organizer/stats/live', () => {
     const body = LiveStatsSchema.parse(await responses[0]?.json())
     expect(body.judge.concurrency).toBe(JUDGE_CONCURRENCY)
     expect(body.submissions.perMinute).toHaveLength(15)
+  })
+})
+
+// --- Process metrics for the load harness (#136) ---
+//
+// Timing rule (#431): only one-sided assertions. CPU contention from another
+// suite on the same machine can only make a window later or a delay longer,
+// so every check below is a floor, and windows are awaited by polling with a
+// wide deadline — never a fixed sleep.
+
+async function waitFor<T>(read: () => T | undefined, deadlineMs = 15_000): Promise<T> {
+  const started = Date.now()
+  for (;;) {
+    const value = read()
+    if (value !== undefined) return value
+    if (Date.now() - started > deadlineMs) throw new Error('waitFor: deadline passed')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+function busyWait(ms: number) {
+  const until = performance.now() + ms
+  while (performance.now() < until) {
+    // spin: block the event loop on purpose
+  }
+}
+
+describe('startProcessSampler', { timeout: 20_000 }, () => {
+  let stop: (() => void) | undefined
+
+  afterEach(() => {
+    stop?.()
+    stop = undefined
+  })
+
+  it('closes windows in order, each with bounded utilization', async () => {
+    stop = startProcessSampler({ windowMs: 50, keep: 120 })
+
+    const windows = await waitFor(() => {
+      const current = getProcessStats().eventLoop.windows
+      return current.length >= 3 ? current : undefined
+    })
+
+    for (let i = 1; i < windows.length; i++) {
+      expect(windows[i]?.endedAt).toBeGreaterThanOrEqual(windows[i - 1]?.endedAt ?? 0)
+    }
+    for (const window of windows) {
+      expect(window.utilization).toBeGreaterThanOrEqual(0)
+      expect(window.utilization).toBeLessThanOrEqual(1)
+      expect(Number.isFinite(window.delayP50Ms)).toBe(true)
+      expect(Number.isFinite(window.delayP99Ms)).toBe(true)
+      expect(Number.isFinite(window.delayMaxMs)).toBe(true)
+    }
+    expect(getProcessStats().eventLoop.windowMs).toBe(50)
+  })
+
+  it('records a blocked event loop as a delay of at least the block', async () => {
+    stop = startProcessSampler({ windowMs: 50, keep: 120 })
+    await waitFor(() => (getProcessStats().eventLoop.windows.length >= 1 ? true : undefined))
+
+    busyWait(120)
+
+    const blocked = await waitFor(() =>
+      getProcessStats().eventLoop.windows.find((window) => window.delayMaxMs >= 100),
+    )
+    expect(blocked.delayMaxMs).toBeGreaterThanOrEqual(100)
+  })
+
+  it('keeps at most `keep` windows, dropping the oldest', async () => {
+    stop = startProcessSampler({ windowMs: 20, keep: 3 })
+
+    // Six windows closed means the ring has wrapped at least once.
+    let closed = 0
+    let lastEnd = 0
+    await waitFor(() => {
+      for (const window of getProcessStats().eventLoop.windows) {
+        if (window.endedAt > lastEnd) {
+          closed += 1
+          lastEnd = window.endedAt
+        }
+      }
+      return closed >= 6 ? true : undefined
+    })
+
+    const windows = getProcessStats().eventLoop.windows
+    expect(windows.length).toBeLessThanOrEqual(3)
+    expect(windows.at(-1)?.endedAt).toBeGreaterThanOrEqual(lastEnd)
+  })
+
+  it('empties the ring when stopped', async () => {
+    stop = startProcessSampler({ windowMs: 20, keep: 10 })
+    await waitFor(() => (getProcessStats().eventLoop.windows.length >= 1 ? true : undefined))
+
+    stop()
+    stop = undefined
+
+    expect(getProcessStats().eventLoop.windows).toEqual([])
+    expect(getProcessStats().eventLoop.windowMs).toBeNull()
+  })
+
+  it('reads CPU and memory without a sampler running', () => {
+    const stats = getProcessStats()
+
+    expect(stats.eventLoop.windows).toEqual([])
+    expect(stats.cpu.userMicros + stats.cpu.systemMicros).toBeGreaterThan(0)
+    expect(stats.memory.rss).toBeGreaterThan(0)
+    expect(stats.memory.heapUsed).toBeGreaterThan(0)
+    expect(stats.uptimeSeconds).toBeGreaterThan(0)
+    expect(ProcessStatsSchema.parse(stats)).toEqual(stats)
+  })
+})
+
+describe('GET /organizer/stats/process', { timeout: 20_000 }, () => {
+  async function tokenFor(user: { id: string; role: Role; university: University }) {
+    return signJwt(
+      { role: user.role, university: user.university },
+      { secret: JWT_SECRET, subject: user.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+    )
+  }
+
+  it('answers 401 without a token', async () => {
+    const res = await app.request('/organizer/stats/process')
+    expect(res.status).toBe(401)
+  })
+
+  it('answers 403 to a participant', async () => {
+    const participant = await insertUser()
+    const res = await app.request('/organizer/stats/process', {
+      headers: { Authorization: `Bearer ${await tokenFor(participant)}` },
+    })
+    expect(res.status).toBe(403)
+  })
+
+  it('answers 200 to an organizer with the process metrics and the windows', async () => {
+    const stop = startProcessSampler({ windowMs: 20, keep: 10 })
+    try {
+      await waitFor(() => (getProcessStats().eventLoop.windows.length >= 1 ? true : undefined))
+      const organizer = await insertUser({ role: 'organizer' })
+
+      const res = await app.request('/organizer/stats/process', {
+        headers: { Authorization: `Bearer ${await tokenFor(organizer)}` },
+      })
+
+      expect(res.status).toBe(200)
+      const body = ProcessStatsSchema.parse(await res.json())
+      expect(body.memory.rss).toBeGreaterThan(0)
+      expect(body.eventLoop.windows.length).toBeGreaterThanOrEqual(1)
+    } finally {
+      stop()
+    }
   })
 })

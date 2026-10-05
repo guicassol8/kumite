@@ -92,3 +92,35 @@ jsonpath "$.sse.connections" >= 0
 jsonpath "$.submissions.inFlight" >= 0
 jsonpath "$.submissions.lastMinute" >= 0
 jsonpath "$.submissions.perMinute" count == 15
+
+# --- Process metrics for the load harness (#136) ---
+
+# 3a. No token -> 401.
+GET {{host}}/organizer/stats/process
+HTTP 401
+[Asserts]
+jsonpath "$.error" == "unauthorized"
+
+# 3b. Participant token -> 403.
+GET {{host}}/organizer/stats/process
+Authorization: Bearer {{participant_token}}
+HTTP 403
+[Asserts]
+jsonpath "$.error" == "forbidden"
+
+# 3c. Organizer -> 200 with CPU, memory and the event-loop windows. The
+# sampler starts with the server (main.ts), so the windows exist; how many
+# depends on how long it has been up, so only the shape is asserted.
+GET {{host}}/organizer/stats/process
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.uptimeSeconds" > 0
+jsonpath "$.cpu.userMicros" >= 0
+jsonpath "$.cpu.systemMicros" >= 0
+jsonpath "$.memory.rss" > 0
+jsonpath "$.memory.heapUsed" > 0
+jsonpath "$.memory.heapTotal" > 0
+jsonpath "$.memory.external" >= 0
+jsonpath "$.eventLoop.windowMs" == 1000
+jsonpath "$.eventLoop.windows" exists

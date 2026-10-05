@@ -4,6 +4,7 @@ import { app } from './app'
 import { env } from './config'
 import { k } from './context'
 import { runExpiryTick, runRankingTick } from './modules/sse/sse.service'
+import { startProcessSampler } from './modules/stats/stats.service'
 
 serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log('kumite api: listening on http://localhost:' + info.port)
@@ -21,3 +22,8 @@ setInterval(() => {
     console.error('sse ranking tick failed', err)
   })
 }, 1000).unref()
+
+// Event-loop lag and utilization, one window per second, the last two minutes
+// kept (#136). Read by GET /organizer/stats/process; wired here for the same
+// reason as the ticks above, and its own timer is unref'd too.
+startProcessSampler({ windowMs: 1000, keep: 120 })

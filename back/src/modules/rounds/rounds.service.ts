@@ -465,19 +465,28 @@ async function findTeamIdForParticipant(db: Db, userId: string): Promise<string 
   return membership?.teamId ?? null
 }
 
+type TeamBest = { score: number; maxScore: number | null }
+
 // One round trip for every problem in the round: rows come back sorted by
-// score desc (then earliest createdAt on a tie), so the first row seen for a
-// given problemId is already that problem's best submission.
+// score desc, then earliest acceptedAt on a tie — the same tiebreak as
+// getBestSubmission and the ranking (#238, #421), so the list and the problem
+// screen pick the same row. The first row seen for a given problemId is
+// already that problem's best submission. maxScore is the raw stamp (#193):
+// getParticipantRound resolves a NULL one.
 async function getBestScoresForTeam(
   db: Db,
   teamId: string,
   problemIds: string[],
   roundId: string,
-): Promise<Map<string, number>> {
+): Promise<Map<string, TeamBest>> {
   if (problemIds.length === 0) return new Map()
 
   const rows = await db
-    .select({ problemId: submissionsTable.problemId, score: submissionsTable.score })
+    .select({
+      problemId: submissionsTable.problemId,
+      score: submissionsTable.score,
+      maxScore: submissionsTable.maxScore,
+    })
     .from(submissionsTable)
     .where(
       and(
@@ -486,21 +495,23 @@ async function getBestScoresForTeam(
         inArray(submissionsTable.problemId, problemIds),
       ),
     )
-    .orderBy(desc(submissionsTable.score), asc(submissionsTable.createdAt))
+    .orderBy(desc(submissionsTable.score), asc(submissionsTable.acceptedAt))
 
-  const bestByProblem = new Map<string, number>()
+  const bestByProblem = new Map<string, TeamBest>()
   for (const row of rows) {
-    if (!bestByProblem.has(row.problemId)) bestByProblem.set(row.problemId, row.score)
+    if (!bestByProblem.has(row.problemId)) {
+      bestByProblem.set(row.problemId, { score: row.score, maxScore: row.maxScore })
+    }
   }
   return bestByProblem
 }
 
 // The participant read of a round (#39): a missing round or one still
 // 'draft' returns null — same "never announces itself" rule as
-// listParticipantRounds. bestScore is the caller's team best on each
+// listParticipantRounds. bestSubmission is the caller's team best on each
 // problem, open or closed (#206: the team sees its own result mid-round,
-// matching getPublishedProblem); null when the team never submitted it or the
-// caller has no team.
+// matching getPublishedProblem), with the maximum it was judged against
+// (#421); null when the team never submitted it or the caller has no team.
 export async function getParticipantRound(
   db: Db,
   id: string,
@@ -553,7 +564,7 @@ export async function getParticipantRound(
   const teamId = await findTeamIdForParticipant(db, userId)
   const bestScores =
     teamId === null
-      ? new Map<string, number>()
+      ? new Map<string, TeamBest>()
       : await getBestScoresForTeam(db, teamId, problemIds, round.id)
 
   return {
@@ -578,13 +589,22 @@ export async function getParticipantRound(
           problemTranslations.find((t) => t.locale === locale) ??
           problemTranslations.find((t) => t.locale === 'pt')
 
+        const best = bestScores.get(rp.problemId)
+
         return {
           problemId: rp.problemId,
           position: rp.position,
           title: translation?.title ?? '',
           difficulty: problem.difficulty,
           points: problem.points,
-          bestScore: bestScores.get(rp.problemId) ?? null,
+          // A NULL stamp means the row was judged before #193 stamped it, so
+          // the current points are the only number there is — exactly what
+          // this list showed before #421 (same fallback as getPublishedProblem,
+          // #319).
+          bestSubmission:
+            best === undefined
+              ? null
+              : { score: best.score, maxScore: best.maxScore ?? problem.points },
         }
       }),
   }

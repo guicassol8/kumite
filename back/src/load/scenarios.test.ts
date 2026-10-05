@@ -133,6 +133,28 @@ describe('runScenario', { timeout: 120_000 }, () => {
     expect(report.aborted).toBe(false)
   })
 
+  it('stops the setup on Ctrl-C: no new signup and no round', async () => {
+    const controller = new AbortController()
+    let signups = 0
+    const abortAfterFirstSignup: FetchLike = async (input, init) => {
+      const res = await app.request(input, init)
+      if (new URL(input).pathname === '/auth/signup' && ++signups === 1) controller.abort()
+      return res
+    }
+
+    const report = await runScenario({
+      config: { ...minimal, teams: 5, setupConcurrency: 1 },
+      fetch: abortAfterFirstSignup,
+      runId: 'midsetup',
+      signal: controller.signal,
+    })
+
+    expect(report.aborted).toBe(true)
+    expect(report.world).toBeNull()
+    expect(report.actions['signup']).toEqual({ started: 1, completed: 1 })
+    expect(report.http.setup?.['POST /organizer/rounds']).toBeUndefined()
+  })
+
   it('writes a partial report when aborted', async () => {
     const controller = new AbortController()
     controller.abort()

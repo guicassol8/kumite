@@ -1038,7 +1038,8 @@
     },
     "bestScore": {
       "unavailable": "—",
-      "none": "Sem submissão"
+      "none": "Sem submissão",
+      "score": "{{score}}/{{maxScore}}"
     },
     "connection": {
       "reconnecting": "Conexão perdida — reconectando..."

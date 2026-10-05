@@ -155,7 +155,7 @@ function participantRound(problems: { problemId: string; position: number }[]) {
       title: 'Soma dos Pares',
       difficulty: 'easy',
       points: 10,
-      bestScore: null,
+      bestSubmission: null,
     })),
   }
 }

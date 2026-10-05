@@ -29,6 +29,8 @@ const evidence206 = (name: string) => `e2e/evidence/206/${name}.png`
 const evidence280 = (name: string) => `e2e/evidence/280/${name}.png`
 // #319: the best score keeps the maximum it was judged against.
 const evidence319 = (name: string) => `e2e/evidence/319/${name}.png`
+// #421: the round list's team best keeps the maximum it was judged against.
+const evidence421 = (name: string) => `e2e/evidence/421/${name}.png`
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -210,11 +212,13 @@ test.describe('problem screen (#7)', () => {
     await page.screenshot({ path: evidence206('02-badge-apos-submeter'), fullPage: true })
 
     // #206: back on the round list (client-side), the same number in the row.
+    // #421: over the same stamped maximum as the badge.
     await page.goBack()
     await expect(page).toHaveURL(new RegExp(`/rounds/${roundId}$`))
     await expect(bestScoreCell).toHaveAttribute('data-state', 'score')
-    await expect(bestScoreCell).toHaveText(new RegExp(`\\b${bestScore}$`))
+    await expect(bestScoreCell).toHaveText(new RegExp(`\\b${bestScore}/100$`))
     await page.screenshot({ path: evidence206('03-lista-da-rodada-com-nota'), fullPage: true })
+    await page.screenshot({ path: evidence421('01-lista-aberta-com-maximo'), fullPage: true })
 
     // #206: a participant with no team sees no team best — "—" on the list
     // and no badge on the problem — and no error either.
@@ -281,5 +285,18 @@ test.describe('problem screen (#7)', () => {
     await expect(closedBest).toContainText(`${bestScore}/100`)
     await expect(closedBest).not.toContainText('250')
     await page.screenshot({ path: evidence319('02-pontos-250-maximo-carimbado'), fullPage: true })
+
+    // #421: the round list agrees — the Points column says what the problem
+    // is worth now (250), the team's cell keeps "/100". No editor here, so no
+    // extra Blockly mount.
+    await page.goto(`/rounds/${roundId}`)
+    await expect(page.getByTestId(`round-problem-points-${problemId}`)).toHaveText(/\b250$/)
+    await expect(bestScoreCell).toHaveAttribute('data-state', 'score')
+    await expect(bestScoreCell).toHaveText(new RegExp(`\\b${bestScore}/100$`))
+    await expect(bestScoreCell).not.toContainText('250')
+    await page.screenshot({
+      path: evidence421('02-lista-pontos-250-maximo-carimbado'),
+      fullPage: true,
+    })
   })
 })

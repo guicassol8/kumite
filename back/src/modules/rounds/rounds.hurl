@@ -265,7 +265,7 @@ HTTP 404
 [Asserts]
 jsonpath "$.error" == "not_found"
 
-# 9a-d. The closed round -> 200, with both problems, bestScore null (this
+# 9a-d. The closed round -> 200, with both problems, bestSubmission null (this
 # participant has no team and nobody submitted; open or closed, a team sees
 # its own best, #206), and the default (pt) locale title.
 GET {{host}}/rounds/{{round_id}}
@@ -275,7 +275,7 @@ HTTP 200
 jsonpath "$.status" == "closed"
 jsonpath "$.problems" count == 2
 jsonpath "$.problems[0].problemId" == "{{problem_id}}"
-jsonpath "$.problems[0].bestScore" == null
+jsonpath "$.problems[0].bestSubmission" == null
 jsonpath "$.problems[0].title" == "Soma"
 
 # 9a-e. ?locale=es returns the Spanish title captured earlier.

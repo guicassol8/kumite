@@ -4,6 +4,7 @@ import { LocaleSchema } from '../../lib/locale'
 import { UuidSchema } from '../../lib/uuid'
 
 import { DifficultySchema } from '../problems/problems.schema'
+import { BestSubmissionSchema } from '../submissions/submissions.schema'
 
 // Mirrors the `rounds` drizzle table (db/schema.ts).
 export const RoundStatusSchema = z.enum(['draft', 'open', 'closed'])
@@ -134,9 +135,11 @@ export const ParticipantRoundProblemSchema = z.object({
   title: z.string(),
   difficulty: DifficultySchema,
   points: z.number().int(),
-  // The team's best score on this problem, open or closed (#206). Null when
-  // the team never submitted it or the caller has no team.
-  bestScore: z.number().int().nullable(),
+  // The team's best submission on this problem, open or closed (#206). Null
+  // when the team never submitted it or the caller has no team. maxScore is
+  // that row's stamp (#319, #421), never the points read now — the points
+  // column beside it says what the problem is worth today.
+  bestSubmission: BestSubmissionSchema.pick({ score: true, maxScore: true }).nullable(),
 })
 
 // coerce, not date(): kata re-validates the output after JSON serialization,

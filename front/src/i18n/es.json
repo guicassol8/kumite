@@ -1038,7 +1038,8 @@
     },
     "bestScore": {
       "unavailable": "—",
-      "none": "Sin envíos"
+      "none": "Sin envíos",
+      "score": "{{score}}/{{maxScore}}"
     },
     "connection": {
       "reconnecting": "Conexión perdida — reconectando..."

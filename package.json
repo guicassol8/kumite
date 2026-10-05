@@ -19,6 +19,9 @@
     "e2e": "bash scripts/e2e.sh",
     "worktree:prune": "bash scripts/worktree-prune.sh",
     "worktree:env": "bash scripts/worktree-env.sh",
+    "load": "pnpm --filter @kumite/back load",
+    "load:baseline": "pnpm --filter @kumite/back load baseline",
+    "load:smoke": "pnpm --filter @kumite/back load smoke",
     "prepare": "lefthook install"
   },
   "devDependencies": {

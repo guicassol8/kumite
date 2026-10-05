@@ -133,7 +133,7 @@ describe('buildFailures', () => {
 
   it('flags a setup error and an abort', () => {
     const recorder = cleanRecorder()
-    recorder.setupErrors.push('another round is open: "Rodada 1"')
+    recorder.errors.push({ phase: 'setup', message: 'another round is open: "Rodada 1"' })
     expect(buildFailures({ recorder, sse: cleanSse(), aborted: true })).toEqual([
       'setup failed: another round is open: "Rodada 1"',
       'run aborted before the end (SIGINT) — this report is partial',
@@ -297,7 +297,7 @@ describe('buildReport + renderMarkdown', () => {
 
   it('fails a run with failures and lists them first', () => {
     const recorder = cleanRecorder()
-    recorder.setupErrors.push('boom')
+    recorder.errors.push({ phase: 'setup', message: 'boom' })
     const report = buildReport(input({ recorder, world: null, aborted: true }))
     const markdown = renderMarkdown(report)
 

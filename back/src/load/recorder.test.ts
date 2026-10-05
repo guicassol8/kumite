@@ -120,14 +120,16 @@ describe('createRecorder', () => {
       status: 409,
       errorCode: 'name_taken',
     })
-    recorder.recordSetupError('another round is open: Rodada 1')
+    recorder.recordError('another round is open: Rodada 1')
     recorder.recordWarning('the database was not clean')
 
     const snapshot = recorder.snapshot()
     expect(snapshot.unexpected).toEqual([
       { phase: 'setup', route: 'POST /teams', status: 409, errorCode: 'name_taken', count: 1 },
     ])
-    expect(snapshot.setupErrors).toEqual(['another round is open: Rodada 1'])
+    expect(snapshot.errors).toEqual([
+      { phase: 'setup', message: 'another round is open: Rodada 1' },
+    ])
     expect(snapshot.warnings).toEqual(['the database was not clean'])
   })
 

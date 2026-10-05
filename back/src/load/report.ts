@@ -211,7 +211,7 @@ export function buildFailures(input: {
   const failures: string[] = []
   const { recorder, sse } = input
 
-  for (const message of recorder.setupErrors) failures.push(`setup failed: ${message}`)
+  for (const { phase, message } of recorder.errors) failures.push(`${phase} failed: ${message}`)
 
   for (const [phase, routes] of Object.entries(recorder.http)) {
     for (const [route, stats] of Object.entries(routes ?? {})) {
@@ -264,7 +264,9 @@ export function buildFailures(input: {
 
 export function buildReport(input: ReportInput): LoadReport {
   const sse = summarizeSse(input.sse.requested, input.sse.connections)
-  const windows = mergeWindows(input.samples)
+  // The first read hands back the whole ring — up to two minutes from before
+  // the run started. Those windows belong to no phase.
+  const windows = mergeWindows(input.samples).filter((window) => window.endedAt >= input.startedAt)
   const failures = buildFailures({ recorder: input.recorder, sse, aborted: input.aborted })
   const { organizerPassword: _password, ...config } = input.config
   return {

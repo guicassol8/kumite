@@ -51,7 +51,7 @@ export type RecorderSnapshot = {
     matrix: Partial<Record<SubmissionKind, Partial<Record<Verdict, number>>>>
     incoherent: number
   }
-  setupErrors: string[]
+  errors: { phase: Phase; message: string }[]
   warnings: string[]
 }
 
@@ -83,7 +83,7 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
   const actions: Record<string, { started: number; completed: number }> = {}
   const matrix: RecorderSnapshot['verdicts']['matrix'] = {}
   let incoherent = 0
-  const setupErrors: string[] = []
+  const errors: { phase: Phase; message: string }[] = []
   const warnings: string[] = []
 
   const bucketFor = (route: string): RouteBucket => {
@@ -173,8 +173,9 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
       if (!isCoherent(kind, verdict)) incoherent += 1
     },
 
-    recordSetupError(message: string) {
-      setupErrors.push(message)
+    /** An error that stopped the run in the current phase (setup, ramp...). */
+    recordError(message: string) {
+      errors.push({ phase: current, message })
     },
 
     recordWarning(message: string) {
@@ -202,7 +203,7 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
         unexpected: [...unexpected.values()].map((entry) => ({ ...entry })),
         actions: structuredClone(actions),
         verdicts: { matrix: structuredClone(matrix), incoherent },
-        setupErrors: [...setupErrors],
+        errors: errors.map((error) => ({ ...error })),
         warnings: [...warnings],
       }
     },

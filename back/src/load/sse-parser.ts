@@ -51,32 +51,63 @@ export function createSseParser(onFrame: (frame: SseFrame) => void) {
   }
 }
 
+export type ByteStats = { count: number; total: number; min: number; max: number }
+
 export type EventTally = {
   // Events of each type on this connection.
   counts: Record<string, number>
   // Milliseconds between consecutive heartbeats on this connection.
   heartbeatIntervalsMs: number[]
+  // The largest of them; null before the second heartbeat (#138).
+  maxHeartbeatGapMs: number | null
+  // Payload bytes per type (#138).
+  bytes: Record<string, ByteStats>
+  // The time each type first arrived, on the caller's clock (#138).
+  firstAt: Record<string, number>
 }
 
 /**
- * Per-connection event counts and the gaps between heartbeats. Timestamps
- * are passed in, never read from a clock here, so the gaps are testable
- * without measuring anything (#431).
+ * Per-connection event counts, payload bytes, first arrivals and the gaps
+ * between heartbeats. Timestamps are passed in, never read from a clock here,
+ * so the gaps are testable without measuring anything (#431).
  */
 export function createEventTally() {
   const counts: Record<string, number> = {}
   const heartbeatIntervalsMs: number[] = []
+  const bytes: Record<string, ByteStats> = {}
+  const firstAt: Record<string, number> = {}
   let lastHeartbeat: number | null = null
+  let maxGap: number | null = null
 
   return {
-    record(type: string, at: number) {
+    record(type: string, at: number, size = 0) {
       counts[type] = (counts[type] ?? 0) + 1
+      firstAt[type] ??= at
+      const stats = bytes[type]
+      if (stats) {
+        stats.count += 1
+        stats.total += size
+        stats.min = Math.min(stats.min, size)
+        stats.max = Math.max(stats.max, size)
+      } else {
+        bytes[type] = { count: 1, total: size, min: size, max: size }
+      }
       if (type !== 'heartbeat') return
-      if (lastHeartbeat !== null) heartbeatIntervalsMs.push(at - lastHeartbeat)
+      if (lastHeartbeat !== null) {
+        const gap = at - lastHeartbeat
+        heartbeatIntervalsMs.push(gap)
+        if (maxGap === null || gap > maxGap) maxGap = gap
+      }
       lastHeartbeat = at
     },
     snapshot(): EventTally {
-      return { counts: { ...counts }, heartbeatIntervalsMs: [...heartbeatIntervalsMs] }
+      return {
+        counts: { ...counts },
+        heartbeatIntervalsMs: [...heartbeatIntervalsMs],
+        maxHeartbeatGapMs: maxGap,
+        bytes: structuredClone(bytes),
+        firstAt: { ...firstAt },
+      }
     },
   }
 }

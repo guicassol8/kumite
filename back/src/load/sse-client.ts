@@ -2,8 +2,9 @@ import { performance } from 'node:perf_hooks'
 
 import { SseEventSchema } from '../modules/sse/sse.schema'
 
+import { rankingDigest } from './ranking-digest'
 import type { Recorder } from './recorder'
-import { createEventTally, createSseParser } from './sse-parser'
+import { type ByteStats, createEventTally, createSseParser } from './sse-parser'
 
 // One `/sse` connection held open by the load harness (#136). fetch with the
 // Authorization header (the route reads no query token, so no EventSource),
@@ -21,6 +22,16 @@ export type SseConnectionReport = {
   dropReason: string | null
   events: Record<string, number>
   heartbeatIntervalsMs: number[]
+  // #138: the largest gap between two heartbeats on this connection.
+  maxHeartbeatGapMs: number | null
+  // #138: payload bytes per event type (the `data:` line, UTF-8).
+  bytes: Record<string, ByteStats>
+  // #138: from the start of the connect to the response headers, and to
+  // the first event of each type.
+  headersMs: number | null
+  firstEventMs: Record<string, number>
+  // #138: digest of the last ranking.updated (see ranking-digest.ts).
+  lastRankingDigest: string | null
   invalidPayloads: number
   // The first few invalid payloads, verbatim, for the report.
   invalidSamples: string[]
@@ -80,22 +91,33 @@ export async function connectSse({
   now?: () => number
 }): Promise<SseConnection> {
   const tally = createEventTally()
+  const started = now()
   const report: SseConnectionReport = {
     state: 'failed',
     failure: null,
     dropReason: null,
     events: {},
     heartbeatIntervalsMs: [],
+    maxHeartbeatGapMs: null,
+    bytes: {},
+    headersMs: null,
+    firstEventMs: {},
+    lastRankingDigest: null,
     invalidPayloads: 0,
     invalidSamples: [],
   }
   const snapshot = (): SseConnectionReport => {
-    const { counts, heartbeatIntervalsMs } = tally.snapshot()
+    const { counts, heartbeatIntervalsMs, maxHeartbeatGapMs, bytes, firstAt } = tally.snapshot()
     return {
       ...report,
       failure: report.failure ? { ...report.failure } : null,
       events: counts,
       heartbeatIntervalsMs,
+      maxHeartbeatGapMs,
+      bytes,
+      firstEventMs: Object.fromEntries(
+        Object.entries(firstAt).map(([type, at]) => [type, at - started]),
+      ),
       invalidSamples: [...report.invalidSamples],
     }
   }
@@ -110,7 +132,6 @@ export async function connectSse({
     () => controller.abort(new DOMException('connect timeout', 'TimeoutError')),
     connectTimeoutMs,
   )
-  const started = now()
   let res: Response
   try {
     res = await fetch(url, {
@@ -147,7 +168,8 @@ export async function connectSse({
     return settled
   }
   // Time to headers: the body of a stream never ends on its own.
-  recorder?.recordHttp({ method: 'GET', url, status: 200, errorCode: null, ms: now() - started })
+  report.headersMs = now() - started
+  recorder?.recordHttp({ method: 'GET', url, status: 200, errorCode: null, ms: report.headersMs })
   report.state = 'open'
 
   let closedByHarness = false
@@ -170,7 +192,10 @@ export async function connectSse({
       return
     }
     lastType = parsed.data.type
-    tally.record(parsed.data.type, now())
+    if (parsed.data.type === 'ranking.updated') {
+      report.lastRankingDigest = rankingDigest(parsed.data)
+    }
+    tally.record(parsed.data.type, now(), Buffer.byteLength(frame.data))
   })
 
   const ended = (async () => {

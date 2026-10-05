@@ -68,15 +68,38 @@ describe('createEventTally', () => {
     tally.record('ranking.updated', 2_500)
     tally.record('heartbeat', 3_500)
 
-    expect(tally.snapshot()).toEqual({
+    expect(tally.snapshot()).toMatchObject({
       counts: { 'state.sync': 1, 'ranking.updated': 2, heartbeat: 3 },
       heartbeatIntervalsMs: [1_010, 1_490],
+      maxHeartbeatGapMs: 1_490,
     })
+  })
+
+  it('sums the payload bytes per type and keeps their extremes (#138)', () => {
+    const tally = createEventTally()
+    tally.record('ranking.updated', 0, 300)
+    tally.record('ranking.updated', 1, 100)
+    tally.record('heartbeat', 2, 50)
+
+    expect(tally.snapshot().bytes).toEqual({
+      'ranking.updated': { count: 2, total: 400, min: 100, max: 300 },
+      heartbeat: { count: 1, total: 50, min: 50, max: 50 },
+    })
+  })
+
+  it('keeps when each type first arrived, from injected times (#138)', () => {
+    const tally = createEventTally()
+    tally.record('state.sync', 7)
+    tally.record('ranking.updated', 9)
+    tally.record('ranking.updated', 30)
+
+    expect(tally.snapshot().firstAt).toEqual({ 'state.sync': 7, 'ranking.updated': 9 })
   })
 
   it('has no interval before the second heartbeat', () => {
     const tally = createEventTally()
     tally.record('heartbeat', 42)
     expect(tally.snapshot().heartbeatIntervalsMs).toEqual([])
+    expect(tally.snapshot().maxHeartbeatGapMs).toBeNull()
   })
 })

@@ -155,7 +155,8 @@ CADDY_EMAIL=<an email Let's Encrypt can contact about cert issues>
 GHCR_OWNER=<github owner, e.g. guicassol8>
 ```
 The first three are required. `GHCR_OWNER` (default `guicassol8`) and `TAG`
-(default `latest`, pin a commit sha to roll a deploy back) are the only
+(default `latest`, pin a commit sha to roll a deploy back — see **Rolling
+back** in §9) are the only
 optional ones — see `.env.example` at the repo root, which lists exactly what
 `docker-compose.prod.yml` reads.
 
@@ -193,6 +194,42 @@ every release, and it never overwrites the organizer account, the event codes
 or the event configuration the organizer changed in the panel. `db:reset`
 (the local, wipe-everything variant) refuses any non-local database, so it
 cannot be pointed at this one by accident.
+
+**Disk cleanup on every deploy (#429).** `deploy.yml` runs
+`docker image prune -f` twice: right before
+`docker compose -f docker-compose.prod.yml pull back`, to remove the leftover
+of an aborted deploy, and after `db:seed`, to remove the image `up -d` just
+replaced. The back image is ~2 GB and the VM disk 9.7 GB, and on v0.5.0 the
+`pull` no longer fit. The prune removes only dangling images, the untagged ones
+no container uses. It leaves alone the named volumes (`db-data-prod`,
+`caddy-data`, `caddy-config`), the `./backups` bind mount and the images in use
+by `db`, `backup` and `caddy`. To check it after a release:
+```bash
+docker images -f dangling=true   # empty
+docker images                    # one kumite-back, plus postgres:17-alpine and caddy:2-alpine
+df -h /
+```
+
+**Rolling back.** Pin the previous release's commit sha in the root `.env`,
+then pull and recreate:
+```bash
+# in ~/kumite/.env
+TAG=<sha>
+```
+```bash
+docker compose -f docker-compose.prod.yml pull back
+docker compose -f docker-compose.prod.yml up -d
+```
+The image comes from GHCR, not from the VM: the deploy prune already removed
+the previous local copy. The pull needs the login from §7. It works because
+`deploy.yml` publishes every release as both `:latest` and `:<sha>`, and
+nothing deletes the sha tags. Rolling the image back does not undo migrations. Remove `TAG` from
+`.env` before the next release (while it is pinned, the deploy pulls the pinned
+sha, not the new `latest`). Then delete the sha image by hand, since a tagged
+image is never dangling and the prune keeps it:
+```bash
+docker image rm ghcr.io/<owner>/kumite-back:<sha>
+```
 
 ## 10. Point the front at the live back
 

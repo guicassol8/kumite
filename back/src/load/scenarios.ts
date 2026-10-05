@@ -178,9 +178,10 @@ export async function runScenario({
     if (world?.round && config.submissions > 0 && !signal?.aborted) {
       recorder.setPhase('settle')
       log('settle: judge drain and ranking consistency')
-      const drain = await waitForDrain({ transport, organizerToken })
+      const drain = await waitForDrain({ transport, recorder, organizerToken })
       const consistency = await waitForConsistency({
         transport,
+        recorder,
         organizerToken,
         roundId: world.round.id,
         connections,
@@ -206,6 +207,7 @@ export async function runScenario({
       })
       const consistency = await waitForConsistency({
         transport,
+        recorder,
         organizerToken,
         roundId: world.round?.id ?? null,
         connections: stormConnections,

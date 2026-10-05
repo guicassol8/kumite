@@ -1,9 +1,9 @@
 import { performance } from 'node:perf_hooks'
 
 import type { LoadConfig } from './config'
-import type { NetworkErrorDetail, Recorder } from './recorder'
+import type { Recorder } from './recorder'
 import { kindAt, sleep } from './schedule'
-import { detailOf, readErrorCode, type Transport } from './transport'
+import { detailOf, isStaleSocket, readErrorCode, type Transport } from './transport'
 import { classifyVerdict, rejectedVerdict, type SubmissionKind } from './verdict'
 import { WORKSPACES } from './workspaces'
 import type { LoadTeam, LoadUser, World } from './world'
@@ -17,23 +17,6 @@ import type { LoadTeam, LoadUser, World } from './world'
 
 // Retries of a 429 before the submission counts as rejected.
 export const MAX_THROTTLE_RETRIES = 3
-
-/**
- * The one network error a submission is sent again for (#138): the back
- * closed an idle keep-alive socket just as the harness reused it, so the
- * request failed before any byte of a response — it never reached a
- * handler. A browser silently resends in exactly that case; undici does not.
- * Anything else (a fresh socket, a failure mid-body, a timeout) is not
- * retried.
- */
-export function isStaleSocket(detail: NetworkErrorDetail | undefined): boolean {
-  return (
-    detail !== undefined &&
-    detail.stage === 'request' &&
-    detail.reusedSocket === true &&
-    (detail.reason === 'UND_ERR_SOCKET' || detail.reason === 'ECONNRESET')
-  )
-}
 
 export type SubmitterConfig = Pick<LoadConfig, 'submissions' | 'badFraction' | 'cooldownMs'> &
   Partial<Pick<LoadConfig, 'memoryShare'>>

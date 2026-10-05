@@ -246,7 +246,8 @@ cooldown: the harness can reuse a socket at the moment the back closes it.
 undici then fails the POST with `UND_ERR_SOCKET` ("other side closed")
 before any byte of a response — the request never reached a handler. A
 browser silently resends a request in exactly that case; undici does not.
-So a submission is sent again **once**, only for `UND_ERR_SOCKET` or
-`ECONNRESET` on a reused socket before any response. Every retry is counted
+So a submission — and likewise one of the harness's own reads (the
+sampler's polls, settle's checks) — is sent again **once**, only for
+`UND_ERR_SOCKET` or `ECONNRESET` on a reused socket before any response. Every retry is counted
 in the report's `Retries` section and stays in the HTTP table as the network
 error it answered; a second failure is not retried and fails the run.

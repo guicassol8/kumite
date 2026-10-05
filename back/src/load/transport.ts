@@ -71,6 +71,44 @@ export function detailOf(error: unknown): NetworkErrorDetail | undefined {
   return error && typeof error === 'object' ? details.get(error) : undefined
 }
 
+/**
+ * The one network error the harness sends a request again for (#138): the back
+ * closed an idle keep-alive socket just as the harness reused it, so the
+ * request failed before any byte of a response — it never reached a
+ * handler. A browser silently resends in exactly that case; undici does not.
+ * Anything else (a fresh socket, a failure mid-body, a timeout) is not
+ * retried.
+ */
+export function isStaleSocket(detail: NetworkErrorDetail | undefined): boolean {
+  return (
+    detail !== undefined &&
+    detail.stage === 'request' &&
+    detail.reusedSocket === true &&
+    (detail.reason === 'UND_ERR_SOCKET' || detail.reason === 'ECONNRESET')
+  )
+}
+
+/**
+ * `send()`, and once more if it failed on a stale keep-alive socket, the
+ * retry recorded. For the harness's own reads (the sampler, settle); the
+ * submitter applies the same rule inline.
+ */
+export async function resendIfStale<T>(
+  recorder: Pick<Recorder, 'recordRetry'>,
+  method: string,
+  path: string,
+  send: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await send()
+  } catch (error) {
+    const detail = detailOf(error)
+    if (!detail || !isStaleSocket(detail)) throw error
+    recorder.recordRetry({ method, url: path, detail })
+    return send()
+  }
+}
+
 function errorCodeOf(text: string): string | null {
   try {
     const body: unknown = JSON.parse(text)

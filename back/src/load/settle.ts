@@ -1,9 +1,10 @@
 import { performance } from 'node:perf_hooks'
 
 import { rankingDigest } from './ranking-digest'
+import type { Recorder } from './recorder'
 import { sleep } from './schedule'
 import type { SseConnection } from './sse-client'
-import type { Transport } from './transport'
+import { resendIfStale, type Transport } from './transport'
 
 // The checks that close a burst (#137, #138), run after the load and again
 // after the reconnect storm: the judge drained with no worker left behind,
@@ -60,12 +61,16 @@ export function evaluateConsistency(
 }
 
 /** Polls the live card and the worker counter until the judge is idle. */
+type Retrying = Pick<Recorder, 'recordRetry'>
+
 export async function waitForDrain({
   transport,
+  recorder,
   organizerToken,
   deadlineMs = SETTLE_DEADLINE_MS,
 }: {
   transport: Transport
+  recorder: Retrying
   organizerToken: string
   deadlineMs?: number
 }): Promise<DrainCheck> {
@@ -81,9 +86,13 @@ export async function waitForDrain({
   for (;;) {
     try {
       const [live, proc] = await Promise.all([
-        api.organizer.stats.live.$get(),
+        resendIfStale(recorder, 'GET', '/organizer/stats/live', () =>
+          api.organizer.stats.live.$get(),
+        ),
         // A cut in the future: only the counters are wanted, not the rings.
-        api.organizer.stats.process.$get({ query: { since: Date.now() + 3_600_000 } }),
+        resendIfStale(recorder, 'GET', '/organizer/stats/process', () =>
+          api.organizer.stats.process.$get({ query: { since: Date.now() + 3_600_000 } }),
+        ),
       ])
       if (live.status === 200 && proc.status === 200) {
         const { judge } = await live.json()
@@ -108,14 +117,19 @@ export async function waitForDrain({
 
 async function readApiDigest(
   transport: Transport,
+  recorder: Retrying,
   organizerToken: string,
   roundId: string | null,
 ): Promise<string | null> {
   const api = transport.api(organizerToken)
   try {
     const [round, event] = await Promise.all([
-      roundId ? api.rounds[':id'].ranking.$get({ param: { id: roundId } }) : null,
-      api.ranking.$get(),
+      roundId
+        ? resendIfStale(recorder, 'GET', `/rounds/${roundId}/ranking`, () =>
+            api.rounds[':id'].ranking.$get({ param: { id: roundId } }),
+          )
+        : null,
+      resendIfStale(recorder, 'GET', '/ranking', () => api.ranking.$get()),
     ])
     if (event.status !== 200 || (round && round.status !== 200)) return null
     return rankingDigest({
@@ -133,12 +147,14 @@ async function readApiDigest(
  */
 export async function waitForConsistency({
   transport,
+  recorder,
   organizerToken,
   roundId,
   connections,
   deadlineMs = SETTLE_DEADLINE_MS,
 }: {
   transport: Transport
+  recorder: Retrying
   organizerToken: string
   roundId: string | null
   connections: readonly SseConnection[]
@@ -147,7 +163,7 @@ export async function waitForConsistency({
   const started = performance.now()
   for (;;) {
     const open = connections.map((c) => c.report()).filter((r) => r.state === 'open')
-    const apiDigest = await readApiDigest(transport, organizerToken, roundId)
+    const apiDigest = await readApiDigest(transport, recorder, organizerToken, roundId)
     const { consistent, ...result } = evaluateConsistency(
       open.map((r) => r.lastRankingDigest),
       apiDigest,

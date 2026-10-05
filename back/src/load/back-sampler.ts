@@ -4,7 +4,7 @@ import type { EventLoopWindow, LiveStats, ProcessStats } from '../modules/stats/
 
 import type { Phase, Recorder } from './recorder'
 import { sleep } from './schedule'
-import { readErrorCode, type Transport } from './transport'
+import { readErrorCode, resendIfStale, type Transport } from './transport'
 
 // Polls the back's own view of itself while the harness drives it (#136):
 // /organizer/stats/process (CPU, memory, event-loop windows) and
@@ -81,7 +81,7 @@ export function startBackSampler({
   clock = () => Date.now(),
 }: {
   transport: Transport
-  recorder: Pick<Recorder, 'phase' | 'recordUnexpected'>
+  recorder: Pick<Recorder, 'phase' | 'recordUnexpected' | 'recordRetry'>
   organizerToken: string
   intervalMs: number
   clock?: () => number
@@ -95,9 +95,9 @@ export function startBackSampler({
 
   const readProcess = async (): Promise<ProcessStats | null> => {
     try {
-      const res = await api.organizer.stats.process.$get({
-        query: since === undefined ? {} : { since },
-      })
+      const res = await resendIfStale(recorder, 'GET', '/organizer/stats/process', () =>
+        api.organizer.stats.process.$get({ query: since === undefined ? {} : { since } }),
+      )
       if (res.status === 200) {
         const stats = await res.json()
         since = stats.sampledAt
@@ -120,7 +120,9 @@ export function startBackSampler({
 
   const readLive = async (): Promise<LiveStats | null> => {
     try {
-      const res = await api.organizer.stats.live.$get()
+      const res = await resendIfStale(recorder, 'GET', '/organizer/stats/live', () =>
+        api.organizer.stats.live.$get(),
+      )
       if (res.status === 200) return await res.json()
       const errorCode = await readErrorCode(res)
       if (res.status < 500) {

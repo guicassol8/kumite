@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { app } from '../app'
 
 import { createRecorder } from './recorder'
-import { createTransport, detailOf } from './transport'
+import { createTransport, detailOf, resendIfStale } from './transport'
 
 describe('createTransport', () => {
   it('records a request made through the typed client, in-process', async () => {
@@ -160,5 +160,40 @@ describe('createTransport', () => {
       stage: 'body',
       reusedSocket: null,
     })
+  })
+
+  it('resends a read once after a stale socket, counted, and lets any other error through', async () => {
+    const stale = () =>
+      new TypeError('fetch failed', {
+        cause: { code: 'UND_ERR_SOCKET', socket: { bytesWritten: 300, bytesRead: 200 } },
+      })
+    const errors: Array<() => Error> = [
+      stale,
+      () => new TypeError('fetch failed', { cause: { code: 'ECONNREFUSED' } }),
+    ]
+    const recorder = createRecorder()
+    const transport = createTransport({
+      baseUrl: 'http://localhost',
+      recorder,
+      requestTimeoutMs: 10_000,
+      fetch: async (input, init) => {
+        const next = errors.shift()
+        if (next) throw next()
+        return app.request(input, init)
+      },
+    })
+    const health = () =>
+      resendIfStale(recorder, 'GET', '/health', () => transport.api().health.$get())
+
+    await expect(health()).rejects.toThrow('fetch failed')
+    expect((await health()).status).toBe(200)
+    expect(recorder.snapshot().retries).toEqual([
+      {
+        phase: 'rest',
+        route: 'GET /health',
+        reason: 'UND_ERR_SOCKET · request · reused',
+        count: 1,
+      },
+    ])
   })
 })

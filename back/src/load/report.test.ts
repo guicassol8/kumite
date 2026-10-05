@@ -315,3 +315,36 @@ describe('buildReport + renderMarkdown', () => {
     expect(readFileSync(join(dir, 'report.md'), 'utf8')).toContain('# Load report: smoke `abc`')
   })
 })
+
+describe('buildReport timeline', () => {
+  it('keeps each window once and drops the per-sample copies of the ring', () => {
+    const window = (endedAt: number) => ({
+      endedAt,
+      durationMs: 1000,
+      delayP50Ms: 1,
+      delayP99Ms: 2,
+      delayMaxMs: 3,
+      utilization: 0.1,
+    })
+    const sampleAt = (at: number, ends: number[]): BackSample => ({
+      at,
+      phase: 'rest',
+      process: {
+        sampledAt: at,
+        uptimeSeconds: 1,
+        cpu: { userMicros: 0, systemMicros: 0 },
+        memory: { rss: 1, heapUsed: 1, heapTotal: 1, external: 0 },
+        eventLoop: { windowMs: 1000, windows: ends.map(window) },
+      },
+      live: null,
+    })
+    // The run starts at 0: the window that closed at -500 belongs to no phase.
+    const samples = [sampleAt(1000, [-500, 500, 1000]), sampleAt(2000, [1000, 2000])]
+
+    const { timeline } = buildReport(input({ samples }))
+
+    expect(timeline.windows.map((w) => w.endedAt)).toEqual([500, 1000, 2000])
+    expect(timeline.samples.map((s) => s.process?.eventLoop.windows)).toEqual([[], []])
+    expect(timeline.samples.map((s) => s.at)).toEqual([1000, 2000])
+  })
+})

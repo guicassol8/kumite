@@ -86,8 +86,20 @@ export type LoadReport = {
   actions: RecorderSnapshot['actions']
   verdicts: RecorderSnapshot['verdicts']
   sse: SseSummary
-  // Raw, JSON only: every back sample and every event-loop window.
+  // Raw, JSON only: every back sample and every event-loop window. Each
+  // sample's own copy of the ring is dropped (`windows: []`): every read
+  // returns the last 120 windows, so keeping them per sample made a 4-minute
+  // baseline's JSON 9 MB of repeats. The deduplicated list is `windows`.
   timeline: { samples: BackSample[]; windows: EventLoopWindow[] }
+}
+
+/** A sample without its copy of the event-loop ring (see `timeline`). */
+export function withoutRing(sample: BackSample): BackSample {
+  if (!sample.process) return sample
+  return {
+    ...sample,
+    process: { ...sample.process, eventLoop: { ...sample.process.eventLoop, windows: [] } },
+  }
 }
 
 export type ReportInput = {
@@ -288,7 +300,7 @@ export function buildReport(input: ReportInput): LoadReport {
     actions: input.recorder.actions,
     verdicts: input.recorder.verdicts,
     sse,
-    timeline: { samples: input.samples, windows },
+    timeline: { samples: input.samples.map(withoutRing), windows },
   }
 }
 

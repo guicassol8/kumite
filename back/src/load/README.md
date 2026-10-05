@@ -110,7 +110,7 @@ VPS happen only in the windows agreed in #137–#139.
 Each run writes `report.md` and `report.json` into
 `load-results/<scenario>-<runId>/` (git-ignored) and prints the Markdown to
 stdout; progress goes to stderr. The reports worth keeping are copied into
-`docs/load/`.
+`docs/load/` (then `pnpm format`: biome reflows the JSON).
 
 The report has: the run (target, Node, commit, start/end, the harness
 machine's load average and parallelism), the config, the world built, a

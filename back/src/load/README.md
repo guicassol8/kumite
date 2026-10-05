@@ -73,7 +73,8 @@ counted.
   own. A submission that waits longer counts as never completed: a
   participant waiting five minutes for a verdict is a broken system.
 - **settle.** Polls, up to 15 s each: the judge drained (`/organizer/stats/live`
-  shows nothing in flight or waiting, and no worker alive), then every open
+  shows nothing in flight or waiting, and every worker still alive is an
+  idle one in the warm pool, #277), then every open
   stream's last `ranking.updated` has the same digest (sha256 of the
   canonical `{round, event}`, `serverTime` left out) and it is the digest of
   `GET /rounds/:id/ranking` + `GET /ranking`.
@@ -167,11 +168,13 @@ VPS happen only in the windows agreed in #137–#139.
 memory and the event-loop windows:
 
 - `judge`: the configuration it judges with, the worker counters (`spawned`,
-  `exited`, `alive = spawned − exited`: a worker that never exits shows
-  here) and a ring of the last 512 runs — arrival, queue position, queue
-  wait, spawn (slot to the worker's `ready`, QuickJS loaded; null if the
-  worker died first), execution (`ready` to the last case's reply), the sum
-  of the per-case times, and the worst case's outcome;
+  `exited`, `alive = spawned − exited`, and `idle`: the warm pool's workers
+  waiting for a submission, #277 — `alive − idle` above zero with nothing in
+  flight is a leaked worker) and a ring of the last 512 runs — arrival,
+  queue position, queue wait, spawn (slot to the worker's `ready`, QuickJS
+  loaded; 0 on a warm pooled worker, null if the worker died first),
+  execution (`ready`, else the slot, to the last case's reply), the sum of
+  the per-case times, and the worst case's outcome;
 - `sse`: a ring of the last 256 emissions (a ranking tick's three query
   stages, and for every emission the subscriber count and the synchronous
   `bus.publish` time — the N `JSON.stringify` plus queueing the writes, not

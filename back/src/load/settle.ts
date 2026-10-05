@@ -7,7 +7,8 @@ import type { SseConnection } from './sse-client'
 import { resendIfStale, type Transport } from './transport'
 
 // The checks that close a burst (#137, #138), run after the load and again
-// after the reconnect storm: the judge drained with no worker left behind,
+// after the reconnect storm: the judge drained with no busy worker left
+// behind (the pooled idle ones stay, #277),
 // and every open SSE connection's last ranking is the same one the API
 // returns. Both poll with a deadline instead of trusting one read: the last
 // ranking tick and the last worker's exit can trail the load by a second.
@@ -22,6 +23,22 @@ export type DrainCheck = {
   inFlight: number | null
   waiting: number | null
   workersAlive: number | null
+  // The warm pool's idle workers (#277): alive by design, never a leak.
+  workersIdle: number | null
+}
+
+/**
+ * The judge is drained when nothing is in flight or queued and every worker
+ * still alive is an idle pooled one (#277): a discarded worker's exit lands
+ * a moment after its submission, so `alive > idle` is waited out.
+ */
+export function isJudgeDrained(judge: {
+  inFlight: number
+  waiting: number
+  alive: number
+  idle: number
+}): boolean {
+  return judge.inFlight === 0 && judge.waiting === 0 && judge.alive === judge.idle
 }
 
 export type ConsistencyCheck = {
@@ -82,6 +99,7 @@ export async function waitForDrain({
     inFlight: null,
     waiting: null,
     workersAlive: null,
+    workersIdle: null,
   }
   for (;;) {
     try {
@@ -98,11 +116,12 @@ export async function waitForDrain({
         const { judge } = await live.json()
         const { judge: timings } = await proc.json()
         last = {
-          drained: judge.inFlight === 0 && judge.waiting === 0 && timings.workers.alive === 0,
+          drained: isJudgeDrained({ ...judge, ...timings.workers }),
           waitedMs: performance.now() - started,
           inFlight: judge.inFlight,
           waiting: judge.waiting,
           workersAlive: timings.workers.alive,
+          workersIdle: timings.workers.idle,
         }
       }
     } catch {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { evaluateConsistency } from './settle'
+import { evaluateConsistency, isJudgeDrained } from './settle'
 
 describe('evaluateConsistency', () => {
   it('is consistent when every connection holds the API’s digest', () => {
@@ -45,5 +45,21 @@ describe('evaluateConsistency', () => {
       matchesApi: null,
       consistent: true,
     })
+  })
+})
+
+describe('isJudgeDrained (#277)', () => {
+  it('accepts every live worker idle in the pool, with nothing in flight or queued', () => {
+    expect(isJudgeDrained({ inFlight: 0, waiting: 0, alive: 2, idle: 2 })).toBe(true)
+    expect(isJudgeDrained({ inFlight: 0, waiting: 0, alive: 0, idle: 0 })).toBe(true)
+  })
+
+  it('refuses a live worker that is not idle: busy, or discarded and not yet exited', () => {
+    expect(isJudgeDrained({ inFlight: 0, waiting: 0, alive: 3, idle: 2 })).toBe(false)
+  })
+
+  it('refuses a submission in flight or queued', () => {
+    expect(isJudgeDrained({ inFlight: 1, waiting: 0, alive: 2, idle: 2 })).toBe(false)
+    expect(isJudgeDrained({ inFlight: 0, waiting: 1, alive: 2, idle: 2 })).toBe(false)
   })
 })

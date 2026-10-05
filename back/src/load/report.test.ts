@@ -398,7 +398,14 @@ const consistent = {
   apiDigest: 'digest-a',
   waitedMs: 10,
 }
-const drained = { drained: true, waitedMs: 5, inFlight: 0, waiting: 0, workersAlive: 0 }
+const drained = {
+  drained: true,
+  waitedMs: 5,
+  inFlight: 0,
+  waiting: 0,
+  workersAlive: 2,
+  workersIdle: 2,
+}
 
 function judgeRun(seq: number, overrides: Partial<JudgeRun> = {}): JudgeRun {
   return {
@@ -435,16 +442,16 @@ describe('buildFailures (#137, #138)', () => {
     ).toEqual([])
   })
 
-  it('flags a judge that did not drain, or a worker left alive', () => {
+  it('flags a judge that did not drain, or a busy worker left alive', () => {
     const failures = buildFailures({
       ...base(),
       settle: {
-        drain: { ...drained, drained: false, inFlight: 1, workersAlive: 2 },
+        drain: { ...drained, drained: false, inFlight: 1, workersAlive: 3, workersIdle: 2 },
         consistency: consistent,
       },
     })
     expect(failures).toEqual([
-      'judge did not drain after the load: 1 in flight, 0 waiting, 2 worker(s) alive',
+      'judge did not drain after the load: 1 in flight, 0 waiting, 3 worker(s) alive, 2 idle',
     ])
   })
 
@@ -534,7 +541,7 @@ describe('buildReport judge and SSE cost sections', () => {
         cpu: { userMicros: 0, systemMicros: 0 },
         memory: { rss: 1, heapUsed: 1, heapTotal: 1, external: 0 },
         eventLoop: { windowMs: 1000, windows: [] },
-        judge: { ...timings.judge, runs, workers: { spawned: 3, exited: 3, alive: 0 } },
+        judge: { ...timings.judge, runs, workers: { spawned: 3, exited: 1, alive: 2, idle: 2 } },
         sse: {
           emissions: [
             {
@@ -570,7 +577,7 @@ describe('buildReport judge and SSE cost sections', () => {
     expect(report.judge).toMatchObject({
       runs: 3,
       byOutcome: { passed: 1, timeout: 1, runtime_error: 1 },
-      workers: { spawned: 3, exited: 3, alive: 0 },
+      workers: { spawned: 3, exited: 1, alive: 2, idle: 2 },
     })
     expect(report.judge?.spawnShareOfPassed.p50).toBe(0.4)
     expect(report.sseCost.payloads.find((p) => p.type === 'ranking.updated')).toEqual({

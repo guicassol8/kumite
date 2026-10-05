@@ -8,7 +8,7 @@ export function emptyTimings(): Pick<ProcessStats, 'judge' | 'sse'> {
   return {
     judge: {
       config: { concurrency: 4, timeoutMs: 2000, memoryMb: 64 },
-      workers: { spawned: 0, exited: 0, alive: 0 },
+      workers: { spawned: 0, exited: 0, alive: 0, idle: 0 },
       runs: [],
     },
     sse: { emissions: [], connects: [] },

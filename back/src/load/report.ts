@@ -23,7 +23,7 @@ import { maxOf, meanOf, percentile, type Summary, summarize } from './stats'
 // unexpected status, a network error or timeout, an SSE connection that
 // never opened or dropped, an invalid SSE payload, an incoherent verdict, an
 // action started and never completed, a setup error, an abort. #137/#138
-// add: a judge that did not drain (or left a worker alive), and an SSE
+// add: a judge that did not drain (or left a busy worker alive), and an SSE
 // ranking that differs between connections or from the API, after the load
 // or after the storm. Latency, queue, spawn, CPU, memory, lag, bytes and
 // heartbeat cadence are observations — they never fail a run.
@@ -617,9 +617,9 @@ export function buildFailures(input: {
 
   const { settle, storm } = input
   if (settle && !settle.drain.drained) {
-    const { inFlight, waiting, workersAlive } = settle.drain
+    const { inFlight, waiting, workersAlive, workersIdle } = settle.drain
     failures.push(
-      `judge did not drain after the load: ${inFlight ?? '?'} in flight, ${waiting ?? '?'} waiting, ${workersAlive ?? '?'} worker(s) alive`,
+      `judge did not drain after the load: ${inFlight ?? '?'} in flight, ${waiting ?? '?'} waiting, ${workersAlive ?? '?'} worker(s) alive, ${workersIdle ?? '?'} idle`,
     )
   }
   const settleDivergence = settle ? consistencyFailure('after the load', settle.consistency) : null
@@ -1037,9 +1037,9 @@ function renderJudge(out: string[], judge: JudgeReport) {
             .join(' / '),
         ],
         [
-          'workers spawned / exited / alive at the end',
+          'workers spawned / exited / alive / idle at the end',
           judge.workers
-            ? `${judge.workers.spawned} / ${judge.workers.exited} / ${judge.workers.alive}`
+            ? `${judge.workers.spawned} / ${judge.workers.exited} / ${judge.workers.alive} / ${judge.workers.idle}`
             : dash,
         ],
         [
@@ -1206,7 +1206,7 @@ function renderSettle(out: string[], settle: SettleReport) {
       [
         [
           'judge drained',
-          `${drain.drained ? 'yes' : 'NO'} after ${num(drain.waitedMs, 0)} ms (in flight ${drain.inFlight ?? dash}, waiting ${drain.waiting ?? dash}, workers alive ${drain.workersAlive ?? dash})`,
+          `${drain.drained ? 'yes' : 'NO'} after ${num(drain.waitedMs, 0)} ms (in flight ${drain.inFlight ?? dash}, waiting ${drain.waiting ?? dash}, workers alive ${drain.workersAlive ?? dash}, idle ${drain.workersIdle ?? dash})`,
         ],
         ['ranking consistency', consistencyRow(settle.consistency)],
       ],

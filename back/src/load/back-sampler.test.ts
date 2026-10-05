@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
+import type { JudgeRun } from '../modules/judge/judge.schema'
 import type { ProcessStats } from '../modules/stats/stats.schema'
 
-import { type BackSample, cpuPercent, mergeWindows } from './back-sampler'
+import {
+  type BackSample,
+  cpuPercent,
+  mergeTimings,
+  mergeWindows,
+  startBackSampler,
+} from './back-sampler'
 import { emptyTimings } from './fixtures'
+import { createRecorder } from './recorder'
+import { createTransport } from './transport'
 
 function processStats(
   sampledAt: number,
@@ -61,5 +70,81 @@ describe('mergeWindows', () => {
       sample(processStats(3, 0, 0, [400, 500])),
     ]
     expect(mergeWindows(samples).map((window) => window.endedAt)).toEqual([100, 200, 300, 400, 500])
+  })
+})
+
+function run(seq: number): JudgeRun {
+  return {
+    seq,
+    arrivedAt: seq,
+    endedAt: seq + 1,
+    waitingAtArrival: 0,
+    queueMs: 0,
+    spawnMs: 1,
+    execMs: 1,
+    caseMs: 1,
+    cases: 5,
+    outcome: 'passed',
+  }
+}
+
+function withRuns(sampledAt: number, seqs: number[]): ProcessStats {
+  const stats = processStats(sampledAt, 0, 0)
+  return { ...stats, judge: { ...stats.judge, runs: seqs.map(run) } }
+}
+
+describe('mergeTimings', () => {
+  it('keeps each judge run, emission and connect once across overlapping polls, by seq', () => {
+    const emission = (seq: number) => ({
+      seq,
+      endedAt: seq,
+      kind: 'heartbeat' as const,
+      subscribers: 1,
+      publishMs: 0,
+      stages: null,
+    })
+    const first = withRuns(1, [1, 2, 3])
+    const second = withRuns(2, [3, 4])
+    second.sse.emissions = [emission(7), emission(8)]
+    const third = withRuns(3, [4, 5])
+    third.sse.emissions = [emission(8)]
+
+    const merged = mergeTimings([sample(first), sample(null), sample(second), sample(third)])
+
+    expect(merged.judgeRuns.map((entry) => entry.seq)).toEqual([1, 2, 3, 4, 5])
+    expect(merged.emissions.map((entry) => entry.seq)).toEqual([7, 8])
+    expect(merged.connects).toEqual([])
+  })
+})
+
+describe('startBackSampler', () => {
+  it('asks each poll only for what ended since the previous one answered', async () => {
+    const urls: string[] = []
+    let sampledAt = 1_000
+    const recorder = createRecorder()
+    const transport = createTransport({
+      baseUrl: 'http://localhost',
+      recorder,
+      requestTimeoutMs: 5_000,
+      fetch: async (input) => {
+        const url = new URL(input)
+        if (url.pathname === '/organizer/stats/process') {
+          urls.push(url.search)
+          sampledAt += 1_000
+          return Response.json(processStats(sampledAt, 0, 0))
+        }
+        return Response.json({ error: 'not_found' }, { status: 404 })
+      },
+    })
+
+    const sampler = startBackSampler({ transport, recorder, organizerToken: 't', intervalMs: 1 })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await sampler.stop()
+
+    expect(urls[0]).toBe('')
+    expect(urls.length).toBeGreaterThan(2)
+    for (let i = 1; i < urls.length; i++) {
+      expect(urls[i]).toBe(`?since=${1_000 + i * 1_000}`)
+    }
   })
 })

@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { app } from '../app'
 import { k } from '../context'
 import { resetDatabase } from '../db/reset'
-import { runExpiryTick } from '../modules/sse/sse.service'
+import { runExpiryTick, runRankingTick } from '../modules/sse/sse.service'
 import { startProcessSampler } from '../modules/stats/stats.service'
 
 import { type LoadConfig, PRESETS } from './config'
@@ -27,8 +27,11 @@ beforeEach(async () => {
   process.env['ORGANIZER_PASSWORD'] = ORGANIZER.password
   await resetDatabase(db)
   stopSampler = startProcessSampler({ windowMs: 100, keep: 600 })
+  // Both ticks, as main.ts wires them: the settle phase compares the last
+  // ranking.updated with the API, so the debounced emission must run.
   tick = setInterval(() => {
     void runExpiryTick(db, k.resolve('sseBus')).catch(() => {})
+    void runRankingTick(db, k.resolve('sseBus')).catch(() => {})
   }, 200)
 })
 
@@ -81,8 +84,11 @@ describe('runScenario', { timeout: 120_000 }, () => {
       'setup',
       'sse-ramp',
       'load',
+      'settle',
       'teardown',
     ])
+    expect(report.settle?.drain.drained).toBe(true)
+    expect(report.settle?.consistency).toMatchObject({ compared: 2, matchesApi: true })
     expect(report.world).toMatchObject({ teams: 2, participants: 2 })
     expect(report.verdicts).toEqual({ matrix: { correct: { accepted: 2 } }, incoherent: 0 })
     expect(report.actions['submission']).toEqual({ started: 2, completed: 2 })

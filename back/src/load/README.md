@@ -219,7 +219,10 @@ Only these, each counted and listed — the run never stops at the first:
 - any 5xx;
 - a status the call site did not expect (a 429 on a submission is expected:
   it waits and retries, up to 3 times);
-- a network error or a timeout (an action that started and never completed);
+- a network error or a timeout (an action that started and never completed),
+  except one the harness retried (below). Each network error is listed with
+  its code, whether it came before any response or mid-body, and whether
+  the socket was a reused keep-alive one;
 - an SSE connection that did not open, or that dropped before the harness
   closed it;
 - an SSE payload that `SseEventSchema` rejects;
@@ -234,3 +237,16 @@ Only these, each counted and listed — the run never stops at the first:
 
 Latency, queue wait, spawn, CPU, memory, lag, bytes and heartbeat cadence
 are observations: they never fail a run.
+
+### The one retry (#138)
+
+Node's server closes a keep-alive socket after 5 s idle
+(`keepAliveTimeout`), and a team's next submission comes after a 5 s
+cooldown: the harness can reuse a socket at the moment the back closes it.
+undici then fails the POST with `UND_ERR_SOCKET` ("other side closed")
+before any byte of a response — the request never reached a handler. A
+browser silently resends a request in exactly that case; undici does not.
+So a submission is sent again **once**, only for `UND_ERR_SOCKET` or
+`ECONNRESET` on a reused socket before any response. Every retry is counted
+in the report's `Retries` section and stays in the HTTP table as the network
+error it answered; a second failure is not retried and fails the run.

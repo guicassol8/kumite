@@ -1,9 +1,9 @@
 import { performance } from 'node:perf_hooks'
 
 import type { LoadConfig } from './config'
-import type { Recorder } from './recorder'
+import type { NetworkErrorDetail, Recorder } from './recorder'
 import { kindAt, sleep } from './schedule'
-import { readErrorCode, type Transport } from './transport'
+import { detailOf, readErrorCode, type Transport } from './transport'
 import { classifyVerdict, rejectedVerdict, type SubmissionKind } from './verdict'
 import { WORKSPACES } from './workspaces'
 import type { LoadTeam, LoadUser, World } from './world'
@@ -17,6 +17,23 @@ import type { LoadTeam, LoadUser, World } from './world'
 
 // Retries of a 429 before the submission counts as rejected.
 export const MAX_THROTTLE_RETRIES = 3
+
+/**
+ * The one network error a submission is sent again for (#138): the back
+ * closed an idle keep-alive socket just as the harness reused it, so the
+ * request failed before any byte of a response — it never reached a
+ * handler. A browser silently resends in exactly that case; undici does not.
+ * Anything else (a fresh socket, a failure mid-body, a timeout) is not
+ * retried.
+ */
+export function isStaleSocket(detail: NetworkErrorDetail | undefined): boolean {
+  return (
+    detail !== undefined &&
+    detail.stage === 'request' &&
+    detail.reusedSocket === true &&
+    (detail.reason === 'UND_ERR_SOCKET' || detail.reason === 'ECONNRESET')
+  )
+}
 
 export type SubmitterConfig = Pick<LoadConfig, 'submissions' | 'badFraction' | 'cooldownMs'> &
   Partial<Pick<LoadConfig, 'memoryShare'>>
@@ -42,16 +59,25 @@ async function submitOne({
 }): Promise<void> {
   recorder.actionStarted('submission')
   const api = transport.api(member.token)
-  for (let attempt = 0; ; attempt++) {
+  let resent = false
+  let throttled = 0
+  for (;;) {
     let res: Awaited<ReturnType<typeof api.submissions.$post>>
     const started = performance.now()
     try {
       res = await api.submissions.$post({
         json: { problemId: target.problemId, roundId: target.roundId, workspace: WORKSPACES[kind] },
       })
-    } catch {
-      // Network error or timeout: recorded by the transport. The action
-      // stays started-not-completed, which the report counts as a failure.
+    } catch (error) {
+      // Network error or timeout: recorded by the transport. A stale
+      // keep-alive socket is resent once, and the retry counted; anything
+      // else leaves the action started-not-completed, a failure.
+      const detail = detailOf(error)
+      if (!resent && detail && isStaleSocket(detail) && !signal?.aborted) {
+        resent = true
+        recorder.recordRetry({ method: 'POST', url: '/submissions', detail })
+        continue
+      }
       return
     }
 
@@ -64,7 +90,8 @@ async function submitOne({
     }
 
     // 429 is the expected answer to a team going too fast: wait, try again.
-    if (res.status === 429 && attempt < MAX_THROTTLE_RETRIES) {
+    if (res.status === 429 && throttled < MAX_THROTTLE_RETRIES) {
+      throttled += 1
       await sleep(Math.max(cooldownMs, 1000), signal)
       if (signal?.aborted) return
       continue

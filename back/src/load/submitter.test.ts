@@ -221,6 +221,89 @@ describe('runSubmissions', { timeout: 120_000 }, () => {
     expect(snapshot.unexpected).toEqual([])
   })
 
+  // #138: undici's error when the back closes an idle keep-alive socket as
+  // the harness reuses it — before any byte of a response.
+  const staleSocket = () =>
+    new TypeError('fetch failed', {
+      cause: {
+        code: 'UND_ERR_SOCKET',
+        message: 'other side closed',
+        socket: { bytesWritten: 4144, bytesRead: 695 },
+      },
+    })
+
+  function failingFirst(errors: Array<() => Error>): FetchLike {
+    const left = [...errors]
+    return async (input, init) => {
+      const next = left.shift()
+      if (next && init?.method === 'POST' && new URL(input).pathname === '/submissions') {
+        throw next()
+      }
+      return withoutCooldown(input, init)
+    }
+  }
+
+  async function submitThrough(fetch: FetchLike, runId: string) {
+    const { recorder, built } = await world(runId, 1)
+    const transport = createTransport({
+      baseUrl: 'http://localhost',
+      recorder,
+      requestTimeoutMs: 60_000,
+      fetch,
+    })
+    await runSubmissions({
+      transport,
+      recorder,
+      world: built,
+      config: { submissions: 1, badFraction: 0, cooldownMs: 0 },
+      deadline: Date.now() + 60_000,
+    })
+    return recorder.snapshot()
+  }
+
+  it('retries once a POST whose reused socket closed before any response, and counts it', async () => {
+    const snapshot = await submitThrough(failingFirst([staleSocket]), 'stale')
+
+    expect(snapshot.verdicts).toEqual({ matrix: { correct: { accepted: 1 } }, incoherent: 0 })
+    expect(snapshot.actions['submission']).toEqual({ started: 1, completed: 1 })
+    expect(snapshot.retries).toEqual([
+      {
+        phase: 'load',
+        route: 'POST /submissions',
+        reason: 'UND_ERR_SOCKET · request · reused',
+        count: 1,
+      },
+    ])
+    expect(snapshot.http.load?.['POST /submissions']).toMatchObject({
+      networkErrors: 1,
+      byStatus: { '201': 1, network: 1 },
+    })
+  })
+
+  it('retries only once: a second stale socket leaves the submission unfinished', async () => {
+    const snapshot = await submitThrough(failingFirst([staleSocket, staleSocket]), 'stale2')
+
+    expect(snapshot.actions['submission']).toEqual({ started: 1, completed: 0 })
+    expect(snapshot.retries[0]?.count).toBe(1)
+    expect(snapshot.http.load?.['POST /submissions']?.networkErrors).toBe(2)
+  })
+
+  it('never retries any other network error', async () => {
+    const refused = () => new TypeError('fetch failed', { cause: { code: 'ECONNREFUSED' } })
+    const fresh = () =>
+      new TypeError('fetch failed', {
+        cause: { code: 'UND_ERR_SOCKET', socket: { bytesWritten: 2000, bytesRead: 0 } },
+      })
+    for (const [error, runId] of [
+      [refused, 'refused'],
+      [fresh, 'fresh'],
+    ] as const) {
+      const snapshot = await submitThrough(failingFirst([error]), runId)
+      expect(snapshot.actions['submission']).toEqual({ started: 1, completed: 0 })
+      expect(snapshot.retries).toEqual([])
+    }
+  })
+
   it('starts nothing once the deadline has passed', async () => {
     const { recorder, transport, built } = await world('late', 1)
 

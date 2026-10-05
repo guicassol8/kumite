@@ -201,6 +201,7 @@ export type LoadReport = {
   phases: PhaseSummary[]
   http: RecorderSnapshot['http']
   unexpected: RecorderSnapshot['unexpected']
+  retries: RecorderSnapshot['retries']
   actions: RecorderSnapshot['actions']
   verdicts: RecorderSnapshot['verdicts']
   submissions: RecorderSnapshot['submissions']
@@ -565,9 +566,19 @@ export function buildFailures(input: {
       for (const [key, count] of serverErrors) {
         failures.push(`${count}× ${key} on ${route} (${phase})`)
       }
-      if (stats.networkErrors > 0) {
+      // A retried error is reported (`retries`), not failed: the request was
+      // sent again, and the retry's own outcome is what counts.
+      const retried = recorder.retries
+        .filter((retry) => retry.phase === phase && retry.route === route)
+        .reduce((sum, retry) => sum + retry.count, 0)
+      const unretried = stats.networkErrors - retried
+      if (unretried > 0) {
+        const what =
+          retried > 0
+            ? `${unretried}× network error on ${route} (${phase}) not retried (${retried} retried)`
+            : `${unretried}× network error on ${route} (${phase})`
         failures.push(
-          `${stats.networkErrors}× network error on ${route} (${phase}), ${stats.timeouts} of them timeouts: ${JSON.stringify(stats.networkReasons)}`,
+          `${what}, ${stats.timeouts} of them timeouts: ${JSON.stringify(stats.networkReasons)}`,
         )
       }
     }
@@ -674,6 +685,7 @@ export function buildReport(input: ReportInput): LoadReport {
     phases: summarizePhases(input.recorder.phases, input.samples, windows),
     http: input.recorder.http,
     unexpected: input.recorder.unexpected,
+    retries: input.recorder.retries,
     actions: input.recorder.actions,
     verdicts: input.recorder.verdicts,
     submissions: input.recorder.submissions,
@@ -860,6 +872,29 @@ export function renderMarkdown(report: LoadReport): string {
     out.push('')
   }
   out.push('Latency is until the end of the body; for `GET /sse`, until the headers.')
+  out.push('')
+
+  out.push('## Retries')
+  out.push('')
+  if (report.retries.length === 0) {
+    out.push('None.')
+  } else {
+    out.push(
+      table(
+        ['phase', 'route', 'after', 'count'],
+        report.retries.map((retry) => [
+          retry.phase,
+          `\`${retry.route}\``,
+          retry.reason,
+          String(retry.count),
+        ]),
+      ),
+    )
+  }
+  out.push('')
+  out.push(
+    'A submission is sent again once, and only once, when the back closed a reused keep-alive socket before any byte of a response. Each retry is also a network error in the table above.',
+  )
   out.push('')
 
   out.push('## Verdicts')

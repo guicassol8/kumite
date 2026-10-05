@@ -97,6 +97,28 @@ describe('buildFailures', () => {
     ])
   })
 
+  it('does not flag a network error the harness retried, and flags the rest (#138)', () => {
+    const recorder = cleanRecorder()
+    const stats = recorder.http.load?.['POST /submissions']
+    if (!stats) throw new Error('fixture')
+    stats.networkErrors = 3
+    stats.networkReasons = { 'UND_ERR_SOCKET · request · reused': 3 }
+    recorder.retries.push({
+      phase: 'load',
+      route: 'POST /submissions',
+      reason: 'UND_ERR_SOCKET · request · reused',
+      count: 2,
+    })
+    expect(buildFailures({ recorder, sse: cleanSse(), aborted: false })).toEqual([
+      '1× network error on POST /submissions (load) not retried (2 retried), 0 of them timeouts: {"UND_ERR_SOCKET · request · reused":3}',
+    ])
+    recorder.retries[0] = {
+      ...(recorder.retries[0] as (typeof recorder.retries)[number]),
+      count: 3,
+    }
+    expect(buildFailures({ recorder, sse: cleanSse(), aborted: false })).toEqual([])
+  })
+
   it('flags an unexpected status', () => {
     const recorder = cleanRecorder()
     recorder.unexpected.push({

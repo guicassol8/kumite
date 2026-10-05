@@ -69,12 +69,18 @@ export type UnexpectedStatus = {
   count: number
 }
 
+// #138: a request the harness sent again after a stale keep-alive socket.
+export type RetryRecord = { phase: Phase; route: string; reason: string; count: number }
+
 export type PhaseSpan = { phase: Phase; startedAt: number; endedAt: number | null }
 
 export type RecorderSnapshot = {
   phases: PhaseSpan[]
   http: Partial<Record<Phase, Record<string, RouteStats>>>
   unexpected: UnexpectedStatus[]
+  // Each retry is also in `http` as the network error it answered; the
+  // report counts those errors as retried, not as failures.
+  retries: RetryRecord[]
   actions: Record<string, { started: number; completed: number }>
   verdicts: {
     matrix: Partial<Record<SubmissionKind, Partial<Record<Verdict, number>>>>
@@ -123,6 +129,7 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
   const phases: PhaseSpan[] = []
   const http = new Map<Phase, Map<string, RouteBucket>>()
   const unexpected = new Map<string, UnexpectedStatus>()
+  const retries = new Map<string, RetryRecord>()
   const actions: Record<string, { started: number; completed: number }> = {}
   const matrix: RecorderSnapshot['verdicts']['matrix'] = {}
   let incoherent = 0
@@ -222,6 +229,16 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
         })
     },
 
+    /** A request about to be sent again after the network error `detail`. */
+    recordRetry(record: { method: string; url: string; detail: NetworkErrorDetail }) {
+      const route = routeKey(record.method, record.url)
+      const reason = networkReasonKey(record.detail)
+      const key = `${current}|${route}|${reason}`
+      const entry = retries.get(key)
+      if (entry) entry.count += 1
+      else retries.set(key, { phase: current, route, reason, count: 1 })
+    },
+
     actionStarted(kind: string) {
       action(kind).started += 1
     },
@@ -271,6 +288,7 @@ export function createRecorder({ clock = () => Date.now() }: { clock?: () => num
         phases: phases.map((span) => ({ ...span })),
         http: httpOut,
         unexpected: [...unexpected.values()].map((entry) => ({ ...entry })),
+        retries: [...retries.values()].map((entry) => ({ ...entry })),
         actions: structuredClone(actions),
         verdicts: { matrix: structuredClone(matrix), incoherent },
         submissions: {

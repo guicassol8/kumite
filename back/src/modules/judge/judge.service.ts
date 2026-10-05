@@ -1,3 +1,4 @@
+import { performance } from 'node:perf_hooks'
 import { isDeepStrictEqual } from 'node:util'
 import { Worker } from 'node:worker_threads'
 
@@ -6,6 +7,7 @@ import { BlocksError, type BlocksErrorCode, DEFAULT_LOCALE, generateSolution } f
 import { JUDGE_CONCURRENCY, JUDGE_MEMORY_MB, JUDGE_TIMEOUT_MS } from '../../config'
 import type { JsonValue } from '../../lib/json'
 import type { Locale } from '../../lib/locale'
+import { pushBounded } from '../../lib/ring'
 import type { SandboxCaseRequest, SandboxResult } from '../../sandbox-engine.worker'
 import type {
   CodegenErrorCode,
@@ -13,6 +15,9 @@ import type {
   JudgeCase,
   JudgeCaseResult,
   JudgeConfig,
+  JudgeRun,
+  JudgeRunOutcome,
+  JudgeTimings,
   Workspace,
 } from './judge.schema'
 
@@ -89,6 +94,52 @@ function releaseSlot(): void {
   inFlight--
   const next = waiting.shift()
   next?.()
+}
+
+// --- Timings for the load harness (#137) ---
+//
+// One entry per judged submission, kept in a bounded ring and read by
+// GET /organizer/stats/process. Process-local like the semaphore above; the
+// cost is a few performance.now() per submission.
+const JUDGE_RUNS_KEEP = 512
+const judgeRuns: JudgeRun[] = []
+let runSeq = 0
+let workersSpawned = 0
+let workersExited = 0
+
+// Worst first: a submission whose loop timed out on one case is a timeout,
+// whatever its other cases did — the same precedence the harness reads.
+const OUTCOME_SEVERITY: Record<JudgeRunOutcome, number> = {
+  timeout: 3,
+  runtime_error: 2,
+  failed: 1,
+  passed: 0,
+}
+
+function worstOutcome(results: JudgeCaseResult[]): JudgeRunOutcome {
+  if (results.length === 0) return 'failed'
+  let worst: JudgeRunOutcome = 'passed'
+  for (const { outcome } of results) {
+    if (OUTCOME_SEVERITY[outcome] > OUTCOME_SEVERITY[worst]) worst = outcome
+  }
+  return worst
+}
+
+/**
+ * The judge's recent runs, its worker counters and the configuration it
+ * judges with. `alive = spawned - exited`: a worker that never exits after
+ * its submission is a leak this makes visible. Read-only.
+ */
+export function getJudgeTimings(): JudgeTimings {
+  return {
+    config: defaultConfig(),
+    workers: {
+      spawned: workersSpawned,
+      exited: workersExited,
+      alive: workersSpawned - workersExited,
+    },
+    runs: [...judgeRuns],
+  }
 }
 
 /**
@@ -178,12 +229,31 @@ export async function runJudgeAgainstWorker(
   config?: JudgeConfig,
 ): Promise<JudgeCaseResult[]> {
   const cfg = config ?? defaultConfig()
+  const arrivedAt = Date.now()
+  const arrived = performance.now()
+  // Counting itself: 0 when a slot was free, n when n were queued, this one
+  // included. Read before acquireSlot, which claims a free slot synchronously.
+  const waitingAtArrival = inFlight < cfg.concurrency ? 0 : waiting.length + 1
   await acquireSlot(cfg.concurrency)
+  const slotted = performance.now()
+
   const worker = new Worker(workerUrl, {
     resourceLimits: { maxOldGenerationSizeMb: cfg.memoryMb * 2 },
   })
+  workersSpawned++
+  worker.once('exit', () => {
+    workersExited++
+  })
+  // The worker announces `ready` once QuickJS is loaded: the spawn cost the
+  // case timings (measured inside the worker) never include.
+  let readyAt: number | null = null
+  const onReady = (msg: WorkerMessage) => {
+    if (msg.type === 'ready' && readyAt === null) readyAt = performance.now()
+  }
+  worker.on('message', onReady)
 
   const results: JudgeCaseResult[] = []
+  let caseMs = 0
   try {
     // Once the worker dies, every remaining case (the one in flight, plus
     // every case after it) is marked runtime_error without ever reaching the
@@ -218,12 +288,32 @@ export async function runJudgeAgainstWorker(
         workerDied = true
         results.push({ outcome: 'runtime_error', detail: 'worker exited without a result', ms: 0 })
       } else {
+        caseMs += outcome.result.ms
         results.push(toJudgeResult(outcome.result, judgeCase.expected))
       }
     }
   } finally {
+    const finished = performance.now()
+    worker.off('message', onReady)
     void worker.terminate()
     releaseSlot()
+    runSeq++
+    pushBounded(
+      judgeRuns,
+      {
+        seq: runSeq,
+        arrivedAt,
+        endedAt: Date.now(),
+        waitingAtArrival,
+        queueMs: slotted - arrived,
+        spawnMs: readyAt === null ? null : readyAt - slotted,
+        execMs: finished - (readyAt ?? slotted),
+        caseMs,
+        cases: cases.length,
+        outcome: results.length === cases.length ? worstOutcome(results) : 'runtime_error',
+      },
+      JUDGE_RUNS_KEEP,
+    )
   }
 
   return results

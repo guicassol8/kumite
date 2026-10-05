@@ -124,3 +124,36 @@ jsonpath "$.memory.heapTotal" > 0
 jsonpath "$.memory.external" >= 0
 jsonpath "$.eventLoop.windowMs" == 1000
 jsonpath "$.eventLoop.windows" exists
+# The judge's and the fan-out's timings (#137/#138): the config the process
+# judges with, its worker counters and the three rings. The heartbeat tick
+# runs every second, so an emission has always been recorded by now.
+jsonpath "$.judge.config.concurrency" >= 1
+jsonpath "$.judge.config.timeoutMs" >= 1
+jsonpath "$.judge.config.memoryMb" >= 1
+jsonpath "$.judge.workers.spawned" >= 0
+jsonpath "$.judge.workers.exited" >= 0
+jsonpath "$.judge.workers.alive" >= 0
+jsonpath "$.judge.runs" exists
+jsonpath "$.sse.emissions" exists
+jsonpath "$.sse.connects" exists
+
+# 3d. ?since= keeps what ended after it: 0 keeps every heartbeat emission,
+# a cut far in the future keeps none.
+GET {{host}}/organizer/stats/process?since=0
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.sse.emissions" count > 0
+
+GET {{host}}/organizer/stats/process?since=99999999999999
+Authorization: Bearer {{organizer_token}}
+HTTP 200
+[Asserts]
+jsonpath "$.sse.emissions" count == 0
+jsonpath "$.judge.runs" count == 0
+jsonpath "$.eventLoop.windowMs" == 1000
+
+# 3e. A since that is not a non-negative integer -> 422.
+GET {{host}}/organizer/stats/process?since=-1
+Authorization: Bearer {{organizer_token}}
+HTTP 422

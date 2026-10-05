@@ -3,13 +3,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
-
+import type { JudgeRun } from '../modules/judge/judge.schema'
 import type { BackSample } from './back-sampler'
 import { PRESETS } from './config'
+import { emptyTimings } from './fixtures'
 import { createRecorder, type RecorderSnapshot } from './recorder'
+
 import {
   buildFailures,
   buildReport,
+  firstWaveCurve,
   type ReportInput,
   renderMarkdown,
   summarizePhases,
@@ -25,6 +28,15 @@ function connection(overrides: Partial<SseConnectionReport> = {}): SseConnection
     dropReason: null,
     events: { 'state.sync': 1, 'ranking.updated': 1, heartbeat: 10 },
     heartbeatIntervalsMs: [1000, 1001],
+    maxHeartbeatGapMs: 1001,
+    bytes: {
+      'state.sync': { count: 1, total: 100, min: 100, max: 100 },
+      'ranking.updated': { count: 1, total: 2000, min: 2000, max: 2000 },
+      heartbeat: { count: 10, total: 600, min: 60, max: 60 },
+    },
+    headersMs: 5,
+    firstEventMs: { 'state.sync': 6, 'ranking.updated': 9, heartbeat: 900 },
+    lastRankingDigest: 'digest-a',
     invalidPayloads: 0,
     invalidSamples: [],
     ...overrides,
@@ -50,6 +62,7 @@ function cleanRecorder(): RecorderSnapshot {
   recorder.actionStarted('submission')
   recorder.actionCompleted('submission')
   recorder.recordVerdict('correct', 'accepted')
+  recorder.recordSubmissionLatency('correct', 80)
   clock = 10_000
   recorder.endPhases()
   return recorder.snapshot()
@@ -80,8 +93,30 @@ describe('buildFailures', () => {
     stats.networkErrors = 2
     stats.timeouts = 1
     expect(buildFailures({ recorder, sse: cleanSse(), aborted: false })).toEqual([
-      '2× network error on POST /submissions (load), 1 of them timeouts',
+      '2× network error on POST /submissions (load), 1 of them timeouts: {}',
     ])
+  })
+
+  it('does not flag a network error the harness retried, and flags the rest (#138)', () => {
+    const recorder = cleanRecorder()
+    const stats = recorder.http.load?.['POST /submissions']
+    if (!stats) throw new Error('fixture')
+    stats.networkErrors = 3
+    stats.networkReasons = { 'UND_ERR_SOCKET · request · reused': 3 }
+    recorder.retries.push({
+      phase: 'load',
+      route: 'POST /submissions',
+      reason: 'UND_ERR_SOCKET · request · reused',
+      count: 2,
+    })
+    expect(buildFailures({ recorder, sse: cleanSse(), aborted: false })).toEqual([
+      '1× network error on POST /submissions (load) not retried (2 retried), 0 of them timeouts: {"UND_ERR_SOCKET · request · reused":3}',
+    ])
+    recorder.retries[0] = {
+      ...(recorder.retries[0] as (typeof recorder.retries)[number]),
+      count: 3,
+    }
+    expect(buildFailures({ recorder, sse: cleanSse(), aborted: false })).toEqual([])
   })
 
   it('flags an unexpected status', () => {
@@ -175,6 +210,7 @@ describe('summarizePhases', () => {
         cpu: { userMicros: cpuMicros, systemMicros: 0 },
         memory: { rss, heapUsed: rss / 2, heapTotal: rss, external: 0 },
         eventLoop: { windowMs: 1000, windows: [] },
+        ...emptyTimings(),
       },
       live: {
         judge: { inFlight: 0, waiting, concurrency: 4 },
@@ -262,6 +298,8 @@ function input(overrides: Partial<ReportInput> = {}): ReportInput {
       before: { participants: 0, teams: 0 },
       round: { id: 'r', name: 'load-abc' },
       problemId: 'p',
+      problemIds: ['p'],
+      pastRounds: [],
       closedLeftoverRounds: [],
     },
     sse: { requested: 2, connections: [connection(), connection()] },
@@ -335,6 +373,7 @@ describe('buildReport timeline', () => {
         cpu: { userMicros: 0, systemMicros: 0 },
         memory: { rss: 1, heapUsed: 1, heapTotal: 1, external: 0 },
         eventLoop: { windowMs: 1000, windows: ends.map(window) },
+        ...emptyTimings(),
       },
       live: null,
     })
@@ -346,5 +385,220 @@ describe('buildReport timeline', () => {
     expect(timeline.windows.map((w) => w.endedAt)).toEqual([500, 1000, 2000])
     expect(timeline.samples.map((s) => s.process?.eventLoop.windows)).toEqual([[], []])
     expect(timeline.samples.map((s) => s.at)).toEqual([1000, 2000])
+  })
+})
+
+// --- #137/#138 ---
+
+const consistent = {
+  compared: 2,
+  withoutRanking: 0,
+  distinctDigests: 1,
+  matchesApi: true,
+  apiDigest: 'digest-a',
+  waitedMs: 10,
+}
+const drained = { drained: true, waitedMs: 5, inFlight: 0, waiting: 0, workersAlive: 0 }
+
+function judgeRun(seq: number, overrides: Partial<JudgeRun> = {}): JudgeRun {
+  return {
+    seq,
+    arrivedAt: 1_000 + seq,
+    endedAt: 2_000 + seq,
+    waitingAtArrival: 0,
+    queueMs: 0,
+    spawnMs: 40,
+    execMs: 60,
+    caseMs: 50,
+    cases: 5,
+    outcome: 'passed',
+    ...overrides,
+  }
+}
+
+describe('buildFailures (#137, #138)', () => {
+  const base = () => ({ recorder: cleanRecorder(), sse: cleanSse(), aborted: false })
+
+  it('stays empty after a clean settle and a clean storm', () => {
+    const storm = buildReport(
+      input({
+        storm: {
+          requested: 2,
+          windowSeconds: 0,
+          connections: [connection(), connection()],
+          consistency: consistent,
+        },
+      }),
+    ).storm
+    expect(
+      buildFailures({ ...base(), settle: { drain: drained, consistency: consistent }, storm }),
+    ).toEqual([])
+  })
+
+  it('flags a judge that did not drain, or a worker left alive', () => {
+    const failures = buildFailures({
+      ...base(),
+      settle: {
+        drain: { ...drained, drained: false, inFlight: 1, workersAlive: 2 },
+        consistency: consistent,
+      },
+    })
+    expect(failures).toEqual([
+      'judge did not drain after the load: 1 in flight, 0 waiting, 2 worker(s) alive',
+    ])
+  })
+
+  it('flags a ranking that differs between connections or from the API, at settle and after the storm', () => {
+    const diverged = { ...consistent, distinctDigests: 2, matchesApi: false }
+    const storm = buildReport(
+      input({
+        storm: {
+          requested: 1,
+          windowSeconds: 0,
+          connections: [connection()],
+          consistency: { ...consistent, compared: 1, withoutRanking: 1, matchesApi: false },
+        },
+      }),
+    ).storm
+    const failures = buildFailures({
+      ...base(),
+      settle: { drain: drained, consistency: diverged },
+      storm,
+    })
+    expect(failures).toEqual([
+      'SSE ranking diverged after the load: 2 connection(s) compared, 0 without a ranking, 2 distinct digest(s), API digest not matched',
+      'SSE ranking diverged after the storm: 1 connection(s) compared, 1 without a ranking, 1 distinct digest(s), API digest not matched',
+    ])
+  })
+
+  it('flags a storm connection that failed to open or dropped', () => {
+    const storm = buildReport(
+      input({
+        storm: {
+          requested: 2,
+          windowSeconds: 2,
+          connections: [
+            connection({
+              state: 'failed',
+              failure: { status: null, errorCode: null, reason: 'timeout' },
+            }),
+            connection({ state: 'dropped', dropReason: 'stream_ended' }),
+          ],
+          consistency: { ...consistent, compared: 0, matchesApi: null },
+        },
+      }),
+    ).storm
+    expect(buildFailures({ ...base(), storm })).toEqual([
+      '1 storm SSE connection(s) failed to open: {"timeout":1}',
+      '1 storm SSE connection(s) dropped: {"stream_ended":1}',
+    ])
+  })
+})
+
+describe('firstWaveCurve', () => {
+  it('reads the k-th arrival’s wait and the p95 of the first k, and where it passes the threshold', () => {
+    // 100 arrivals, the i-th (1-based) waiting 100·i ms. The p95 of the
+    // first k is the ceil(0.95·k)-th wait: k = 53 is the first where that is
+    // the 51st arrival, 5100 ms.
+    const runs = Array.from({ length: 100 }, (_, i) =>
+      judgeRun(100 - i, { arrivedAt: i, queueMs: (i + 1) * 100 }),
+    )
+    const curve = firstWaveCurve(runs)
+
+    expect(curve.points).toEqual([
+      { k: 10, kthQueueMs: 1_000, p95QueueMs: 1_000 },
+      { k: 25, kthQueueMs: 2_500, p95QueueMs: 2_400 },
+      { k: 50, kthQueueMs: 5_000, p95QueueMs: 4_800 },
+      { k: 75, kthQueueMs: 7_500, p95QueueMs: 7_200 },
+      { k: 100, kthQueueMs: 10_000, p95QueueMs: 9_500 },
+    ])
+    expect(curve.firstKAboveThreshold).toBe(53)
+  })
+
+  it('has no point beyond the runs it has, and no threshold crossing when nothing waits', () => {
+    const curve = firstWaveCurve(Array.from({ length: 12 }, (_, i) => judgeRun(i + 1)))
+    expect(curve.points.map((point) => point.k)).toEqual([10])
+    expect(curve.firstKAboveThreshold).toBeNull()
+  })
+})
+
+describe('buildReport judge and SSE cost sections', () => {
+  function processSample(at: number, runs: JudgeRun[]): BackSample {
+    const timings = emptyTimings()
+    return {
+      at,
+      phase: 'load',
+      process: {
+        sampledAt: at,
+        uptimeSeconds: 1,
+        cpu: { userMicros: 0, systemMicros: 0 },
+        memory: { rss: 1, heapUsed: 1, heapTotal: 1, external: 0 },
+        eventLoop: { windowMs: 1000, windows: [] },
+        judge: { ...timings.judge, runs, workers: { spawned: 3, exited: 3, alive: 0 } },
+        sse: {
+          emissions: [
+            {
+              seq: 1,
+              endedAt: at,
+              kind: 'ranking',
+              subscribers: 2,
+              publishMs: 0.5,
+              stages: { openRoundMs: 1, roundRankingMs: 2, eventRankingMs: 3 },
+            },
+          ],
+          connects: [],
+        },
+      },
+      live: null,
+    }
+  }
+
+  it('summarizes the load phase’s runs by outcome, the payloads and the emissions, and renders them', () => {
+    // cleanRecorder's load phase spans [0, 10 000].
+    const runs = [
+      judgeRun(1, { arrivedAt: 100 }),
+      judgeRun(2, { arrivedAt: 200, outcome: 'timeout', spawnMs: null }),
+      judgeRun(3, { arrivedAt: 300, outcome: 'runtime_error' }),
+    ]
+    const report = buildReport(
+      input({
+        samples: [processSample(5_000, runs.slice(0, 2)), processSample(6_000, runs.slice(1))],
+        settle: { drain: drained, consistency: consistent },
+      }),
+    )
+
+    expect(report.judge).toMatchObject({
+      runs: 3,
+      byOutcome: { passed: 1, timeout: 1, runtime_error: 1 },
+      workers: { spawned: 3, exited: 3, alive: 0 },
+    })
+    expect(report.judge?.spawnShareOfPassed.p50).toBe(0.4)
+    expect(report.sseCost.payloads.find((p) => p.type === 'ranking.updated')).toEqual({
+      type: 'ranking.updated',
+      events: 2,
+      minBytes: 2000,
+      meanBytes: 2000,
+      maxBytes: 2000,
+    })
+    expect(report.sseCost.rankingBandwidthPerEmissionBytes).toBe(4000)
+    expect(report.sseCost.emissions).toMatchObject([
+      { phase: 'load', kind: 'ranking', count: 1, subscribersMax: 2 },
+    ])
+    expect(report.timeline.judgeRuns.map((run) => run.seq)).toEqual([1, 2, 3])
+    expect(report.timeline.samples.every((sample) => sample.process?.judge.runs.length === 0)).toBe(
+      true,
+    )
+
+    const markdown = renderMarkdown(report)
+    for (const section of [
+      '## Submissions by kind',
+      '## Judge (load phase)',
+      '### First wave',
+      '### Payloads',
+      '### Emissions (back)',
+      '## Settle',
+    ]) {
+      expect(markdown).toContain(section)
+    }
   })
 })

@@ -1,10 +1,11 @@
 import type { SubmissionResult } from '../modules/submissions/submissions.schema'
 
-// What the harness sends (#136): the correct solution, or an infinite loop
-// that must come back as a timeout. #137 adds a memory bomb.
-export type SubmissionKind = 'correct' | 'loop'
+// What the harness sends: the correct solution, an infinite loop that must
+// come back as a timeout (#136), or a memory bomb that must come back as a
+// runtime error (#137).
+export type SubmissionKind = 'correct' | 'loop' | 'memory'
 
-export const SUBMISSION_KINDS: readonly SubmissionKind[] = ['correct', 'loop']
+export const SUBMISSION_KINDS: readonly SubmissionKind[] = ['correct', 'loop', 'memory']
 
 export type Verdict =
   | 'accepted'
@@ -17,6 +18,7 @@ export type Verdict =
 const EXPECTED: Record<SubmissionKind, Verdict> = {
   correct: 'accepted',
   loop: 'timeout',
+  memory: 'runtime_error',
 }
 
 /**

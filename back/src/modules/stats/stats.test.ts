@@ -16,6 +16,8 @@ import {
   teamsTable,
   usersTable,
 } from '../../db/schema'
+import { runJudgeAgainstWorker } from '../judge/judge.service'
+import { createSseBus, runExpiryTick } from '../sse/sse.service'
 import {
   acquireSubmissionSlot,
   recordAcceptedSubmission,
@@ -562,6 +564,85 @@ describe('GET /organizer/stats/process', { timeout: 20_000 }, () => {
       expect(body.eventLoop.windows.length).toBeGreaterThanOrEqual(1)
     } finally {
       stop()
+    }
+  })
+})
+
+// #137/#138: the judge's and the fan-out's own timings, filtered by `since`
+// so the harness polling once a second only receives what is new.
+describe('process stats: judge and SSE timings', { timeout: 20_000 }, () => {
+  const DOUBLE_WORKER_URL = new URL('../../judge-test-worker.mjs', import.meta.url)
+  const judgeOnce = () =>
+    runJudgeAgainstWorker(DOUBLE_WORKER_URL, 'unused', [{ input: 'a', expected: 'a' }], {
+      timeoutMs: 2000,
+      memoryMb: 64,
+      concurrency: 4,
+    })
+  const heartbeatOnce = () => runExpiryTick(db, createSseBus())
+  // The next millisecond, so `since` cleanly splits what came before it.
+  const nextMillisecond = async () => {
+    const now = Date.now()
+    while (Date.now() <= now) await new Promise((resolve) => setTimeout(resolve, 1))
+    return Date.now()
+  }
+
+  async function tokenFor(user: { id: string; role: Role; university: University }) {
+    return signJwt(
+      { role: user.role, university: user.university },
+      { secret: JWT_SECRET, subject: user.id, expiresInSeconds: TOKEN_TTL_SECONDS },
+    )
+  }
+
+  it('carries the judge config, the worker counters and the recorded runs and emissions', async () => {
+    await judgeOnce()
+    await heartbeatOnce()
+
+    const stats = getProcessStats()
+
+    expect(stats.judge.config.concurrency).toBe(JUDGE_CONCURRENCY)
+    expect(stats.judge.workers.alive).toBe(stats.judge.workers.spawned - stats.judge.workers.exited)
+    expect(stats.judge.runs.length).toBeGreaterThanOrEqual(1)
+    expect(stats.sse.emissions.some((emission) => emission.kind === 'heartbeat')).toBe(true)
+    expect(ProcessStatsSchema.parse(stats)).toEqual(stats)
+  })
+
+  it('drops what ended before `since` and keeps what ended after it', async () => {
+    await judgeOnce()
+    await heartbeatOnce()
+    const before = getProcessStats()
+    const oldRun = before.judge.runs.at(-1)?.seq
+    const oldEmission = before.sse.emissions.at(-1)?.seq
+    const since = await nextMillisecond()
+    await judgeOnce()
+    await heartbeatOnce()
+
+    const stats = getProcessStats({ since })
+
+    expect(stats.judge.runs.map((run) => run.seq)).not.toContain(oldRun)
+    expect(stats.judge.runs).toHaveLength(1)
+    expect(stats.sse.emissions.map((emission) => emission.seq)).not.toContain(oldEmission)
+    expect(stats.sse.emissions).toHaveLength(1)
+    expect(stats.sse.connects.every((connect) => connect.endedAt >= since)).toBe(true)
+  })
+
+  it('answers ?since= over HTTP, and refuses one that is not a non-negative integer', async () => {
+    await judgeOnce()
+    const organizer = await insertUser({ role: 'organizer' })
+    const headers = { Authorization: `Bearer ${await tokenFor(organizer)}` }
+
+    const all = await app.request('/organizer/stats/process?since=0', { headers })
+    expect(all.status).toBe(200)
+    const body = ProcessStatsSchema.parse(await all.json())
+    expect(body.judge.runs.length).toBeGreaterThanOrEqual(1)
+
+    const future = await app.request(`/organizer/stats/process?since=${Date.now() + 60_000}`, {
+      headers,
+    })
+    expect(ProcessStatsSchema.parse(await future.json()).judge.runs).toEqual([])
+
+    for (const since of ['-1', 'abc', '1.5']) {
+      const res = await app.request(`/organizer/stats/process?since=${since}`, { headers })
+      expect(res.status).toBe(422)
     }
   })
 })

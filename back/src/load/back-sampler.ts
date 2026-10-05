@@ -1,13 +1,17 @@
+import type { JudgeRun } from '../modules/judge/judge.schema'
+import type { SseConnect, SseEmission } from '../modules/sse/sse.schema'
 import type { EventLoopWindow, LiveStats, ProcessStats } from '../modules/stats/stats.schema'
 
 import type { Phase, Recorder } from './recorder'
 import { sleep } from './schedule'
-import { readErrorCode, type Transport } from './transport'
+import { readErrorCode, resendIfStale, type Transport } from './transport'
 
 // Polls the back's own view of itself while the harness drives it (#136):
 // /organizer/stats/process (CPU, memory, event-loop windows) and
 // /organizer/stats/live (judge queue, SSE connections), as the organizer.
-// Each sample carries the phase it was taken in.
+// Each sample carries the phase it was taken in. From #137/#138 each poll
+// passes the previous answer's `sampledAt` as `?since=`, so it only carries
+// the judge runs, SSE emissions and connects that are new.
 
 export type BackSample = {
   // Harness clock (epoch ms) when the poll answered — what phases are cut by.
@@ -43,6 +47,32 @@ export function mergeWindows(samples: readonly BackSample[]): EventLoopWindow[] 
   return [...byEnd.values()].sort((a, b) => a.endedAt - b.endedAt)
 }
 
+export type MergedTimings = {
+  judgeRuns: JudgeRun[]
+  emissions: SseEmission[]
+  connects: SseConnect[]
+}
+
+function uniqueBySeq<T extends { seq: number }>(lists: T[][]): T[] {
+  const bySeq = new Map<number, T>()
+  for (const list of lists) for (const entry of list) bySeq.set(entry.seq, entry)
+  return [...bySeq.values()].sort((a, b) => a.seq - b.seq)
+}
+
+/**
+ * Every judge run, SSE emission and connect seen across the samples, once
+ * each, in `seq` order. `since` is inclusive, so consecutive polls can
+ * repeat an entry that ended on the boundary millisecond.
+ */
+export function mergeTimings(samples: readonly BackSample[]): MergedTimings {
+  const reads = samples.flatMap((sample) => (sample.process ? [sample.process] : []))
+  return {
+    judgeRuns: uniqueBySeq(reads.map((read) => read.judge.runs)),
+    emissions: uniqueBySeq(reads.map((read) => read.sse.emissions)),
+    connects: uniqueBySeq(reads.map((read) => read.sse.connects)),
+  }
+}
+
 export function startBackSampler({
   transport,
   recorder,
@@ -51,7 +81,7 @@ export function startBackSampler({
   clock = () => Date.now(),
 }: {
   transport: Transport
-  recorder: Pick<Recorder, 'phase' | 'recordUnexpected'>
+  recorder: Pick<Recorder, 'phase' | 'recordUnexpected' | 'recordRetry'>
   organizerToken: string
   intervalMs: number
   clock?: () => number
@@ -60,10 +90,19 @@ export function startBackSampler({
   const controller = new AbortController()
   const api = transport.api(organizerToken)
 
+  // The previous answer's own clock, never the harness's: the two can drift.
+  let since: number | undefined
+
   const readProcess = async (): Promise<ProcessStats | null> => {
     try {
-      const res = await api.organizer.stats.process.$get()
-      if (res.status === 200) return await res.json()
+      const res = await resendIfStale(transport, recorder, 'GET', '/organizer/stats/process', () =>
+        api.organizer.stats.process.$get({ query: since === undefined ? {} : { since } }),
+      )
+      if (res.status === 200) {
+        const stats = await res.json()
+        since = stats.sampledAt
+        return stats
+      }
       const errorCode = await readErrorCode(res)
       if (res.status < 500) {
         recorder.recordUnexpected({
@@ -81,7 +120,9 @@ export function startBackSampler({
 
   const readLive = async (): Promise<LiveStats | null> => {
     try {
-      const res = await api.organizer.stats.live.$get()
+      const res = await resendIfStale(transport, recorder, 'GET', '/organizer/stats/live', () =>
+        api.organizer.stats.live.$get(),
+      )
       if (res.status === 200) return await res.json()
       const errorCode = await readErrorCode(res)
       if (res.status < 500) {

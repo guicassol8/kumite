@@ -1,5 +1,8 @@
+import { performance } from 'node:perf_hooks'
+
 import { JUDGE_TIMEOUT_MS } from '../../config'
 import type { Db } from '../../db/client'
+import { pushBounded } from '../../lib/ring'
 import { getEventConfig } from '../event-config/event-config.service'
 import { getEventRanking, getRoundRanking } from '../ranking/ranking.service'
 import {
@@ -10,7 +13,15 @@ import {
 } from '../rounds/rounds.service'
 import { hasJudgingInFlight } from '../submissions/submissions.service'
 
-import type { RankingUpdatedEvent, SseBusEvent, StateSyncEvent } from './sse.schema'
+import type {
+  RankingStages,
+  RankingUpdatedEvent,
+  SseBusEvent,
+  SseConnect,
+  SseEmission,
+  SseTimings,
+  StateSyncEvent,
+} from './sse.schema'
 
 // Carries `SseBusEvent`, not `SseEvent`: besides the wire contract the bus
 // also moves internal control events that must never be written to a stream
@@ -136,6 +147,60 @@ export function announceClosedRounds(bus: SseBus, now = Date.now()): void {
   }
 }
 
+// --- Timings for the load harness (#138) ---
+//
+// Bounded rings read by GET /organizer/stats/process, process-local like the
+// ranking flag below. Each entry costs a few performance.now().
+const SSE_EMISSIONS_KEEP = 256
+const SSE_CONNECTS_KEEP = 1024
+const emissions: SseEmission[] = []
+const connects: SseConnect[] = []
+let emissionSeq = 0
+let connectSeq = 0
+let snapshotsBuilding = 0
+
+/** Publishes `event` and records what the synchronous fan-out cost. */
+function publishTimed(
+  bus: SseBus,
+  event: SseBusEvent,
+  kind: SseEmission['kind'],
+  stages: RankingStages | null,
+): void {
+  const subscribers = bus.connections()
+  const started = performance.now()
+  bus.publish(event)
+  const publishMs = performance.now() - started
+  emissionSeq++
+  pushBounded(
+    emissions,
+    { seq: emissionSeq, endedAt: Date.now(), kind, subscribers, publishMs, stages },
+    SSE_EMISSIONS_KEEP,
+  )
+}
+
+/**
+ * Called by the `/sse` handler as it starts building a connect snapshot.
+ * Returns how many snapshots are being built now, this one included; every
+ * call is paired with one `sseConnectFinished`.
+ */
+export function sseConnectStarted(): number {
+  snapshotsBuilding++
+  return snapshotsBuilding
+}
+
+/** Ends a `sseConnectStarted`; records the timings of one that completed. */
+export function sseConnectFinished(timings: Omit<SseConnect, 'seq' | 'endedAt'> | null): void {
+  snapshotsBuilding = Math.max(0, snapshotsBuilding - 1)
+  if (!timings) return
+  connectSeq++
+  pushBounded(connects, { ...timings, seq: connectSeq, endedAt: Date.now() }, SSE_CONNECTS_KEEP)
+}
+
+/** The recent emissions and connects. Read-only. */
+export function getSseTimings(): SseTimings {
+  return { emissions: [...emissions], connects: [...connects] }
+}
+
 // A background tick must not crash the process: a DB error is caught and
 // logged, never thrown. The heartbeat always fires — success or failure —
 // since it's also what tells connected clients the stream is still alive.
@@ -149,7 +214,7 @@ export async function runExpiryTick(db: Db, bus: SseBus): Promise<void> {
   } catch (error) {
     console.error('sse expiry tick failed', error)
   }
-  bus.publish({ type: 'heartbeat', serverTime: new Date() })
+  publishTimed(bus, { type: 'heartbeat', serverTime: new Date() }, 'heartbeat', null)
 }
 
 // --- Ranking debounce (#44) ---
@@ -166,12 +231,27 @@ export function markRankingDirty(): void {
 }
 
 export async function buildRankingUpdatedEvent(db: Db): Promise<RankingUpdatedEvent> {
+  return (await buildRankingUpdatedEventTimed(db)).event
+}
+
+/** The same snapshot, with what each of its three queries took (#138). */
+export async function buildRankingUpdatedEventTimed(
+  db: Db,
+): Promise<{ event: RankingUpdatedEvent; stages: RankingStages }> {
+  const started = performance.now()
   const openRound = await findOpenRound(db)
+  const opened = performance.now()
+  const round = openRound ? await getRoundRanking(db, openRound.id) : null
+  const ranked = performance.now()
+  const event = await getEventRanking(db)
+  const ended = performance.now()
   return {
-    type: 'ranking.updated',
-    serverTime: new Date(),
-    round: openRound ? await getRoundRanking(db, openRound.id) : null,
-    event: await getEventRanking(db),
+    event: { type: 'ranking.updated', serverTime: new Date(), round, event },
+    stages: {
+      openRoundMs: opened - started,
+      roundRankingMs: ranked - opened,
+      eventRankingMs: ended - ranked,
+    },
   }
 }
 
@@ -183,8 +263,8 @@ export async function runRankingTick(db: Db, bus: SseBus): Promise<void> {
   rankingDirty = false
 
   try {
-    const event = await buildRankingUpdatedEvent(db)
-    bus.publish(event)
+    const { event, stages } = await buildRankingUpdatedEventTimed(db)
+    publishTimed(bus, event, 'ranking', stages)
   } catch (error) {
     console.error('sse ranking tick failed', error)
   }

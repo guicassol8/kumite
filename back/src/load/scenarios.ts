@@ -3,8 +3,9 @@ import { availableParallelism, loadavg } from 'node:os'
 import { type BackSample, startBackSampler } from './back-sampler'
 import type { LoadConfig } from './config'
 import { createRecorder } from './recorder'
-import { buildReport, type LoadReport, type WorldSummary } from './report'
+import { buildReport, type LoadReport, type SettleReport, type WorldSummary } from './report'
 import { sleep } from './schedule'
+import { waitForConsistency, waitForDrain } from './settle'
 import { connectSse, type FetchLike, type SseConnection } from './sse-client'
 import { runSubmissions } from './submitter'
 import { createTransport, type Transport } from './transport'
@@ -18,9 +19,12 @@ import {
 } from './world'
 
 // One run, end to end (#136): rest → setup → sse-ramp → sse-idle (baseline)
-// or load (smoke) → teardown. Nothing here aborts the run on a failure: an
-// error stops the phase it happened in, the teardown always runs, and the
-// report always comes out — partial, with `aborted`, on Ctrl-C.
+// or load (smoke, burst) → settle → storm (#137, #138) → teardown. settle
+// runs after any load: the judge must drain and every stream's last ranking
+// must be the API's. storm only with --storm: every stream closes and as
+// many reopen, then the same ranking check. Nothing here aborts the run on a
+// failure: an error stops the phase it happened in, the teardown always
+// runs, and the report always comes out — partial, with `aborted`, on Ctrl-C.
 
 function summarizeWorld(world: World): WorldSummary {
   return {
@@ -31,20 +35,22 @@ function summarizeWorld(world: World): WorldSummary {
     before: world.before,
     round: world.round,
     problemId: world.problemId,
+    problemIds: world.problemIds,
+    pastRounds: world.pastRounds,
     closedLeftoverRounds: world.closedLeftoverRounds,
   }
 }
 
 /**
- * Opens `count` connections round-robin across the participants, at `perSecond`
- * connections per second. Each connect runs on its own; the ramp waits for
+ * Opens `count` connections round-robin across the participants, one every
+ * `gapMs` (0 = all at once). Each connect runs on its own; the ramp waits for
  * all of them before the next phase starts.
  */
 async function rampSse({
   transport,
   users,
   count,
-  perSecond,
+  gapMs,
   connectTimeoutMs,
   recorder,
   signal,
@@ -52,13 +58,12 @@ async function rampSse({
   transport: Transport
   users: LoadUser[]
   count: number
-  perSecond: number
+  gapMs: number
   connectTimeoutMs: number
   recorder: ReturnType<typeof createRecorder>
   signal?: AbortSignal
 }): Promise<SseConnection[]> {
   if (count === 0 || users.length === 0) return []
-  const gapMs = 1000 / perSecond
   const started = Date.now()
   const pending: Promise<SseConnection>[] = []
   for (let i = 0; i < count && !signal?.aborted; i++) {
@@ -105,13 +110,17 @@ export async function runScenario({
     recorder,
     requestTimeoutMs: config.requestTimeoutMs,
     fetch,
+    resendStale: config.resendStale,
   })
 
   let world: World | null = null
   let organizerToken: string | null = null
   let sampler: ReturnType<typeof startBackSampler> | null = null
   let connections: SseConnection[] = []
+  let stormConnections: SseConnection[] = []
   let samples: BackSample[] = []
+  let settle: SettleReport | null = null
+  let storm: Parameters<typeof buildReport>[0]['storm'] = null
 
   try {
     recorder.setPhase('rest')
@@ -142,7 +151,7 @@ export async function runScenario({
         transport,
         users: world.users,
         count: config.sse,
-        perSecond: config.sseRamp,
+        gapMs: 1000 / config.sseRamp,
         connectTimeoutMs: config.requestTimeoutMs,
         recorder,
         signal,
@@ -163,14 +172,60 @@ export async function runScenario({
           )
         }
       }
-      await sleep(Math.max(0, deadline - Date.now()), signal)
+      // --until-done: the load is over when the last submission is.
+      if (!(loaded && config.untilDone)) await sleep(Math.max(0, deadline - Date.now()), signal)
+    }
+
+    if (world?.round && config.submissions > 0 && !signal?.aborted) {
+      recorder.setPhase('settle')
+      log('settle: judge drain and ranking consistency')
+      const drain = await waitForDrain({ transport, recorder, organizerToken })
+      const consistency = await waitForConsistency({
+        transport,
+        recorder,
+        organizerToken,
+        roundId: world.round.id,
+        connections,
+      })
+      settle = { drain, consistency }
+    }
+
+    if (world && config.storm && !signal?.aborted) {
+      recorder.setPhase('storm')
+      const open = connections.filter((c) => c.report().state === 'open').length
+      log(
+        `storm: closing ${open} connection(s), reopening as many over ${config.stormWindowSeconds}s`,
+      )
+      await Promise.all(connections.map((connection) => connection.close()))
+      stormConnections = await rampSse({
+        transport,
+        users: world.users,
+        count: open,
+        gapMs: open > 0 ? (config.stormWindowSeconds * 1000) / open : 0,
+        connectTimeoutMs: config.requestTimeoutMs,
+        recorder,
+        signal,
+      })
+      const consistency = await waitForConsistency({
+        transport,
+        recorder,
+        organizerToken,
+        roundId: world.round?.id ?? null,
+        connections: stormConnections,
+      })
+      storm = {
+        requested: open,
+        windowSeconds: config.stormWindowSeconds,
+        connections: [],
+        consistency,
+      }
     }
   } catch (error) {
     recorder.recordError(error instanceof Error ? error.message : String(error))
   } finally {
     recorder.setPhase('teardown')
     log('teardown')
-    await Promise.all(connections.map((connection) => connection.close()))
+    await Promise.all([...connections, ...stormConnections].map((connection) => connection.close()))
     if (organizerToken && world?.round) {
       try {
         await teardownWorld({ transport, recorder, organizerToken, round: world.round })
@@ -198,6 +253,8 @@ export async function runScenario({
     recorder: recorder.snapshot(),
     world: world ? summarizeWorld(world) : null,
     sse: { requested: config.sse, connections: connections.map((c) => c.report()) },
+    settle,
+    storm: storm ? { ...storm, connections: stormConnections.map((c) => c.report()) } : null,
     samples,
   })
 }

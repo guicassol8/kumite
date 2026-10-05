@@ -139,3 +139,54 @@ export type SseBroadcastEvent = Exclude<SseEvent, SessionRevokedEvent>
 
 /** Everything the bus carries: the broadcast wire events plus the internal ones. */
 export type SseBusEvent = SseBroadcastEvent | SseControlEvent
+
+// --- Timings for the load harness (#138) ---
+//
+// What the fan-out and the connect snapshot cost, as GET
+// /organizer/stats/process reports it. Durations in milliseconds, instants in
+// epoch milliseconds; `seq` increases by one per entry of its own ring and is
+// what the harness dedupes by.
+const nonNegative = z.number().nonnegative()
+const count = z.number().int().nonnegative()
+
+// The three queries a full `ranking.updated` runs, in order.
+export const RankingStagesSchema = z.object({
+  openRoundMs: nonNegative,
+  roundRankingMs: nonNegative,
+  eventRankingMs: nonNegative,
+})
+
+export const SseEmissionSchema = z.object({
+  seq: z.number().int().positive(),
+  endedAt: count,
+  kind: z.enum(['ranking', 'heartbeat']),
+  // Bus subscribers at publish time: the open streams.
+  subscribers: count,
+  // The synchronous part of `bus.publish`: one JSON.stringify per subscriber
+  // plus queueing the write. The socket write itself happens after it.
+  publishMs: nonNegative,
+  // Building the snapshot, for a ranking tick; null for a heartbeat.
+  stages: RankingStagesSchema.nullable(),
+})
+
+export const SseConnectSchema = RankingStagesSchema.extend({
+  seq: z.number().int().positive(),
+  endedAt: count,
+  // Building `state.sync`.
+  stateSyncMs: nonNegative,
+  // From the handler's start until the snapshot's ranking frame was written.
+  totalMs: nonNegative,
+  // Snapshots being built when this one started, itself included.
+  concurrent: z.number().int().positive(),
+})
+
+export const SseTimingsSchema = z.object({
+  // Oldest first, the last 256 and 1024.
+  emissions: z.array(SseEmissionSchema),
+  connects: z.array(SseConnectSchema),
+})
+
+export type RankingStages = z.infer<typeof RankingStagesSchema>
+export type SseEmission = z.infer<typeof SseEmissionSchema>
+export type SseConnect = z.infer<typeof SseConnectSchema>
+export type SseTimings = z.infer<typeof SseTimingsSchema>

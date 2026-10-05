@@ -33,7 +33,7 @@ describe('pnpm load', { timeout: 120_000 }, () => {
   it('prints the usage with no back environment at all', () => {
     const result = runCli(['--help'])
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Usage: pnpm load <baseline|smoke>')
+    expect(result.stdout).toContain('Usage: pnpm load <baseline|smoke|burst>')
   })
 
   it('exits 2 on a bad configuration, naming the flag', () => {

@@ -52,4 +52,10 @@ describe('isCoherent', () => {
     expect(isCoherent('loop', 'runtime_error')).toBe(false)
     expect(isCoherent('correct', rejectedVerdict('codegen_rejected'))).toBe(false)
   })
+
+  it('expects runtime_error for the memory bomb, and nothing else (#137)', () => {
+    expect(isCoherent('memory', 'runtime_error')).toBe(true)
+    expect(isCoherent('memory', 'timeout')).toBe(false)
+    expect(isCoherent('memory', 'accepted')).toBe(false)
+  })
 })

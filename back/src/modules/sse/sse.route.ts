@@ -1,10 +1,17 @@
+import { performance } from 'node:perf_hooks'
+
 import { streamSSE } from 'hono/streaming'
 
 import { defineRoute } from '../../context'
 import { requirePasswordUpToDate, requireUser } from '../../middlewares/auth'
 
 import type { SseEvent } from './sse.schema'
-import { buildRankingUpdatedEvent, buildStateSyncEvent } from './sse.service'
+import {
+  buildRankingUpdatedEventTimed,
+  buildStateSyncEvent,
+  sseConnectFinished,
+  sseConnectStarted,
+} from './sse.service'
 
 // 401 (requireUser) short-circuits before output validation runs (kata
 // ADR-0011), same as every other guarded route — not declared here.
@@ -79,15 +86,28 @@ export const sseRoute = defineRoute({
         void write(event)
       })
 
+      // #138: what the snapshot below costs, and how many were being built
+      // at once — a reconnect storm is exactly that number going up.
+      const started = performance.now()
+      const concurrent = sseConnectStarted()
+      let snapshotted = false
       try {
         const initial = await buildStateSyncEvent(c.get('db'))
+        const stateSyncMs = performance.now() - started
         await write(initial)
 
         // Sent unconditionally, outside the debounce tick: every new
         // connection sees the current leaderboard immediately rather than
         // waiting up to 1s for the next dirty tick (#44 plan).
-        const initialRanking = await buildRankingUpdatedEvent(c.get('db'))
+        const { event: initialRanking, stages } = await buildRankingUpdatedEventTimed(c.get('db'))
         await write(initialRanking)
+        snapshotted = true
+        sseConnectFinished({
+          ...stages,
+          stateSyncMs,
+          totalMs: performance.now() - started,
+          concurrent,
+        })
 
         // Drained by index, not iterated: an event published while a buffered
         // one is being written lands in `pending` too and must go out in turn.
@@ -99,6 +119,7 @@ export const sseRoute = defineRoute({
         }
         buffering = false
       } catch (error) {
+        if (!snapshotted) sseConnectFinished(null)
         unsubscribe()
         throw error
       }

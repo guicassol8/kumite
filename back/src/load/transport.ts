@@ -6,7 +6,7 @@ import { hc } from 'hono/client'
 // would load ../config.ts and demand the back's own environment).
 import type { AppType } from '../app'
 
-import type { Recorder } from './recorder'
+import type { NetworkErrorDetail, Recorder } from './recorder'
 import type { FetchLike } from './sse-client'
 
 // Every request the harness makes goes through here (#136): timed until the
@@ -20,6 +20,94 @@ function describeNetworkError(error: unknown): string {
     return typeof code === 'string' ? code : error.message
   }
   return String(error)
+}
+
+function socketCounter(socket: unknown, key: 'bytesWritten' | 'bytesRead'): number | null {
+  if (!socket || typeof socket !== 'object' || !(key in socket)) return null
+  const value = (socket as Record<string, unknown>)[key]
+  return typeof value === 'number' ? value : null
+}
+
+/**
+ * What a failed request can tell about itself (#138): the code (undici puts
+ * it on `cause`), the message, whether it failed before any response
+ * (`request`) or while reading the body (`body`), and the socket's byte
+ * counters when undici attaches the socket to the error. A socket that had
+ * already read bytes when a request failed before its own response had
+ * carried earlier responses: it was a reused keep-alive socket.
+ */
+export function networkErrorDetail(
+  error: unknown,
+  stage: NetworkErrorDetail['stage'],
+): NetworkErrorDetail {
+  const reason = describeNetworkError(error)
+  const cause =
+    error instanceof Error && error.cause && typeof error.cause === 'object'
+      ? (error.cause as { message?: unknown; socket?: unknown })
+      : null
+  const socket = cause?.socket
+  const bytesRead = socketCounter(socket, 'bytesRead')
+  return {
+    reason,
+    message:
+      typeof cause?.message === 'string'
+        ? cause.message
+        : error instanceof Error
+          ? error.message
+          : String(error),
+    stage,
+    socketBytesWritten: socketCounter(socket, 'bytesWritten'),
+    socketBytesRead: bytesRead,
+    reusedSocket: bytesRead === null ? null : stage === 'request' && bytesRead > 0,
+  }
+}
+
+// The detail of each error the transport rethrew, for the caller to decide
+// on (the submitter's retry); a WeakMap, so the error itself is untouched.
+const details = new WeakMap<object, NetworkErrorDetail>()
+
+/** The detail recorded for an error `timedFetch` rethrew, if any. */
+export function detailOf(error: unknown): NetworkErrorDetail | undefined {
+  return error && typeof error === 'object' ? details.get(error) : undefined
+}
+
+/**
+ * The one network error the harness sends a request again for (#138): the back
+ * closed an idle keep-alive socket just as the harness reused it, so the
+ * request failed before any byte of a response — it never reached a
+ * handler. A browser silently resends in exactly that case; undici does not.
+ * Anything else (a fresh socket, a failure mid-body, a timeout) is not
+ * retried.
+ */
+export function isStaleSocket(detail: NetworkErrorDetail | undefined): boolean {
+  return (
+    detail !== undefined &&
+    detail.stage === 'request' &&
+    detail.reusedSocket === true &&
+    (detail.reason === 'UND_ERR_SOCKET' || detail.reason === 'ECONNRESET')
+  )
+}
+
+/**
+ * `send()`, and — only with `--resend-stale` — once more if it failed on a
+ * stale keep-alive socket, the retry recorded. For the harness's own reads
+ * (the sampler, settle); the submitter applies the same rule inline.
+ */
+export async function resendIfStale<T>(
+  transport: { resendStale: boolean },
+  recorder: Pick<Recorder, 'recordRetry'>,
+  method: string,
+  path: string,
+  send: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await send()
+  } catch (error) {
+    const detail = detailOf(error)
+    if (!transport.resendStale || !detail || !isStaleSocket(detail)) throw error
+    recorder.recordRetry({ method, url: path, detail })
+    return send()
+  }
 }
 
 function errorCodeOf(text: string): string | null {
@@ -44,11 +132,15 @@ export function createTransport({
   recorder,
   requestTimeoutMs,
   fetch = (input, init) => globalThis.fetch(input, init),
+  resendStale = false,
 }: {
   baseUrl: string
   recorder: Pick<Recorder, 'recordHttp'>
   requestTimeoutMs: number
   fetch?: FetchLike
+  // --resend-stale: send a request again once after a stale keep-alive
+  // socket. Off by default, so the harness models Caddy (see README).
+  resendStale?: boolean
 }) {
   /**
    * fetch, timed and recorded. Reads the whole body before returning (so the
@@ -64,6 +156,7 @@ export function createTransport({
     const timeout = AbortSignal.timeout(requestTimeoutMs)
     const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout
     const started = performance.now()
+    let stage: NetworkErrorDetail['stage'] = 'request'
     try {
       // hc calls fetch(url, init); a Request is unwrapped for completeness.
       const requestInit: RequestInit =
@@ -76,6 +169,7 @@ export function createTransport({
             }
           : { ...init, signal }
       const res = await fetch(url, requestInit)
+      stage = 'body'
       const text = await res.text()
       recorder.recordHttp({
         method,
@@ -90,13 +184,16 @@ export function createTransport({
         headers: res.headers,
       })
     } catch (error) {
+      const detail = networkErrorDetail(error, stage)
+      if (error && typeof error === 'object') details.set(error, detail)
       recorder.recordHttp({
         method,
         url,
         status: null,
         errorCode: null,
         ms: performance.now() - started,
-        networkError: describeNetworkError(error),
+        networkError: detail.reason,
+        networkDetail: detail,
       })
       throw error
     }
@@ -104,6 +201,7 @@ export function createTransport({
 
   return {
     baseUrl,
+    resendStale,
     timedFetch,
     /** The typed RPC client, as `token` (or anonymous), over timedFetch. */
     api: (token?: string) =>

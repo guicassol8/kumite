@@ -9,7 +9,7 @@ import { z } from 'zod'
 // (JWT_SECRET and friends), which a load run against a remote back has no
 // business needing.
 
-export const SCENARIOS = ['baseline', 'smoke'] as const
+export const SCENARIOS = ['baseline', 'smoke', 'burst'] as const
 export type ScenarioName = (typeof SCENARIOS)[number]
 
 const positiveInt = z.coerce.number().int().positive()
@@ -29,6 +29,25 @@ export const LoadConfigSchema = z.object({
   // Total across all teams.
   submissions: nonNegativeInt,
   badFraction: z.coerce.number().min(0).max(1),
+  // Among the bad submissions, the share that are memory bombs (#137); the
+  // rest are infinite loops.
+  memoryShare: z.coerce.number().min(0).max(1),
+  // Problems in the run's round: the base one plus clones of it (#138).
+  problems: positiveInt,
+  // The load phase ends when every submission is over; `durationSeconds` is
+  // then only the deadline for starting new ones (#137).
+  untilDone: z.boolean(),
+  // After the load, close every stream and reopen as many, spread over
+  // `stormWindowSeconds` (0 = all at once) (#138).
+  storm: z.boolean(),
+  stormWindowSeconds: z.coerce.number().nonnegative(),
+  // Closed rounds created before the run's own, each with one correct
+  // submission per team: getEventRanking's cost grows with them (#138).
+  pastRounds: nonNegativeInt,
+  // Send a request again once after the back closed a reused keep-alive
+  // socket under it (#138). Off: Caddy, in front of the back in production,
+  // does not resend a POST either, so the harness models it.
+  resendStale: z.boolean(),
   restSeconds: z.coerce.number().nonnegative(),
   durationSeconds: z.coerce.number().positive(),
   setupConcurrency: positiveInt,
@@ -59,6 +78,14 @@ const COMMON = {
   sampleIntervalMs: 1000,
   requestTimeoutMs: 60_000,
   cooldownMs: 5000,
+  // Neutral: baseline and smoke run exactly as #136 measured them.
+  memoryShare: 0,
+  problems: 1,
+  untilDone: false,
+  storm: false,
+  stormWindowSeconds: 0,
+  pastRounds: 0,
+  resendStale: false,
 } as const
 
 export const PRESETS: Record<ScenarioName, Preset> = {
@@ -84,6 +111,27 @@ export const PRESETS: Record<ScenarioName, Preset> = {
     restSeconds: 10,
     durationSeconds: 90,
   },
+  // The first wave (#137, #138): 100 teams submitting at once on a round of
+  // 5 problems, 400 streams watching, then a reconnect storm.
+  burst: {
+    ...COMMON,
+    teams: 100,
+    members: 3,
+    sse: 400,
+    problems: 5,
+    // 3 per team: the first wave is all 100 teams at the same moment.
+    submissions: 300,
+    badFraction: 0.1,
+    memoryShare: 0.5,
+    restSeconds: 30,
+    durationSeconds: 600,
+    untilDone: true,
+    // Under undici's 300 s headersTimeout, so a timeout is always the
+    // harness's own: a submission waiting longer has failed anyway.
+    requestTimeoutMs: 290_000,
+    storm: true,
+    stormWindowSeconds: 0,
+  },
 }
 
 // Flag name → config key, for every numeric/string flag.
@@ -94,6 +142,10 @@ const FLAGS = {
   sse: 'sse',
   submissions: 'submissions',
   'bad-fraction': 'badFraction',
+  'memory-share': 'memoryShare',
+  problems: 'problems',
+  'storm-window': 'stormWindowSeconds',
+  'past-rounds': 'pastRounds',
   rest: 'restSeconds',
   duration: 'durationSeconds',
   'setup-concurrency': 'setupConcurrency',
@@ -105,16 +157,30 @@ const FLAGS = {
   'problem-id': 'problemId',
 } as const satisfies Record<string, keyof LoadConfig>
 
-export const USAGE = `Usage: pnpm load <baseline|smoke> [flags]
+// Boolean flags that a preset may turn on: `--storm` / `--no-storm`.
+const TOGGLES = {
+  'until-done': 'untilDone',
+  storm: 'storm',
+  'resend-stale': 'resendStale',
+} as const satisfies Record<string, keyof LoadConfig>
+
+export const USAGE = `Usage: pnpm load <baseline|smoke|burst> [flags]
 
   --url <url>                 target API (LOAD_API_URL; default http://localhost:$PORT)
   --teams <n>                 teams to create
   --members <n>               members per team (capped at the event's maxTeamSize)
   --sse <n>                   /sse connections, round-robin across participants
   --submissions <n>           total submissions (0 = no round)
-  --bad-fraction <0..1>       share of infinite-loop submissions
+  --bad-fraction <0..1>       share of bad submissions (infinite loops or memory bombs)
+  --memory-share <0..1>       among the bad ones, the share of memory bombs
+  --problems <n>              problems in the run's round (clones of the base one)
+  --past-rounds <n>           closed rounds created first, one correct submission per team
+  --[no-]until-done           load ends when every submission is over (--duration: start deadline)
+  --[no-]storm                after the load, close every stream and reopen as many
+  --storm-window <s>          spread the storm's reconnects over s seconds (0 = at once)
+  --[no-]resend-stale         resend once after a stale keep-alive socket (masks the Caddy→back race)
   --rest <s>                  idle seconds before setup
-  --duration <s>              seconds of idle SSE (baseline) or load (smoke)
+  --duration <s>              seconds of idle SSE (baseline) or load (smoke, burst)
   --setup-concurrency <n>     signups/logins in flight
   --sse-ramp <n>              connections opened per second
   --sample-interval <ms>      back metrics polling interval
@@ -190,12 +256,16 @@ export function parseLoadConfig({
     const value = values[flag]
     if (typeof value === 'string') raw[key] = value
   }
+  for (const [flag, key] of Object.entries(TOGGLES)) {
+    const value = values[flag]
+    if (typeof value === 'boolean') raw[key] = value
+  }
 
   const result = LoadConfigSchema.safeParse(raw)
   if (!result.success) {
     const issues = result.error.issues.map((issue) => {
       const key = String(issue.path[0] ?? '')
-      const flag = Object.entries(FLAGS).find(([, k]) => k === key)?.[0]
+      const flag = Object.entries({ ...FLAGS, ...TOGGLES }).find(([, k]) => k === key)?.[0]
       const name =
         key === 'organizerEmail'
           ? 'ORGANIZER_EMAIL'
@@ -217,7 +287,14 @@ function parseCli(argv: string[]) {
     help: { type: 'boolean' },
   }
   for (const flag of Object.keys(FLAGS)) options[flag] = { type: 'string' }
-  return parseArgs({ args: argv, options, allowPositionals: true, strict: true })
+  for (const flag of Object.keys(TOGGLES)) options[flag] = { type: 'boolean' }
+  return parseArgs({
+    args: argv,
+    options,
+    allowPositionals: true,
+    allowNegative: true,
+    strict: true,
+  })
 }
 
 export function wantsHelp(argv: string[]): boolean {

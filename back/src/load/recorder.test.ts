@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createRecorder, routeKey } from './recorder'
+import { createRecorder, PHASES, routeKey } from './recorder'
 
 describe('routeKey', () => {
   it('replaces uuids with :id and drops the origin and the query', () => {
@@ -131,6 +131,19 @@ describe('createRecorder', () => {
       { phase: 'setup', message: 'another round is open: Rodada 1' },
     ])
     expect(snapshot.warnings).toEqual(['the database was not clean'])
+  })
+
+  it('orders the phases of a run, settle and storm between load and teardown (#137)', () => {
+    expect(PHASES).toEqual([
+      'rest',
+      'setup',
+      'sse-ramp',
+      'sse-idle',
+      'load',
+      'settle',
+      'storm',
+      'teardown',
+    ])
   })
 
   it('records a timeline of phases with their bounds', () => {

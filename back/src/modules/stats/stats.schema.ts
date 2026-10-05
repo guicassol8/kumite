@@ -1,6 +1,8 @@
 import { z } from 'zod'
 
+import { JudgeTimingsSchema } from '../judge/judge.schema'
 import { RoundStatusSchema } from '../rounds/rounds.schema'
+import { SseTimingsSchema } from '../sse/sse.schema'
 
 // --- Organizer event overview (#54) ---
 //
@@ -125,6 +127,22 @@ export const ProcessStatsSchema = z.object({
     windowMs: z.number().int().positive().nullable(),
     windows: z.array(EventLoopWindowSchema),
   }),
+  // #137: the judge's runs (arrival, queue, spawn, execution), its worker
+  // counters and the configuration it judges with.
+  judge: JudgeTimingsSchema,
+  // #138: each emission's fan-out and snapshot cost, and each connect's.
+  sse: SseTimingsSchema,
 })
 
 export type ProcessStats = z.infer<typeof ProcessStatsSchema>
+
+// `since` (epoch ms) keeps only the judge runs, SSE emissions and connects
+// that ended at or after it: a poller passes its previous `sampledAt` and
+// receives what is new, so every poll's output — validated in production
+// too — stays proportional to the traffic, not to the rings. The event-loop
+// windows are not filtered.
+export const ProcessStatsQuerySchema = z.object({
+  since: z.coerce.number().int().nonnegative().optional(),
+})
+
+export type ProcessStatsQuery = z.infer<typeof ProcessStatsQuerySchema>

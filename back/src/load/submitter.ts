@@ -1,21 +1,25 @@
+import { performance } from 'node:perf_hooks'
+
 import type { LoadConfig } from './config'
 import type { Recorder } from './recorder'
-import { isBadAt, sleep } from './schedule'
-import { readErrorCode, type Transport } from './transport'
+import { kindAt, sleep } from './schedule'
+import { detailOf, isStaleSocket, readErrorCode, type Transport } from './transport'
 import { classifyVerdict, rejectedVerdict, type SubmissionKind } from './verdict'
 import { WORKSPACES } from './workspaces'
 import type { LoadTeam, LoadUser, World } from './world'
 
 // The submission load (#136): one loop per team, as a team would play —
 // one submission at a time (the back allows one in flight per team), the
-// cooldown after each, the members taking turns. The kind of each
+// cooldown after each, the members taking turns, and the team's k-th
+// submission on the round's problem k mod n (#138). The kind of each
 // submission comes from a global index, so the sequence is the same on
 // every run with the same config.
 
 // Retries of a 429 before the submission counts as rejected.
 export const MAX_THROTTLE_RETRIES = 3
 
-export type SubmitterConfig = Pick<LoadConfig, 'submissions' | 'badFraction' | 'cooldownMs'>
+export type SubmitterConfig = Pick<LoadConfig, 'submissions' | 'badFraction' | 'cooldownMs'> &
+  Partial<Pick<LoadConfig, 'memoryShare'>>
 
 type Target = { roundId: string; problemId: string }
 
@@ -38,26 +42,40 @@ async function submitOne({
 }): Promise<void> {
   recorder.actionStarted('submission')
   const api = transport.api(member.token)
-  for (let attempt = 0; ; attempt++) {
+  let resent = false
+  let throttled = 0
+  for (;;) {
     let res: Awaited<ReturnType<typeof api.submissions.$post>>
+    const started = performance.now()
     try {
       res = await api.submissions.$post({
         json: { problemId: target.problemId, roundId: target.roundId, workspace: WORKSPACES[kind] },
       })
-    } catch {
-      // Network error or timeout: recorded by the transport. The action
-      // stays started-not-completed, which the report counts as a failure.
+    } catch (error) {
+      // Network error or timeout: recorded by the transport. With
+      // --resend-stale, a stale keep-alive socket is resent once and the
+      // retry counted; anything else leaves the action started-not-completed,
+      // a failure.
+      const detail = detailOf(error)
+      if (transport.resendStale && !resent && detail && isStaleSocket(detail) && !signal?.aborted) {
+        resent = true
+        recorder.recordRetry({ method: 'POST', url: '/submissions', detail })
+        continue
+      }
       return
     }
 
     if (res.status === 201) {
+      // The transport has read the body already: this is until its last byte.
+      recorder.recordSubmissionLatency(kind, performance.now() - started)
       recorder.recordVerdict(kind, classifyVerdict(await res.json()))
       recorder.actionCompleted('submission')
       return
     }
 
     // 429 is the expected answer to a team going too fast: wait, try again.
-    if (res.status === 429 && attempt < MAX_THROTTLE_RETRIES) {
+    if (res.status === 429 && throttled < MAX_THROTTLE_RETRIES) {
+      throttled += 1
       await sleep(Math.max(cooldownMs, 1000), signal)
       if (signal?.aborted) return
       continue
@@ -98,17 +116,19 @@ export async function runSubmissions({
 }: {
   transport: Transport
   recorder: Recorder
-  world: Pick<World, 'teams' | 'round' | 'problemId'>
+  world: Pick<World, 'teams' | 'round' | 'problemIds'>
   config: SubmitterConfig
   deadline: number
   signal?: AbortSignal
   clock?: () => number
 }): Promise<void> {
   if (config.submissions === 0) return
-  if (!world.round || !world.problemId) {
+  const round = world.round
+  const problemIds = world.problemIds
+  if (!round || problemIds.length === 0) {
     throw new Error('a run with submissions needs a round and a problem')
   }
-  const target: Target = { roundId: world.round.id, problemId: world.problemId }
+  const memoryShare = config.memoryShare ?? 0
   let next = 0
 
   const teamLoop = async (team: LoadTeam) => {
@@ -117,19 +137,22 @@ export async function runSubmissions({
       const index = next
       next += 1
       const member = team.members[turn % team.members.length]
+      const problemId = problemIds[turn % problemIds.length] as string
       turn += 1
       if (!member) return
-      const kind: SubmissionKind = isBadAt(index, config.badFraction) ? 'loop' : 'correct'
+      const kind: SubmissionKind = kindAt(index, config.badFraction, memoryShare)
       await submitOne({
         transport,
         recorder,
-        target,
+        target: { roundId: round.id, problemId },
         member,
         kind,
         cooldownMs: config.cooldownMs,
         signal,
       })
-      if (config.cooldownMs > 0) await sleep(config.cooldownMs, signal)
+      // No cooldown after the last one: with --until-done it would only
+      // stretch the load phase.
+      if (config.cooldownMs > 0 && next < config.submissions) await sleep(config.cooldownMs, signal)
     }
   }
 

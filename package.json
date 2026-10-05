@@ -22,6 +22,7 @@
     "load": "pnpm --filter @kumite/back load",
     "load:baseline": "pnpm --filter @kumite/back load baseline",
     "load:smoke": "pnpm --filter @kumite/back load smoke",
+    "load:burst": "pnpm --filter @kumite/back load burst",
     "prepare": "lefthook install"
   },
   "devDependencies": {

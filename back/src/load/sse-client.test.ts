@@ -7,6 +7,9 @@ import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../config'
 import { k } from '../context'
 import { roundsTable, usersTable } from '../db/schema'
 
+import { getEventRanking } from '../modules/ranking/ranking.service'
+
+import { rankingDigest } from './ranking-digest'
 import { createRecorder } from './recorder'
 import { connectSse, type FetchLike } from './sse-client'
 
@@ -89,6 +92,29 @@ describe('connectSse', { timeout: 30_000 }, () => {
     expect(report.dropReason).toBeNull()
     expect(report.invalidPayloads).toBe(0)
     expect(recorder.snapshot().http.rest?.['GET /sse']?.byStatus).toEqual({ '200': 1 })
+  })
+
+  it('measures each event type’s bytes, when it first arrived and the last ranking’s digest (#138)', async () => {
+    const { token } = await insertUser('participant')
+
+    const connection = await connectSse({
+      url: SSE_URL,
+      token,
+      fetch: inProcess,
+      connectTimeoutMs: 10_000,
+    })
+    await waitFor(() => connection.report().events['ranking.updated'] === 1)
+    await connection.close()
+
+    const report = connection.report()
+    expect(report.bytes['state.sync']?.total).toBeGreaterThan(0)
+    expect(report.bytes['ranking.updated']?.total).toBeGreaterThan(0)
+    expect(report.headersMs).toBeGreaterThanOrEqual(0)
+    expect(report.firstEventMs['state.sync']).toBeGreaterThanOrEqual(0)
+    expect(report.firstEventMs['ranking.updated']).toBeGreaterThanOrEqual(0)
+    expect(report.lastRankingDigest).toBe(
+      rankingDigest({ round: null, event: await getEventRanking(db) }),
+    )
   })
 
   it('reports a refused connection as failed with its status and code, without throwing', async () => {

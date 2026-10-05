@@ -43,6 +43,12 @@ src/
     └── <domain>.test.ts      # unit tests
 ```
 
+`src/load/` is not a module: it is the load harness (#136), a CLI that drives
+the API from outside (`pnpm load`, see its `README.md`). It imports the app
+only as a type (`hc<AppType>`) and the zod schemas it validates against, and
+it must never import `config.ts` at runtime — a run against a remote back has
+no `JWT_SECRET`.
+
 ## Conventions
 - Functional only — no classes, no decorators.
 - Named exports only — no default exports.

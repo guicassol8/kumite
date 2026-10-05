@@ -63,6 +63,105 @@ describe('parseLoadConfig', () => {
   })
 })
 
+describe('presets', () => {
+  // #137/#138 added flags with neutral defaults: the #136 runs must stay
+  // reproducible with the same command, so these are pinned whole.
+  it('keeps baseline and smoke exactly as #136 measured them', () => {
+    const common = {
+      setupConcurrency: 4,
+      sseRamp: 50,
+      sampleIntervalMs: 1000,
+      requestTimeoutMs: 60_000,
+      cooldownMs: 5000,
+      memoryShare: 0,
+      problems: 1,
+      untilDone: false,
+      storm: false,
+      stormWindowSeconds: 0,
+      pastRounds: 0,
+    }
+    expect(PRESETS.baseline).toEqual({
+      ...common,
+      teams: 100,
+      members: 3,
+      sse: 400,
+      submissions: 0,
+      badFraction: 0,
+      restSeconds: 60,
+      durationSeconds: 120,
+    })
+    expect(PRESETS.smoke).toEqual({
+      ...common,
+      teams: 10,
+      members: 2,
+      sse: 20,
+      submissions: 30,
+      badFraction: 0.1,
+      restSeconds: 10,
+      durationSeconds: 90,
+    })
+  })
+
+  it('makes burst the first wave of 100 teams on 5 problems, with a storm after it', () => {
+    const result = parse(['burst'])
+    if (!result.ok) throw new Error(result.message)
+    expect(result.config).toMatchObject({
+      scenario: 'burst',
+      teams: 100,
+      members: 3,
+      sse: 400,
+      problems: 5,
+      submissions: 300,
+      badFraction: 0.1,
+      memoryShare: 0.5,
+      restSeconds: 30,
+      durationSeconds: 600,
+      untilDone: true,
+      requestTimeoutMs: 290_000,
+      storm: true,
+      stormWindowSeconds: 0,
+      pastRounds: 0,
+      cooldownMs: 5000,
+      sseRamp: 50,
+    })
+  })
+
+  it('lets the new flags win over the burst preset, booleans included', () => {
+    const result = parse([
+      'burst',
+      '--memory-share',
+      '0',
+      '--problems',
+      '2',
+      '--storm-window',
+      '2',
+      '--past-rounds',
+      '3',
+      '--no-storm',
+      '--no-until-done',
+    ])
+    if (!result.ok) throw new Error(result.message)
+    expect(result.config).toMatchObject({
+      memoryShare: 0,
+      problems: 2,
+      stormWindowSeconds: 2,
+      pastRounds: 3,
+      storm: false,
+      untilDone: false,
+    })
+    const smoke = parse(['smoke', '--storm', '--until-done'])
+    expect(smoke.ok && smoke.config).toMatchObject({ storm: true, untilDone: true })
+  })
+
+  it('refuses a memory share outside [0, 1] with the flag named', () => {
+    for (const value of ['1.5', '-0.1']) {
+      const result = parse(['burst', '--memory-share', value])
+      expect(result.ok).toBe(false)
+      expect(!result.ok && result.message).toContain('--memory-share')
+    }
+  })
+})
+
 describe('readEnvFile', () => {
   it('parses a .env file and returns {} for a missing one', () => {
     const dir = mkdtempSync(join(tmpdir(), 'load-config-'))

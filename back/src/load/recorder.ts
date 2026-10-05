@@ -5,7 +5,18 @@ import { isCoherent, type SubmissionKind, type Verdict } from './verdict'
 // started and completed, every verdict, by phase. Closures, no class (kata
 // verify's no-class covers src/ whole). `snapshot()` is plain JSON.
 
-export const PHASES = ['rest', 'setup', 'sse-ramp', 'sse-idle', 'load', 'teardown'] as const
+// settle and storm are #137/#138's: after the load, the judge drains and the
+// SSE ranking is checked against the API, then every stream reconnects.
+export const PHASES = [
+  'rest',
+  'setup',
+  'sse-ramp',
+  'sse-idle',
+  'load',
+  'settle',
+  'storm',
+  'teardown',
+] as const
 
 export type Phase = (typeof PHASES)[number]
 

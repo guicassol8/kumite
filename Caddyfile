@@ -9,5 +9,17 @@
 	request_body {
 		max_size 1MB
 	}
-	reverse_proxy back:3000
+	# Caddy closes an idle pooled socket to the back, never the back (#438).
+	# 2m is Caddy v2.11.4's own default (reverseproxy/httptransport.go:213-214),
+	# pinned so the floating caddy:2-alpine tag cannot move it silently. Neither
+	# Caddy (no retries by default) nor Go's net/http (only replayable GET/HEAD)
+	# resends a POST that dies on a socket the back just closed: that is a 502
+	# on submit. The back closes at 131s (back/src/lib/http-server.ts), and
+	# http-server.test.ts reads this value and fails unless the back closes
+	# later than Caddy. Raising it here means raising the back's too.
+	reverse_proxy back:3000 {
+		transport http {
+			keepalive 2m
+		}
+	}
 }

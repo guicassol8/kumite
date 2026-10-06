@@ -210,6 +210,17 @@ docker images                    # one kumite-back, plus postgres:17-alpine and 
 df -h /
 ```
 
+**Caddyfile changes need a recreate (#438).** `deploy.yml` runs `git pull` and
+`up -d`, and `up -d` does not recreate the `caddy` container when only the
+Caddyfile changed. The Caddyfile is a single-file bind mount, and `git pull`
+writes the new version as a new inode, so the running container keeps reading
+the old file. After a release that touches the Caddyfile, apply it by hand:
+```bash
+docker compose -f docker-compose.prod.yml up -d --force-recreate caddy
+```
+The `keepalive 2m` that #438 pinned equals Caddy's default, so that release
+needs no recreate: the value is already the one running.
+
 **Rolling back.** Pin the previous release's full 40-character commit sha
 (the tag `deploy.yml` pushes; a short sha matches no tag) in the root `.env`,
 then pull, recreate and untag the bad `latest`:

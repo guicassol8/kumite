@@ -44,6 +44,18 @@ describe('SERVER_TIMEOUTS against the Caddyfile (#438)', () => {
   })
 })
 
+// main.ts is the entrypoint: no test imports it (it would listen and start the
+// ticks), so a bare `serve()` coming back there — a merge resolution, a boot
+// refactor — would drop the timeouts past every gate. Read it instead.
+describe('main.ts boots through serveApp (#438)', () => {
+  const main = readFileSync(new URL('../main.ts', import.meta.url), 'utf8')
+
+  it('starts the app with serveApp, never a bare serve()', () => {
+    expect(main).toMatch(/^serveApp\(app\.fetch, env\.PORT\b/m)
+    expect(main).not.toMatch(/from '@hono\/node-server'/)
+  })
+})
+
 describe('serveApp (#438)', () => {
   let server: Server
 

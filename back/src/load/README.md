@@ -174,8 +174,9 @@ memory and the event-loop windows:
   of the per-case times, and the worst case's outcome;
 - `sse`: a ring of the last 256 emissions (a ranking tick's three query
   stages, and for every emission the subscriber count and the synchronous
-  `bus.publish` time — the N `JSON.stringify` plus queueing the writes, not
-  the socket write itself) and of the last 1024 connects (building
+  `bus.publish` time — the frame encoded once, in the first subscriber
+  (#439), plus N writes of it queued, not the socket write itself) and of
+  the last 1024 connects (building
   `state.sync`, the ranking's three stages, the total until the snapshot's
   ranking frame was written, and how many snapshots were being built at
   once).

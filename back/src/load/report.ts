@@ -1152,7 +1152,7 @@ function renderSseCost(out: string[], report: LoadReport) {
     )
     out.push('')
     out.push(
-      'publish: the synchronous `bus.publish` — one `JSON.stringify` per subscriber and the write queued, not the socket write.',
+      'publish: the synchronous `bus.publish` — the frame encoded once, in the first subscriber (#439), plus N writes of it queued, not the socket write.',
     )
     out.push('')
   }

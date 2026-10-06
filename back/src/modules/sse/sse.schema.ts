@@ -162,8 +162,9 @@ export const SseEmissionSchema = z.object({
   kind: z.enum(['ranking', 'heartbeat']),
   // Bus subscribers at publish time: the open streams.
   subscribers: count,
-  // The synchronous part of `bus.publish`: one JSON.stringify per subscriber
-  // plus queueing the write. The socket write itself happens after it.
+  // The synchronous part of `bus.publish`: the frame encoded once, in the
+  // first subscriber (#439), plus N writes of it queued. The socket write
+  // itself happens after it.
   publishMs: nonNegative,
   // Building the snapshot, for a ranking tick; null for a heartbeat.
   stages: RankingStagesSchema.nullable(),

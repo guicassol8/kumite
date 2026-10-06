@@ -19,6 +19,7 @@ import type {
   SseBusEvent,
   SseConnect,
   SseEmission,
+  SseEvent,
   SseTimings,
   StateSyncEvent,
 } from './sse.schema'
@@ -57,6 +58,39 @@ export function createSseBus(): SseBus {
       return subscribers.size
     },
   }
+}
+
+// --- The wire frame (#439) ---
+//
+// One emission goes to every open stream, and the event ranking it carries
+// is 90–130 KB. Serialized and encoded per connection, that was N
+// JSON.stringify inside the synchronous publish plus N copies split and
+// re-encoded by hono's `writeSSE`, each one held in its own stream's queue
+// (#138: 130–600 ms per emission, RSS up to 2 GB). Encoded once, every
+// connection is handed the same `Uint8Array`: hono writes a `Uint8Array` as
+// is, and Node queues a view of it, never a copy.
+const frames = new WeakMap<SseEvent, Uint8Array>()
+const encoder = new TextEncoder()
+
+/**
+ * The SSE frame for `event`, `event: <type>\ndata: <json>\n\n` in UTF-8 —
+ * byte for byte what hono's `writeSSE({ event: type, data: json })` writes,
+ * with a single `data:` line because `JSON.stringify` never emits a raw line
+ * break.
+ *
+ * Memoized per event object, so the first subscriber to write an emission
+ * pays for it and the rest reuse the same buffer. That relies on every event
+ * being a fresh object per publish and never mutated after it — which is how
+ * every `publish*`/`build*` helper here creates them. Mutating an event after
+ * it was written would send the old bytes.
+ */
+export function encodeSseFrame(event: SseEvent): Uint8Array {
+  let frame = frames.get(event)
+  if (!frame) {
+    frame = encoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+    frames.set(event, frame)
+  }
+  return frame
 }
 
 export async function buildStateSyncEvent(db: Db): Promise<StateSyncEvent> {
@@ -159,7 +193,12 @@ let emissionSeq = 0
 let connectSeq = 0
 let snapshotsBuilding = 0
 
-/** Publishes `event` and records what the synchronous fan-out cost. */
+/**
+ * Publishes `event` and records what the synchronous fan-out cost: encoding
+ * the frame once, in the first subscriber (`encodeSseFrame`, #439), plus each
+ * subscriber queueing its write of that same buffer. The socket write itself
+ * happens after it.
+ */
 function publishTimed(
   bus: SseBus,
   event: SseBusEvent,

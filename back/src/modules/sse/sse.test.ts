@@ -1,5 +1,6 @@
 import { signJwt } from '@katajs-framework/core/jwt'
 import { eq, sql } from 'drizzle-orm'
+import { SSEStreamingApi } from 'hono/streaming'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { app } from '../../app'
@@ -64,6 +65,7 @@ import {
   buildRankingUpdatedEvent,
   buildStateSyncEvent,
   createSseBus,
+  encodeSseFrame,
   getSseTimings,
   markRankingDirty,
   publishRoundClosed,
@@ -380,6 +382,106 @@ describe('sse.service', () => {
         type: 'submissions.resumed',
         serverTime: expect.any(Date),
       })
+    })
+  })
+
+  // #439: the frame is encoded once per event and the same bytes go to every
+  // connection. The wire must stay exactly what hono's own `writeSSE` wrote
+  // before, so the reference here is the real `SSEStreamingApi`, not a copy
+  // of its format.
+  describe('encodeSseFrame', () => {
+    async function honoFrame(event: SseEvent): Promise<string> {
+      const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
+      const stream = new SSEStreamingApi(writable, readable)
+      const reader = stream.responseReadable.getReader()
+      const read = reader.read()
+      await stream.writeSSE({ event: event.type, data: JSON.stringify(event) })
+      const { value } = await read
+      await reader.cancel()
+      return new TextDecoder().decode(value)
+    }
+
+    const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes)
+
+    const rankingWithAwkwardName: SseEvent = {
+      type: 'ranking.updated',
+      serverTime: new Date('2026-10-05T12:00:00.000Z'),
+      round: null,
+      event: {
+        rounds: [],
+        teams: [
+          {
+            teamId: 't1',
+            teamName: 'Peña\n"los de\r\nabajo"',
+            rank: 1,
+            totalScore: 100,
+            totalAttempts: 3,
+            tiebreakTimeMs: 5000,
+            rounds: [],
+          },
+        ],
+      },
+    }
+
+    it.each<[string, SseEvent]>([
+      ['heartbeat', { type: 'heartbeat', serverTime: new Date('2026-10-05T12:00:00.000Z') }],
+      [
+        'state.sync',
+        {
+          type: 'state.sync',
+          serverTime: new Date('2026-10-05T12:00:00.000Z'),
+          round: { id: 'r1', closesAt: new Date('2026-10-05T12:30:00.000Z') },
+          submissionsPaused: false,
+        },
+      ],
+      ['ranking.updated with a newline, quotes and ñ in a team name', rankingWithAwkwardName],
+    ])('writes the same bytes as hono writeSSE for a %s', async (_label, event) => {
+      expect(decode(encodeSseFrame(event))).toBe(await honoFrame(event))
+    })
+
+    it('encodes UTF-8, so a non-ASCII name costs its real byte length', () => {
+      const frame = encodeSseFrame(rankingWithAwkwardName)
+      expect(frame.byteLength).toBe(Buffer.byteLength(decode(frame), 'utf8'))
+      expect(frame.byteLength).toBeGreaterThan(decode(frame).length)
+    })
+
+    it('returns the very same buffer for the same event object', () => {
+      const event: SseEvent = { type: 'heartbeat', serverTime: new Date() }
+      expect(encodeSseFrame(event)).toBe(encodeSseFrame(event))
+    })
+
+    it('encodes each event object on its own, even when the content is equal', () => {
+      const serverTime = new Date()
+      const a: SseEvent = { type: 'heartbeat', serverTime }
+      const b: SseEvent = { type: 'heartbeat', serverTime }
+
+      const frameA = encodeSseFrame(a)
+      const frameB = encodeSseFrame(b)
+
+      expect(frameB).not.toBe(frameA)
+      expect(decode(frameB)).toBe(decode(frameA))
+    })
+
+    it('stringifies a published event once, however many subscribers encode it', () => {
+      const bus = createSseBus()
+      const frames: Uint8Array[] = []
+      for (let i = 0; i < 3; i++) {
+        bus.subscribe((event) => {
+          if (event.type !== 'user.deactivated') frames.push(encodeSseFrame(event))
+        })
+      }
+      const event: SseEvent = { type: 'heartbeat', serverTime: new Date() }
+      const stringify = vi.spyOn(JSON, 'stringify')
+
+      try {
+        bus.publish(event)
+        expect(stringify.mock.calls.filter(([arg]) => arg === event)).toHaveLength(1)
+      } finally {
+        stringify.mockRestore()
+      }
+      expect(frames).toHaveLength(3)
+      expect(frames[1]).toBe(frames[0])
+      expect(frames[2]).toBe(frames[0])
     })
   })
 
@@ -862,6 +964,56 @@ describe('GET /sse', () => {
     expect(third).toContain('event: heartbeat')
 
     await frames.cancel()
+  })
+
+  // #439: one emission is serialized once, not once per connection — that
+  // per-connection JSON.stringify of a 90–130 KB ranking was the 130–600 ms
+  // stall of #138 — and every connection gets the same bytes.
+  it('serializes a published event once and writes the same frame to every connection', async () => {
+    const users = await db
+      .insert(usersTable)
+      .values(
+        [0, 1].map(() => ({
+          email: `sse-${crypto.randomUUID()}@example.com`,
+          passwordHash: 'hash',
+          role: 'participant' as const,
+          university: 'pucrs' as const,
+        })),
+      )
+      .returning()
+    const connections = await Promise.all(
+      users.map(async (user) => {
+        const token = await tokenFor(user)
+        const res = await app.request('/sse', { headers: { Authorization: `Bearer ${token}` } })
+        if (!res.body) throw new Error('expected a streamed body')
+        return createFrameReader(res.body)
+      }),
+    )
+    for (const frames of connections) {
+      expect(await frames.next()).toContain('event: state.sync')
+      expect(await frames.next()).toContain('event: ranking.updated')
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const event: SseEvent = {
+      type: 'ranking.updated',
+      serverTime: new Date(),
+      round: null,
+      event: { rounds: [], teams: [] },
+    }
+    const stringify = vi.spyOn(JSON, 'stringify')
+    try {
+      k.resolve('sseBus').publish(event)
+      const received = await Promise.all(connections.map((frames) => frames.next()))
+
+      expect(stringify.mock.calls.filter(([arg]) => arg === event)).toHaveLength(1)
+      // The reader strips the frame's trailing blank line.
+      const expected = new TextDecoder().decode(encodeSseFrame(event)).replace(/\n\n$/, '')
+      expect(received).toEqual([expected, expected])
+    } finally {
+      stringify.mockRestore()
+      await Promise.all(connections.map((frames) => frames.cancel()))
+    }
   })
 
   it('records what building the connect snapshot cost (#138)', async () => {

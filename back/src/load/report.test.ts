@@ -662,6 +662,18 @@ describe('summarizeHarness (#442)', () => {
     expect(load?.samples).toBe(0)
     expect(load?.saturated).toBe(false)
   })
+
+  it('is saturated from a mean ELU of exactly 0.9 or a stall of exactly 1000 ms, not below', () => {
+    const samples = [
+      harness(1_000, 'rest', 0.9, 10),
+      harness(3_000, 'setup', 0.89, 999),
+      harness(5_000, 'load', 0.1, 1_000),
+    ]
+    const [rest, setup, load] = summarizeHarness(spans, samples, [])
+    expect(rest?.saturated).toBe(true)
+    expect(setup?.saturated).toBe(false)
+    expect(load?.saturated).toBe(true)
+  })
 })
 
 describe('buildReport harness section (#442)', () => {

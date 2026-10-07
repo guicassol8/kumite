@@ -258,6 +258,20 @@ describe('createPayloadCache', () => {
     cache.classify('"a"')
     expect(cache.stats()).toEqual({ distinct: 4, reused: 1 })
   })
+
+  it('drops the least recently used, not the oldest inserted: a hit refreshes the entry', () => {
+    const cache = createPayloadCache({ maxEntries: 2 })
+    cache.classify('"a"')
+    cache.classify('"b"')
+    // "a" is read again, so "b" is now the least recently used...
+    cache.classify('"a"')
+    // ...and the third distinct payload drops "b", not "a".
+    cache.classify('"c"')
+    cache.classify('"a"')
+    expect(cache.stats()).toEqual({ distinct: 3, reused: 2 })
+    cache.classify('"b"')
+    expect(cache.stats()).toEqual({ distinct: 4, reused: 2 })
+  })
 })
 
 describe('connectSse with a shared payload cache (#442)', () => {

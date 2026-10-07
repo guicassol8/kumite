@@ -11,7 +11,8 @@ organizer.
 It lives in `back/src/load/` rather than in a package of its own, so it
 shares the back's `tsc`, vitest and `tsx`. It reaches the API through the
 typed client (`hc<AppType>`, type-only) and validates SSE payloads with the
-back's own `SseEventSchema`. It is not a kata module.
+back's own `SseEventSchema`, each distinct payload once per run (#442). It
+is not a kata module.
 
 ## Scenarios
 
@@ -138,6 +139,8 @@ E2E use. `PORT` is read the same way when `--url`/`LOAD_API_URL` is unset.
    the same time: they share the CPU and move every number (#431). Check
    `cat /proc/loadavg` first. The report's header records the harness
    machine's load average at the start and at the end, so a noisy run shows.
+   The report's `Phases (harness process)` table is the run's own check:
+   a phase marked saturated measured the harness, not the back (below).
 
 5. **Run**, e.g. `pnpm load:baseline --sse 300`.
 
@@ -194,7 +197,9 @@ stdout; progress goes to stderr. The reports worth keeping are copied into
 The report has: the run (target, Node, commit, start/end, the harness
 machine's load average and parallelism), the config, the world built, a
 table per phase of the back's CPU %, RSS, heap, event-loop lag and
-utilization, judge queue and server-side SSE count, HTTP latency
+utilization, judge queue and server-side SSE count, the same per phase for
+the harness's own process (CPU %, ELU, lag, the largest gap between two
+back polls, and whether it saturated — #442), HTTP latency
 (p50/p95/p99/max) and status counts per route and phase, the verdict matrix
 (sent × verdict), actions started vs completed, and SSE (opened, failed,
 dropped and why, events per connection, heartbeat gaps and each
@@ -238,6 +243,37 @@ Only these, each counted and listed — the run never stops at the first:
 
 Latency, queue wait, spawn, CPU, memory, lag, bytes and heartbeat cadence
 are observations: they never fail a run.
+
+### The harness's own load (#442)
+
+The harness is one Node process holding every stream. Each frame reaches
+all of them, and since #439 its bytes are identical on every connection;
+validating it 400 times (JSON, the zod union, and for a `ranking.updated`
+of 90–130 KB two more zod parses, a canonical JSON and a sha256) kept the
+harness at 100% of one core through a burst's `load` phase. Its heartbeat
+gaps and its back polls (15–46 s apart) then measured the harness, not the
+back.
+
+- **One validation per distinct payload.** A cache shared by the run's
+  streams, keyed by the `data:` text, keeps the answer for the last 64
+  distinct payloads (valid or not, the type, the ranking digest, the bytes).
+  The answer depends only on the text, so every connection still counts its
+  own invalid payloads and keeps its own last ranking digest: settle and
+  the storm compare exactly what they compared before. The SSE table shows
+  `payloads validated (distinct / reused)`.
+- **The harness reports its own load.** Every `--sample-interval` it reads
+  its CPU (`process.cpuUsage`), event-loop utilization and event-loop delay
+  (`monitorEventLoopDelay`), tagged with the phase. `## Phases (harness
+  process)` shows them per phase, with the largest gap between two answers
+  of the back sampler. That gap includes the back's answer time, so a slow
+  back widens it too (the panel's 8 s in #436's signup peak): it points at
+  the harness only next to a high ELU or lag.
+- **Saturated:** a phase whose mean ELU is ≥ 0.9, or where the harness's
+  loop stalled ≥ 1000 ms (the heartbeat's period). Each saturated phase adds
+  a warning — `harness saturated in <phase> …: heartbeat gaps, poll gaps
+  and latencies of this phase measure the harness, not the back` — and
+  **never fails the run**: like CPU and lag, it is an observation. Read
+  that phase's heartbeat gaps and latencies as an upper bound.
 
 ### The stale-socket resend, off by default (#138, #438)
 

@@ -1,0 +1,34 @@
+phase load: 70.5 s window, profiled 70.5 s, busy (non-idle) 3.8 s
+| category | self s | % of busy |
+|---|---|---|
+| gc | 0.69 | 18.2 |
+| program | 0.66 | 17.4 |
+| node internals | 0.63 | 16.6 |
+| undici | 0.59 | 15.5 |
+| parser | 0.34 | 8.9 |
+| sse-client | 0.29 | 7.6 |
+| other | 0.23 | 6.1 |
+| TextDecoder | 0.11 | 3.0 |
+| zod | 0.11 | 2.8 |
+| digest | 0.11 | 2.8 |
+| harness other | 0.03 | 0.7 |
+| crypto | 0.01 | 0.1 |
+| JSON.parse | 0.00 | 0.1 |
+| (idle) | 66.69 | — |
+
+top functions by self time:
+66.69 s  1759.8%  (idle) :-1
+0.69 s  18.2%  (garbage collector) :-1
+0.66 s  17.4%  (program) :-1
+0.27 s  7.1%  fetchParams.controller.resume undici/undici:13825
+0.25 s  6.7%  push load/sse-parser.ts:0
+0.20 s  5.2%  classify load/sse-client.ts:0
+0.12 s  3.2%  runMicrotasks :-1
+0.11 s  2.9%  execute undici/undici:7346
+0.11 s  2.9%  decode node:internal/encoding:481
+0.08 s  2.0%  readableByteStreamControllerEnqueue webstreams/readablestream:3246
+0.07 s  2.0%  (anon) load/sse-client.ts:0
+0.06 s  1.7%  (anon) load/ranking-digest.ts:0
+0.06 s  1.6%  (anon) load/sse-parser.ts:0
+0.05 s  1.4%  processTicksAndRejections process/task_queues:71
+0.05 s  1.3%  decodeUTF8 :-1

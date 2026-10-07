@@ -9,7 +9,7 @@ import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
 } from '@/components/blockly/blockly-workspace'
-import { CreateVariableDialog } from '@/components/blockly/create-variable-dialog'
+import { VariableNameDialog } from '@/components/blockly/variable-name-dialog'
 import { ActionsBar } from '@/components/problem/actions-bar'
 import { ExampleResults, type ExampleResultsNotice } from '@/components/problem/example-results'
 import { PracticeDemoCanvas, PracticeDemoControls } from '@/components/problem/practice-demo'
@@ -524,8 +524,12 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
         resultsVersion={resultsVersion}
       />
       {/* Outside the panels, so both layouts share one dialog. */}
-      <CreateVariableDialog
-        workspace={variableDialog?.kind === 'create' ? variableDialog.workspace : null}
+      <VariableNameDialog
+        request={
+          variableDialog?.kind === 'create' || variableDialog?.kind === 'rename'
+            ? variableDialog
+            : null
+        }
         onClose={() => setVariableDialog(null)}
       />
     </main>

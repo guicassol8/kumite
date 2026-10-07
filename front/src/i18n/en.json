@@ -132,6 +132,12 @@
         "empty": "Give the variable a name.",
         "duplicate": "A variable named \"{{name}}\" already exists."
       }
+    },
+    "renameVariable": {
+      "title": "Rename variable \"{{name}}\"",
+      "label": "New name",
+      "confirm": "Rename",
+      "cancel": "Cancel"
     }
   },
   "organizer": {

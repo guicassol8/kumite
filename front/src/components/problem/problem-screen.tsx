@@ -9,6 +9,7 @@ import {
   BlocklyWorkspace,
   type BlocklyWorkspaceHandle,
 } from '@/components/blockly/blockly-workspace'
+import { DeleteVariableDialog } from '@/components/blockly/delete-variable-dialog'
 import { VariableNameDialog } from '@/components/blockly/variable-name-dialog'
 import { ActionsBar } from '@/components/problem/actions-bar'
 import { ExampleResults, type ExampleResultsNotice } from '@/components/problem/example-results'
@@ -523,13 +524,17 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
         actionsBar={actionsBar}
         resultsVersion={resultsVersion}
       />
-      {/* Outside the panels, so both layouts share one dialog. */}
+      {/* Outside the panels, so both layouts share the variable dialogs. */}
       <VariableNameDialog
         request={
           variableDialog?.kind === 'create' || variableDialog?.kind === 'rename'
             ? variableDialog
             : null
         }
+        onClose={() => setVariableDialog(null)}
+      />
+      <DeleteVariableDialog
+        request={variableDialog?.kind === 'delete' ? variableDialog : null}
         onClose={() => setVariableDialog(null)}
       />
     </main>

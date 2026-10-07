@@ -30,6 +30,45 @@ const BLOCKLY_MESSAGE_PACKS: Record<BlockLocale, Record<string, string>> = {
   en: en as unknown as Record<string, string>,
 }
 
+const BLOCK_DISABLE_ITEM_ID = 'blockDisable'
+let noManualDisableInstalled = false
+
+/**
+ * Hides Blockly's "Disable block" from the block context menu (#239). A
+ * disabled block in the solution is refused by `generateSolution` with
+ * `disabled-block` (#181) — that refusal is the trust boundary and stays —
+ * so offering the action only leads the participant into a state that exists
+ * to be rejected.
+ *
+ * `options.disable: false` would hide the item too, but it also takes away
+ * "Enable block", leaving a block disabled before this change (an old
+ * autosave, a forged workspace) with no way back, while the `disabled-block`
+ * message tells the participant to re-enable it. So the item stays registered
+ * and only its precondition changes: hidden on any block that is not already
+ * manually disabled, Blockly's own rule otherwise.
+ *
+ * Global to the registry, so once per page; it runs at module load.
+ */
+export function installNoManualDisable(): void {
+  if (noManualDisableInstalled) return
+  const registry = Blockly.ContextMenuRegistry.registry
+  const original = registry.getItem(BLOCK_DISABLE_ITEM_ID)
+  if (!original || !('preconditionFn' in original) || !original.preconditionFn) return
+  const originalPrecondition = original.preconditionFn
+  noManualDisableInstalled = true
+
+  registry.unregister(BLOCK_DISABLE_ITEM_ID)
+  registry.register({
+    ...original,
+    preconditionFn(scope, menuOpenEvent) {
+      if (!scope.block?.hasDisabledReason(Blockly.constants.MANUALLY_DISABLED)) return 'hidden'
+      return originalPrecondition(scope, menuOpenEvent)
+    },
+  })
+}
+
+installNoManualDisable()
+
 /**
  * Applies a locale to both the native Blockly blocks and the kumite blocks,
  * and returns the toolbox for it. Both `Blockly.setLocale` and

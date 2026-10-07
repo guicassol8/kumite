@@ -7,7 +7,12 @@ import {
 import * as Blockly from 'blockly'
 import { describe, expect, it, vi } from 'vitest'
 
-import { applyBlocklyLocale, registerVariablesFlyout, workspaceOptions } from '@/lib/blockly-setup'
+import {
+  applyBlocklyLocale,
+  installNoManualDisable,
+  registerVariablesFlyout,
+  workspaceOptions,
+} from '@/lib/blockly-setup'
 
 type Callbacks = {
   registerToolboxCategoryCallback: ReturnType<typeof vi.fn>
@@ -16,6 +21,31 @@ type Callbacks = {
 
 function spyWorkspace(): Callbacks {
   return { registerToolboxCategoryCallback: vi.fn(), registerButtonCallback: vi.fn() }
+}
+
+// The editor has a categorized toolbox, so Blockly leaves `options.disable` on
+// (#239); a bare headless workspace mirrors that with the flag set by hand.
+function withEditorBlock<T>(type: string, run: (block: Blockly.Block) => T): T {
+  const workspace = new Blockly.Workspace()
+  workspace.options.disable = true
+  try {
+    return run(workspace.newBlock(type))
+  } finally {
+    workspace.dispose()
+  }
+}
+
+function disableItem() {
+  return Blockly.ContextMenuRegistry.registry.getItem('blockDisable')
+}
+
+function scopeOf(block: Blockly.Block): Blockly.ContextMenuRegistry.Scope {
+  return { block } as unknown as Blockly.ContextMenuRegistry.Scope
+}
+
+// Runs the registered item's own precondition, the one the context menu asks.
+function precondition(block: Blockly.Block): string | undefined {
+  return disableItem()?.preconditionFn?.(scopeOf(block), new Event('contextmenu'))
 }
 
 describe('blockly-setup', () => {
@@ -125,5 +155,62 @@ describe('blockly-setup', () => {
 
   it('does nothing when the workspace is not mounted yet', () => {
     expect(() => registerVariablesFlyout(null, 'pt', vi.fn())).not.toThrow()
+  })
+})
+
+describe('the "disable block" context menu item (#239)', () => {
+  it('is hidden on an enabled block', () => {
+    withEditorBlock('math_number', (block) => {
+      expect(precondition(block)).toBe('hidden')
+    })
+  })
+
+  it('is hidden on the root block', () => {
+    withEditorBlock(ROOT_BLOCK_TYPE, (block) => {
+      expect(precondition(block)).toBe('hidden')
+    })
+  })
+
+  it('still offers "enable block" on a block that is already disabled, and re-enables it', () => {
+    withEditorBlock('math_number', (block) => {
+      block.setDisabledReason(true, Blockly.constants.MANUALLY_DISABLED)
+      const item = disableItem()
+      const displayText = item?.displayText
+
+      expect(precondition(block)).toBe('enabled')
+      expect(typeof displayText === 'function' ? displayText(scopeOf(block)) : displayText).toBe(
+        Blockly.Msg.ENABLE_BLOCK,
+      )
+
+      item?.callback?.(
+        scopeOf(block),
+        new Event('contextmenu'),
+        new Event('click'),
+        new Blockly.utils.Coordinate(0, 0),
+      )
+
+      expect(block.hasDisabledReason(Blockly.constants.MANUALLY_DISABLED)).toBe(false)
+      expect(precondition(block)).toBe('hidden')
+    })
+  })
+
+  it('stays hidden on a block in a flyout, even a disabled one', () => {
+    withEditorBlock('math_number', (block) => {
+      block.isInFlyout = true
+      block.setDisabledReason(true, Blockly.constants.MANUALLY_DISABLED)
+
+      expect(precondition(block)).toBe('hidden')
+    })
+  })
+
+  it('installs once, however many times it is called', () => {
+    expect(() => {
+      installNoManualDisable()
+      installNoManualDisable()
+    }).not.toThrow()
+
+    withEditorBlock('math_number', (block) => {
+      expect(precondition(block)).toBe('hidden')
+    })
   })
 })

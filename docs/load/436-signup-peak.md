@@ -11,8 +11,10 @@ The command is `pnpm load:baseline --setup-concurrency N --sse 0 --rest 30
 --duration 1`. With `--sse 0` and `--duration 1`, a run is reduced to 30 s
 of rest followed by the setup: 300 signups, 300 logins, 100 teams and 200
 joins. The organizer panel polls `/organizer/stats/live` and
-`/organizer/stats/process` once per second throughout. The raw reports and
-`noise.log` are in [`436/`](436/).
+`/organizer/stats/process` once per second throughout. The raw reports are
+in [`436/`](436/). Each run's `noise.log` (and the `N64-probe`'s
+`health-probe.log`) match the repository's `*.log` ignore rule, so they were
+not committed: the Environment table summarizes what they recorded.
 
 ## Verdict
 

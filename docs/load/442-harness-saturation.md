@@ -19,8 +19,11 @@ This change does two things:
   mean ELU ≥ 0.9 or a stall ≥ 1000 ms gets a warning. That warning never
   fails the run.
 
-All runs are local. The raw reports, `noise.log`, the harness's `top` and
-the profile summaries are in [`442/`](442/).
+All runs are local. The raw reports and the profile summaries are in
+[`442/`](442/). Each run's `noise.log` and the harness's `top.log` match the
+repository's `*.log` ignore rule, so they were not committed: the
+Environment table below summarizes what `noise.log` recorded, and the
+`top` column of the table below comes from `top.log`.
 
 ## Verdict
 

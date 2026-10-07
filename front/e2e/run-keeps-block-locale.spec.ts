@@ -46,8 +46,8 @@ async function runExamples(page: Page) {
 
 /** "Limpar blocos": the fresh root comes from the global block registry. */
 async function clearBlocks(page: Page) {
-  page.once('dialog', (dialog) => dialog.accept())
   await page.getByTestId('problem-clear-button').click()
+  await page.getByTestId('problem-clear-confirm').click()
 }
 
 test.describe('Executar keeps the block locale (#183)', () => {

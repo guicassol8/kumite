@@ -78,16 +78,18 @@ test.describe('the root block and native blocks (#4)', () => {
     await page.screenshot({ path: evidence('01-blocos-nativos-pt-br') })
 
     // 02 — the root block's context menu offers neither "Deletar bloco" nor
-    // "Duplicar".
+    // "Duplicar", nor "Desabilitar bloco" (#239).
     await page.keyboard.press('Escape')
     await rootLabel(page).click({ button: 'right' })
     await expect(contextMenu(page)).toBeVisible()
     await expect(contextMenu(page).getByText('Deletar bloco')).toHaveCount(0)
     await expect(contextMenu(page).getByText('Duplicar')).toHaveCount(0)
+    await expect(contextMenu(page).getByText('Desabilitar bloco')).toHaveCount(0)
     await page.screenshot({ path: evidence('02-menu-raiz-protegido') })
 
     // 03 — a block dragged from the toolbox still offers both: the protection is
-    // the root block's, not a global lockdown of the editor.
+    // the root block's, not a global lockdown of the editor. "Desabilitar bloco"
+    // is gone everywhere (#239): a disabled block is refused by the codegen.
     await page.keyboard.press('Escape')
     await dragBlockFromCategory(page, 'Matemática')
     const dragged = page
@@ -99,6 +101,7 @@ test.describe('the root block and native blocks (#4)', () => {
     await expect(contextMenu(page)).toBeVisible()
     await expect(contextMenu(page).getByText('Deletar bloco')).toBeVisible()
     await expect(contextMenu(page).getByText('Duplicar')).toBeVisible()
+    await expect(contextMenu(page).getByText('Desabilitar bloco')).toHaveCount(0)
     await page.screenshot({ path: evidence('03-menu-bloco-comum') })
 
     // 04 — selecting the root and pressing Delete leaves it exactly where it was.
@@ -175,5 +178,84 @@ test.describe('the root block and native blocks (#4)', () => {
     await expect(page.locator('[data-id="salvoSemRaiz"]')).toHaveCount(1)
     await expect(host.getByText('42')).toBeVisible()
     await page.screenshot({ path: evidence('06-restore-sem-raiz') })
+  })
+
+  // #239, premise P1: the editor never offers "Desabilitar bloco", but a block
+  // that is already disabled (an autosave from before #239, a forged one)
+  // keeps "Habilitar bloco" — the way out the `disabled-block` message asks
+  // for. Its own folder: this is #239's evidence, not #4's.
+  test('a block saved disabled is still refused, and offers only "Habilitar bloco"', async ({
+    page,
+  }) => {
+    const evidence239 = (name: string) => `e2e/evidence/239/${name}.png`
+    const disabledBlock = page.locator('[data-id="salvoDesligado"]')
+
+    await page.addInitScript(
+      ([key, state]) => {
+        window.localStorage.setItem(key as string, state as string)
+      },
+      [
+        workspaceStorageKey(participantId, problemId),
+        JSON.stringify({
+          blocks: {
+            languageVersion: 0,
+            blocks: [
+              {
+                type: 'kumite_solve',
+                id: 'kumiteSolveRoot',
+                x: 40,
+                y: 40,
+                deletable: false,
+                inputs: {
+                  RETURN: {
+                    block: {
+                      type: 'math_number',
+                      id: 'salvoDesligado',
+                      disabledReasons: ['MANUALLY_DISABLED'],
+                      fields: { NUM: 7 },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      ],
+    )
+
+    // 01 — the restored solution holds a disabled block: Executar is still
+    // refused with the `disabled-block` message (#181), no regression.
+    await page.goto(`/problem/${problemId}`)
+    await expectBlocklyInjected(page)
+    await expect(disabledBlock).toHaveCount(1)
+    await page.getByTestId('problem-run-button').click()
+    await expect(page.getByTestId('problem-results-invalid')).toHaveText(
+      'Há um bloco desabilitado na sua solução. Reative-o para continuar.',
+    )
+    await page.screenshot({ path: evidence239('01-bloco-desligado-recusado') })
+
+    // 02 — its context menu offers "Habilitar bloco", never "Desabilitar bloco".
+    await disabledBlock.getByText('7', { exact: true }).click({ button: 'right' })
+    await expect(contextMenu(page)).toBeVisible()
+    await expect(contextMenu(page).getByText('Habilitar bloco')).toBeVisible()
+    await expect(contextMenu(page).getByText('Desabilitar bloco')).toHaveCount(0)
+    await page.screenshot({ path: evidence239('02-menu-oferece-habilitar') })
+
+    // 03 — re-enabled, the block offers neither: there is no way back into
+    // the refused state.
+    await contextMenu(page).getByText('Habilitar bloco').click()
+    await expect(contextMenu(page)).toBeHidden()
+    await disabledBlock.getByText('7', { exact: true }).click({ button: 'right' })
+    await expect(contextMenu(page)).toBeVisible()
+    await expect(contextMenu(page).getByText('Deletar bloco')).toBeVisible()
+    await expect(contextMenu(page).getByText('Habilitar bloco')).toHaveCount(0)
+    await expect(contextMenu(page).getByText('Desabilitar bloco')).toHaveCount(0)
+    await page.screenshot({ path: evidence239('03-reabilitado-sem-desabilitar') })
+
+    // 04 — and Executar runs it: the refusal is gone with the disabled block.
+    await page.keyboard.press('Escape')
+    await page.getByTestId('problem-run-button').click()
+    await expect(page.getByTestId('problem-results-invalid')).toHaveCount(0)
+    await page.screenshot({ path: evidence239('04-executar-sem-recusa') })
   })
 })

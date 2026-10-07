@@ -850,7 +850,12 @@
     "submitButton": "Enviar",
     "submitProgress": "Enviando...",
     "clearButton": "Limpiar bloques",
-    "clearConfirm": "Esto borrará todos los bloques de este problema. ¿Continuar?",
+    "clearDialog": {
+      "title": "¿Limpiar los bloques?",
+      "description": "Esto borrará todos los bloques de este problema.",
+      "confirm": "Limpiar",
+      "cancel": "Cancelar"
+    },
     "executeRunning": "Ejecutando...",
     "submitError": {
       "cooldown": "Espera antes de volver a enviar.",

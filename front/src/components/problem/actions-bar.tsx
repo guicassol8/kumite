@@ -1,6 +1,17 @@
 import { Lightbulb, Play, Send, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -38,6 +49,10 @@ export function ActionsBar({
   className,
 }: ActionsBarProps) {
   const { t } = useTranslation()
+  // Limpar asks in the app's own dialog (#283): `window.confirm` sat outside
+  // the identity, never translated its OK/Cancel, and blocked browser
+  // automation.
+  const [confirmingClear, setConfirmingClear] = useState(false)
 
   return (
     <div
@@ -63,14 +78,33 @@ export function ActionsBar({
         variant="ghost"
         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
         data-testid="problem-clear-button"
-        onClick={() => {
-          if (!window.confirm(t('problem.clearConfirm'))) return
-          onClear()
-        }}
+        onClick={() => setConfirmingClear(true)}
       >
         <Trash2 aria-hidden="true" />
         {t('problem.clearButton')}
       </Button>
+      <AlertDialog open={confirmingClear} onOpenChange={setConfirmingClear}>
+        <AlertDialogContent data-testid="problem-clear-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display font-semibold text-2xl">
+              {t('problem.clearDialog.title')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{t('problem.clearDialog.description')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="problem-clear-cancel">
+              {t('problem.clearDialog.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              data-testid="problem-clear-confirm"
+              onClick={onClear}
+            >
+              {t('problem.clearDialog.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {onShowDemo && (
         // Right edge, where Submeter sits on a round problem: practice never
         // has both.

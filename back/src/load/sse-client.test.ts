@@ -11,7 +11,7 @@ import { getEventRanking } from '../modules/ranking/ranking.service'
 
 import { rankingDigest } from './ranking-digest'
 import { createRecorder } from './recorder'
-import { connectSse, type FetchLike } from './sse-client'
+import { connectSse, createPayloadCache, type FetchLike } from './sse-client'
 
 // In-process: app.fetch is the transport, against the suite's own test
 // database. Timing rule (#431): nothing here measures a duration — events
@@ -200,5 +200,115 @@ describe('connectSse', { timeout: 30_000 }, () => {
       failure: { status: null, reason: 'ECONNREFUSED' },
     })
     expect(recorder.snapshot().http.rest?.['GET /sse']?.networkErrors).toBe(1)
+  })
+})
+
+// --- #442: one validation per distinct payload ---
+
+const rankingFrame = (score: number) =>
+  JSON.stringify({
+    type: 'ranking.updated',
+    serverTime: '2026-10-05T00:00:01.000Z',
+    round: {
+      roundId: 'r1',
+      roundName: 'load-x',
+      problemIds: ['p1'],
+      denominators: 'consistent',
+      teams: [
+        {
+          teamId: 't1',
+          teamName: 'Time 1',
+          rank: 1,
+          totalScore: score,
+          totalAttempts: 1,
+          tiebreakTimeMs: 10,
+          problems: [{ problemId: 'p1', score, attempts: 1, maxScore: 100 }],
+        },
+      ],
+    },
+    event: { rounds: [], teams: [] },
+  })
+const HEARTBEAT = '{"type":"heartbeat","serverTime":"2026-10-05T00:00:00.000Z"}'
+
+const sse = (data: string, event = 'message') => `event: ${event}\ndata: ${data}\n\n`
+
+describe('createPayloadCache', () => {
+  it('validates a payload once and serves the same answer to every later reader', () => {
+    const cache = createPayloadCache()
+    const first = cache.classify(HEARTBEAT)
+    expect(first).toEqual({
+      ok: true,
+      type: 'heartbeat',
+      rankingDigest: null,
+      bytes: Buffer.byteLength(HEARTBEAT),
+    })
+    expect(cache.classify(HEARTBEAT)).toEqual(first)
+    expect(cache.classify('not json')).toEqual({ ok: false })
+    expect(cache.classify('not json')).toEqual({ ok: false })
+    expect(cache.stats()).toEqual({ distinct: 2, reused: 2 })
+  })
+
+  it('keeps at most maxEntries: the oldest is dropped and validated again when it returns', () => {
+    const cache = createPayloadCache({ maxEntries: 2 })
+    cache.classify('"a"')
+    cache.classify('"b"')
+    cache.classify('"c"')
+    expect(cache.stats()).toEqual({ distinct: 3, reused: 0 })
+    cache.classify('"c"')
+    cache.classify('"a"')
+    expect(cache.stats()).toEqual({ distinct: 4, reused: 1 })
+  })
+})
+
+describe('connectSse with a shared payload cache (#442)', () => {
+  it('validates each distinct payload once and still counts per connection', async () => {
+    const payloads = createPayloadCache()
+    const frames = [
+      sse(HEARTBEAT, 'heartbeat'),
+      sse(rankingFrame(100), 'ranking.updated'),
+      'data: not json\n\n',
+    ]
+    const open = () =>
+      connectSse({
+        url: SSE_URL,
+        token: 'x',
+        fetch: async () => streamResponse(frames),
+        connectTimeoutMs: 10_000,
+        payloads,
+      })
+    const [a, b] = await Promise.all([open(), open()])
+    await Promise.all([a.ended, b.ended])
+
+    const expected = rankingDigest(JSON.parse(rankingFrame(100)))
+    for (const connection of [a, b]) {
+      const report = connection.report()
+      expect(report.invalidPayloads).toBe(1)
+      expect(report.invalidSamples).toEqual(['not json'])
+      expect(report.events).toEqual({ heartbeat: 1, 'ranking.updated': 1 })
+      expect(report.bytes['ranking.updated']?.total).toBe(Buffer.byteLength(rankingFrame(100)))
+      expect(report.lastRankingDigest).toBe(expected)
+    }
+    expect(payloads.stats()).toEqual({ distinct: 3, reused: 3 })
+  })
+
+  it('keeps the digest of the last ranking, never a cached older one', async () => {
+    const payloads = createPayloadCache()
+    const open = (scores: number[]) =>
+      connectSse({
+        url: SSE_URL,
+        token: 'x',
+        fetch: async () =>
+          streamResponse(scores.map((score) => sse(rankingFrame(score), 'ranking.updated'))),
+        connectTimeoutMs: 10_000,
+        payloads,
+      })
+    const first = await open([100, 200])
+    await first.ended
+    const second = await open([200, 100])
+    await second.ended
+
+    expect(first.report().lastRankingDigest).toBe(rankingDigest(JSON.parse(rankingFrame(200))))
+    expect(second.report().lastRankingDigest).toBe(rankingDigest(JSON.parse(rankingFrame(100))))
+    expect(payloads.stats()).toEqual({ distinct: 2, reused: 2 })
   })
 })

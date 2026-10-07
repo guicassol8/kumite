@@ -44,4 +44,35 @@ describe('validateVariableName', () => {
       name: 'nova var',
     })
   })
+
+  describe('renaming a variable (#335)', () => {
+    it('does not count the variable being renamed as a conflict, so a case change goes through', () => {
+      const x = workspace.getVariableMap().createVariable('x', '')
+
+      expect(validateVariableName('X', workspace, { except: x.getId() })).toEqual({
+        ok: true,
+        name: 'X',
+      })
+    })
+
+    it('still refuses the name of another variable, even of the same type', () => {
+      const x = workspace.getVariableMap().createVariable('x', '')
+      workspace.getVariableMap().createVariable('y', '')
+
+      expect(validateVariableName('Y', workspace, { except: x.getId() })).toEqual({
+        ok: false,
+        reason: 'duplicate',
+        existing: 'y',
+      })
+    })
+
+    it('still refuses an empty name', () => {
+      const x = workspace.getVariableMap().createVariable('x', '')
+
+      expect(validateVariableName('  ', workspace, { except: x.getId() })).toEqual({
+        ok: false,
+        reason: 'empty',
+      })
+    })
+  })
 })

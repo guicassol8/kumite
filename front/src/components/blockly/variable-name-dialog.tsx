@@ -12,29 +12,45 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import type { VariableDialogRequest } from '@/lib/blockly-variable-field'
 import { validateVariableName } from '@/lib/variable-name'
 
 type ErrorMessage = { key: 'empty' } | { key: 'duplicate'; name: string }
 
-export type CreateVariableDialogProps = {
-  /** The workspace the new variable goes into; the dialog is open while set. */
-  workspace: Blockly.Workspace | null
+export type VariableNameDialogProps = {
+  /** What to name: a new variable, or an existing one to rename. The dialog
+   * is open while set. */
+  request: Extract<VariableDialogRequest, { kind: 'create' | 'rename' }> | null
   onClose: () => void
 }
 
 /**
- * The app's own "Criar variável..." dialog (#205), replacing Blockly's prompt.
- * Same rules as Blockly (see `validateVariableName`), but a refusal is shown
- * here, in the dialog, instead of Blockly's silent cancel or second alert.
- * Creation goes through the same `createVariable(name, '')` call Blockly
- * makes, so the `VarCreate` event, autosave and the flyout refresh are the
- * ones the editor already relies on.
+ * The app's own dialog for naming a variable, replacing Blockly's prompt in
+ * "Criar variável..." (#205) and in a variable dropdown's "Renomear
+ * variável..." (#335). Same rules as Blockly (see `validateVariableName`), but
+ * a refusal is shown here, in the dialog, instead of Blockly's silent cancel
+ * or second alert — and renaming to another variable's name is refused rather
+ * than merging the two.
+ *
+ * The change goes through the same calls Blockly makes —
+ * `createVariable(name, '')` and `renameVariable(variable, name)` — so the
+ * variable events, autosave and the flyout refresh are the ones the editor
+ * already relies on.
  */
-export function CreateVariableDialog({ workspace, onClose }: CreateVariableDialogProps) {
+export function VariableNameDialog({ request, onClose }: VariableNameDialogProps) {
   const { t } = useTranslation()
   const inputId = useId()
   const [name, setName] = useState('')
   const [error, setError] = useState<ErrorMessage | null>(null)
+
+  // Keeps the last request through the closing animation, so the title and
+  // the test ids do not flip to "create" while the dialog fades out.
+  const [shown, setShown] = useState(request)
+  if (request && request !== shown) setShown(request)
+  const current = request ?? shown
+  const isRename = current?.kind === 'rename'
+  const testId = isRename ? 'rename-variable' : 'create-variable'
+  const copy = isRename ? 'editor.renameVariable' : 'editor.createVariable'
 
   const contentRef = useRef<HTMLDivElement>(null)
   // Focus moving into this dialog is, to Blockly, the editor losing focus —
@@ -49,20 +65,22 @@ export function CreateVariableDialog({ workspace, onClose }: CreateVariableDialo
 
   // Every opening starts over: empty input, no stale error.
   useEffect(() => {
-    if (!workspace) {
+    if (!request) {
       giveBackFocus()
       return
     }
     setName('')
     setError(null)
-  }, [workspace, giveBackFocus])
+  }, [request, giveBackFocus])
 
   useEffect(() => giveBackFocus, [giveBackFocus])
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!workspace) return
-    const result = validateVariableName(name, workspace)
+    if (!request) return
+    const { workspace } = request
+    const except = request.kind === 'rename' ? request.variableId : undefined
+    const result = validateVariableName(name, workspace, { except })
     if (!result.ok) {
       setError(
         result.reason === 'duplicate'
@@ -71,20 +89,31 @@ export function CreateVariableDialog({ workspace, onClose }: CreateVariableDialo
       )
       return
     }
-    workspace.getVariableMap().createVariable(result.name, '')
+
+    const variables = workspace.getVariableMap()
+    if (request.kind === 'create') {
+      variables.createVariable(result.name, '')
+    } else {
+      // Looked up by id now, not held from the request: a language switch
+      // reloads the workspace under the open dialog, with the same ids.
+      const variable = variables.getVariableById(request.variableId)
+      if (variable && variable.getName() !== result.name) {
+        variables.renameVariable(variable, result.name)
+      }
+    }
     onClose()
   }
 
   return (
     <Dialog
-      open={workspace !== null}
+      open={request !== null}
       onOpenChange={(open) => {
         if (!open) onClose()
       }}
     >
       <DialogContent
         ref={contentRef}
-        data-testid="create-variable-dialog"
+        data-testid={`${testId}-dialog`}
         showCloseButton={false}
         onOpenAutoFocus={() => {
           // Not prevented: Radix still moves focus on to the input.
@@ -94,20 +123,21 @@ export function CreateVariableDialog({ workspace, onClose }: CreateVariableDialo
             )
           }
         }}
-        // Blockly puts focus back where it was (the flyout) on give-back.
+        // Blockly puts focus back where it was (the flyout, the block) on
+        // give-back.
         onCloseAutoFocus={(event) => event.preventDefault()}
       >
         <DialogHeader>
           <DialogTitle className="font-display font-semibold text-2xl">
-            {t('editor.createVariable.title')}
+            {isRename ? t(`${copy}.title`, { name: current.name }) : t(`${copy}.title`)}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor={inputId}>{t('editor.createVariable.label')}</Label>
+            <Label htmlFor={inputId}>{t(`${copy}.label`)}</Label>
             <Input
               id={inputId}
-              data-testid="create-variable-input"
+              data-testid={`${testId}-input`}
               className="h-11"
               // No autoFocus: Radix focuses this first field itself, and an
               // input already focused would skip onOpenAutoFocus above.
@@ -120,11 +150,8 @@ export function CreateVariableDialog({ workspace, onClose }: CreateVariableDialo
               }}
             />
             {error && (
-              <p
-                role="alert"
-                data-testid="create-variable-error"
-                className="text-destructive text-sm"
-              >
+              <p role="alert" data-testid={`${testId}-error`} className="text-destructive text-sm">
+                {/* Same refusals whether creating or renaming. */}
                 {error.key === 'duplicate'
                   ? t('editor.createVariable.errors.duplicate', { name: error.name })
                   : t('editor.createVariable.errors.empty')}
@@ -135,13 +162,13 @@ export function CreateVariableDialog({ workspace, onClose }: CreateVariableDialo
             <Button
               type="button"
               variant="outline"
-              data-testid="create-variable-cancel"
+              data-testid={`${testId}-cancel`}
               onClick={onClose}
             >
-              {t('editor.createVariable.cancel')}
+              {t(`${copy}.cancel`)}
             </Button>
-            <Button type="submit" data-testid="create-variable-confirm">
-              {t('editor.createVariable.confirm')}
+            <Button type="submit" data-testid={`${testId}-confirm`}>
+              {t(`${copy}.confirm`)}
             </Button>
           </DialogFooter>
         </form>

@@ -12,6 +12,8 @@ import * as en from 'blockly/msg/en'
 import * as es from 'blockly/msg/es'
 import * as ptBr from 'blockly/msg/pt-br'
 
+import { installVariableField } from '@/lib/blockly-variable-field'
+
 /**
  * Single entry point for the editor's Blockly configuration.
  *
@@ -68,6 +70,8 @@ export function installNoManualDisable(): void {
 }
 
 installNoManualDisable()
+// Variable dropdowns hand "rename" and "delete" to the app's dialogs (#335).
+installVariableField()
 
 /**
  * Applies a locale to both the native Blockly blocks and the kumite blocks,

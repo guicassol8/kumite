@@ -72,6 +72,7 @@ test.describe('the workspace auto-save (#6)', () => {
     await page.getByTestId('problem-clear-cancel').click()
     await expect(clearDialog).toBeHidden()
     await expect(blocks).toHaveCount(before)
+    await page.screenshot({ path: 'e2e/evidence/283/02-cancelado-blocos-intactos.png' })
 
     // Confirming resets the workspace to just the root block (it isn't
     // offered by the toolbox, so losing it would strand the user) and removes
@@ -80,6 +81,7 @@ test.describe('the workspace auto-save (#6)', () => {
     await page.getByTestId('problem-clear-confirm').click()
     await expect(clearDialog).toBeHidden()
     await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
+    await page.screenshot({ path: 'e2e/evidence/283/03-confirmado-so-a-raiz.png' })
     await page.reload()
     await expectBlocklyInjected(page)
     await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)

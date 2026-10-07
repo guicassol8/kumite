@@ -78,16 +78,18 @@ test.describe('the root block and native blocks (#4)', () => {
     await page.screenshot({ path: evidence('01-blocos-nativos-pt-br') })
 
     // 02 — the root block's context menu offers neither "Deletar bloco" nor
-    // "Duplicar".
+    // "Duplicar", nor "Desabilitar bloco" (#239).
     await page.keyboard.press('Escape')
     await rootLabel(page).click({ button: 'right' })
     await expect(contextMenu(page)).toBeVisible()
     await expect(contextMenu(page).getByText('Deletar bloco')).toHaveCount(0)
     await expect(contextMenu(page).getByText('Duplicar')).toHaveCount(0)
+    await expect(contextMenu(page).getByText('Desabilitar bloco')).toHaveCount(0)
     await page.screenshot({ path: evidence('02-menu-raiz-protegido') })
 
     // 03 — a block dragged from the toolbox still offers both: the protection is
-    // the root block's, not a global lockdown of the editor.
+    // the root block's, not a global lockdown of the editor. "Desabilitar bloco"
+    // is gone everywhere (#239): a disabled block is refused by the codegen.
     await page.keyboard.press('Escape')
     await dragBlockFromCategory(page, 'Matemática')
     const dragged = page
@@ -99,6 +101,7 @@ test.describe('the root block and native blocks (#4)', () => {
     await expect(contextMenu(page)).toBeVisible()
     await expect(contextMenu(page).getByText('Deletar bloco')).toBeVisible()
     await expect(contextMenu(page).getByText('Duplicar')).toBeVisible()
+    await expect(contextMenu(page).getByText('Desabilitar bloco')).toHaveCount(0)
     await page.screenshot({ path: evidence('03-menu-bloco-comum') })
 
     // 04 — selecting the root and pressing Delete leaves it exactly where it was.

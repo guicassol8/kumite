@@ -140,7 +140,9 @@ its CPU, not for its ELU.
   default `JUDGE_CONCURRENCY` of 4, with a 2000 ms timeout and 64 MB.
 - **The harness:** "before" ran from the measurement worktree (`3c8f3d0`)
   and "after" from this branch (`685bfa8`), both against the same back
-  with `--url`. The report's `commit` is the harness's HEAD.
+  with `--url`. The report's `commit` is the harness's HEAD. After the
+  measurements the branch was rebased onto develop's `5652903`, a
+  front-only change, so the same harness code is now `b78a295`.
 - **Each cycle** reset the database (`pnpm worktree:env --reset`), booted
   the back, ran the harness and stopped the back. The whole cycle held
   `flock /tmp/kumite-load.lock` and the machine's E2E slot

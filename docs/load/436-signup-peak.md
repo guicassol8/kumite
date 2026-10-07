@@ -144,8 +144,9 @@ What each option would do, read from these numbers:
 
 ## Environment
 
-- **The back:** this branch at `685bfa8` (the auth path is the same as
-  develop's), under `systemd-run --user --scope -p CPUQuota=200% -p
+- **The back:** this branch at `685bfa8` (`b78a295` after the rebase onto
+  develop's front-only `5652903`; the auth path is the same as develop's),
+  under `systemd-run --user --scope -p CPUQuota=200% -p
   MemoryMax=4G -p MemorySwapMax=0`, verified on every scope
   (`CPUQuotaPerSecUSec=2s`, `MemoryMax=4294967296`, `MemorySwapMax=0`).
   Node v24.21.0, default `UV_THREADPOOL_SIZE` (4).

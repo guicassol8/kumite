@@ -86,7 +86,8 @@ export type HarnessPhaseSummary = {
   // Over the harness's windows that closed during the phase.
   lag: { p99OfWindowP99Ms: number | null; maxMs: number | null }
   // The longest time between two answers of the back sampler, the later one
-  // in the phase: a saturated harness polls late.
+  // in the phase: a saturated harness polls late, and so does a slow back
+  // (the gap includes the poll's own answer time).
   maxPollGapMs: number | null
   samples: number
   // Mean ELU ≥ HARNESS_SATURATED_ELU or a lag ≥ HARNESS_STALL_MS. A warning,
@@ -1146,7 +1147,7 @@ function renderHarness(out: string[], harness: HarnessPhaseSummary[]) {
   )
   out.push('')
   out.push(
-    `The load harness’s own process: CPU % of one core, event-loop utilization and delay per sample window. Largest poll gap: the longest time between two answers of the back sampler (one poll per \`--sample-interval\` when the harness keeps up). A phase is saturated at a mean ELU ≥ ${HARNESS_SATURATED_ELU} or a lag ≥ ${HARNESS_STALL_MS} ms (the heartbeat’s period): its heartbeat gaps, poll gaps and latencies measure the harness, not the back. A warning, never a failure.`,
+    `The load harness’s own process: CPU % of one core, event-loop utilization and delay per sample window. Largest poll gap: the longest time between two answers of the back sampler (one poll per \`--sample-interval\` when the harness keeps up; a slow answer from the back widens it too, so it points at the harness only next to a high ELU or lag). A phase is saturated at a mean ELU ≥ ${HARNESS_SATURATED_ELU} or a lag ≥ ${HARNESS_STALL_MS} ms (the heartbeat’s period): its heartbeat gaps, poll gaps and latencies measure the harness, not the back. A warning, never a failure.`,
   )
   out.push('')
 }

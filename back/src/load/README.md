@@ -265,7 +265,9 @@ back.
   its CPU (`process.cpuUsage`), event-loop utilization and event-loop delay
   (`monitorEventLoopDelay`), tagged with the phase. `## Phases (harness
   process)` shows them per phase, with the largest gap between two answers
-  of the back sampler.
+  of the back sampler. That gap includes the back's answer time, so a slow
+  back widens it too (the panel's 8 s in #436's signup peak): it points at
+  the harness only next to a high ELU or lag.
 - **Saturated:** a phase whose mean ELU is ≥ 0.9, or where the harness's
   loop stalled ≥ 1000 ms (the heartbeat's period). Each saturated phase adds
   a warning — `harness saturated in <phase> …: heartbeat gaps, poll gaps

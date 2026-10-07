@@ -850,7 +850,12 @@
     "submitButton": "Submeter",
     "submitProgress": "Enviando...",
     "clearButton": "Limpar blocos",
-    "clearConfirm": "Isso vai apagar todos os blocos deste problema. Continuar?",
+    "clearDialog": {
+      "title": "Limpar os blocos?",
+      "description": "Isso vai apagar todos os blocos deste problema.",
+      "confirm": "Limpar",
+      "cancel": "Cancelar"
+    },
     "executeRunning": "Executando...",
     "submitError": {
       "cooldown": "Aguarde antes de submeter de novo.",

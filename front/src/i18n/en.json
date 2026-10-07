@@ -850,7 +850,12 @@
     "submitButton": "Submit",
     "submitProgress": "Submitting...",
     "clearButton": "Clear blocks",
-    "clearConfirm": "This will erase all blocks for this problem. Continue?",
+    "clearDialog": {
+      "title": "Clear the blocks?",
+      "description": "This will erase all blocks for this problem.",
+      "confirm": "Clear",
+      "cancel": "Cancel"
+    },
     "executeRunning": "Running...",
     "submitError": {
       "cooldown": "Wait a moment before submitting again.",

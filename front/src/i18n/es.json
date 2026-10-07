@@ -138,6 +138,12 @@
       "label": "Nuevo nombre",
       "confirm": "Renombrar",
       "cancel": "Cancelar"
+    },
+    "deleteVariable": {
+      "title": "¿Eliminar la variable \"{{name}}\"?",
+      "description": "{{uses}} bloques usan esta variable y se borrarán con ella.",
+      "confirm": "Eliminar",
+      "cancel": "Cancelar"
     }
   },
   "organizer": {

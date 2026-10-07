@@ -120,16 +120,16 @@ describe('blockly-setup', () => {
 
   it("hands the create-variable button to the app's dialog, never to Blockly's prompt (#205)", () => {
     const workspace = spyWorkspace()
-    const onCreateVariable = vi.fn()
+    const onVariableDialog = vi.fn()
     const blocklyHandler = vi.spyOn(Blockly.Variables, 'createVariableButtonHandler')
     const blocklyPrompt = vi.spyOn(Blockly.dialog, 'prompt')
-    registerVariablesFlyout(workspace as unknown as Blockly.WorkspaceSvg, 'pt', onCreateVariable)
+    registerVariablesFlyout(workspace as unknown as Blockly.WorkspaceSvg, 'pt', onVariableDialog)
     const callback = workspace.registerButtonCallback.mock.calls[0]?.[1]
     const target = { id: 'target' } as unknown as Blockly.WorkspaceSvg
 
     callback({ getTargetWorkspace: () => target })
 
-    expect(onCreateVariable).toHaveBeenCalledWith(target)
+    expect(onVariableDialog).toHaveBeenCalledWith({ kind: 'create', workspace: target })
     expect(blocklyHandler).not.toHaveBeenCalled()
     expect(blocklyPrompt).not.toHaveBeenCalled()
     blocklyHandler.mockRestore()

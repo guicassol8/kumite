@@ -132,6 +132,18 @@
         "empty": "Dale un nombre a la variable.",
         "duplicate": "Ya existe una variable llamada \"{{name}}\"."
       }
+    },
+    "renameVariable": {
+      "title": "Renombrar la variable \"{{name}}\"",
+      "label": "Nuevo nombre",
+      "confirm": "Renombrar",
+      "cancel": "Cancelar"
+    },
+    "deleteVariable": {
+      "title": "¿Eliminar la variable \"{{name}}\"?",
+      "description": "{{uses}} bloques usan esta variable y se borrarán con ella.",
+      "confirm": "Eliminar",
+      "cancel": "Cancelar"
     }
   },
   "organizer": {

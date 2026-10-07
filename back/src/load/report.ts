@@ -27,7 +27,8 @@ import { maxOf, meanOf, percentile, type Summary, summarize } from './stats'
 // add: a judge that did not drain (or left a worker alive), and an SSE
 // ranking that differs between connections or from the API, after the load
 // or after the storm. Latency, queue, spawn, CPU, memory, lag, bytes and
-// heartbeat cadence are observations — they never fail a run.
+// heartbeat cadence are observations — they never fail a run; so is the
+// harness's own saturation (#442), which only adds a warning.
 
 export type HarnessEnvironment = {
   node: string

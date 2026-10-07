@@ -29,6 +29,7 @@ import { useWorkspaceAutoSave } from '@/hooks/use-workspace-autosave'
 import { formatDate } from '@/i18n/format'
 import { api } from '@/lib/api'
 import { workspaceOptions } from '@/lib/blockly-setup'
+import type { VariableDialogRequest } from '@/lib/blockly-variable-field'
 import { PRACTICE_DEMOS } from '@/lib/practice-demos'
 import { fetchProblem, ProblemNotFoundError, problemQueryKey } from '@/lib/problems-query'
 import { positionLabel } from '@/lib/round-position'
@@ -79,10 +80,10 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
   const lang = i18n.resolvedLanguage ?? i18n.language
 
   const workspaceRef = useRef<BlocklyWorkspaceHandle>(null)
-  // The workspace whose "Criar variável..." button was pressed; the app's
-  // dialog is open while it is set (#205).
-  const [variableTarget, setVariableTarget] = useState<Blockly.WorkspaceSvg | null>(null)
-  const { toolbox, onReady: onWorkspaceReady } = useBlocklyLocale(workspaceRef, setVariableTarget)
+  // The variable dialog the editor asked for — "Criar variável..." (#205),
+  // or a variable dropdown's rename/delete (#335); open while it is set.
+  const [variableDialog, setVariableDialog] = useState<VariableDialogRequest | null>(null)
+  const { toolbox, onReady: onWorkspaceReady } = useBlocklyLocale(workspaceRef, setVariableDialog)
   const blocklyTheme = useBlocklyTheme()
   const { initialState, handleChange, clearSaved } = useWorkspaceAutoSave(id)
 
@@ -523,7 +524,10 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
         resultsVersion={resultsVersion}
       />
       {/* Outside the panels, so both layouts share one dialog. */}
-      <CreateVariableDialog workspace={variableTarget} onClose={() => setVariableTarget(null)} />
+      <CreateVariableDialog
+        workspace={variableDialog?.kind === 'create' ? variableDialog.workspace : null}
+        onClose={() => setVariableDialog(null)}
+      />
     </main>
   )
 }

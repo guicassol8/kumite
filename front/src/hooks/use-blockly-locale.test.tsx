@@ -5,7 +5,7 @@ import {
   type WorkspaceState,
 } from '@kumite/blocks'
 import { act, cleanup, render, screen } from '@testing-library/react'
-import type * as Blockly from 'blockly'
+import * as Blockly from 'blockly'
 import { createRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -13,6 +13,7 @@ import {
   type BlocklyWorkspaceHandle,
 } from '@/components/blockly/blockly-workspace'
 import i18n from '@/i18n'
+import type { VariableDialogRequest } from '@/lib/blockly-variable-field'
 import { useBlocklyLocale } from './use-blockly-locale'
 
 const fixtureWithExtraBlock: WorkspaceState = {
@@ -79,11 +80,11 @@ function fieldTexts(handle: BlocklyWorkspaceHandle, type: string) {
 
 function renderHost(
   initialState: WorkspaceState = fixtureWithExtraBlock,
-  onCreateVariable: (target: Blockly.WorkspaceSvg) => void = () => {},
+  onVariableDialog: (request: VariableDialogRequest) => void = () => {},
 ) {
   const workspaceRef = createRef<BlocklyWorkspaceHandle>()
   function Host() {
-    const { toolbox, onReady } = useBlocklyLocale(workspaceRef, onCreateVariable)
+    const { toolbox, onReady } = useBlocklyLocale(workspaceRef, onVariableDialog)
     return (
       <BlocklyWorkspace
         ref={workspaceRef}
@@ -131,21 +132,48 @@ describe('useBlocklyLocale', () => {
   })
 
   it("routes the create-variable button to the caller's handler, also after a language switch (#205)", async () => {
-    const onCreateVariable = vi.fn()
-    const { handle } = renderHost(fixtureWithExtraBlock, onCreateVariable)
+    const onVariableDialog = vi.fn()
+    const { handle } = renderHost(fixtureWithExtraBlock, onVariableDialog)
     const workspace = handle.getWorkspace()
     if (!workspace) throw new Error('the workspace was not injected')
     const button = { getTargetWorkspace: () => workspace } as unknown as Blockly.FlyoutButton
 
     workspace.getButtonCallback(CREATE_VARIABLE_BUTTON_KEY)?.(button)
-    expect(onCreateVariable).toHaveBeenLastCalledWith(workspace)
+    expect(onVariableDialog).toHaveBeenLastCalledWith({ kind: 'create', workspace })
 
     await act(async () => {
       await i18n.changeLanguage('en')
     })
     workspace.getButtonCallback(CREATE_VARIABLE_BUTTON_KEY)?.(button)
 
-    expect(onCreateVariable).toHaveBeenCalledTimes(2)
+    expect(onVariableDialog).toHaveBeenCalledTimes(2)
+  })
+
+  it("routes a variable dropdown's rename to the caller's handler, also after a language switch (#335)", async () => {
+    const onVariableDialog = vi.fn()
+    const { handle } = renderHost(fixtureWithVariables, onVariableDialog)
+    const workspace = handle.getWorkspace()
+    if (!workspace) throw new Error('the workspace was not injected')
+    const rename = () => {
+      // The language switch rebuilds every block, so look the field up each time.
+      const field = workspace.getBlockById('leSoma')?.getField('VAR') as unknown as {
+        onItemSelected_(menu: Blockly.Menu, item: Blockly.MenuItem): void
+      }
+      const item = { getValue: () => Blockly.RENAME_VARIABLE_ID } as unknown as Blockly.MenuItem
+      field.onItemSelected_({} as Blockly.Menu, item)
+    }
+    const request = { kind: 'rename', workspace, variableId: 'varSoma', name: 'soma' }
+
+    rename()
+    expect(onVariableDialog).toHaveBeenLastCalledWith(request)
+
+    await act(async () => {
+      await i18n.changeLanguage('en')
+    })
+    rename()
+
+    expect(onVariableDialog).toHaveBeenCalledTimes(2)
+    expect(onVariableDialog).toHaveBeenLastCalledWith(request)
   })
 
   it('renames no variable when the language changes, only the input block label (#202)', async () => {

@@ -12,7 +12,11 @@ import * as en from 'blockly/msg/en'
 import * as es from 'blockly/msg/es'
 import * as ptBr from 'blockly/msg/pt-br'
 
-import { installVariableField } from '@/lib/blockly-variable-field'
+import {
+  installVariableField,
+  setVariableDialogHandler,
+  type VariableDialogHandler,
+} from '@/lib/blockly-variable-field'
 
 /**
  * Single entry point for the editor's Blockly configuration.
@@ -99,21 +103,25 @@ export const workspaceOptions: Partial<Blockly.BlocklyOptions> = {
  * the toolbox definition, so this runs once per injected workspace (and again
  * whenever the locale changes, to relabel the flyout).
  *
- * The button opens the app's own dialog through `onCreateVariable` instead of
+ * The button opens the app's own dialog through `onVariableDialog` instead of
  * `Blockly.Variables.createVariableButtonHandler` (#205): Blockly's prompt
- * cannot refuse an empty or duplicate name inside itself.
+ * cannot refuse an empty or duplicate name inside itself. The variable
+ * dropdowns' "rename" and "delete" reach the same callback, through the
+ * handler registered here on the workspace (#335, `blockly-variable-field`).
  */
 export function registerVariablesFlyout(
   workspace: Blockly.WorkspaceSvg | null | undefined,
   locale: BlockLocale,
-  onCreateVariable: (target: Blockly.WorkspaceSvg) => void,
+  onVariableDialog: VariableDialogHandler,
 ): void {
   if (!workspace) return
+
+  setVariableDialogHandler(workspace, onVariableDialog)
 
   workspace.registerToolboxCategoryCallback(VARIABLES_CATEGORY_KEY, (target) =>
     variablesFlyout(target, locale),
   )
   workspace.registerButtonCallback(CREATE_VARIABLE_BUTTON_KEY, (button) => {
-    onCreateVariable(button.getTargetWorkspace())
+    onVariableDialog({ kind: 'create', workspace: button.getTargetWorkspace() })
   })
 }

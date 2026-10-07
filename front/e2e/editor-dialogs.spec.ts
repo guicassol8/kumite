@@ -46,6 +46,8 @@ const saved = JSON.stringify({
         },
       },
       { type: 'variables_get', id: 'getLoose', x: 460, y: 60, fields: { VAR: { id: 'varX' } } },
+      // `y`'s only use: deleting it from here asks nothing (P3).
+      { type: 'variables_get', id: 'getY', x: 460, y: 160, fields: { VAR: { id: 'varY' } } },
     ],
   },
   variables: [
@@ -69,9 +71,10 @@ async function expectEveryUseShows(page: Page, name: string) {
   }
 }
 
-/** Opens the loose `x` block's variable dropdown and picks `item`. */
-async function pickFromLooseDropdown(page: Page, item: string) {
-  await page.locator('[data-id="getLoose"] .blocklyDropdownText').first().click()
+/** Opens a loose block's variable dropdown (the `x` one by default) and picks
+ * `item`. */
+async function pickFromLooseDropdown(page: Page, item: string, blockId = 'getLoose') {
+  await page.locator(`[data-id="${blockId}"] .blocklyDropdownText`).first().click()
   const dropdown = page.locator('.blocklyDropDownDiv')
   await expect(dropdown).toBeVisible()
   await dropdown.locator('.blocklyMenuItem').getByText(item, { exact: true }).click()
@@ -156,6 +159,33 @@ test.describe('variable dialogs (#335)', () => {
     await page.screenshot({ path: evidence('05-renomeado') })
   })
 
+  test('a case change of its own name is not a conflict, and renames (P2)', async ({ page }) => {
+    await pickFromLooseDropdown(page, 'Renomear variável...')
+    await page.getByTestId('rename-variable-input').fill('X')
+    await page.getByTestId('rename-variable-confirm').click()
+
+    await expect(page.getByTestId('rename-variable-dialog')).toBeHidden()
+    await expect(page.getByTestId('rename-variable-error')).toHaveCount(0)
+    await expectEveryUseShows(page, 'X')
+    await page.screenshot({ path: evidence('05b-renomeado-so-caixa') })
+  })
+
+  test('a variable whose only use is the clicked block goes at once, with no dialog (P3)', async ({
+    page,
+  }) => {
+    await pickFromLooseDropdown(page, "Deletar a variável 'y'", 'getY')
+
+    await expect(page.locator('[data-id="getY"]')).toHaveCount(0)
+    await expect(page.getByTestId('delete-variable-dialog')).toHaveCount(0)
+    await expect(page.locator('dialog.blocklyDialog')).toHaveCount(0)
+    await expectEveryUseShows(page, 'x')
+    await page.locator('.blocklyToolbox').getByRole('treeitem', { name: 'Variáveis' }).click()
+    const flyout = page.locator('.blocklyFlyout')
+    await expect(flyout.getByText('x', { exact: true }).first()).toBeVisible()
+    await expect(flyout.getByText('y', { exact: true })).toHaveCount(0)
+    await page.screenshot({ path: evidence('09-excluido-sem-dialogo') })
+  })
+
   test('deleting a variable in use asks in the app first, and only deletes on confirm', async ({
     page,
   }) => {
@@ -187,5 +217,13 @@ test.describe('variable dialogs (#335)', () => {
     await expect(flyout.getByText('x', { exact: true })).toHaveCount(0)
     await expect(page.locator('dialog.blocklyDialog')).toHaveCount(0)
     await page.screenshot({ path: evidence('08-excluido') })
+
+    // One undo brings back the variable and every block it took: the delete
+    // is a single event group. Close the flyout first, back on the canvas.
+    await page.keyboard.press('Escape')
+    await page.locator('.blocklyMainBackground').click({ position: { x: 700, y: 400 } })
+    await page.keyboard.press('ControlOrMeta+z')
+    await expectEveryUseShows(page, 'x')
+    await page.screenshot({ path: evidence('08b-desfeito') })
   })
 })

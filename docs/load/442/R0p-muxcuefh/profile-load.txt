@@ -1,0 +1,48 @@
+phase load: 109.2 s window, profiled 109.2 s, busy (non-idle) 106.1 s
+| category | self s | % of busy |
+|---|---|---|
+| zod | 45.63 | 43.0 |
+| digest | 39.41 | 37.1 |
+| sse-client | 9.32 | 8.8 |
+| gc | 2.91 | 2.7 |
+| crypto | 2.83 | 2.7 |
+| parser | 1.59 | 1.5 |
+| node internals | 1.52 | 1.4 |
+| other | 1.28 | 1.2 |
+| undici | 0.99 | 0.9 |
+| program | 0.44 | 0.4 |
+| TextDecoder | 0.17 | 0.2 |
+| harness other | 0.01 | 0.0 |
+| (idle) | 3.06 | — |
+
+top functions by self time:
+22.78 s  21.5%  (anon) load/ranking-digest.ts:0
+17.82 s  16.8%  _parse v3/types.js:1933
+16.56 s  15.6%  canonicalJson load/ranking-digest.ts:0
+9.32 s  8.8%  (anon) load/sse-client.ts:0
+8.28 s  7.8%  _parseSync v3/types.js:98
+3.86 s  3.6%  _parse v3/types.js:1069
+3.86 s  3.6%  mergeObjectSync helpers/parseUtil.js:81
+3.44 s  3.2%  _parse v3/types.js:1747
+3.06 s  2.9%  (idle) :-1
+2.91 s  2.7%  (garbage collector) :-1
+2.29 s  2.2%  update crypto/hash:145
+2.29 s  2.2%  _processInputParams v3/types.js:85
+2.22 s  2.1%  getParsedType helpers/util.js:92
+1.91 s  1.8%  get path v3/types.js:13
+1.24 s  1.2%  push load/sse-parser.ts:0
+0.94 s  0.9%  _parse v3/types.js:477
+0.62 s  0.6%  (anon) :-1
+0.57 s  0.5%  _parse v3/types.js:3329
+0.44 s  0.4%  (program) :-1
+0.42 s  0.4%  Hash crypto/hash:97
+0.34 s  0.3%  fetchParams.controller.resume undici/undici:13825
+0.25 s  0.2%  execute undici/undici:7346
+0.24 s  0.2%  runMicrotasks :-1
+0.19 s  0.2%  (anon) load/sse-parser.ts:0
+0.18 s  0.2%  _parse v3/types.js:1503
+0.18 s  0.2%  fromList streams/readable:1628
+0.16 s  0.2%  record load/sse-parser.ts:0
+0.16 s  0.1%  decode node:internal/encoding:481
+0.13 s  0.1%  createAsyncIterator streams/readable:1374
+0.13 s  0.1%  processTicksAndRejections process/task_queues:71

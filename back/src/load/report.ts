@@ -13,6 +13,7 @@ import {
   mergeWindows,
 } from './back-sampler'
 import type { LoadConfig } from './config'
+import type { HarnessSample } from './harness-sampler'
 import type { Phase, PhaseSpan, RecorderSnapshot } from './recorder'
 import type { ConsistencyCheck, DrainCheck } from './settle'
 import type { SseConnectionReport } from './sse-client'
@@ -65,6 +66,31 @@ export type PhaseSummary = {
   judgeWaitingMax: number | null
   sseConnectionsMax: number | null
   samples: number
+}
+
+// --- The harness's own process (#442) ---
+
+/** A phase whose mean event-loop utilization reaches this is saturated. */
+export const HARNESS_SATURATED_ELU = 0.9
+/**
+ * A phase where the harness's loop stalled this long is saturated: the
+ * heartbeat's period, so one stall already moves the gaps it measures.
+ */
+export const HARNESS_STALL_MS = 1000
+
+export type HarnessPhaseSummary = {
+  phase: Phase
+  cpuPercent: { mean: number | null; max: number | null }
+  elu: { mean: number | null; max: number | null }
+  // Over the harness's windows that closed during the phase.
+  lag: { p99OfWindowP99Ms: number | null; maxMs: number | null }
+  // The longest time between two answers of the back sampler, the later one
+  // in the phase: a saturated harness polls late.
+  maxPollGapMs: number | null
+  samples: number
+  // Mean ELU ≥ HARNESS_SATURATED_ELU or a lag ≥ HARNESS_STALL_MS. A warning,
+  // never a failure.
+  saturated: boolean
 }
 
 export type SseSummary = {
@@ -199,6 +225,10 @@ export type LoadReport = {
   config: Omit<LoadConfig, 'organizerPassword'>
   world: WorldSummary | null
   phases: PhaseSummary[]
+  // #442: the harness's own CPU, ELU and lag per phase, and the SSE payloads
+  // it validated (null when the run had no shared cache).
+  harness: HarnessPhaseSummary[]
+  payloadCache: { distinct: number; reused: number } | null
   http: RecorderSnapshot['http']
   unexpected: RecorderSnapshot['unexpected']
   retries: RecorderSnapshot['retries']
@@ -214,8 +244,13 @@ export type LoadReport = {
   // sample's own copy of the ring is dropped (`windows: []`): every read
   // returns the last 120 windows, so keeping them per sample made a 4-minute
   // baseline's JSON 9 MB of repeats. The deduplicated list is `windows`, and
-  // likewise the judge runs, emissions and connects (#137/#138).
-  timeline: { samples: BackSample[]; windows: EventLoopWindow[] } & MergedTimings
+  // likewise the judge runs, emissions and connects (#137/#138). `harness`:
+  // the harness's own samples (#442).
+  timeline: {
+    samples: BackSample[]
+    windows: EventLoopWindow[]
+    harness: HarnessSample[]
+  } & MergedTimings
 }
 
 /**
@@ -248,6 +283,8 @@ export type ReportInput = {
   settle?: SettleReport | null
   storm?: StormInput | null
   samples: BackSample[]
+  harnessSamples?: HarnessSample[]
+  payloadCache?: { distinct: number; reused: number } | null
 }
 
 function increment(record: Record<string, number>, key: string) {
@@ -349,6 +386,53 @@ export function summarizePhases(
       samples: inPhase.length,
     }
   })
+}
+
+/** The harness's own process per phase, and whether it saturated (#442). */
+export function summarizeHarness(
+  spans: PhaseSpan[],
+  harnessSamples: HarnessSample[],
+  backSamples: BackSample[],
+): HarnessPhaseSummary[] {
+  const valuesOf = (samples: HarnessSample[], pick: (sample: HarnessSample) => number | null) =>
+    samples.flatMap((sample) => {
+      const value = pick(sample)
+      return value === null ? [] : [value]
+    })
+  return spans.map((span) => {
+    const inPhase = harnessSamples.filter((sample) => within(sample.at, span))
+    const cpu = valuesOf(inPhase, (sample) => sample.cpuPercent)
+    const elu = valuesOf(inPhase, (sample) => sample.elu)
+    const p99s = valuesOf(inPhase, (sample) => sample.lagP99Ms).sort((a, b) => a - b)
+    const lagMax = maxOf(valuesOf(inPhase, (sample) => sample.lagMaxMs))
+    const pollGaps: number[] = []
+    for (let i = 1; i < backSamples.length; i++) {
+      const prev = backSamples[i - 1]
+      const next = backSamples[i]
+      if (prev && next && within(next.at, span)) pollGaps.push(next.at - prev.at)
+    }
+    const eluMean = meanOf(elu)
+    return {
+      phase: span.phase,
+      cpuPercent: { mean: meanOf(cpu), max: maxOf(cpu) },
+      elu: { mean: eluMean, max: maxOf(elu) },
+      lag: { p99OfWindowP99Ms: percentile(p99s, 99), maxMs: lagMax },
+      maxPollGapMs: maxOf(pollGaps),
+      samples: inPhase.length,
+      saturated:
+        (eluMean !== null && eluMean >= HARNESS_SATURATED_ELU) ||
+        (lagMax !== null && lagMax >= HARNESS_STALL_MS),
+    }
+  })
+}
+
+function harnessWarnings(harness: HarnessPhaseSummary[]): string[] {
+  return harness
+    .filter((phase) => phase.saturated)
+    .map(
+      (phase) =>
+        `harness saturated in ${phase.phase} (ELU mean ${num(phase.elu.mean, 2)}, lag max ${num(phase.lag.maxMs, 0)} ms): heartbeat gaps, poll gaps and latencies of this phase measure the harness, not the back`,
+    )
 }
 
 function spanOf(spans: PhaseSpan[], phase: Phase): PhaseSpan | undefined {
@@ -668,14 +752,17 @@ export function buildReport(input: ReportInput): LoadReport {
     ...(input.storm?.connections ?? []),
   ])
   const rankingMax = payloads.find((payload) => payload.type === 'ranking.updated')?.maxBytes
+  const harnessSamples = input.harnessSamples ?? []
+  const harness = summarizeHarness(spans, harnessSamples, input.samples)
   const { organizerPassword: _password, ...config } = input.config
   return {
     scenario: input.config.scenario,
     runId: input.runId,
     target: input.config.url,
+    // A saturated harness is a warning, never a failure (#442).
     status: failures.length === 0 ? 'PASS' : 'FAIL',
     failures,
-    warnings: input.recorder.warnings,
+    warnings: [...input.recorder.warnings, ...harnessWarnings(harness)],
     aborted: input.aborted,
     startedAt: new Date(input.startedAt).toISOString(),
     endedAt: new Date(input.endedAt).toISOString(),
@@ -683,6 +770,8 @@ export function buildReport(input: ReportInput): LoadReport {
     config,
     world: input.world,
     phases: summarizePhases(input.recorder.phases, input.samples, windows),
+    harness,
+    payloadCache: input.payloadCache ?? null,
     http: input.recorder.http,
     unexpected: input.recorder.unexpected,
     retries: input.recorder.retries,
@@ -700,7 +789,12 @@ export function buildReport(input: ReportInput): LoadReport {
     },
     settle,
     storm,
-    timeline: { samples: input.samples.map(withoutRing), windows, ...timings },
+    timeline: {
+      samples: input.samples.map(withoutRing),
+      windows,
+      harness: harnessSamples,
+      ...timings,
+    },
   }
 }
 
@@ -848,6 +942,7 @@ export function renderMarkdown(report: LoadReport): string {
     'CPU % is of one core (the judge threads count, so it can pass 100). Lag p99 is the 99th percentile of the per-second windows’ p99.',
   )
   out.push('')
+  renderHarness(out, report.harness)
 
   out.push('## HTTP by route')
   out.push('')
@@ -975,6 +1070,12 @@ export function renderMarkdown(report: LoadReport): string {
         ['closed by the harness', String(sse.closedByHarness)],
         ['invalid payloads', String(sse.invalidPayloads)],
         [
+          'payloads validated (distinct / reused)',
+          report.payloadCache
+            ? `${report.payloadCache.distinct} / ${report.payloadCache.reused}`
+            : dash,
+        ],
+        [
           'largest heartbeat gap per connection ms (p50 / p95 / p99 / max)',
           summaryCells(sse.maxHeartbeatGapMs).join(' / '),
         ],
@@ -1009,6 +1110,44 @@ export function renderMarkdown(report: LoadReport): string {
   if (report.settle) renderSettle(out, report.settle)
   if (report.storm) renderStorm(out, report.storm)
   return out.join('\n')
+}
+
+function renderHarness(out: string[], harness: HarnessPhaseSummary[]) {
+  out.push('## Phases (harness process)')
+  out.push('')
+  out.push(
+    table(
+      [
+        'phase',
+        'CPU % mean',
+        'CPU % max',
+        'ELU mean',
+        'ELU max',
+        'lag p99 ms',
+        'lag max ms',
+        'largest poll gap ms',
+        'samples',
+        'saturated',
+      ],
+      harness.map((phase) => [
+        phase.phase,
+        num(phase.cpuPercent.mean),
+        num(phase.cpuPercent.max),
+        num(phase.elu.mean, 3),
+        num(phase.elu.max, 3),
+        num(phase.lag.p99OfWindowP99Ms),
+        num(phase.lag.maxMs),
+        num(phase.maxPollGapMs, 0),
+        String(phase.samples),
+        phase.saturated ? 'yes' : dash,
+      ]),
+    ),
+  )
+  out.push('')
+  out.push(
+    `The load harness’s own process: CPU % of one core, event-loop utilization and delay per sample window. Largest poll gap: the longest time between two answers of the back sampler (one poll per \`--sample-interval\` when the harness keeps up). A phase is saturated at a mean ELU ≥ ${HARNESS_SATURATED_ELU} or a lag ≥ ${HARNESS_STALL_MS} ms (the heartbeat’s period): its heartbeat gaps, poll gaps and latencies measure the harness, not the back. A warning, never a failure.`,
+  )
+  out.push('')
 }
 
 function summaryCells(summary: Summary): string[] {

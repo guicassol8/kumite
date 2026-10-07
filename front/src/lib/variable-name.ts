@@ -14,16 +14,24 @@ export type VariableNameResult =
  * and non-breaking spaces collapse to one space, then trim. Duplicates use
  * `nameUsedWithAnyType`, which ignores case and variable type — same as
  * `createVariableButtonHandler`.
+ *
+ * Renaming (#335) passes `except`, the id of the variable being renamed: its
+ * own name is not a conflict, so "x" → "X" goes through, as in Blockly. Any
+ * *other* variable's name is refused, even one of the same type — where
+ * Blockly would silently merge the two variables.
  */
 export function validateVariableName(
   raw: string,
   workspace: Blockly.Workspace,
+  { except }: { except?: string } = {},
 ): VariableNameResult {
   const name = raw.replace(/[\s\xa0]+/g, ' ').trim()
   if (!name) return { ok: false, reason: 'empty' }
 
   const existing = Blockly.Variables.nameUsedWithAnyType(name, workspace)
-  if (existing) return { ok: false, reason: 'duplicate', existing: existing.getName() }
+  if (existing && existing.getId() !== except) {
+    return { ok: false, reason: 'duplicate', existing: existing.getName() }
+  }
 
   return { ok: true, name }
 }

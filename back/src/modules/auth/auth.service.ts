@@ -1,10 +1,10 @@
 import { signJwt } from '@katajs-framework/core/jwt'
-import argon2 from 'argon2'
 import { eq } from 'drizzle-orm'
 
 import { JWT_SECRET, TOKEN_TTL_SECONDS } from '../../config'
 import type { Db } from '../../db/client'
 import { passwordResetOtpsTable, usersTable } from '../../db/schema'
+import { argon2Hash, argon2Verify } from '../../lib/argon2'
 import { findEventCode } from '../event-codes/event-codes.service'
 import type { PublicUser } from '../users/users.schema'
 import { createUser, findUserByEmail, findUserById } from '../users/users.service'
@@ -34,7 +34,7 @@ export async function signup(db: Db, input: SignupBody): Promise<SignupResult> {
     return { ok: false, error: 'invalid_email_domain', allowedSuffixes }
   }
 
-  const passwordHash = await argon2.hash(input.password)
+  const passwordHash = await argon2Hash(input.password)
   const user = await createUser(db, {
     email: input.email.toLowerCase(),
     // Already trimmed by SignupBodySchema.
@@ -58,7 +58,7 @@ const DUMMY_PASSWORD_HASH =
 
 export async function login(db: Db, input: LoginBody): Promise<LoginResult> {
   const user = await findUserByEmail(db, input.email)
-  const valid = await argon2.verify(user?.passwordHash ?? DUMMY_PASSWORD_HASH, input.password)
+  const valid = await argon2Verify(user?.passwordHash ?? DUMMY_PASSWORD_HASH, input.password)
   if (!user || !valid || !user.active) return { ok: false, error: 'invalid_credentials' }
 
   const token = await signJwt(
@@ -89,13 +89,10 @@ export async function changePassword(
   input: ChangePasswordBody,
 ): Promise<ChangePasswordResult> {
   const user = await findUserById(db, userId)
-  const valid = await argon2.verify(
-    user?.passwordHash ?? DUMMY_PASSWORD_HASH,
-    input.currentPassword,
-  )
+  const valid = await argon2Verify(user?.passwordHash ?? DUMMY_PASSWORD_HASH, input.currentPassword)
   if (!user || !valid) return { ok: false, error: 'invalid_credentials' }
 
-  const passwordHash = await argon2.hash(input.newPassword)
+  const passwordHash = await argon2Hash(input.newPassword)
   await db
     .update(usersTable)
     .set({ passwordHash, mustChangePassword: false, updatedAt: new Date() })

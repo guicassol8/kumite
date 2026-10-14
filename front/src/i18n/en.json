@@ -119,6 +119,8 @@
   "editor": {
     "workspaceLabel": "Blocks area",
     "recenter": "Center the solution",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
     "flyoutClose": {
       "label": "Close",
       "aria": "Close the block list"

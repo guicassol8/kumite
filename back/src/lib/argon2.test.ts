@@ -1,7 +1,9 @@
 import { signJwt, verifyJwt } from '@katajs-framework/core/jwt'
-import { describe, expect, it } from 'vitest'
+import argon2 from 'argon2'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
+import { ARGON2_CONCURRENCY } from '../config'
 import { argon2Hash, argon2Verify } from './argon2'
 
 const SECRET = 'argon2-test-secret'
@@ -41,4 +43,34 @@ describe('argon2Hash and the libuv threadpool (#447)', () => {
     expect(result.ok).toBe(true)
     expect(finished[0]).toBe('jwt')
   }, 30_000)
+})
+
+describe('argon2Hash and argon2Verify share one queue (#447)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it(`keeps at most ARGON2_CONCURRENCY hashes and verifications in flight`, async () => {
+    const pending: Array<() => void> = []
+    const hold = <T>(value: T) =>
+      new Promise<T>((resolve) => {
+        pending.push(() => resolve(value))
+      })
+    const hash = vi.spyOn(argon2, 'hash').mockImplementation(() => hold('stubbed-hash'))
+    const verify = vi.spyOn(argon2, 'verify').mockImplementation(() => hold(true))
+    const started = () => hash.mock.calls.length + verify.mock.calls.length
+    const total = ARGON2_CONCURRENCY + 2
+
+    const calls = Array.from({ length: total }, (_, i) =>
+      i % 2 === 0 ? argon2Hash(`p${i}`) : argon2Verify('digest', `p${i}`),
+    )
+
+    expect(started()).toBe(ARGON2_CONCURRENCY)
+    for (let done = 1; done <= total; done++) {
+      pending.shift()?.()
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(started()).toBe(Math.min(total, ARGON2_CONCURRENCY + done))
+    }
+    await Promise.all(calls)
+  })
 })

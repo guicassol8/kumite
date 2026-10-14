@@ -146,6 +146,12 @@
       "description": "{{uses}} bloques usan esta variable y se borrarán con ella.",
       "confirm": "Eliminar",
       "cancel": "Cancelar"
+    },
+    "deleteBlocks": {
+      "title": "¿Borrar {{blocks}} bloques?",
+      "description": "Se borrarán todos los bloques del lienzo, menos \"resolver\".",
+      "confirm": "Borrar",
+      "cancel": "Cancelar"
     }
   },
   "organizer": {

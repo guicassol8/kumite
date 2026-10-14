@@ -568,6 +568,71 @@ describe('BlocklyWorkspace theme (#218)', () => {
   })
 })
 
+// #445: the canvas menu's "Delete N blocks" confirms in the app's dialog.
+describe('the "Delete N blocks" dialog (#445)', () => {
+  const twoLoose: WorkspaceState = {
+    blocks: {
+      languageVersion: 0,
+      blocks: [
+        { type: 'math_number', id: 'one', x: 20, y: 20, fields: { NUM: 1 } },
+        { type: 'math_number', id: 'two', x: 20, y: 120, fields: { NUM: 2 } },
+      ],
+    },
+  }
+
+  // What the context menu does on a click on the item.
+  function chooseDeleteAll(workspace: Blockly.WorkspaceSvg) {
+    const item = Blockly.ContextMenuRegistry.registry.getItem('workspaceDelete')
+    if (!item || item.separator) throw new Error('workspaceDelete is not registered')
+    act(() => {
+      item.callback(
+        { workspace } as Blockly.ContextMenuRegistry.Scope,
+        new Event('contextmenu'),
+        new Event('click'),
+        new Blockly.utils.Coordinate(0, 0),
+      )
+    })
+  }
+
+  function setup() {
+    const onChange = vi.fn()
+    const { handle } = renderWorkspace({ initialState: twoLoose, onChange })
+    const workspace = handle.getWorkspace()
+    if (!workspace) throw new Error('no workspace')
+    return { workspace, onChange }
+  }
+
+  it('asks in the app dialog, and Cancel closes it leaving the blocks', async () => {
+    await i18n.changeLanguage('pt')
+    const { workspace, onChange } = setup()
+
+    chooseDeleteAll(workspace)
+
+    const dialog = screen.getByTestId('delete-blocks-dialog')
+    expect(dialog.textContent).toContain('Apagar 2 blocos?')
+    expect(dialog.textContent).toContain('"resolver"')
+
+    fireEvent.click(screen.getByTestId('delete-blocks-cancel'))
+
+    await waitFor(() => expect(screen.queryByTestId('delete-blocks-dialog')).toBeNull())
+    await flushBlocklyEvents()
+    expect(workspace.getAllBlocks(false)).toHaveLength(2)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('deletes the blocks on Confirm, and reports the change', async () => {
+    const { workspace, onChange } = setup()
+
+    chooseDeleteAll(workspace)
+    fireEvent.click(screen.getByTestId('delete-blocks-confirm'))
+
+    await waitFor(() => expect(screen.queryByTestId('delete-blocks-dialog')).toBeNull())
+    expect(workspace.getAllBlocks(false)).toHaveLength(0)
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    expect(onChange.mock.lastCall?.[0].blocks).toBeUndefined()
+  })
+})
+
 // #367: Blockly ≥ 12 hangs its popups inside the workspace's `.injectionDiv`
 // (overflow: hidden) unless told otherwise, but positions them against the
 // window — so a menu that fits the window below a block was cut at the

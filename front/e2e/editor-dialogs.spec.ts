@@ -227,3 +227,99 @@ test.describe('variable dialogs (#335)', () => {
     await page.screenshot({ path: evidence('08b-desfeito') })
   })
 })
+
+// #445 — the canvas menu's "Deletar N blocos" confirms in the app's dialog,
+// not Blockly's `<dialog class="blocklyDialog">`. The saved workspace above
+// has five deletable blocks — `setX`, `five` and `getReturn` inside the root,
+// `getLoose` and `getY` on their own — and the root, which stays.
+const DELETABLE = ['setX', 'five', 'getReturn', 'getLoose', 'getY'] as const
+const evidence445 = (name: string) => `e2e/evidence/445/${name}.png`
+
+async function expectBlocks(page: Page, ids: readonly string[], count: number) {
+  for (const id of ids) {
+    await expect(page.locator(`[data-id="${id}"]`)).toHaveCount(count)
+  }
+}
+
+/** A point of the canvas with no block under it: bottom centre, clear of the
+ * blocks (top of the view), the controls (right) and the scrollbar. */
+async function emptyCanvasPoint(page: Page) {
+  const box = await page.getByTestId('blockly-workspace').boundingBox()
+  if (!box) throw new Error('the canvas has no size')
+  return { x: box.x + box.width / 2, y: box.y + box.height - 40 }
+}
+
+test.describe('"Deletar N blocos" (#445)', () => {
+  test.describe.configure({ timeout: EDITOR_TEST_TIMEOUT_MS })
+  test.skip(!hasOrganizerCredentials, 'ORGANIZER_EMAIL/ORGANIZER_PASSWORD not set')
+
+  let problemId: string
+  let participantToken: string
+  let participantId: string
+
+  test.beforeAll(async () => {
+    test.setTimeout(EDITOR_FIXTURE_TIMEOUT_MS)
+    ;({ problemId, participantToken, participantId } = await seedEditorFixture('Editor Delete All'))
+  })
+
+  test('asks in the app first, cancels cleanly, deletes all but the root on confirm', async ({
+    page,
+  }) => {
+    // Any native dialog (window.confirm and friends) is a failure.
+    const nativeDialogs: string[] = []
+    page.on('dialog', (dialog) => {
+      nativeDialogs.push(dialog.message())
+      void dialog.dismiss()
+    })
+    await seedParticipantToken(page, participantToken)
+    const key = workspaceStorageKey(participantId, problemId)
+    await page.addInitScript(
+      ([k, v]) => window.localStorage.setItem(k as string, v as string),
+      [key, saved],
+    )
+    await page.goto(`/problem/${problemId}`)
+    await expectBlocklyInjected(page)
+    await expectBlocks(page, ['kumiteSolveRoot', ...DELETABLE], 1)
+
+    const menu = page.locator('.blocklyContextMenu')
+    const dialog = page.getByTestId('delete-blocks-dialog')
+    const chooseDeleteAll = async () => {
+      const point = await emptyCanvasPoint(page)
+      await page.mouse.click(point.x, point.y, { button: 'right' })
+      await expect(menu).toBeVisible()
+      await menu.getByText('Deletar 5 blocos', { exact: true }).click()
+    }
+
+    // 1 — the app's dialog, centred, with the count; no Blockly dialog.
+    await chooseDeleteAll()
+    await expectCenteredAppDialog(page, dialog)
+    await expect(dialog).toContainText('Apagar 5 blocos?')
+    await expect(dialog).toContainText('menos o "resolver"')
+    await page.screenshot({ path: evidence445('01-dialogo') })
+
+    // 2 — Cancel changes nothing.
+    await page.getByTestId('delete-blocks-cancel').click()
+    await expect(dialog).toBeHidden()
+    await expectBlocks(page, ['kumiteSolveRoot', ...DELETABLE], 1)
+    await page.screenshot({ path: evidence445('02-cancelado') })
+
+    // 3 — Confirm deletes every deletable block; the root stays.
+    await chooseDeleteAll()
+    await expect(dialog).toBeVisible()
+    await page.getByTestId('delete-blocks-confirm').click()
+    await expect(dialog).toBeHidden()
+    await expectBlocks(page, DELETABLE, 0)
+    await expect(page.locator('[data-id="kumiteSolveRoot"]')).toHaveCount(1)
+    await expect(page.locator('dialog.blocklyDialog')).toHaveCount(0)
+    await page.screenshot({ path: evidence445('03-apagado') })
+
+    // 4 — one undo brings all five back: a single event group.
+    const point = await emptyCanvasPoint(page)
+    await page.mouse.click(point.x, point.y)
+    await page.keyboard.press('ControlOrMeta+z')
+    await expectBlocks(page, ['kumiteSolveRoot', ...DELETABLE], 1)
+    await page.screenshot({ path: evidence445('04-desfeito') })
+
+    expect(nativeDialogs).toEqual([])
+  })
+})

@@ -9,6 +9,7 @@ import type { SseEvent } from './sse.schema'
 import {
   buildRankingUpdatedEventTimed,
   buildStateSyncEvent,
+  encodeSseFrame,
   sseConnectFinished,
   sseConnectStarted,
 } from './sse.service'
@@ -34,8 +35,10 @@ export const sseRoute = defineRoute({
   handler: async (c) => {
     const currentUser = c.get('currentUser')
     return streamSSE(c.raw, async (stream) => {
-      const write = (event: SseEvent) =>
-        stream.writeSSE({ event: event.type, data: JSON.stringify(event) })
+      // The frame is encoded once per event and shared by every connection
+      // (#439): `write` with a `Uint8Array` skips hono's per-call split and
+      // re-encode, and the same bytes `writeSSE` would have produced go out.
+      const write = (event: SseEvent) => stream.write(encodeSseFrame(event))
 
       // Subscribed BEFORE the snapshot below, and buffered until it has been
       // written (#150). Subscribing afterwards left a window two queries and

@@ -31,6 +31,19 @@ There are two rounds of measurements:
 
 ### Verdict
 
+**R8 meets every acceptance. The user accepted the result on the reading
+below; confirmation on the VPS stays in #139.**
+
+- R8, the run each acceptance is read on, passes all of them.
+- The repeat R8b missed the publish p95 bar: 64.5 ms. R9, which is not an
+  acceptance run, gave 61.3 ms.
+- Every publish took either 1.3–4.7 ms or 58–78 ms, nothing in between.
+- During R8c's `load`, 92% of the CFS periods were throttled. The likely
+  cause of the slow group is therefore the 2-CPU quota of the local setup,
+  not the fan-out ("The 60 ms stalls" below).
+- On the VPS (#139) there is no CFS quota: an R8 and an R8b there confirm
+  the publish p95.
+
 - **Acceptance 1, event-loop lag p99 under 150 ms in R8's `load`: PASS.**
   90 ms, and 92 and 93 ms in the repeats R8b and R8c. The 175–185 ms of the
   first round does not come back.
@@ -61,6 +74,12 @@ There are two rounds of measurements:
   `origin/develop` at `9232995`. That develop includes #438's keep-alive
   (`Keep-Alive: timeout=130` on `/health` before each run) and #442's
   harness. The back's SSE code is the same as in the first round.
+- **Merged afterwards:** #443 (#277, `e46a7d1`, the judge's pool of warm
+  workers) landed on develop after these runs, and the branch was merged
+  with it before the PR. It changes how the judge spawns its workers, so
+  the absolute judge numbers (correct-submission latency, CPU in `load`,
+  maybe the throttling) would differ on today's develop. The SSE fan-out
+  code is unaffected. The runs were not repeated.
 - **The limits:** the same as the first round and #138. The back ran under
   `systemd-run --user --scope -p CPUQuota=200% -p MemoryMax=4G -p
   MemorySwapMax=0`. `systemctl --user show` on each scope confirmed

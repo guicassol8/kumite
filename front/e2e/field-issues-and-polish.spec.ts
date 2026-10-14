@@ -210,6 +210,8 @@ test.describe('#200 — acabamento', () => {
           'Rodada encerrada: executar só testa os exemplos e não vale pontos.',
         )
         await expect(page.getByTestId('problem-submit-button')).toHaveCount(0)
+        // Visible here; only a screen 700px tall or less keeps it sr-only.
+        expect((await hint.boundingBox())?.height ?? 0).toBeGreaterThan(10)
         const hintId = await hint.getAttribute('id')
         expect(hintId).toBeTruthy()
         await expect(page.getByTestId('problem-run-button')).toHaveAttribute(

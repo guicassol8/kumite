@@ -143,10 +143,13 @@ export function ActionsBar({
       )}
       {isClosed && (
         // #200.2: Executar keeps working once the round closes, and nothing
-        // said it no longer counts. Quiet text where Submeter used to sit.
+        // said it no longer counts. Quiet text where Submeter used to sit. On
+        // a screen 700px tall or less its extra line came out of the results
+        // band (#155), so there it is for screen readers only — Executar's
+        // aria-describedby still names it.
         <p
           id={closedHintId}
-          className="ml-auto flex-[1_1_14rem] text-right text-muted-foreground text-xs"
+          className="ml-auto flex-[1_1_14rem] text-right text-muted-foreground text-xs short:sr-only"
           data-testid="problem-run-closed-hint"
         >
           {t('problem.closedRound.runHint')}

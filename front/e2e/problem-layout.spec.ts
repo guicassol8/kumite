@@ -248,6 +248,15 @@ test.describe('/problem/$id — barra ancorada, rodada encerrada (#155)', () => 
     expect(canvas.height).toBeGreaterThan(120)
     // And nothing was bought by pushing the bar or the page out of frame.
     expect(bar.y + bar.height).toBeLessThanOrEqual(641)
+    // #200.2: the closed-round hint stays with Executar for screen readers but
+    // takes no room here; its second line is what squeezed the band to 25px.
+    const hint = page.getByTestId('problem-run-closed-hint')
+    await expect(hint).toBeAttached()
+    expect((await boxOf(page, 'problem-run-closed-hint')).height).toBeLessThanOrEqual(1)
+    await expect(page.getByTestId('problem-run-button')).toHaveAttribute(
+      'aria-describedby',
+      (await hint.getAttribute('id')) ?? '',
+    )
     await expectNoPageScroll(page)
     await expectFooterBelowMain(page)
     await page.screenshot({ path: evidence('09-mobile-baixo-faixa-utilizavel') })

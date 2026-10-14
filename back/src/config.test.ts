@@ -76,6 +76,48 @@ describe('config PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER (#143)', () => {
   })
 })
 
+describe('config ARGON2_CONCURRENCY (#447)', () => {
+  const originalEnv = { ...process.env }
+  const required = {
+    JWT_SECRET: 'test-secret',
+    DATABASE_URL: 'postgres://kumite:kumite@localhost:5433/kumite',
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    process.env = { ...originalEnv, ...required }
+    delete process.env.ARGON2_CONCURRENCY
+    // A developer's back/.env may set it; the default case must not read it.
+    vi.spyOn(process, 'loadEnvFile').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    process.env = { ...originalEnv }
+    vi.resetModules()
+  })
+
+  it('defaults to 3, one below the default libuv threadpool of 4', async () => {
+    const { ARGON2_CONCURRENCY } = await import('./config')
+
+    expect(ARGON2_CONCURRENCY).toBe(3)
+  })
+
+  it('is overridable by env', async () => {
+    process.env.ARGON2_CONCURRENCY = '2'
+
+    const { ARGON2_CONCURRENCY } = await import('./config')
+
+    expect(ARGON2_CONCURRENCY).toBe(2)
+  })
+
+  it('refuses 0, which would never run a hash', async () => {
+    process.env.ARGON2_CONCURRENCY = '0'
+
+    await expect(import('./config')).rejects.toThrow(/ARGON2_CONCURRENCY/)
+  })
+})
+
 describe('config env validation failure (#97)', () => {
   const originalEnv = { ...process.env }
 

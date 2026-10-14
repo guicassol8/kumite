@@ -70,8 +70,10 @@ export function deleteAllDeletable(workspace: Blockly.WorkspaceSvg): void {
  * changes — the way `installNoManualDisable` swaps a precondition (#239).
  *
  * The rule for asking stays Blockly's: a single deletable block goes at once,
- * with no question. That, and a workspace with no handler (the read-only
- * practice demo), fall through to Blockly's own callback.
+ * with no question. That, and a workspace with no handler (one injected
+ * outside `BlocklyWorkspace`, which registers it on every canvas it injects),
+ * fall through to Blockly's own callback. The read-only practice demo never
+ * gets here: Blockly shows no canvas menu on a read-only workspace.
  *
  * Global to the registry, so once per page; the editor's module runs it at
  * load. The menu has already closed when the callback runs, so the dialog

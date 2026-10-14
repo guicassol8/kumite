@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/ui/password-input'
 import { api } from '@/lib/api'
+import { readFieldIssues } from '@/lib/api-issues'
 import { setSession } from '@/lib/session'
 
 export const Route = createFileRoute('/signup')({
@@ -76,6 +77,17 @@ function SignupScreen() {
   })
 
   async function onSubmit(values: SignupFormValues) {
+    try {
+      await submitSignup(values)
+    } catch {
+      // A request that never got an answer (offline, DNS, CORS). RHF rethrows
+      // whatever `onSubmit` throws, so without this the form would just sit
+      // there with no message at all (#312).
+      form.setError('root', { message: t('auth.signup.errors.unexpected') })
+    }
+  }
+
+  async function submitSignup(values: SignupFormValues) {
     const signupRes = await api.auth.signup.$post({
       json: {
         name: values.name,
@@ -124,16 +136,11 @@ function SignupScreen() {
       return
     }
 
-    // Undeclared status (kata's automatic 422 validation envelope, or any
-    // other unexpected response) — `signupRes` narrows to `never` here since
-    // both declared statuses (201, 400) were excluded above; treat it as an
-    // unknown Response. Defensive: client-side zod should already have
-    // caught a validation failure before it reaches the API.
-    const res = signupRes as unknown as { json: () => Promise<unknown> }
-    const body = (await res.json().catch(() => null)) as {
-      issues?: Record<string, { path: string }[]>
-    } | null
-    const issue = body?.issues?.body?.find((i) => isKnownField(i.path))
+    // Anything else — kata's automatic 422 validation envelope, which no
+    // route declares, or a 5xx. Defensive: the client zod above should catch a
+    // validation failure before it ever reaches the API. The field gets the
+    // catalog string, never the issue's English `message`.
+    const issue = (await readFieldIssues(signupRes)).find((i) => isKnownField(i.path))
     if (issue && isKnownField(issue.path)) {
       form.setError(issue.path, { message: t('auth.signup.errors.invalidField') })
     } else {

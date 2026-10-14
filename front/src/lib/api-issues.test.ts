@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { errorCodeFrom, fieldIssuesFrom, readFieldIssues } from './api-issues'
@@ -127,5 +130,24 @@ describe('fieldIssuesFrom / errorCodeFrom', () => {
   ])('returns null for the code of %s', (_label, body) => {
     expect(errorCodeFrom(body)).toBeNull()
     expect(fieldIssuesFrom(body)).toEqual([])
+  })
+})
+
+// Acceptance 3 of #312: the envelope kept being parsed by hand in a screen
+// that predated this module. The sweep keeps a new copy from creeping back:
+// an `issues?.body` / `.issues.body` anywhere else in `src/` is a screen
+// reaching into kata's envelope on its own instead of through these helpers.
+describe('no hand-rolled envelope parsing', () => {
+  const SRC = path.resolve(import.meta.dirname, '..')
+  const THIS_MODULE = path.join(SRC, 'lib', 'api-issues.ts')
+  const HAND_ROLLED = /issues\?\.body|\.issues\.body/
+
+  it('reads issues.body only through lib/api-issues.ts', () => {
+    const offenders = readdirSync(SRC, { recursive: true, encoding: 'utf8' })
+      .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
+      .filter((file) => path.join(SRC, file) !== THIS_MODULE)
+      .filter((file) => HAND_ROLLED.test(readFileSync(path.join(SRC, file), 'utf8')))
+
+    expect(offenders).toEqual([])
   })
 })

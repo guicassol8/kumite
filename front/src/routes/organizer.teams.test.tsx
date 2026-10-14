@@ -285,9 +285,6 @@ describe('OrganizerTeamsScreen', () => {
     expect(error.textContent).toContain('no máximo 40 caracteres')
   })
 
-  // Achado #10 (Acceptance 4): teams stored blank before #185 used to render a
-  // card with no title at all, so the organizer could not even tell two of
-  // them apart — which is exactly what the id suffix is here to fix.
   // #200.4: removing, moving or leaving never deletes the team, so a team
   // with nobody in it is a normal state — not a card with a bare header row.
   it('says a team has no members instead of drawing an empty table', async () => {
@@ -308,6 +305,9 @@ describe('OrganizerTeamsScreen', () => {
     expect(screen.getByTestId('team-moderation-remove-team-action-team-1')).toBeDefined()
   })
 
+  // Achado #10 (Acceptance 4): teams stored blank before #185 used to render a
+  // card with no title at all, so the organizer could not even tell two of
+  // them apart — which is exactly what the id suffix is here to fix.
   it('labels blank-named teams distinguishably, each with its rename control', async () => {
     mockedTeamsGet.mockResolvedValue(
       jsonResponse(

@@ -189,30 +189,36 @@ describe('createCanvasControls', () => {
       expect(button('editor-zoom-in').getAttribute('transform')).toBe('translate(308,388)')
     })
 
-    it('moves what does not fit to the next column, inside the view, overlapping nothing', () => {
-      // The 181px canvas of a closed round on a phone; something placed
-      // elsewhere (along the toolbox) is not part of the column.
-      const elsewhere = rect(0, 181, 0, 40)
-      const { placed, saved } = layout(181, [elsewhere])
+    // 181px: the canvas of a closed round on a phone. 220px: room for zoom
+    // out above the recenter, but not for zoom in on top of it.
+    it.each([181, 220])(
+      'moves what does not fit a %ipx view to the next column, the zoom pair together',
+      (height) => {
+        // Something placed elsewhere (along the toolbox) is not part of the column.
+        const elsewhere = rect(0, height, 0, 40)
+        const { placed, saved } = layout(height, [elsewhere])
 
-      for (const box of Object.values(placed)) {
-        expect(box.top).toBeGreaterThanOrEqual(0)
-        expect(box.bottom).toBeLessThanOrEqual(181)
-        expect(box.left).toBeGreaterThanOrEqual(0)
-        expect(box.right).toBeLessThanOrEqual(360)
-      }
-      for (const [i, a] of saved.entries()) {
-        for (const b of saved.slice(i + 1)) {
-          if (a === elsewhere || b === elsewhere) continue
-          expect(a.intersects(b), `${JSON.stringify(a)} × ${JSON.stringify(b)}`).toBe(false)
+        for (const box of Object.values(placed)) {
+          expect(box.top).toBeGreaterThanOrEqual(0)
+          expect(box.bottom).toBeLessThanOrEqual(height)
+          expect(box.left).toBeGreaterThanOrEqual(0)
+          expect(box.right).toBeLessThanOrEqual(360)
         }
-      }
-      // The recenter stays on the trashcan; + sits right above − beside them.
-      expect(placed.recenter.left).toBe(308)
-      expect(placed.zoomOut.right).toBe(273)
-      expect(placed.zoomIn.left).toBe(placed.zoomOut.left)
-      expect(placed.zoomOut.top - placed.zoomIn.bottom).toBe(8)
-    })
+        for (const [i, a] of saved.entries()) {
+          for (const b of saved.slice(i + 1)) {
+            if (a === elsewhere || b === elsewhere) continue
+            expect(a.intersects(b), `${JSON.stringify(a)} × ${JSON.stringify(b)}`).toBe(false)
+          }
+        }
+        // The recenter stays on the trashcan; + sits right above − beside them,
+        // from the bottom of the view.
+        expect(placed.recenter.left).toBe(308)
+        expect(placed.zoomOut.right).toBe(273)
+        expect(placed.zoomOut.bottom).toBe(height - 20)
+        expect(placed.zoomIn.left).toBe(placed.zoomOut.left)
+        expect(placed.zoomOut.top - placed.zoomIn.bottom).toBe(8)
+      },
+    )
   })
 
   it('removes all three from the workspace on dispose', () => {

@@ -42,6 +42,13 @@ export type CanvasControlConfig = {
   weight: number
   /** Distance kept from whatever was placed below it in its column. */
   gap: number
+  /**
+   * The control it stacks on: it never takes a column before that one's, so
+   * a pair (zoom out, zoom in) moving to the next column moves together.
+   */
+  follows?: CanvasControl
+  /** Room the column must still have past it, for the controls that follow it. */
+  reserve?: number
   /** Draws the icon into a 32×32 group already stroked with the icon color. */
   icon(group: SVGGElement): void
   action(workspace: Blockly.WorkspaceSvg): void
@@ -154,21 +161,27 @@ export class CanvasControl implements Blockly.IPositionable {
         : Blockly.uiPosition.bumpDirection.UP
     const viewTop = metrics.absoluteMetrics.top
     const viewBottom = viewTop + metrics.viewMetrics.height
+    const reserve = this.config.reserve ?? 0
+    const up = direction === Blockly.uiPosition.bumpDirection.UP
     const fits = (rect: Blockly.utils.Rect) =>
-      rect.top >= viewTop + MARGIN && rect.bottom <= viewBottom - MARGIN
+      rect.top - (up ? reserve : 0) >= viewTop + MARGIN &&
+      rect.bottom + (up ? 0 : reserve) <= viewBottom - MARGIN
 
     // A short editor (the stacked phone layout) has no room for the whole
     // column: stacking on would push a control out of the view. What does
     // not fit goes to the next column, in the same corner, stacking from the
     // bottom again (#205, #340).
+    const below = this.config.follows?.getBoundingRectangle()
+    let column = below
+      ? new Blockly.utils.Rect(start.top, start.bottom, below.left, below.right)
+      : start
     const first = Blockly.uiPosition.bumpPositionRect(
-      start,
+      column,
       this.config.gap,
       direction,
       savedPositions,
     )
     let placed = first
-    let column = start
     for (let tries = 1; !fits(placed) && tries < MAX_COLUMNS; tries++) {
       const inColumn = savedPositions.filter(
         (rect) => rect.right > column.left && rect.left < column.right,
@@ -229,6 +242,9 @@ export function createCanvasControls(
       testId: 'editor-zoom-out',
       weight: TRASHCAN_WEIGHT + 2,
       gap: GAP,
+      follows: recenter,
+      // Zoom in goes right above it: the pair changes column together.
+      reserve: GAP + SIZE,
       icon: (group) => {
         svg('path', { d: 'M10 16h12' }, group)
       },
@@ -243,6 +259,7 @@ export function createCanvasControls(
       testId: 'editor-zoom-in',
       weight: TRASHCAN_WEIGHT + 3,
       gap: GAP,
+      follows: zoomOut,
       icon: (group) => {
         svg('path', { d: 'M10 16h12' }, group)
         svg('path', { d: 'M16 10v12' }, group)

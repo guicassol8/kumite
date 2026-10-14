@@ -1,3 +1,7 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { signJwt, verifyJwt } from '@katajs-framework/core/jwt'
 import argon2 from 'argon2'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -72,5 +76,23 @@ describe('argon2Hash and argon2Verify share one queue (#447)', () => {
       expect(started()).toBe(Math.min(total, ARGON2_CONCURRENCY + done))
     }
     await Promise.all(calls)
+  })
+})
+
+describe('every argon2 call of the API goes through the queue (#447)', () => {
+  // A module that imports argon2 itself hashes on the threadpool past the
+  // limit, and a rush through it would stall every JWT again — with every
+  // other test still green. Only this wrapper and the seed (a standalone
+  // script, never the API process) may import it.
+  it('no source file but lib/argon2.ts and db/seed.ts imports argon2', () => {
+    const src = fileURLToPath(new URL('..', import.meta.url))
+    const importsArgon2 = /(?:from\s*|import\(\s*|require\(\s*)['"]argon2['"]/
+    const importers = readdirSync(src, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
+      .filter((file) => importsArgon2.test(readFileSync(join(src, file), 'utf8')))
+      .map((file) => file.split(sep).join('/'))
+      .sort()
+
+    expect(importers).toEqual(['db/seed.ts', 'lib/argon2.ts'])
   })
 })

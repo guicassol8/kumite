@@ -17,7 +17,12 @@ import {
 // the solve block in ink with paper text, the input block in red, the chrome
 // on the identity's paper/card surfaces, and a live light ↔ dark swap that
 // neither reloads nor loses a block. Doubles as the PR's visual evidence.
-const evidence = (name: string) => `e2e/evidence/218/${name}.png`
+// Also covers the round canvas controls repainting live (#340) and the
+// toolbox labels in Barlow (#345), with their own evidence folders.
+const evidenceOf = (issue: number) => (name: string) => `e2e/evidence/${issue}/${name}.png`
+const evidence = evidenceOf(218)
+const evidence340 = evidenceOf(340)
+const evidence345 = evidenceOf(345)
 
 // `docs/design/tokens/tokens.css`, as the browser computes them.
 const BLOCK = {
@@ -65,6 +70,25 @@ async function chrome(page: Page) {
       'stroke',
     ),
   }
+}
+
+/** Fill and stroke of a canvas control's circle (#340). */
+async function controlPaint(page: Page, testId: string) {
+  const circle = page.getByTestId(testId).locator(':scope > circle')
+  return { fill: await computed(circle, 'fill'), stroke: await computed(circle, 'stroke') }
+}
+
+/**
+ * #345: the toolbox category labels in the identity's UI role (Barlow · 500 ·
+ * 14px) — and the face actually loaded, not only declared.
+ */
+async function expectToolboxLabelsInBarlow(page: Page) {
+  const label = page.locator('.blocklyToolboxCategoryLabel').first()
+  await expect(label).toBeVisible()
+  expect(await computed(label, 'font-family')).toMatch(/^"?Barlow"?,/)
+  expect(await computed(label, 'font-weight')).toBe('500')
+  expect(await computed(label, 'font-size')).toBe('14px')
+  await expect.poll(() => page.evaluate(() => document.fonts.check('500 14px Barlow'))).toBe(true)
 }
 
 /** Fill of the first top-level block of a theme style on the main canvas. */
@@ -138,6 +162,16 @@ test.describe('the kumite Blockly theme', () => {
       await page.keyboard.press('Escape')
       await page.screenshot({ path: evidence('01-editor-claro') })
 
+      // #345: the toolbox labels read in Barlow.
+      await expectToolboxLabelsInBarlow(page)
+      await page.screenshot({ path: evidence345('01-toolbox-claro') })
+
+      // #340: the round controls on the card/border tokens.
+      expect(await controlPaint(page, 'editor-zoom-in')).toEqual({
+        fill: LIGHT.card,
+        stroke: LIGHT.border,
+      })
+
       // Live swap: no reload (the marker survives), same blocks, same colours.
       const blocks = page.locator(TOP_BLOCKS)
       const count = await blocks.count()
@@ -161,6 +195,12 @@ test.describe('the kumite Blockly theme', () => {
         await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload),
       ).toBe(true)
       await page.screenshot({ path: evidence('02-editor-escuro-apos-alternar') })
+
+      // #340: the controls repaint with the theme — same page, same blocks.
+      await expect
+        .poll(() => controlPaint(page, 'editor-zoom-in'))
+        .toEqual({ fill: DARK.card, stroke: DARK.border })
+      await page.screenshot({ path: evidence340('04-controles-escuro') })
 
       // A language switch rebuilds every block — the dark theme stays.
       await page.getByTestId('language-option-es').click()
@@ -192,9 +232,20 @@ test.describe('the kumite Blockly theme', () => {
           grid: DARK.border,
         })
       expect(await blockFill(page, 'kumite_root_blocks')).toBe(BLOCK.root)
-      // Zoom and trash are dark sprites: inverted on the dark canvas.
-      expect(await computed(page.locator('.blocklyZoom image').first(), 'filter')).toBe('invert(1)')
+      // The trash is a dark sprite: inverted on the dark canvas. The zoom
+      // controls are the app's round ones (#340), painted in the dark tokens.
+      expect(await computed(page.locator('.blocklyTrash image').first(), 'filter')).toBe(
+        'invert(1)',
+      )
+      expect(await controlPaint(page, 'editor-zoom-out')).toEqual({
+        fill: DARK.card,
+        stroke: DARK.border,
+      })
       await page.screenshot({ path: evidence('04-celular-escuro') })
+
+      // #345: Barlow in the dark too.
+      await expectToolboxLabelsInBarlow(page)
+      await page.screenshot({ path: evidence345('02-toolbox-escuro') })
     })
   })
 })

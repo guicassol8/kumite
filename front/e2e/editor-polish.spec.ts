@@ -162,20 +162,15 @@ test.describe('editor polish (#205)', () => {
     await expectCentered(page)
     const scale = await canvasScale(page)
 
-    // The control sits in the zoom column, right above it. Compared through
-    // their `translate(...)`: both live in the same svg space, while the zoom
-    // buttons' client rects are their whole (clipped) sprite sheet.
+    // The control sits in the zoom column (#340), right below zoom out.
+    // Compared through their `translate(...)`: both live in the same svg space.
     const recenter = page.getByTestId('editor-recenter')
     await expect(recenter).toBeVisible()
     await expect(recenter).toHaveAttribute('aria-label', 'Centralizar a solução')
-    const zoomColumn = translateOf(
-      await page
-        .locator('.blocklyZoomReset')
-        .evaluate((node) => node.parentElement?.getAttribute('transform') ?? null),
-    )
+    const zoomOut = translateOf(await page.getByTestId('editor-zoom-out').getAttribute('transform'))
     const button = translateOf(await recenter.getAttribute('transform'))
-    expect(button.x).toBe(zoomColumn.x)
-    expect(button.y + 32).toBeLessThan(zoomColumn.y)
+    expect(button.x).toBe(zoomOut.x)
+    expect(button.y).toBeGreaterThan(zoomOut.y + 32)
 
     // Drag the canvas background far away.
     const canvas = await visibleCanvasCenter(page)
@@ -378,8 +373,9 @@ test.describe('editor polish (#205)', () => {
     test('the root opens centered and the recenter control is on screen', async ({ page }) => {
       await openEditor(page, problemId)
       await expectCentered(page)
-      // The stacked editor is too short for a fourth button above the zoom
-      // column, so the control sits beside it — but inside the editor.
+      // The stacked editor may be too short for the whole column above the
+      // trashcan: what does not fit sits beside it (#340) — but always
+      // inside the editor.
       const recenter = page.getByTestId('editor-recenter')
       await expect(recenter).toBeInViewport({ ratio: 1 })
       const button = await recenter.boundingBox()

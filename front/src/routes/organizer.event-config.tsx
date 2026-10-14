@@ -217,12 +217,22 @@ function TeamRulesSection({ eventConfig }: { eventConfig: EventConfig }) {
   }
 
   const updateMixing = useMutation({
-    mutationFn: async (next: boolean) => {
+    mutationFn: async (next: boolean): Promise<'ok' | 'field' | 'failed'> => {
       const res = await api.organizer['event-config'].$patch({ json: { mixingLocked: next } })
-      return res.status === 200
+      if (res.status === 200) return 'ok'
+      // kata's 422 that names this switch gets its own message (#312);
+      // anything else, envelope or not, is the generic failure.
+      const issues = await readFieldIssues(res)
+      return issues.some((issue) => issue.path === 'mixingLocked') ? 'field' : 'failed'
     },
-    onSuccess: (ok) => {
-      setMixingError(ok ? undefined : t('organizer.eventConfig.teamRules.errors.saveFailed'))
+    onSuccess: (outcome) => {
+      setMixingError(
+        outcome === 'ok'
+          ? undefined
+          : outcome === 'field'
+            ? t('organizer.eventConfig.teamRules.errors.fieldRejected')
+            : t('organizer.eventConfig.teamRules.errors.saveFailed'),
+      )
       invalidateConfig()
     },
     onError: () => setMixingError(t('organizer.eventConfig.teamRules.errors.saveFailed')),

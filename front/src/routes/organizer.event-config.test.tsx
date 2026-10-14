@@ -240,6 +240,51 @@ describe('OrganizerEventConfigScreen', () => {
     )
   })
 
+  // #312: the mixing switch used to throw the response body away and say
+  // "save failed" to everything, a 422 that names the field included.
+  describe('when the mixing lock is refused', () => {
+    async function flipMixing(answer: () => Promise<unknown>) {
+      mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
+      mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))
+      mockedConfigPatch.mockImplementation(answer as never)
+      renderScreen()
+
+      await waitFor(() => expect(screen.getByTestId('event-config-mixing-switch')).toBeDefined())
+      fireEvent.click(screen.getByTestId('event-config-mixing-switch'))
+      await waitFor(() => expect(screen.getByTestId('event-config-mixing-confirm')).toBeDefined())
+      fireEvent.click(screen.getByTestId('event-config-mixing-confirm-confirm'))
+      return await screen.findByTestId('event-config-mixing-error')
+    }
+
+    it('says the field was rejected when the 422 names mixingLocked', async () => {
+      const error = await flipMixing(async () =>
+        jsonResponse(422, {
+          error: 'validation_failed',
+          message: 'Invalid input',
+          issues: {
+            body: [{ path: 'mixingLocked', message: 'Expected boolean', code: 'invalid_type' }],
+          },
+        }),
+      )
+
+      expect(error.textContent).toBe('O servidor recusou este valor. Revise o campo.')
+    })
+
+    it('falls back to the generic error on a 422 that names no field', async () => {
+      const error = await flipMixing(async () => jsonResponse(422, { error: 'validation_failed' }))
+
+      expect(error.textContent).toBe('Não foi possível salvar. Tente novamente.')
+    })
+
+    it('shows the generic error when the request never gets an answer', async () => {
+      const error = await flipMixing(async () => {
+        throw new TypeError('Failed to fetch')
+      })
+
+      expect(error.textContent).toBe('Não foi possível salvar. Tente novamente.')
+    })
+  })
+
   it('leaves the mixing lock untouched when the confirmation is cancelled', async () => {
     mockedConfigGet.mockResolvedValue(jsonResponse(200, eventConfig()))
     mockedCodesGet.mockResolvedValue(jsonResponse(200, [eventCode()]))

@@ -1,4 +1,3 @@
-import argon2 from 'argon2'
 import { and, count, eq, gte, lt, sql } from 'drizzle-orm'
 
 import {
@@ -10,6 +9,7 @@ import {
 } from '../../config'
 import type { Db } from '../../db/client'
 import { passwordResetOtpsTable, passwordResetRequestsTable, usersTable } from '../../db/schema'
+import { argon2Hash, argon2Verify } from '../../lib/argon2'
 import type { Locale } from '../../lib/locale'
 import { generateOtp, generateTemporaryPassword } from '../../lib/random'
 import { sendPasswordResetNotice } from '../notifications/notifications.service'
@@ -131,7 +131,7 @@ export async function issuePasswordResetOtp(
   if (!user) return { ok: false, error: 'not_found' }
 
   const otp = generateOtp()
-  const otpHash = await argon2.hash(otp)
+  const otpHash = await argon2Hash(otp)
   const expiresAt = new Date(Date.now() + OTP_TTL_MS)
 
   await db
@@ -183,13 +183,13 @@ export async function requestPasswordReset(
     now,
   )
   if (!withinBudget) {
-    await argon2.hash(DUMMY_OTP)
+    await argon2Hash(DUMMY_OTP)
     return
   }
 
   const user = await findUserByEmail(db, emailKey)
   if (!user) {
-    await argon2.hash(DUMMY_OTP)
+    await argon2Hash(DUMMY_OTP)
     return
   }
 
@@ -223,7 +223,7 @@ export async function completePasswordReset(
     now,
   )
   if (!withinBudget) {
-    await argon2.verify(DUMMY_OTP_HASH, input.otp)
+    await argon2Verify(DUMMY_OTP_HASH, input.otp)
     return { ok: false, error: 'invalid_otp' }
   }
 
@@ -239,7 +239,7 @@ export async function completePasswordReset(
   // dummy otherwise — an unknown address must not answer faster than a wrong
   // code for a real one.
   const usable = pending !== undefined && pending.expiresAt.getTime() >= now
-  const valid = await argon2.verify(usable ? pending.otpHash : DUMMY_OTP_HASH, input.otp)
+  const valid = await argon2Verify(usable ? pending.otpHash : DUMMY_OTP_HASH, input.otp)
   if (!user || !usable) return { ok: false, error: 'invalid_otp' }
 
   if (!valid) {
@@ -262,7 +262,7 @@ export async function completePasswordReset(
   // would land on /change-password and be asked for the "current" password
   // they picked seconds ago. The delete below drops the code in the same
   // breath, so it cannot be redeemed again over the password just chosen.
-  const passwordHash = await argon2.hash(input.newPassword)
+  const passwordHash = await argon2Hash(input.newPassword)
   await db
     .update(usersTable)
     .set({ passwordHash, mustChangePassword: false, updatedAt: new Date() })
@@ -345,11 +345,11 @@ export async function verifyOrganizerStepUp(
       )
 
     if ((failures?.value ?? 0) >= PASSWORD_RESET_ADMIN_MAX_PER_ORGANIZER) {
-      await argon2.verify(DUMMY_ADMIN_PASSWORD_HASH, input.password)
+      await argon2Verify(DUMMY_ADMIN_PASSWORD_HASH, input.password)
       return { ok: false, error: 'invalid_admin_password' }
     }
 
-    if (!(await argon2.verify(input.passwordHash, input.password))) {
+    if (!(await argon2Verify(input.passwordHash, input.password))) {
       await tx.insert(passwordResetRequestsTable).values({
         action: 'organizer_reset',
         emailKey: input.organizerId,
@@ -428,7 +428,7 @@ export async function resetPasswordByOrganizer(
   if (target.role !== 'participant') return { ok: false, error: 'target_not_participant' }
 
   const temporaryPassword = generateTemporaryPassword()
-  const passwordHash = await argon2.hash(temporaryPassword)
+  const passwordHash = await argon2Hash(temporaryPassword)
   await db
     .update(usersTable)
     .set({ passwordHash, mustChangePassword: true, updatedAt: new Date() })

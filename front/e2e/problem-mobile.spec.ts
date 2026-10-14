@@ -221,12 +221,14 @@ test.describe('/problem/$id no celular (#199)', () => {
         .poll(async () => Math.abs(((await svg.boundingBox())?.height ?? 0) - canvasAfter.height))
         .toBeLessThanOrEqual(2)
 
-      // With the room back, Blockly's own column fits: on the 181px canvas of
-      // a closed round the zoom buttons were cut above the canvas. Measured
-      // by their focus rings: each icon is a clipped sprite sheet, and the
-      // unclipped <image> reaches far past the button it shows.
+      // With the room back, the controls' column fits: on the 181px canvas of
+      // a closed round the zoom buttons were cut above the canvas. The trash
+      // is measured by its focus ring: its icon is a clipped sprite sheet,
+      // and the unclipped <image> reaches far past the button it shows. The
+      // zoom buttons are the app's own circles (#340).
       const controls = [
-        ['zoom', page.locator('.blocklyZoom > rect.blocklyFocusRing')],
+        ['zoom in', page.getByTestId('editor-zoom-in')],
+        ['zoom out', page.getByTestId('editor-zoom-out')],
         ['trash', page.locator('.blocklyTrash > rect.blocklyFocusRing')],
         ['recenter', page.getByTestId('editor-recenter')],
       ] as const

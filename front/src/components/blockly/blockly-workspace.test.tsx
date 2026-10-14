@@ -183,18 +183,38 @@ describe('BlocklyWorkspace', () => {
     expect(observer.disconnect).toHaveBeenCalled()
   })
 
-  it('adds a recenter control, relabelled when the language changes (#205)', async () => {
+  it('adds the zoom and recenter controls, relabelled when the language changes (#205, #340)', async () => {
     renderWorkspace()
-    const control = screen.getByTestId('editor-recenter')
+    const labels = () =>
+      ['editor-zoom-in', 'editor-zoom-out', 'editor-recenter'].map((testId) =>
+        screen.getByTestId(testId).getAttribute('aria-label'),
+      )
 
-    expect(control.getAttribute('aria-label')).toBe('Centralizar a solução')
+    expect(labels()).toEqual(['Aumentar o zoom', 'Diminuir o zoom', 'Centralizar a solução'])
 
     await act(async () => {
       await i18n.changeLanguage('en')
     })
-    expect(control.getAttribute('aria-label')).toBe('Center the solution')
+    expect(labels()).toEqual(['Zoom in', 'Zoom out', 'Center the solution'])
+
     await act(async () => {
       await i18n.changeLanguage('pt')
+    })
+    expect(labels()).toEqual(['Aumentar o zoom', 'Diminuir o zoom', 'Centralizar a solução'])
+  })
+
+  it("drops Blockly's sprite zoom controls but keeps the wheel and the scale limits (#340)", () => {
+    const { handle } = renderWorkspace()
+    const workspace = handle.getWorkspace()
+    if (!workspace) throw new Error('the workspace was not injected')
+
+    expect(screen.getByTestId('blockly-workspace').querySelector('.blocklyZoom')).toBeNull()
+    expect(workspace.options.zoomOptions).toMatchObject({
+      controls: false,
+      wheel: true,
+      startScale: 0.9,
+      minScale: 0.4,
+      maxScale: 2,
     })
   })
 

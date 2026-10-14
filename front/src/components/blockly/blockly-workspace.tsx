@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { DESKTOP_QUERY, useMediaQuery } from '@/hooks/use-media-query'
+import { type CanvasControls, createCanvasControls } from '@/lib/blockly-canvas-controls'
 import { installBodyPopovers, keepCanvasFocusIntoPopovers } from '@/lib/blockly-popovers'
-import { RecenterControl } from '@/lib/blockly-recenter-control'
 import { cn } from '@/lib/utils'
 
 export type WorkspaceState = ReturnType<typeof Blockly.serialization.workspaces.save>
@@ -77,7 +77,9 @@ const defaultOptions: Partial<Blockly.BlocklyOptions> = {
   media: '/blockly-media/',
   renderer: 'zelos',
   trashcan: true,
-  zoom: { controls: true, wheel: true, startScale: 0.9, minScale: 0.4, maxScale: 2 },
+  // Blockly's sprite zoom controls give way to the app's round ones (#340,
+  // `createCanvasControls`); the wheel and the scale limits stay Blockly's.
+  zoom: { controls: false, wheel: true, startScale: 0.9, minScale: 0.4, maxScale: 2 },
   grid: { ...kumiteGridOptions },
   move: { scrollbars: true, drag: true, wheel: true },
 }
@@ -107,10 +109,16 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
     const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
     const appliedToolboxRef = useRef(toolbox)
     const appliedThemeRef = useRef(theme)
-    const recenterControlRef = useRef<RecenterControl | null>(null)
+    const canvasControlsRef = useRef<CanvasControls | null>(null)
+    const zoomInLabel = t('editor.zoomIn')
+    const zoomOutLabel = t('editor.zoomOut')
     const recenterLabel = t('editor.recenter')
-    const labelRef = useRef(recenterLabel)
-    labelRef.current = recenterLabel
+    const labelsRef = useRef({
+      zoomIn: zoomInLabel,
+      zoomOut: zoomOutLabel,
+      recenter: recenterLabel,
+    })
+    labelsRef.current = { zoomIn: zoomInLabel, zoomOut: zoomOutLabel, recenter: recenterLabel }
     // Whether a toolbox category has its flyout open — what the phone's
     // "Fechar" follows (#199). Never true on a canvas without a toolbox.
     const [flyoutOpen, setFlyoutOpen] = useState(false)
@@ -141,8 +149,8 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       workspaceRef.current = workspace
       appliedToolboxRef.current = injected
       appliedThemeRef.current = injectedTheme
-      const recenterControl = new RecenterControl(workspace, labelRef.current)
-      recenterControlRef.current = recenterControl
+      const canvasControls = createCanvasControls(workspace, labelsRef.current)
+      canvasControlsRef.current = canvasControls
       propsRef.current.onReady?.(workspace)
       const releasePopoverFocus = keepCanvasFocusIntoPopovers(container)
 
@@ -212,18 +220,22 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
         observer.disconnect()
         workspace.removeChangeListener(listener)
         workspace.removeChangeListener(flyoutListener)
-        recenterControl.dispose()
-        recenterControlRef.current = null
+        canvasControls.dispose()
+        canvasControlsRef.current = null
         workspace.dispose()
         workspaceRef.current = null
       }
     }, [])
 
-    // The recenter control lives in Blockly's svg, outside React: relabel it
+    // The canvas controls live in Blockly's svg, outside React: relabel them
     // by hand on a language switch.
     useEffect(() => {
-      recenterControlRef.current?.setLabel(recenterLabel)
-    }, [recenterLabel])
+      canvasControlsRef.current?.setLabels({
+        zoomIn: zoomInLabel,
+        zoomOut: zoomOutLabel,
+        recenter: recenterLabel,
+      })
+    }, [zoomInLabel, zoomOutLabel, recenterLabel])
 
     // A new toolbox swaps in place — the blocks already on the canvas stay.
     useEffect(() => {

@@ -119,6 +119,8 @@
   "editor": {
     "workspaceLabel": "Área de blocos",
     "recenter": "Centralizar a solução",
+    "zoomIn": "Aumentar o zoom",
+    "zoomOut": "Diminuir o zoom",
     "flyoutClose": {
       "label": "Fechar",
       "aria": "Fechar a lista de blocos"

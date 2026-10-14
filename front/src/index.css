@@ -206,12 +206,23 @@
   fill: var(--chrome-foreground);
 }
 
-/* Zoom e lixeira são sprites escuros: somem sobre o canvas escuro. Invertidos
-   no escuro; as opacidades 0,4/0,8 do Blockly ficam. (Os círculos de 32px das
-   pranchas são a #340.) */
-.dark .blocklyZoom image,
+/* A lixeira é um sprite escuro: some sobre o canvas escuro. Invertida no
+   escuro; as opacidades 0,4/0,8 do Blockly ficam. Zoom e recentralizar são os
+   círculos de 32px da #340, desenhados nos tokens (blockly-canvas-controls):
+   não precisam de filtro. */
 .dark .blocklyTrash image {
   filter: invert(1);
+}
+
+/* Rótulos das categorias da toolbox no papel UI da identity § 4 (Barlow · 500
+   · 14, #345); a cor continua com o tema. O Blockly declara
+   `.blocklyToolboxCategoryLabel { font: 16px sans-serif }` num <style> que ele
+   põe com `prepend` no <head> (core/css.ts): esta regra, mesma especificidade
+   e sem layer, vem depois e vence pela ordem do documento. */
+.blocklyToolboxCategoryLabel {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 14px;
 }
 
 /* Hairline entre toolbox, flyout e canvas. */

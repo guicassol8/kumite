@@ -10,6 +10,8 @@ import { BroadcastChannel, isMainThread, parentPort } from 'node:worker_threads'
  * - input '__hang__' (#277): never replies, so the judge's watchdog fires;
  * - input '__memory__' / '__error__' (#277): replies with that sandbox
  *   outcome, as QuickJS running out of memory or a host-side failure would;
+ * - input '__die_idle__' (#277): echoed back like any other, then the worker
+ *   throws an uncaught error a moment later — while it sits idle in the pool;
  * - input { barrier, waitMs } (#294): meets another worker at a barrier —
  *   opens the BroadcastChannel named `barrier` and announces itself; value
  *   'together' if a peer shows up (it answers an arrival, so whichever
@@ -48,6 +50,11 @@ if (!isMainThread) {
       process.exit(1)
     }
     if (request.input === '__hang__') return
+    if (request.input === '__die_idle__') {
+      setTimeout(() => {
+        throw new Error('idle worker crash')
+      }, 200)
+    }
     if (request.input === '__memory__' || request.input === '__error__') {
       const outcome = request.input === '__memory__' ? 'memory' : 'error'
       parentPort?.postMessage({ type: 'result', id: request.id, outcome, detail: outcome, ms: 0 })

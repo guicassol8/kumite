@@ -329,6 +329,37 @@ describe('worker pool', () => {
   )
 
   it(
+    'drops a worker that dies while idle, without crashing the process',
+    async () => {
+      const workerUrl = isolatedWorkerUrl()
+      const before = getJudgeTimings().workers
+
+      const dying = await runJudgeAgainstWorker(
+        workerUrl,
+        'unused',
+        [{ input: '__die_idle__', expected: '__die_idle__' }],
+        single,
+      )
+      expect(dying.map((result) => result.outcome)).toEqual(['passed'])
+      expect(getJudgeTimings().workers.idle).toBe(before.idle + 1)
+
+      // Its uncaught error lands while it is idle: the pool's own 'error'
+      // listener absorbs it (no unhandled 'error' event in this process) and
+      // its 'exit' takes it off the idle list.
+      await vi.waitFor(() => expect(getJudgeTimings().workers.idle).toBe(before.idle), {
+        timeout: 10_000,
+        interval: 20,
+      })
+      const after = await runJudgeAgainstWorker(workerUrl, 'unused', okCase, single)
+
+      expect(after.map((result) => result.outcome)).toEqual(['passed'])
+      expect(getJudgeTimings().workers.spawned).toBe(before.spawned + 2)
+      await allAliveIdle()
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  it(
     'leaks no guest global between cases or submissions on the same worker',
     async () => {
       const cases = (count: number): JudgeCase[] =>

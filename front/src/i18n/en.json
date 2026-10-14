@@ -345,7 +345,8 @@
         "saveFailed": "Couldn't save the round. Try again.",
         "invalidProblemIds": "One or more selected problems are invalid.",
         "notFound": "Round not found.",
-        "roundNotDraft": "That round is no longer a draft."
+        "roundNotDraft": "That round is no longer a draft.",
+        "fieldRejected": "The server rejected this value. Check the field."
       },
       "notDraft": {
         "title": "This round has already been opened or closed and can no longer be edited.",

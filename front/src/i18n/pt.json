@@ -345,7 +345,8 @@
         "saveFailed": "Não foi possível salvar a rodada. Tente novamente.",
         "invalidProblemIds": "Um ou mais problemas selecionados são inválidos.",
         "notFound": "Rodada não encontrada.",
-        "roundNotDraft": "Essa rodada não é mais um rascunho."
+        "roundNotDraft": "Essa rodada não é mais um rascunho.",
+        "fieldRejected": "O servidor recusou este valor. Revise o campo."
       },
       "notDraft": {
         "title": "Essa rodada já foi aberta ou encerrada e não pode mais ser editada.",

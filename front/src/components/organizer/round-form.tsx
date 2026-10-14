@@ -25,6 +25,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
+import type { ApiFieldIssue } from '@/lib/api-issues'
 import { resolveProblemTitle, type UiLocale } from '@/lib/resolve-problem-title'
 
 export type RoundFormValues = {
@@ -33,11 +34,40 @@ export type RoundFormValues = {
   problemIds: string[]
 }
 
+type RoundField = keyof RoundFormValues
+
+/** A message per field the server refused, already translated (#312). */
+export type RoundFieldErrors = Partial<Record<RoundField, string>>
+
 type RoundFormProps = {
   initialValues: RoundFormValues
   isSubmitting?: boolean
   rootError?: string
-  onSave: (values: RoundFormValues) => void
+  /**
+   * May hand back the fields the server refused; each message lands under its
+   * field, and the next save's validation clears them. A caller with nothing
+   * to report returns `void`.
+   */
+  onSave: (values: RoundFormValues) => void | Promise<RoundFieldErrors | void>
+}
+
+/**
+ * Which catalog key each body issue of kata's 422 gets (#312). Never the
+ * issue's own `message` — that is English written for the API's logs. An
+ * issue on one problem id (`problemIds[2]`) belongs to the problems list as a
+ * whole; a path the form has no field for is dropped, and the caller falls
+ * back to its generic error when nothing is left.
+ */
+export function roundFieldErrorKeys(issues: ApiFieldIssue[]): Partial<Record<RoundField, string>> {
+  const keys: Partial<Record<RoundField, string>> = {}
+  for (const { path } of issues) {
+    if (path === 'name') keys.name = 'organizer.roundForm.errors.fieldRejected'
+    else if (path === 'durationMinutes')
+      keys.durationMinutes = 'organizer.roundForm.errors.durationInvalid'
+    else if (path === 'problemIds' || path.startsWith('problemIds['))
+      keys.problemIds = 'organizer.roundForm.errors.invalidProblemIds'
+  }
+  return keys
 }
 
 function toUiLocale(language: string): UiLocale {
@@ -107,6 +137,9 @@ export function RoundForm({
   })
 
   const problemIds = form.watch('problemIds')
+  // Not a `FormField` — the list is a set of checkboxes — so the error a
+  // server hands back for it needs a slot of its own.
+  const problemsError = form.formState.errors.problemIds?.message
 
   const selectedProblems = problemIds
     .map((id) => problems.data?.find((problem) => problem.id === id))
@@ -138,7 +171,11 @@ export function RoundForm({
   async function handleSave() {
     const valid = await form.trigger()
     if (!valid) return
-    onSave(form.getValues())
+    const fieldErrors = await onSave(form.getValues())
+    if (!fieldErrors) return
+    for (const [field, message] of Object.entries(fieldErrors) as [RoundField, string][]) {
+      form.setError(field, { message })
+    }
   }
 
   return (
@@ -252,6 +289,12 @@ export function RoundForm({
               </div>
             )
           })}
+
+          {problemsError && (
+            <p role="alert" className={PANEL_FIELD_ERROR} data-testid="round-form-problems-error">
+              {problemsError}
+            </p>
+          )}
         </section>
 
         {rootError && (

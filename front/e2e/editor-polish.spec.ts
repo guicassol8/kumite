@@ -286,8 +286,8 @@ test.describe('editor polish (#205)', () => {
     await page.mouse.move(grab.x - 300, grab.y + 250, { steps: 10 })
     await page.mouse.up()
 
-    page.once('dialog', (dialog) => dialog.accept())
     await page.getByTestId('problem-clear-button').click()
+    await page.getByTestId('problem-clear-confirm').click()
     await expect(page.locator(TOP_BLOCKS)).toHaveCount(1)
     await expectCentered(page)
     await page.screenshot({ path: evidence('11-limpar-centralizado') })

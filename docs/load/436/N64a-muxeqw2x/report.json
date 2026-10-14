@@ -1,0 +1,5732 @@
+{
+  "scenario": "baseline",
+  "runId": "muxeqw2x",
+  "target": "http://localhost:3443",
+  "status": "PASS",
+  "failures": [],
+  "warnings": [],
+  "aborted": false,
+  "startedAt": "2026-10-07T01:07:13.262Z",
+  "endedAt": "2026-10-07T01:08:58.999Z",
+  "environment": {
+    "node": "v24.21.0",
+    "commit": "685bfa8",
+    "loadavgStart": [1.53, 2.46, 2.44],
+    "loadavgEnd": [2.11, 2.15, 2.31],
+    "parallelism": 12
+  },
+  "config": {
+    "scenario": "baseline",
+    "url": "http://localhost:3443",
+    "teams": 100,
+    "members": 3,
+    "sse": 0,
+    "submissions": 0,
+    "badFraction": 0,
+    "memoryShare": 0,
+    "problems": 1,
+    "untilDone": false,
+    "storm": false,
+    "stormWindowSeconds": 0,
+    "pastRounds": 0,
+    "resendStale": false,
+    "restSeconds": 30,
+    "durationSeconds": 1,
+    "setupConcurrency": 64,
+    "sseRamp": 50,
+    "sampleIntervalMs": 1000,
+    "requestTimeoutMs": 60000,
+    "cooldownMs": 5000,
+    "out": "/tmp/claude-1000/-home-guilherme-code-kumite/3210b158-b9d5-45cb-a9bc-211e0876da65/scratchpad/runs/436/N64a/raw",
+    "allowRemote": false,
+    "organizerEmail": "organizer@edu.pucrs.br"
+  },
+  "world": {
+    "teams": 100,
+    "participants": 300,
+    "membersPerTeam": 3,
+    "maxTeamSize": 3,
+    "before": {
+      "participants": 0,
+      "teams": 0
+    },
+    "round": null,
+    "problemId": null,
+    "problemIds": [],
+    "pastRounds": [],
+    "closedLeftoverRounds": []
+  },
+  "phases": [
+    {
+      "phase": "rest",
+      "durationSeconds": 30.107,
+      "cpuPercent": {
+        "mean": 0.905106539102481,
+        "max": 1.637007874015748
+      },
+      "rssMaxBytes": 292999168,
+      "heapUsedMaxBytes": 69638784,
+      "lag": {
+        "p99OfWindowP99Ms": 1.8347060000000965,
+        "maxMs": 1.8347060000000965
+      },
+      "eluMean": 0.0067681483652109265,
+      "judgeWaitingMax": 0,
+      "sseConnectionsMax": 0,
+      "samples": 30
+    },
+    {
+      "phase": "setup",
+      "durationSeconds": 74.626,
+      "cpuPercent": {
+        "mean": 128.75582856035282,
+        "max": 144.72016216216215
+      },
+      "rssMaxBytes": 562888704,
+      "heapUsedMaxBytes": 104079064,
+      "lag": {
+        "p99OfWindowP99Ms": 182.61847500000295,
+        "maxMs": 182.61847500000295
+      },
+      "eluMean": 0.08847177964333071,
+      "judgeWaitingMax": 0,
+      "sseConnectionsMax": 0,
+      "samples": 13
+    },
+    {
+      "phase": "sse-ramp",
+      "durationSeconds": 0,
+      "cpuPercent": {
+        "mean": null,
+        "max": null
+      },
+      "rssMaxBytes": null,
+      "heapUsedMaxBytes": null,
+      "lag": {
+        "p99OfWindowP99Ms": null,
+        "maxMs": null
+      },
+      "eluMean": null,
+      "judgeWaitingMax": null,
+      "sseConnectionsMax": null,
+      "samples": 0
+    },
+    {
+      "phase": "sse-idle",
+      "durationSeconds": 1,
+      "cpuPercent": {
+        "mean": 10.602290836653387,
+        "max": 10.602290836653387
+      },
+      "rssMaxBytes": 295743488,
+      "heapUsedMaxBytes": 76683264,
+      "lag": {
+        "p99OfWindowP99Ms": 3.784206999989692,
+        "maxMs": 3.784206999989692
+      },
+      "eluMean": 0.45852352017145864,
+      "judgeWaitingMax": 0,
+      "sseConnectionsMax": 0,
+      "samples": 1
+    },
+    {
+      "phase": "teardown",
+      "durationSeconds": 0.004,
+      "cpuPercent": {
+        "mean": 1.7238493723849373,
+        "max": 1.7238493723849373
+      },
+      "rssMaxBytes": 295743488,
+      "heapUsedMaxBytes": 77398784,
+      "lag": {
+        "p99OfWindowP99Ms": null,
+        "maxMs": null
+      },
+      "eluMean": null,
+      "judgeWaitingMax": 0,
+      "sseConnectionsMax": 0,
+      "samples": 1
+    }
+  ],
+  "harness": [
+    {
+      "phase": "rest",
+      "cpuPercent": {
+        "mean": 0.7632944067344066,
+        "max": 9.725074925074924
+      },
+      "elu": {
+        "mean": 0.003683659236692476,
+        "max": 0.02704697850356065
+      },
+      "lag": {
+        "p99OfWindowP99Ms": 10.764287,
+        "maxMs": 11.935743
+      },
+      "maxPollGapMs": 1008,
+      "samples": 30,
+      "saturated": false
+    },
+    {
+      "phase": "setup",
+      "cpuPercent": {
+        "mean": 2.151512342296127,
+        "max": 16.340000000000003
+      },
+      "elu": {
+        "mean": 0.01505861937561841,
+        "max": 0.08737167113826225
+      },
+      "lag": {
+        "p99OfWindowP99Ms": 17.465343,
+        "maxMs": 23.937023
+      },
+      "maxPollGapMs": 8192,
+      "samples": 74,
+      "saturated": false
+    },
+    {
+      "phase": "sse-ramp",
+      "cpuPercent": {
+        "mean": null,
+        "max": null
+      },
+      "elu": {
+        "mean": null,
+        "max": null
+      },
+      "lag": {
+        "p99OfWindowP99Ms": null,
+        "maxMs": null
+      },
+      "maxPollGapMs": null,
+      "samples": 0,
+      "saturated": false
+    },
+    {
+      "phase": "sse-idle",
+      "cpuPercent": {
+        "mean": 17.474425574425574,
+        "max": 17.474425574425574
+      },
+      "elu": {
+        "mean": 0.10436005471991071,
+        "max": 0.10436005471991071
+      },
+      "lag": {
+        "p99OfWindowP99Ms": 12.378111,
+        "maxMs": 12.476415
+      },
+      "maxPollGapMs": 1004,
+      "samples": 1,
+      "saturated": false
+    },
+    {
+      "phase": "teardown",
+      "cpuPercent": {
+        "mean": 0.7878321678321679,
+        "max": 0.7878321678321679
+      },
+      "elu": {
+        "mean": 0.005999011710637768,
+        "max": 0.005999011710637768
+      },
+      "lag": {
+        "p99OfWindowP99Ms": 10.485759,
+        "maxMs": 10.534911
+      },
+      "maxPollGapMs": 238,
+      "samples": 1,
+      "saturated": false
+    }
+  ],
+  "payloadCache": {
+    "distinct": 0,
+    "reused": 0
+  },
+  "http": {
+    "rest": {
+      "GET /organizer/stats/live": {
+        "count": 30,
+        "byStatus": {
+          "200": 30
+        },
+        "latencyMs": {
+          "count": 30,
+          "min": 2.75981899999897,
+          "p50": 3.4055200000002515,
+          "p95": 5.394536999999673,
+          "p99": 17.696795000000066,
+          "max": 17.696795000000066,
+          "mean": 4.077086466666583
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "GET /organizer/stats/process": {
+        "count": 30,
+        "byStatus": {
+          "200": 30
+        },
+        "latencyMs": {
+          "count": 30,
+          "min": 2.6217670000005455,
+          "p50": 3.1759320000001026,
+          "p95": 4.917319000000134,
+          "p99": 9.640561000000048,
+          "max": 9.640561000000048,
+          "mean": 3.57097319999981
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "POST /auth/login": {
+        "count": 1,
+        "byStatus": {
+          "200": 1
+        },
+        "latencyMs": {
+          "count": 1,
+          "min": 90.31420300000002,
+          "p50": 90.31420300000002,
+          "p95": 90.31420300000002,
+          "p99": 90.31420300000002,
+          "max": 90.31420300000002,
+          "mean": 90.31420300000002
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      }
+    },
+    "setup": {
+      "GET /organizer/event-codes": {
+        "count": 1,
+        "byStatus": {
+          "200": 1
+        },
+        "latencyMs": {
+          "count": 1,
+          "min": 4.191349000000628,
+          "p50": 4.191349000000628,
+          "p95": 4.191349000000628,
+          "p99": 4.191349000000628,
+          "max": 4.191349000000628,
+          "mean": 4.191349000000628
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "GET /organizer/event-config": {
+        "count": 1,
+        "byStatus": {
+          "200": 1
+        },
+        "latencyMs": {
+          "count": 1,
+          "min": 4.089132999997673,
+          "p50": 4.089132999997673,
+          "p95": 4.089132999997673,
+          "p99": 4.089132999997673,
+          "max": 4.089132999997673,
+          "mean": 4.089132999997673
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "GET /organizer/stats": {
+        "count": 1,
+        "byStatus": {
+          "200": 1
+        },
+        "latencyMs": {
+          "count": 1,
+          "min": 18.6987859999972,
+          "p50": 18.6987859999972,
+          "p95": 18.6987859999972,
+          "p99": 18.6987859999972,
+          "max": 18.6987859999972,
+          "mean": 18.6987859999972
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "GET /organizer/stats/live": {
+        "count": 13,
+        "byStatus": {
+          "200": 13
+        },
+        "latencyMs": {
+          "count": 13,
+          "min": 15.468001000001095,
+          "p50": 5993.273927000002,
+          "p95": 7189.846869000001,
+          "p99": 7189.846869000001,
+          "max": 7189.846869000001,
+          "mean": 4786.7059380769215
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "GET /organizer/stats/process": {
+        "count": 13,
+        "byStatus": {
+          "200": 13
+        },
+        "latencyMs": {
+          "count": 13,
+          "min": 15.337703999990481,
+          "p50": 5992.956883000006,
+          "p95": 7187.877392999995,
+          "p99": 7187.877392999995,
+          "max": 7187.877392999995,
+          "mean": 4747.353942846155
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "POST /auth/login": {
+        "count": 300,
+        "byStatus": {
+          "200": 300
+        },
+        "latencyMs": {
+          "count": 300,
+          "min": 2000.8346829999937,
+          "p50": 10018.102824999994,
+          "p95": 13602.679991999998,
+          "p99": 14275.067205,
+          "max": 14585.891432000004,
+          "mean": 9936.117638009997
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "POST /auth/signup": {
+        "count": 300,
+        "byStatus": {
+          "201": 300
+        },
+        "latencyMs": {
+          "count": 300,
+          "min": 347.11275100000057,
+          "p50": 4783.006397999998,
+          "p95": 10810.262394999998,
+          "p99": 13786.518314,
+          "max": 14295.528212999998,
+          "mean": 5095.169475233336
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "POST /teams": {
+        "count": 100,
+        "byStatus": {
+          "201": 100
+        },
+        "latencyMs": {
+          "count": 100,
+          "min": 98.99856000000727,
+          "p50": 131.76671600001282,
+          "p95": 233.6544270000013,
+          "p99": 252.4422840000043,
+          "max": 252.63076899999578,
+          "mean": 155.0660717500007
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "POST /teams/:id/join": {
+        "count": 200,
+        "byStatus": {
+          "200": 200
+        },
+        "latencyMs": {
+          "count": 200,
+          "min": 83.39607600000454,
+          "p50": 224.05344999999215,
+          "p95": 291.12341000000015,
+          "p99": 300.6227440000075,
+          "max": 309.08626599999843,
+          "mean": 202.32842872499998
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      }
+    },
+    "sse-idle": {
+      "GET /organizer/stats/live": {
+        "count": 1,
+        "byStatus": {
+          "200": 1
+        },
+        "latencyMs": {
+          "count": 1,
+          "min": 3.3000040000042645,
+          "p50": 3.3000040000042645,
+          "p95": 3.3000040000042645,
+          "p99": 3.3000040000042645,
+          "max": 3.3000040000042645,
+          "mean": 3.3000040000042645
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "GET /organizer/stats/process": {
+        "count": 1,
+        "byStatus": {
+          "200": 1
+        },
+        "latencyMs": {
+          "count": 1,
+          "min": 2.990075000008801,
+          "p50": 2.990075000008801,
+          "p95": 2.990075000008801,
+          "p99": 2.990075000008801,
+          "max": 2.990075000008801,
+          "mean": 2.990075000008801
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      }
+    },
+    "teardown": {
+      "GET /organizer/stats/live": {
+        "count": 1,
+        "byStatus": {
+          "200": 1
+        },
+        "latencyMs": {
+          "count": 1,
+          "min": 2.927211999995052,
+          "p50": 2.927211999995052,
+          "p95": 2.927211999995052,
+          "p99": 2.927211999995052,
+          "max": 2.927211999995052,
+          "mean": 2.927211999995052
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      },
+      "GET /organizer/stats/process": {
+        "count": 1,
+        "byStatus": {
+          "200": 1
+        },
+        "latencyMs": {
+          "count": 1,
+          "min": 2.652064000008977,
+          "p50": 2.652064000008977,
+          "p95": 2.652064000008977,
+          "p99": 2.652064000008977,
+          "max": 2.652064000008977,
+          "mean": 2.652064000008977
+        },
+        "networkErrors": 0,
+        "timeouts": 0,
+        "networkReasons": {},
+        "networkSamples": []
+      }
+    }
+  },
+  "unexpected": [],
+  "retries": [],
+  "actions": {
+    "signup": {
+      "started": 300,
+      "completed": 300
+    },
+    "login": {
+      "started": 300,
+      "completed": 300
+    },
+    "create-team": {
+      "started": 100,
+      "completed": 100
+    },
+    "join-team": {
+      "started": 200,
+      "completed": 200
+    }
+  },
+  "verdicts": {
+    "matrix": {},
+    "incoherent": 0
+  },
+  "submissions": {
+    "latencyMs": {}
+  },
+  "sse": {
+    "requested": 0,
+    "opened": 0,
+    "failedToOpen": 0,
+    "failedToOpenBy": {},
+    "dropped": 0,
+    "droppedBy": {},
+    "closedByHarness": 0,
+    "eventsPerConnection": {},
+    "heartbeatIntervalMs": {
+      "count": 0,
+      "min": null,
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "max": null,
+      "mean": null
+    },
+    "maxHeartbeatGapMs": {
+      "count": 0,
+      "min": null,
+      "p50": null,
+      "p95": null,
+      "p99": null,
+      "max": null,
+      "mean": null
+    },
+    "invalidPayloads": 0,
+    "invalidSamples": []
+  },
+  "judge": null,
+  "sseCost": {
+    "payloads": [],
+    "rankingBandwidthPerEmissionBytes": null,
+    "emissions": [
+      {
+        "phase": "rest",
+        "kind": "heartbeat",
+        "count": 30,
+        "subscribersMax": 0,
+        "publishMs": {
+          "count": 30,
+          "min": 0.0006140000004961621,
+          "p50": 0.0008110000017040875,
+          "p95": 0.002739000001383829,
+          "p99": 0.0337760000002163,
+          "max": 0.0337760000002163,
+          "mean": 0.0021092000000256426
+        },
+        "openRoundMs": {
+          "count": 0,
+          "min": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "roundRankingMs": {
+          "count": 0,
+          "min": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "eventRankingMs": {
+          "count": 0,
+          "min": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        }
+      },
+      {
+        "phase": "setup",
+        "kind": "heartbeat",
+        "count": 75,
+        "subscribersMax": 0,
+        "publishMs": {
+          "count": 75,
+          "min": 0.0005939999973634258,
+          "p50": 0.00274100000387989,
+          "p95": 0.0061160000041127205,
+          "p99": 0.010443999999552034,
+          "max": 0.010443999999552034,
+          "mean": 0.002806319999411547
+        },
+        "openRoundMs": {
+          "count": 0,
+          "min": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "roundRankingMs": {
+          "count": 0,
+          "min": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "eventRankingMs": {
+          "count": 0,
+          "min": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        }
+      },
+      {
+        "phase": "sse-idle",
+        "kind": "heartbeat",
+        "count": 1,
+        "subscribersMax": 0,
+        "publishMs": {
+          "count": 1,
+          "min": 0.0007909999985713512,
+          "p50": 0.0007909999985713512,
+          "p95": 0.0007909999985713512,
+          "p99": 0.0007909999985713512,
+          "max": 0.0007909999985713512,
+          "mean": 0.0007909999985713512
+        },
+        "openRoundMs": {
+          "count": 0,
+          "min": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "roundRankingMs": {
+          "count": 0,
+          "min": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "eventRankingMs": {
+          "count": 0,
+          "min": null,
+          "p50": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        }
+      }
+    ],
+    "connects": []
+  },
+  "settle": null,
+  "storm": null,
+  "timeline": {
+    "samples": [
+      {
+        "at": 1791335233386,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335233375,
+          "uptimeSeconds": 2.770805417,
+          "cpu": {
+            "userMicros": 1403653,
+            "systemMicros": 195160
+          },
+          "memory": {
+            "rss": 292081664,
+            "heapUsed": 50880336,
+            "heapTotal": 206385152,
+            "external": 8117797
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335234394,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335234391,
+          "uptimeSeconds": 3.787120618,
+          "cpu": {
+            "userMicros": 1416794,
+            "systemMicros": 198651
+          },
+          "memory": {
+            "rss": 292212736,
+            "heapUsed": 51934360,
+            "heapTotal": 206385152,
+            "external": 8129241
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335235400,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335235398,
+          "uptimeSeconds": 4.793847707,
+          "cpu": {
+            "userMicros": 1426493,
+            "systemMicros": 202712
+          },
+          "memory": {
+            "rss": 292474880,
+            "heapUsed": 52750720,
+            "heapTotal": 206647296,
+            "external": 8131556
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335236406,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335236404,
+          "uptimeSeconds": 5.800112669,
+          "cpu": {
+            "userMicros": 1437739,
+            "systemMicros": 203240
+          },
+          "memory": {
+            "rss": 292474880,
+            "heapUsed": 53465312,
+            "heapTotal": 206909440,
+            "external": 8133871
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335237411,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335237409,
+          "uptimeSeconds": 6.804895467,
+          "cpu": {
+            "userMicros": 1450852,
+            "systemMicros": 203244
+          },
+          "memory": {
+            "rss": 292474880,
+            "heapUsed": 54178272,
+            "heapTotal": 206909440,
+            "external": 8201722
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335238415,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335238414,
+          "uptimeSeconds": 7.809555932,
+          "cpu": {
+            "userMicros": 1462168,
+            "systemMicros": 203720
+          },
+          "memory": {
+            "rss": 292605952,
+            "heapUsed": 54746144,
+            "heapTotal": 206909440,
+            "external": 8204037
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335239420,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335239418,
+          "uptimeSeconds": 8.8136778,
+          "cpu": {
+            "userMicros": 1470315,
+            "systemMicros": 204631
+          },
+          "memory": {
+            "rss": 292605952,
+            "heapUsed": 55323944,
+            "heapTotal": 206909440,
+            "external": 8206352
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335240424,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335240423,
+          "uptimeSeconds": 9.81879147,
+          "cpu": {
+            "userMicros": 1478554,
+            "systemMicros": 205249
+          },
+          "memory": {
+            "rss": 292605952,
+            "heapUsed": 55915432,
+            "heapTotal": 206909440,
+            "external": 8208667
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335241428,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335241427,
+          "uptimeSeconds": 10.823238528,
+          "cpu": {
+            "userMicros": 1484843,
+            "systemMicros": 207275
+          },
+          "memory": {
+            "rss": 292605952,
+            "heapUsed": 56544344,
+            "heapTotal": 206909440,
+            "external": 8210982
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335242433,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335242432,
+          "uptimeSeconds": 11.827911885,
+          "cpu": {
+            "userMicros": 1491843,
+            "systemMicros": 207282
+          },
+          "memory": {
+            "rss": 292605952,
+            "heapUsed": 57133192,
+            "heapTotal": 206909440,
+            "external": 8213297
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335243437,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335243436,
+          "uptimeSeconds": 12.831774272,
+          "cpu": {
+            "userMicros": 1500556,
+            "systemMicros": 207282
+          },
+          "memory": {
+            "rss": 292605952,
+            "heapUsed": 57726696,
+            "heapTotal": 207171584,
+            "external": 8215612
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335244440,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335244439,
+          "uptimeSeconds": 13.835102874,
+          "cpu": {
+            "userMicros": 1508167,
+            "systemMicros": 207282
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 58315968,
+            "heapTotal": 207171584,
+            "external": 8217927
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335245445,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335245443,
+          "uptimeSeconds": 14.839046489,
+          "cpu": {
+            "userMicros": 1516989,
+            "systemMicros": 207282
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 58916008,
+            "heapTotal": 207171584,
+            "external": 8220242
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335246448,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335246447,
+          "uptimeSeconds": 15.843180614,
+          "cpu": {
+            "userMicros": 1524012,
+            "systemMicros": 210208
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 59522432,
+            "heapTotal": 207171584,
+            "external": 8222557
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335247453,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335247451,
+          "uptimeSeconds": 16.847148722,
+          "cpu": {
+            "userMicros": 1533330,
+            "systemMicros": 210212
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 60139256,
+            "heapTotal": 207171584,
+            "external": 8224872
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335248456,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335248455,
+          "uptimeSeconds": 17.851237883,
+          "cpu": {
+            "userMicros": 1538084,
+            "systemMicros": 213831
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 60767696,
+            "heapTotal": 207171584,
+            "external": 8227187
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335249461,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335249459,
+          "uptimeSeconds": 18.855089482,
+          "cpu": {
+            "userMicros": 1541669,
+            "systemMicros": 217031
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 61362120,
+            "heapTotal": 207171584,
+            "external": 8229502
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335250465,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335250463,
+          "uptimeSeconds": 19.859069982,
+          "cpu": {
+            "userMicros": 1549518,
+            "systemMicros": 217082
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 61987352,
+            "heapTotal": 207433728,
+            "external": 8231817
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335251468,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335251467,
+          "uptimeSeconds": 20.862823483,
+          "cpu": {
+            "userMicros": 1553584,
+            "systemMicros": 220871
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 62605112,
+            "heapTotal": 207433728,
+            "external": 8299668
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335252473,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335252471,
+          "uptimeSeconds": 21.867217487,
+          "cpu": {
+            "userMicros": 1558039,
+            "systemMicros": 224178
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 63213616,
+            "heapTotal": 207433728,
+            "external": 8301983
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335253476,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335253475,
+          "uptimeSeconds": 22.870705205,
+          "cpu": {
+            "userMicros": 1565447,
+            "systemMicros": 224705
+          },
+          "memory": {
+            "rss": 292737024,
+            "heapUsed": 63844608,
+            "heapTotal": 207433728,
+            "external": 8304298
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335254479,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335254478,
+          "uptimeSeconds": 23.873601783,
+          "cpu": {
+            "userMicros": 1574120,
+            "systemMicros": 225411
+          },
+          "memory": {
+            "rss": 292868096,
+            "heapUsed": 64506456,
+            "heapTotal": 207433728,
+            "external": 8306613
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335255482,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335255481,
+          "uptimeSeconds": 24.876772408,
+          "cpu": {
+            "userMicros": 1580219,
+            "systemMicros": 226284
+          },
+          "memory": {
+            "rss": 292868096,
+            "heapUsed": 65126680,
+            "heapTotal": 207433728,
+            "external": 8308928
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335256486,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335256485,
+          "uptimeSeconds": 25.880987561,
+          "cpu": {
+            "userMicros": 1586160,
+            "systemMicros": 227135
+          },
+          "memory": {
+            "rss": 292868096,
+            "heapUsed": 65753704,
+            "heapTotal": 207433728,
+            "external": 8311243
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335257491,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335257490,
+          "uptimeSeconds": 26.885672,
+          "cpu": {
+            "userMicros": 1592606,
+            "systemMicros": 228058
+          },
+          "memory": {
+            "rss": 292868096,
+            "heapUsed": 66383672,
+            "heapTotal": 207433728,
+            "external": 8313558
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335258496,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335258494,
+          "uptimeSeconds": 27.889948132,
+          "cpu": {
+            "userMicros": 1597246,
+            "systemMicros": 231981
+          },
+          "memory": {
+            "rss": 292868096,
+            "heapUsed": 67042072,
+            "heapTotal": 207433728,
+            "external": 8315873
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335259500,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335259499,
+          "uptimeSeconds": 28.894490142,
+          "cpu": {
+            "userMicros": 1605037,
+            "systemMicros": 232558
+          },
+          "memory": {
+            "rss": 292868096,
+            "heapUsed": 67689264,
+            "heapTotal": 207433728,
+            "external": 8318188
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335260504,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335260503,
+          "uptimeSeconds": 29.898463758,
+          "cpu": {
+            "userMicros": 1611858,
+            "systemMicros": 232562
+          },
+          "memory": {
+            "rss": 292868096,
+            "heapUsed": 68331600,
+            "heapTotal": 207433728,
+            "external": 8320503
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335261508,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335261507,
+          "uptimeSeconds": 30.902804278,
+          "cpu": {
+            "userMicros": 1620358,
+            "systemMicros": 233117
+          },
+          "memory": {
+            "rss": 292868096,
+            "heapUsed": 68982976,
+            "heapTotal": 207433728,
+            "external": 8322818
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335262512,
+        "phase": "rest",
+        "process": {
+          "sampledAt": 1791335262511,
+          "uptimeSeconds": 31.906607223,
+          "cpu": {
+            "userMicros": 1629330,
+            "systemMicros": 233307
+          },
+          "memory": {
+            "rss": 292999168,
+            "heapUsed": 69638784,
+            "heapTotal": 207433728,
+            "external": 8325133
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335264158,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335263650,
+          "uptimeSeconds": 33.045976738,
+          "cpu": {
+            "userMicros": 1996399,
+            "systemMicros": 331544
+          },
+          "memory": {
+            "rss": 424153088,
+            "heapUsed": 80344040,
+            "heapTotal": 208220160,
+            "external": 8556689
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335272350,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335272345,
+          "uptimeSeconds": 41.741259697,
+          "cpu": {
+            "userMicros": 12161362,
+            "systemMicros": 2240681
+          },
+          "memory": {
+            "rss": 471347200,
+            "heapUsed": 104079064,
+            "heapTotal": 208482304,
+            "external": 9109157
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335278756,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335278755,
+          "uptimeSeconds": 48.150797205,
+          "cpu": {
+            "userMicros": 19566325,
+            "systemMicros": 3615314
+          },
+          "memory": {
+            "rss": 562651136,
+            "heapUsed": 52638616,
+            "heapTotal": 76361728,
+            "external": 7853822
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335286739,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335286735,
+          "uptimeSeconds": 56.130665911,
+          "cpu": {
+            "userMicros": 28885435,
+            "systemMicros": 5284565
+          },
+          "memory": {
+            "rss": 476971008,
+            "heapUsed": 58051248,
+            "heapTotal": 76361728,
+            "external": 8328876
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335294146,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335294144,
+          "uptimeSeconds": 63.540177898,
+          "cpu": {
+            "userMicros": 37659001,
+            "systemMicros": 6736376
+          },
+          "memory": {
+            "rss": 562888704,
+            "heapUsed": 58410520,
+            "heapTotal": 65613824,
+            "external": 8318852
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335301765,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335301759,
+          "uptimeSeconds": 71.154958274,
+          "cpu": {
+            "userMicros": 46913837,
+            "systemMicros": 8392575
+          },
+          "memory": {
+            "rss": 428773376,
+            "heapUsed": 57039720,
+            "heapTotal": 72167424,
+            "external": 8131732
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335308758,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335308756,
+          "uptimeSeconds": 78.151584824,
+          "cpu": {
+            "userMicros": 55491712,
+            "systemMicros": 9899954
+          },
+          "memory": {
+            "rss": 524574720,
+            "heapUsed": 59635624,
+            "heapTotal": 72429568,
+            "external": 8223317
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335316157,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335316156,
+          "uptimeSeconds": 85.551670872,
+          "cpu": {
+            "userMicros": 64610401,
+            "systemMicros": 11490557
+          },
+          "memory": {
+            "rss": 509337600,
+            "heapUsed": 59971176,
+            "heapTotal": 85274624,
+            "external": 8232971
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335323657,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335323656,
+          "uptimeSeconds": 93.051422538,
+          "cpu": {
+            "userMicros": 73756193,
+            "systemMicros": 13132760
+          },
+          "memory": {
+            "rss": 530382848,
+            "heapUsed": 60454248,
+            "heapTotal": 85274624,
+            "external": 8170213
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335325346,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335325343,
+          "uptimeSeconds": 94.739296505,
+          "cpu": {
+            "userMicros": 75657202,
+            "systemMicros": 13460254
+          },
+          "memory": {
+            "rss": 520863744,
+            "heapUsed": 58614264,
+            "heapTotal": 85274624,
+            "external": 8145681
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335331559,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335331557,
+          "uptimeSeconds": 100.952649523,
+          "cpu": {
+            "userMicros": 83201509,
+            "systemMicros": 14798676
+          },
+          "memory": {
+            "rss": 502034432,
+            "heapUsed": 64740848,
+            "heapTotal": 85274624,
+            "external": 8378807
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335336739,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335336737,
+          "uptimeSeconds": 106.133348849,
+          "cpu": {
+            "userMicros": 89268566,
+            "systemMicros": 15814279
+          },
+          "memory": {
+            "rss": 462073856,
+            "heapUsed": 60093080,
+            "heapTotal": 85274624,
+            "external": 8150977
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335337756,
+        "phase": "setup",
+        "process": {
+          "sampledAt": 1791335337754,
+          "uptimeSeconds": 107.150267961,
+          "cpu": {
+            "userMicros": 90063936,
+            "systemMicros": 15971587
+          },
+          "memory": {
+            "rss": 295743488,
+            "heapUsed": 81124408,
+            "heapTotal": 115945472,
+            "external": 8502227
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335338760,
+        "phase": "sse-idle",
+        "process": {
+          "sampledAt": 1791335338758,
+          "uptimeSeconds": 108.154151308,
+          "cpu": {
+            "userMicros": 90150245,
+            "systemMicros": 15991725
+          },
+          "memory": {
+            "rss": 295743488,
+            "heapUsed": 76683264,
+            "heapTotal": 118042624,
+            "external": 8335810
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      },
+      {
+        "at": 1791335338998,
+        "phase": "teardown",
+        "process": {
+          "sampledAt": 1791335338997,
+          "uptimeSeconds": 108.393103284,
+          "cpu": {
+            "userMicros": 90154147,
+            "systemMicros": 15991943
+          },
+          "memory": {
+            "rss": 295743488,
+            "heapUsed": 77398784,
+            "heapTotal": 118042624,
+            "external": 8338125
+          },
+          "eventLoop": {
+            "windowMs": 1000,
+            "windows": []
+          },
+          "judge": {
+            "config": {
+              "timeoutMs": 2000,
+              "memoryMb": 64,
+              "concurrency": 4
+            },
+            "workers": {
+              "spawned": 0,
+              "exited": 0,
+              "alive": 0
+            },
+            "runs": []
+          },
+          "sse": {
+            "emissions": [],
+            "connects": []
+          }
+        },
+        "live": {
+          "judge": {
+            "inFlight": 0,
+            "waiting": 0,
+            "concurrency": 4
+          },
+          "sse": {
+            "connections": 0
+          },
+          "submissions": {
+            "inFlight": 0,
+            "lastMinute": 0,
+            "perMinute": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+          }
+        }
+      }
+    ],
+    "windows": [
+      {
+        "endedAt": 1791335233593,
+        "durationMs": 1001.1144619999998,
+        "delayP50Ms": 0.18649699999969016,
+        "delayP99Ms": 1.8347060000000965,
+        "delayMaxMs": 1.8347060000000965,
+        "utilization": 0.027144892486961694
+      },
+      {
+        "endedAt": 1791335234594,
+        "durationMs": 1000.9918720000001,
+        "delayP50Ms": 0.23031600000012986,
+        "delayP99Ms": 0.3470800000000054,
+        "delayMaxMs": 0.3470800000000054,
+        "utilization": 0.007996118787524141
+      },
+      {
+        "endedAt": 1791335235595,
+        "durationMs": 1001.3501800000004,
+        "delayP50Ms": 0.23310099999980594,
+        "delayP99Ms": 0.5243550000004689,
+        "delayMaxMs": 0.5243550000004689,
+        "utilization": 0.008188718912162378
+      },
+      {
+        "endedAt": 1791335236605,
+        "durationMs": 1009.7887599999995,
+        "delayP50Ms": 0.2313189999995302,
+        "delayP99Ms": 1.0602240000007441,
+        "delayMaxMs": 1.0602240000007441,
+        "utilization": 0.007561318866264029
+      },
+      {
+        "endedAt": 1791335237614,
+        "durationMs": 1009.3357059999998,
+        "delayP50Ms": 0.21790400000008958,
+        "delayP99Ms": 0.3875980000002528,
+        "delayMaxMs": 0.3875980000002528,
+        "utilization": 0.00854387019459714
+      },
+      {
+        "endedAt": 1791335238623,
+        "durationMs": 1008.2477080000008,
+        "delayP50Ms": 0.2152859999996508,
+        "delayP99Ms": 0.4081179999993765,
+        "delayMaxMs": 0.4081179999993765,
+        "utilization": 0.00633513293641398
+      },
+      {
+        "endedAt": 1791335239629,
+        "durationMs": 1006.6928919999991,
+        "delayP50Ms": 0.18003200000021025,
+        "delayP99Ms": 0.2984969999997702,
+        "delayMaxMs": 0.2984969999997702,
+        "utilization": 0.007022551058982506
+      },
+      {
+        "endedAt": 1791335240638,
+        "durationMs": 1008.2010200000004,
+        "delayP50Ms": 0.1984229999998206,
+        "delayP99Ms": 0.5102750000005472,
+        "delayMaxMs": 0.5102750000005472,
+        "utilization": 0.0062636147149063475
+      },
+      {
+        "endedAt": 1791335241638,
+        "durationMs": 1000.0105660000008,
+        "delayP50Ms": 0.2239159999990079,
+        "delayP99Ms": 0.5596199999999953,
+        "delayMaxMs": 0.5596199999999953,
+        "utilization": 0.00496943516440667
+      },
+      {
+        "endedAt": 1791335242639,
+        "durationMs": 1001.4774039999993,
+        "delayP50Ms": 0.2250820000008389,
+        "delayP99Ms": 0.7150040000014997,
+        "delayMaxMs": 0.7150040000014997,
+        "utilization": 0.005292678180999812
+      },
+      {
+        "endedAt": 1791335243645,
+        "durationMs": 1006.4825920000003,
+        "delayP50Ms": 0.19411500000023807,
+        "delayP99Ms": 0.37048999999933585,
+        "delayMaxMs": 0.37048999999933585,
+        "utilization": 0.005405374245483665
+      },
+      {
+        "endedAt": 1791335244655,
+        "durationMs": 1009.8577729999997,
+        "delayP50Ms": 0.21055300000080024,
+        "delayP99Ms": 0.8072900000006484,
+        "delayMaxMs": 0.8072900000006484,
+        "utilization": 0.005070746543947019
+      },
+      {
+        "endedAt": 1791335245662,
+        "durationMs": 1006.2411790000006,
+        "delayP50Ms": 0.18695599999955448,
+        "delayP99Ms": 0.3955900000000838,
+        "delayMaxMs": 0.3955900000000838,
+        "utilization": 0.006934212144482336
+      },
+      {
+        "endedAt": 1791335246669,
+        "durationMs": 1006.9946099999997,
+        "delayP50Ms": 0.18674499999906402,
+        "delayP99Ms": 0.37066199999935634,
+        "delayMaxMs": 0.37066199999935634,
+        "utilization": 0.0065227850468766715
+      },
+      {
+        "endedAt": 1791335247677,
+        "durationMs": 1008.4779479999997,
+        "delayP50Ms": 0.22468799999842304,
+        "delayP99Ms": 0.5689700000002631,
+        "delayMaxMs": 0.5689700000002631,
+        "utilization": 0.005658799538471951
+      },
+      {
+        "endedAt": 1791335248683,
+        "durationMs": 1006.059487999999,
+        "delayP50Ms": 0.22354099999938626,
+        "delayP99Ms": 0.35215400000015507,
+        "delayMaxMs": 0.35215400000015507,
+        "utilization": 0.005378621094715713
+      },
+      {
+        "endedAt": 1791335249692,
+        "durationMs": 1008.4743789999993,
+        "delayP50Ms": 0.2225560000006226,
+        "delayP99Ms": 0.3605680000000575,
+        "delayMaxMs": 0.3605680000000575,
+        "utilization": 0.005562734863393639
+      },
+      {
+        "endedAt": 1791335250692,
+        "durationMs": 1000.1344239999999,
+        "delayP50Ms": 0.22388300000238814,
+        "delayP99Ms": 0.7332569999998668,
+        "delayMaxMs": 0.7332569999998668,
+        "utilization": 0.005294673792930888
+      },
+      {
+        "endedAt": 1791335251698,
+        "durationMs": 1006.3524260000013,
+        "delayP50Ms": 0.22422499999811407,
+        "delayP99Ms": 0.46132199999919976,
+        "delayMaxMs": 0.46132199999919976,
+        "utilization": 0.005038180691323567
+      },
+      {
+        "endedAt": 1791335252699,
+        "durationMs": 1001.1408570000021,
+        "delayP50Ms": 0.22508700000253157,
+        "delayP99Ms": 0.5004200000003038,
+        "delayMaxMs": 0.5004200000003038,
+        "utilization": 0.005504539744789079
+      },
+      {
+        "endedAt": 1791335253708,
+        "durationMs": 1008.838163999997,
+        "delayP50Ms": 0.2245290000028035,
+        "delayP99Ms": 0.28234900000097696,
+        "delayMaxMs": 0.28234900000097696,
+        "utilization": 0.005399211950857429
+      },
+      {
+        "endedAt": 1791335254716,
+        "durationMs": 1008.2725150000006,
+        "delayP50Ms": 0.22470000000248547,
+        "delayP99Ms": 0.38180499999725726,
+        "delayMaxMs": 0.38180499999725726,
+        "utilization": 0.005116317166805044
+      },
+      {
+        "endedAt": 1791335255723,
+        "durationMs": 1007.1809429999994,
+        "delayP50Ms": 0.21169799999915995,
+        "delayP99Ms": 0.5042199999988952,
+        "delayMaxMs": 0.5042199999988952,
+        "utilization": 0.005495833725234697
+      },
+      {
+        "endedAt": 1791335256733,
+        "durationMs": 1009.1381510000028,
+        "delayP50Ms": 0.20971099999951548,
+        "delayP99Ms": 0.47092399999746704,
+        "delayMaxMs": 0.47092399999746704,
+        "utilization": 0.00476549341434608
+      },
+      {
+        "endedAt": 1791335257740,
+        "durationMs": 1007.6729149999992,
+        "delayP50Ms": 0.21218799999769544,
+        "delayP99Ms": 0.39639700000043376,
+        "delayMaxMs": 0.39639700000043376,
+        "utilization": 0.005761014892807512
+      },
+      {
+        "endedAt": 1791335258750,
+        "durationMs": 1009.6560680000002,
+        "delayP50Ms": 0.20771700000113924,
+        "delayP99Ms": 0.40315100000225357,
+        "delayMaxMs": 0.40315100000225357,
+        "utilization": 0.006110541650154587
+      },
+      {
+        "endedAt": 1791335259758,
+        "durationMs": 1007.6393810000009,
+        "delayP50Ms": 0.21503999999913503,
+        "delayP99Ms": 0.31001300000207266,
+        "delayMaxMs": 0.31001300000207266,
+        "utilization": 0.005290900899316149
+      },
+      {
+        "endedAt": 1791335260766,
+        "durationMs": 1008.3185409999969,
+        "delayP50Ms": 0.22073099999761325,
+        "delayP99Ms": 0.40088200000172947,
+        "delayMaxMs": 0.40088200000172947,
+        "utilization": 0.0052659414382022545
+      },
+      {
+        "endedAt": 1791335261772,
+        "durationMs": 1006.3277780000026,
+        "delayP50Ms": 0.15959599999769125,
+        "delayP99Ms": 0.45561699999962,
+        "delayMaxMs": 0.45561699999962,
+        "utilization": 0.007218171061276319
+      },
+      {
+        "endedAt": 1791335262776,
+        "durationMs": 1003.9873289999996,
+        "delayP50Ms": 0.15350699999908102,
+        "delayP99Ms": 0.8361760000007052,
+        "delayMaxMs": 0.8361760000007052,
+        "utilization": 0.00693202574769454
+      },
+      {
+        "endedAt": 1791335263835,
+        "durationMs": 1059.2102569999988,
+        "delayP50Ms": 0.2239579999986745,
+        "delayP99Ms": 80.19441299999744,
+        "delayMaxMs": 80.19441299999744,
+        "utilization": 0.41566184126396155
+      },
+      {
+        "endedAt": 1791335264840,
+        "durationMs": 1004.6736339999989,
+        "delayP50Ms": 0.24689300000318326,
+        "delayP99Ms": 82.44759599999816,
+        "delayMaxMs": 82.44759599999816,
+        "utilization": 0.05588844618979163
+      },
+      {
+        "endedAt": 1791335265846,
+        "durationMs": 1005.8145589999986,
+        "delayP50Ms": 0.24211700000159908,
+        "delayP99Ms": 80.46672299999773,
+        "delayMaxMs": 80.46672299999773,
+        "utilization": 0.12678805299268187
+      },
+      {
+        "endedAt": 1791335266935,
+        "durationMs": 1089.021584000002,
+        "delayP50Ms": 0.23354500000277767,
+        "delayP99Ms": 80.53692600000068,
+        "delayMaxMs": 80.53692600000068,
+        "utilization": 0.040427538782755165
+      },
+      {
+        "endedAt": 1791335267936,
+        "durationMs": 1001.4480029999977,
+        "delayP50Ms": 0.23312599999917438,
+        "delayP99Ms": 84.07503999999608,
+        "delayMaxMs": 84.07503999999608,
+        "utilization": 0.2732485697417761
+      },
+      {
+        "endedAt": 1791335268945,
+        "durationMs": 1008.947629000002,
+        "delayP50Ms": 0.6245539999945322,
+        "delayP99Ms": 79.68109100000584,
+        "delayMaxMs": 79.68109100000584,
+        "utilization": 0.054224118657102104
+      },
+      {
+        "endedAt": 1791335269947,
+        "durationMs": 1001.3508589999983,
+        "delayP50Ms": 0.31650400000216905,
+        "delayP99Ms": 81.68918200000189,
+        "delayMaxMs": 81.68918200000189,
+        "utilization": 0.12029273197435685
+      },
+      {
+        "endedAt": 1791335270955,
+        "durationMs": 1008.296116000005,
+        "delayP50Ms": 0.24266399999760324,
+        "delayP99Ms": 85.03292900000088,
+        "delayMaxMs": 85.03292900000088,
+        "utilization": 0.11479759457359474
+      },
+      {
+        "endedAt": 1791335272035,
+        "durationMs": 1079.8710809999975,
+        "delayP50Ms": 0.22545100000570528,
+        "delayP99Ms": 84.02930599999672,
+        "delayMaxMs": 84.02930599999672,
+        "utilization": 0.11490050422801783
+      },
+      {
+        "endedAt": 1791335273038,
+        "durationMs": 1003.3343729999979,
+        "delayP50Ms": 0.1786229999997886,
+        "delayP99Ms": 84.70410699999775,
+        "delayMaxMs": 84.70410699999775,
+        "utilization": 0.017346779753979632
+      },
+      {
+        "endedAt": 1791335274046,
+        "durationMs": 1007.3166710000005,
+        "delayP50Ms": 0.21638800000073388,
+        "delayP99Ms": 85.50518900000316,
+        "delayMaxMs": 85.50518900000316,
+        "utilization": 0.010314540237757155
+      },
+      {
+        "endedAt": 1791335275050,
+        "durationMs": 1004.0783330000049,
+        "delayP50Ms": 0.2549399999988964,
+        "delayP99Ms": 91.71452700000373,
+        "delayMaxMs": 91.71452700000373,
+        "utilization": 0.10528898896839664
+      },
+      {
+        "endedAt": 1791335276055,
+        "durationMs": 1005.7954679999966,
+        "delayP50Ms": 0.2258430000001681,
+        "delayP99Ms": 79.78334700000414,
+        "delayMaxMs": 79.78334700000414,
+        "utilization": 0.010443480104228513
+      },
+      {
+        "endedAt": 1791335277135,
+        "durationMs": 1079.5210799999986,
+        "delayP50Ms": 0.22535200000129407,
+        "delayP99Ms": 79.98059099999955,
+        "delayMaxMs": 79.98059099999955,
+        "utilization": 0.007362448115219302
+      },
+      {
+        "endedAt": 1791335278135,
+        "durationMs": 1000.0202839999984,
+        "delayP50Ms": 0.22990199999912875,
+        "delayP99Ms": 79.29574700000376,
+        "delayMaxMs": 79.29574700000376,
+        "utilization": 0.015372693181891724
+      },
+      {
+        "endedAt": 1791335279143,
+        "durationMs": 1007.8082250000007,
+        "delayP50Ms": 0.22154299999965588,
+        "delayP99Ms": 89.53613100000075,
+        "delayMaxMs": 89.53613100000075,
+        "utilization": 0.4182344719901089
+      },
+      {
+        "endedAt": 1791335280146,
+        "durationMs": 1003.2483070000017,
+        "delayP50Ms": 0.2253740000014659,
+        "delayP99Ms": 83.54454499999702,
+        "delayMaxMs": 83.54454499999702,
+        "utilization": 0.11649216592917115
+      },
+      {
+        "endedAt": 1791335281147,
+        "durationMs": 1001.3626179999992,
+        "delayP50Ms": 0.2250590000039665,
+        "delayP99Ms": 79.93821999999636,
+        "delayMaxMs": 79.93821999999636,
+        "utilization": 0.03975103243402353
+      },
+      {
+        "endedAt": 1791335282155,
+        "durationMs": 1007.7065460000013,
+        "delayP50Ms": 0.23986400000285357,
+        "delayP99Ms": 78.41703200000484,
+        "delayMaxMs": 78.41703200000484,
+        "utilization": 0.27016060367317435
+      },
+      {
+        "endedAt": 1791335283162,
+        "durationMs": 1006.5021249999991,
+        "delayP50Ms": 0.18076899999869056,
+        "delayP99Ms": 78.98951599999418,
+        "delayMaxMs": 78.98951599999418,
+        "utilization": 0.03908525235032324
+      },
+      {
+        "endedAt": 1791335284235,
+        "durationMs": 1073.3874810000052,
+        "delayP50Ms": 0.27034999999887077,
+        "delayP99Ms": 80.38012500000332,
+        "delayMaxMs": 80.38012500000332,
+        "utilization": 0.11379639751515341
+      },
+      {
+        "endedAt": 1791335285245,
+        "durationMs": 1010.0712649999987,
+        "delayP50Ms": 0.37582199999451404,
+        "delayP99Ms": 84.03244899999845,
+        "delayMaxMs": 84.03244899999845,
+        "utilization": 0.03747284949289667
+      },
+      {
+        "endedAt": 1791335286245,
+        "durationMs": 1000.2450439999957,
+        "delayP50Ms": 0.2242740000001504,
+        "delayP99Ms": 78.99431000000186,
+        "delayMaxMs": 78.99431000000186,
+        "utilization": 0.11960443247010077
+      },
+      {
+        "endedAt": 1791335287249,
+        "durationMs": 1003.3833290000039,
+        "delayP50Ms": 0.240034000002197,
+        "delayP99Ms": 85.60277700000006,
+        "delayMaxMs": 85.60277700000006,
+        "utilization": 0.1143170559931344
+      },
+      {
+        "endedAt": 1791335288255,
+        "durationMs": 1006.0787469999996,
+        "delayP50Ms": 0.22579299999779323,
+        "delayP99Ms": 79.93708200000401,
+        "delayMaxMs": 79.93708200000401,
+        "utilization": 0.009374471182984151
+      },
+      {
+        "endedAt": 1791335289255,
+        "durationMs": 1000.6546549999985,
+        "delayP50Ms": 0.23971000000165077,
+        "delayP99Ms": 82.30429600000207,
+        "delayMaxMs": 82.30429600000207,
+        "utilization": 0.007731283982492991
+      },
+      {
+        "endedAt": 1791335290265,
+        "durationMs": 1009.4231690000015,
+        "delayP50Ms": 0.22369599999365164,
+        "delayP99Ms": 80.3834829999978,
+        "delayMaxMs": 80.3834829999978,
+        "utilization": 0.008420811038666405
+      },
+      {
+        "endedAt": 1791335291265,
+        "durationMs": 1000.7250799999965,
+        "delayP50Ms": 0.23383599999942817,
+        "delayP99Ms": 79.9788250000056,
+        "delayMaxMs": 79.9788250000056,
+        "utilization": 0.008001747425138922
+      },
+      {
+        "endedAt": 1791335292335,
+        "durationMs": 1069.3706559999991,
+        "delayP50Ms": 0.22507400000176858,
+        "delayP99Ms": 87.6490449999983,
+        "delayMaxMs": 87.6490449999983,
+        "utilization": 0.007349558624202654
+      },
+      {
+        "endedAt": 1791335293342,
+        "durationMs": 1006.9997839999996,
+        "delayP50Ms": 0.22542999999859603,
+        "delayP99Ms": 76.48513100000127,
+        "delayMaxMs": 76.48513100000127,
+        "utilization": 0.008852014284027996
+      },
+      {
+        "endedAt": 1791335294346,
+        "durationMs": 1004.006103000007,
+        "delayP50Ms": 0.23151399999915157,
+        "delayP99Ms": 182.61847500000295,
+        "delayMaxMs": 182.61847500000295,
+        "utilization": 0.5177784221274249
+      },
+      {
+        "endedAt": 1791335295350,
+        "durationMs": 1003.9457639999964,
+        "delayP50Ms": 0.22008199999982025,
+        "delayP99Ms": 84.14840600000025,
+        "delayMaxMs": 84.14840600000025,
+        "utilization": 0.13418832965926786
+      },
+      {
+        "endedAt": 1791335296435,
+        "durationMs": 1084.9236689999962,
+        "delayP50Ms": 0.2205940000130795,
+        "delayP99Ms": 81.5067659999986,
+        "delayMaxMs": 81.5067659999986,
+        "utilization": 0.04027146024463901
+      },
+      {
+        "endedAt": 1791335297436,
+        "durationMs": 1000.7961349999969,
+        "delayP50Ms": 0.2221490000083577,
+        "delayP99Ms": 79.66009499999927,
+        "delayMaxMs": 79.66009499999927,
+        "utilization": 0.05050414510694354
+      },
+      {
+        "endedAt": 1791335298436,
+        "durationMs": 1000.500721000004,
+        "delayP50Ms": 0.20570599999336991,
+        "delayP99Ms": 78.34198299999116,
+        "delayMaxMs": 78.34198299999116,
+        "utilization": 0.12123072373027731
+      },
+      {
+        "endedAt": 1791335299446,
+        "durationMs": 1009.6394200000068,
+        "delayP50Ms": 0.36846800000057556,
+        "delayP99Ms": 82.55111900001066,
+        "delayMaxMs": 82.55111900001066,
+        "utilization": 0.050171185115978484
+      },
+      {
+        "endedAt": 1791335300446,
+        "durationMs": 1000.0111489999981,
+        "delayP50Ms": 0.24916300000040792,
+        "delayP99Ms": 79.81957000000693,
+        "delayMaxMs": 79.81957000000693,
+        "utilization": 0.18765162795910184
+      },
+      {
+        "endedAt": 1791335301457,
+        "durationMs": 1010.8800999999949,
+        "delayP50Ms": 0.19719000000623055,
+        "delayP99Ms": 79.82362399999693,
+        "delayMaxMs": 79.82362399999693,
+        "utilization": 0.11605010776481109
+      },
+      {
+        "endedAt": 1791335302457,
+        "durationMs": 1000.6073920000053,
+        "delayP50Ms": 0.27004800000577234,
+        "delayP99Ms": 75.90217499999562,
+        "delayMaxMs": 75.90217499999562,
+        "utilization": 0.03469445693963402
+      },
+      {
+        "endedAt": 1791335303535,
+        "durationMs": 1077.7242049999913,
+        "delayP50Ms": 0.2210380000033183,
+        "delayP99Ms": 79.35870799999975,
+        "delayMaxMs": 79.35870799999975,
+        "utilization": 0.009060730007590308
+      },
+      {
+        "endedAt": 1791335304545,
+        "durationMs": 1010.2757390000043,
+        "delayP50Ms": 0.18966899999941234,
+        "delayP99Ms": 79.5014680000022,
+        "delayMaxMs": 79.5014680000022,
+        "utilization": 0.009936970863630283
+      },
+      {
+        "endedAt": 1791335305545,
+        "durationMs": 1000.1337460000068,
+        "delayP50Ms": 0.23280299999169074,
+        "delayP99Ms": 79.76735699998972,
+        "delayMaxMs": 79.76735699998972,
+        "utilization": 0.10873030359043931
+      },
+      {
+        "endedAt": 1791335306547,
+        "durationMs": 1001.3227849999967,
+        "delayP50Ms": 0.22621100000105798,
+        "delayP99Ms": 79.58219099999405,
+        "delayMaxMs": 79.58219099999405,
+        "utilization": 0.00994358510195826
+      },
+      {
+        "endedAt": 1791335307556,
+        "durationMs": 1009.0847599999979,
+        "delayP50Ms": 0.22916599999007303,
+        "delayP99Ms": 84.83707700000377,
+        "delayMaxMs": 84.83707700000377,
+        "utilization": 0.0056561930327713875
+      },
+      {
+        "endedAt": 1791335308563,
+        "durationMs": 1006.8595789999963,
+        "delayP50Ms": 0.22579100000439212,
+        "delayP99Ms": 78.12628700000641,
+        "delayMaxMs": 78.12628700000641,
+        "utilization": 0.007810232153833325
+      },
+      {
+        "endedAt": 1791335309646,
+        "durationMs": 1082.7595950000104,
+        "delayP50Ms": 0.2291069999919273,
+        "delayP99Ms": 84.54123500001151,
+        "delayMaxMs": 84.54123500001151,
+        "utilization": 0.45007322841703207
+      },
+      {
+        "endedAt": 1791335310649,
+        "durationMs": 1003.55554999999,
+        "delayP50Ms": 0.209391999989748,
+        "delayP99Ms": 79.39334100000269,
+        "delayMaxMs": 79.39334100000269,
+        "utilization": 0.0525290348798689
+      },
+      {
+        "endedAt": 1791335311656,
+        "durationMs": 1007.2053920000035,
+        "delayP50Ms": 0.2248189999954775,
+        "delayP99Ms": 76.89602200000081,
+        "delayMaxMs": 76.89602200000081,
+        "utilization": 0.03847502207255327
+      },
+      {
+        "endedAt": 1791335312735,
+        "durationMs": 1078.9698119999957,
+        "delayP50Ms": 0.21606800000881776,
+        "delayP99Ms": 81.5108029999974,
+        "delayMaxMs": 81.5108029999974,
+        "utilization": 0.03665202385660096
+      },
+      {
+        "endedAt": 1791335313737,
+        "durationMs": 1001.5843120000063,
+        "delayP50Ms": 0.20678100000077393,
+        "delayP99Ms": 84.5825799999875,
+        "delayMaxMs": 84.5825799999875,
+        "utilization": 0.062426443941070636
+      },
+      {
+        "endedAt": 1791335314740,
+        "durationMs": 1003.5753010000044,
+        "delayP50Ms": 0.19799000000057276,
+        "delayP99Ms": 80.87331799999811,
+        "delayMaxMs": 80.87331799999811,
+        "utilization": 0.03696485644958014
+      },
+      {
+        "endedAt": 1791335315758,
+        "durationMs": 1017.7740149999881,
+        "delayP50Ms": 0.2099949999974342,
+        "delayP99Ms": 79.23198399999819,
+        "delayMaxMs": 79.23198399999819,
+        "utilization": 0.03922040203178372
+      },
+      {
+        "endedAt": 1791335316768,
+        "durationMs": 1010.105018000002,
+        "delayP50Ms": 2.3898840000038035,
+        "delayP99Ms": 80.39672900000005,
+        "delayMaxMs": 80.39672900000005,
+        "utilization": 0.20953201094755217
+      },
+      {
+        "endedAt": 1791335317768,
+        "durationMs": 1000.0622690000018,
+        "delayP50Ms": 0.4564869999885559,
+        "delayP99Ms": 83.45439099999203,
+        "delayMaxMs": 83.45439099999203,
+        "utilization": 0.00873701795178371
+      },
+      {
+        "endedAt": 1791335318770,
+        "durationMs": 1002.020829000001,
+        "delayP50Ms": 0.2132220000057714,
+        "delayP99Ms": 79.58263999999326,
+        "delayMaxMs": 79.58263999999326,
+        "utilization": 0.008294022869493772
+      },
+      {
+        "endedAt": 1791335319835,
+        "durationMs": 1064.6525770000007,
+        "delayP50Ms": 0.20989100000588223,
+        "delayP99Ms": 79.74918699999398,
+        "delayMaxMs": 79.74918699999398,
+        "utilization": 0.008463126366502097
+      },
+      {
+        "endedAt": 1791335320836,
+        "durationMs": 1001.4770529999951,
+        "delayP50Ms": 0.1957610000099521,
+        "delayP99Ms": 80.94307299998763,
+        "delayMaxMs": 80.94307299998763,
+        "utilization": 0.01305310184134297
+      },
+      {
+        "endedAt": 1791335321842,
+        "durationMs": 1005.2610859999986,
+        "delayP50Ms": 0.17416500000399537,
+        "delayP99Ms": 82.57227899999998,
+        "delayMaxMs": 82.57227899999998,
+        "utilization": 0.009435911435151344
+      },
+      {
+        "endedAt": 1791335322846,
+        "durationMs": 1004.8735760000127,
+        "delayP50Ms": 0.20818200000212528,
+        "delayP99Ms": 79.38785899999493,
+        "delayMaxMs": 79.38785899999493,
+        "utilization": 0.10771259769585749
+      },
+      {
+        "endedAt": 1791335323861,
+        "durationMs": 1014.5774689999962,
+        "delayP50Ms": 1.068158999987645,
+        "delayP99Ms": 80.26064799999585,
+        "delayMaxMs": 80.26064799999585,
+        "utilization": 0.22003078310737353
+      },
+      {
+        "endedAt": 1791335324935,
+        "durationMs": 1073.7737199999974,
+        "delayP50Ms": 0.20607999998901505,
+        "delayP99Ms": 78.46985600001062,
+        "delayMaxMs": 78.46985600001062,
+        "utilization": 0.10266664871907183
+      },
+      {
+        "endedAt": 1791335325935,
+        "durationMs": 1000.0262530000036,
+        "delayP50Ms": 0.18316600000252947,
+        "delayP99Ms": 87.65127099999518,
+        "delayMaxMs": 87.65127099999518,
+        "utilization": 0.10754385237500282
+      },
+      {
+        "endedAt": 1791335326946,
+        "durationMs": 1010.9304719999927,
+        "delayP50Ms": 0.2830019999964861,
+        "delayP99Ms": 81.56441999999515,
+        "delayMaxMs": 81.56441999999515,
+        "utilization": 0.11352887568566063
+      },
+      {
+        "endedAt": 1791335327956,
+        "durationMs": 1010.0993580000068,
+        "delayP50Ms": 0.2329360000003362,
+        "delayP99Ms": 79.52812499999709,
+        "delayMaxMs": 79.52812499999709,
+        "utilization": 0.1194207125891573
+      },
+      {
+        "endedAt": 1791335329039,
+        "durationMs": 1083.3238390000042,
+        "delayP50Ms": 0.21242899999197107,
+        "delayP99Ms": 82.29800000000978,
+        "delayMaxMs": 82.29800000000978,
+        "utilization": 0.0331304969149131
+      },
+      {
+        "endedAt": 1791335330048,
+        "durationMs": 1008.5522280000005,
+        "delayP50Ms": 0.26036099999328144,
+        "delayP99Ms": 82.64891000000353,
+        "delayMaxMs": 82.64891000000353,
+        "utilization": 0.04244681250912247
+      },
+      {
+        "endedAt": 1791335331056,
+        "durationMs": 1008.443637999997,
+        "delayP50Ms": 0.2293199999985518,
+        "delayP99Ms": 77.68280600001162,
+        "delayMaxMs": 77.68280600001162,
+        "utilization": 0.04518833101012473
+      },
+      {
+        "endedAt": 1791335332135,
+        "durationMs": 1078.5910509999958,
+        "delayP50Ms": 0.26455899998836685,
+        "delayP99Ms": 79.51724400000239,
+        "delayMaxMs": 79.51724400000239,
+        "utilization": 0.02131431547216975
+      },
+      {
+        "endedAt": 1791335333135,
+        "durationMs": 1000.1631510000007,
+        "delayP50Ms": 0.2103170000045793,
+        "delayP99Ms": 79.79244499999913,
+        "delayMaxMs": 79.79244499999913,
+        "utilization": 0.0100726509989397
+      },
+      {
+        "endedAt": 1791335334145,
+        "durationMs": 1010.1608019999985,
+        "delayP50Ms": 0.21226200000091922,
+        "delayP99Ms": 80.83547900000121,
+        "delayMaxMs": 80.83547900000121,
+        "utilization": 0.00812489981048486
+      },
+      {
+        "endedAt": 1791335335147,
+        "durationMs": 1002.1501480000006,
+        "delayP50Ms": 0.24595400001271628,
+        "delayP99Ms": 81.75131500000134,
+        "delayMaxMs": 81.75131500000134,
+        "utilization": 0.008585394037893435
+      },
+      {
+        "endedAt": 1791335336235,
+        "durationMs": 1087.6197059999977,
+        "delayP50Ms": 0.24523299999418668,
+        "delayP99Ms": 79.74644199998875,
+        "delayMaxMs": 79.74644199998875,
+        "utilization": 0.007338619038269579
+      },
+      {
+        "endedAt": 1791335337242,
+        "durationMs": 1006.9787440000073,
+        "delayP50Ms": 0.2346350000007078,
+        "delayP99Ms": 79.75524099999166,
+        "delayMaxMs": 79.75524099999166,
+        "utilization": 0.3327977703893757
+      },
+      {
+        "endedAt": 1791335338247,
+        "durationMs": 1004.636308000001,
+        "delayP50Ms": 0.149543999999878,
+        "delayP99Ms": 3.784206999989692,
+        "delayMaxMs": 3.784206999989692,
+        "utilization": 0.45852352017145864
+      }
+    ],
+    "harness": [
+      {
+        "at": 1791335234263,
+        "phase": "rest",
+        "cpuPercent": 9.725074925074924,
+        "elu": 0.02704697850356065,
+        "lagP99Ms": 10.428415,
+        "lagMaxMs": 11.935743
+      },
+      {
+        "at": 1791335235263,
+        "phase": "rest",
+        "cpuPercent": 0.7139000000000001,
+        "elu": 0.004673003104574303,
+        "lagP99Ms": 10.543103,
+        "lagMaxMs": 10.559487
+      },
+      {
+        "at": 1791335236263,
+        "phase": "rest",
+        "cpuPercent": 0.5860000000000001,
+        "elu": 0.003955591602333478,
+        "lagP99Ms": 10.362879,
+        "lagMaxMs": 10.510335
+      },
+      {
+        "at": 1791335237263,
+        "phase": "rest",
+        "cpuPercent": 0.686,
+        "elu": 0.003847796093028914,
+        "lagP99Ms": 10.272767,
+        "lagMaxMs": 10.272767
+      },
+      {
+        "at": 1791335238264,
+        "phase": "rest",
+        "cpuPercent": 0.487012987012987,
+        "elu": 0.003400357261499654,
+        "lagP99Ms": 10.256383,
+        "lagMaxMs": 10.657791
+      },
+      {
+        "at": 1791335239264,
+        "phase": "rest",
+        "cpuPercent": 0.44070000000000004,
+        "elu": 0.0029889307664064343,
+        "lagP99Ms": 10.346495,
+        "lagMaxMs": 10.428415
+      },
+      {
+        "at": 1791335240264,
+        "phase": "rest",
+        "cpuPercent": 0.5208,
+        "elu": 0.00369647272169741,
+        "lagP99Ms": 10.764287,
+        "lagMaxMs": 10.919935
+      },
+      {
+        "at": 1791335241264,
+        "phase": "rest",
+        "cpuPercent": 0.36869999999999997,
+        "elu": 0.002529625176188321,
+        "lagP99Ms": 10.264575,
+        "lagMaxMs": 10.420223
+      },
+      {
+        "at": 1791335242265,
+        "phase": "rest",
+        "cpuPercent": 0.41878121878121877,
+        "elu": 0.00268058890307305,
+        "lagP99Ms": 10.297343,
+        "lagMaxMs": 10.371071
+      },
+      {
+        "at": 1791335243265,
+        "phase": "rest",
+        "cpuPercent": 0.39509999999999995,
+        "elu": 0.002574224289699056,
+        "lagP99Ms": 10.264575,
+        "lagMaxMs": 10.502143
+      },
+      {
+        "at": 1791335244265,
+        "phase": "rest",
+        "cpuPercent": 0.39169999999999994,
+        "elu": 0.0024304431796278794,
+        "lagP99Ms": 10.272767,
+        "lagMaxMs": 10.510335
+      },
+      {
+        "at": 1791335245266,
+        "phase": "rest",
+        "cpuPercent": 0.35434565434565435,
+        "elu": 0.0023506154644475623,
+        "lagP99Ms": 10.264575,
+        "lagMaxMs": 10.297343
+      },
+      {
+        "at": 1791335246265,
+        "phase": "rest",
+        "cpuPercent": 0.5042042042042042,
+        "elu": 0.003190961728478832,
+        "lagP99Ms": 10.321919,
+        "lagMaxMs": 10.903551
+      },
+      {
+        "at": 1791335247266,
+        "phase": "rest",
+        "cpuPercent": 0.4321678321678321,
+        "elu": 0.0027194415773164576,
+        "lagP99Ms": 10.272767,
+        "lagMaxMs": 10.477567
+      },
+      {
+        "at": 1791335248265,
+        "phase": "rest",
+        "cpuPercent": 0.4810810810810811,
+        "elu": 0.002874277090653597,
+        "lagP99Ms": 10.239999,
+        "lagMaxMs": 10.665983
+      },
+      {
+        "at": 1791335249266,
+        "phase": "rest",
+        "cpuPercent": 0.35614385614385613,
+        "elu": 0.002310829969702674,
+        "lagP99Ms": 10.264575,
+        "lagMaxMs": 10.428415
+      },
+      {
+        "at": 1791335250265,
+        "phase": "rest",
+        "cpuPercent": 0.4318318318318319,
+        "elu": 0.0027181416733364485,
+        "lagP99Ms": 10.362879,
+        "lagMaxMs": 10.428415
+      },
+      {
+        "at": 1791335251266,
+        "phase": "rest",
+        "cpuPercent": 0.4899100899100899,
+        "elu": 0.002711973685193678,
+        "lagP99Ms": 10.493951,
+        "lagMaxMs": 10.665983
+      },
+      {
+        "at": 1791335252266,
+        "phase": "rest",
+        "cpuPercent": 0.44909999999999994,
+        "elu": 0.0025553316553943053,
+        "lagP99Ms": 10.280959,
+        "lagMaxMs": 10.395647
+      },
+      {
+        "at": 1791335253266,
+        "phase": "rest",
+        "cpuPercent": 0.42140000000000005,
+        "elu": 0.0026959923364696546,
+        "lagP99Ms": 10.330111,
+        "lagMaxMs": 10.510335
+      },
+      {
+        "at": 1791335254266,
+        "phase": "rest",
+        "cpuPercent": 0.3692,
+        "elu": 0.0024326896326435686,
+        "lagP99Ms": 10.371071,
+        "lagMaxMs": 10.543103
+      },
+      {
+        "at": 1791335255266,
+        "phase": "rest",
+        "cpuPercent": 0.3812,
+        "elu": 0.0024591500342962106,
+        "lagP99Ms": 10.256383,
+        "lagMaxMs": 10.870783
+      },
+      {
+        "at": 1791335256266,
+        "phase": "rest",
+        "cpuPercent": 0.41639999999999994,
+        "elu": 0.0025729668092652,
+        "lagP99Ms": 10.289151,
+        "lagMaxMs": 10.321919
+      },
+      {
+        "at": 1791335257266,
+        "phase": "rest",
+        "cpuPercent": 0.3391,
+        "elu": 0.002240673300938698,
+        "lagP99Ms": 10.305535,
+        "lagMaxMs": 10.313727
+      },
+      {
+        "at": 1791335258266,
+        "phase": "rest",
+        "cpuPercent": 0.5166999999999999,
+        "elu": 0.002887394531271418,
+        "lagP99Ms": 10.403839,
+        "lagMaxMs": 10.715135
+      },
+      {
+        "at": 1791335259267,
+        "phase": "rest",
+        "cpuPercent": 0.4214785214785215,
+        "elu": 0.0025844649821915302,
+        "lagP99Ms": 10.289151,
+        "lagMaxMs": 10.526719
+      },
+      {
+        "at": 1791335260267,
+        "phase": "rest",
+        "cpuPercent": 0.3435,
+        "elu": 0.00227894856906109,
+        "lagP99Ms": 10.280959,
+        "lagMaxMs": 10.321919
+      },
+      {
+        "at": 1791335261267,
+        "phase": "rest",
+        "cpuPercent": 0.4273,
+        "elu": 0.002823576078683423,
+        "lagP99Ms": 10.289151,
+        "lagMaxMs": 10.362879
+      },
+      {
+        "at": 1791335262267,
+        "phase": "rest",
+        "cpuPercent": 0.5559999999999999,
+        "elu": 0.0033082703896399187,
+        "lagP99Ms": 10.199039,
+        "lagMaxMs": 10.256383
+      },
+      {
+        "at": 1791335263267,
+        "phase": "rest",
+        "cpuPercent": 0.47400000000000003,
+        "elu": 0.0029700659901008377,
+        "lagP99Ms": 10.248191,
+        "lagMaxMs": 10.272767
+      },
+      {
+        "at": 1791335264267,
+        "phase": "setup",
+        "cpuPercent": 16.340000000000003,
+        "elu": 0.08737167113826225,
+        "lagP99Ms": 17.465343,
+        "lagMaxMs": 21.364735
+      },
+      {
+        "at": 1791335265267,
+        "phase": "setup",
+        "cpuPercent": 1.8210999999999997,
+        "elu": 0.01256820872073718,
+        "lagP99Ms": 15.007743,
+        "lagMaxMs": 15.589375
+      },
+      {
+        "at": 1791335266267,
+        "phase": "setup",
+        "cpuPercent": 2.2812,
+        "elu": 0.018010908975863067,
+        "lagP99Ms": 11.026431,
+        "lagMaxMs": 13.066239
+      },
+      {
+        "at": 1791335267267,
+        "phase": "setup",
+        "cpuPercent": 1.4162000000000001,
+        "elu": 0.01178102377357425,
+        "lagP99Ms": 10.887167,
+        "lagMaxMs": 13.205503
+      },
+      {
+        "at": 1791335268267,
+        "phase": "setup",
+        "cpuPercent": 2.6973000000000003,
+        "elu": 0.022593664186179533,
+        "lagP99Ms": 11.960319,
+        "lagMaxMs": 12.034047
+      },
+      {
+        "at": 1791335269267,
+        "phase": "setup",
+        "cpuPercent": 2.6263,
+        "elu": 0.0225202750446867,
+        "lagP99Ms": 10.518527,
+        "lagMaxMs": 11.624447
+      },
+      {
+        "at": 1791335270266,
+        "phase": "setup",
+        "cpuPercent": 1.900900900900901,
+        "elu": 0.015639902516339125,
+        "lagP99Ms": 10.485759,
+        "lagMaxMs": 10.551295
+      },
+      {
+        "at": 1791335271267,
+        "phase": "setup",
+        "cpuPercent": 1.1738261738261737,
+        "elu": 0.009780958441785118,
+        "lagP99Ms": 11.329535,
+        "lagMaxMs": 11.771903
+      },
+      {
+        "at": 1791335272267,
+        "phase": "setup",
+        "cpuPercent": 1.8869,
+        "elu": 0.013857019183536825,
+        "lagP99Ms": 12.705791,
+        "lagMaxMs": 13.189119
+      },
+      {
+        "at": 1791335273267,
+        "phase": "setup",
+        "cpuPercent": 0.615,
+        "elu": 0.004377971914431073,
+        "lagP99Ms": 10.567679,
+        "lagMaxMs": 13.508607
+      },
+      {
+        "at": 1791335274267,
+        "phase": "setup",
+        "cpuPercent": 0.5222,
+        "elu": 0.0032355910596711286,
+        "lagP99Ms": 10.379263,
+        "lagMaxMs": 10.526719
+      },
+      {
+        "at": 1791335275267,
+        "phase": "setup",
+        "cpuPercent": 0.3669,
+        "elu": 0.00208864379164562,
+        "lagP99Ms": 10.461183,
+        "lagMaxMs": 13.787135
+      },
+      {
+        "at": 1791335276268,
+        "phase": "setup",
+        "cpuPercent": 0.34325674325674327,
+        "elu": 0.001929415766347023,
+        "lagP99Ms": 10.387455,
+        "lagMaxMs": 10.420223
+      },
+      {
+        "at": 1791335277268,
+        "phase": "setup",
+        "cpuPercent": 0.42969999999999997,
+        "elu": 0.002751591905024994,
+        "lagP99Ms": 12.763135,
+        "lagMaxMs": 12.943359
+      },
+      {
+        "at": 1791335278269,
+        "phase": "setup",
+        "cpuPercent": 0.6082917082917083,
+        "elu": 0.0045783929702330325,
+        "lagP99Ms": 11.993087,
+        "lagMaxMs": 12.820479
+      },
+      {
+        "at": 1791335279269,
+        "phase": "setup",
+        "cpuPercent": 6.519899999999999,
+        "elu": 0.051353343122235266,
+        "lagP99Ms": 13.164543,
+        "lagMaxMs": 23.199743
+      },
+      {
+        "at": 1791335280268,
+        "phase": "setup",
+        "cpuPercent": 1.9506506506506502,
+        "elu": 0.014528595360123365,
+        "lagP99Ms": 10.854399,
+        "lagMaxMs": 11.485183
+      },
+      {
+        "at": 1791335281269,
+        "phase": "setup",
+        "cpuPercent": 1.8591408591408594,
+        "elu": 0.015784423194439744,
+        "lagP99Ms": 11.214847,
+        "lagMaxMs": 12.607487
+      },
+      {
+        "at": 1791335282269,
+        "phase": "setup",
+        "cpuPercent": 1.5954,
+        "elu": 0.014643453560231716,
+        "lagP99Ms": 10.838015,
+        "lagMaxMs": 14.106623
+      },
+      {
+        "at": 1791335283269,
+        "phase": "setup",
+        "cpuPercent": 1.2671,
+        "elu": 0.010586122548175645,
+        "lagP99Ms": 10.616831,
+        "lagMaxMs": 14.106623
+      },
+      {
+        "at": 1791335284269,
+        "phase": "setup",
+        "cpuPercent": 1.8741,
+        "elu": 0.014899635694210052,
+        "lagP99Ms": 10.903551,
+        "lagMaxMs": 11.296767
+      },
+      {
+        "at": 1791335285268,
+        "phase": "setup",
+        "cpuPercent": 2.474074074074074,
+        "elu": 0.016127458991016086,
+        "lagP99Ms": 11.542527,
+        "lagMaxMs": 13.451263
+      },
+      {
+        "at": 1791335286269,
+        "phase": "setup",
+        "cpuPercent": 3.2517482517482517,
+        "elu": 0.023254628467131142,
+        "lagP99Ms": 11.706367,
+        "lagMaxMs": 11.812863
+      },
+      {
+        "at": 1791335287269,
+        "phase": "setup",
+        "cpuPercent": 1.0674,
+        "elu": 0.008007772616308537,
+        "lagP99Ms": 12.877823,
+        "lagMaxMs": 14.467071
+      },
+      {
+        "at": 1791335288269,
+        "phase": "setup",
+        "cpuPercent": 0.5051,
+        "elu": 0.0035033705480717165,
+        "lagP99Ms": 12.296191,
+        "lagMaxMs": 13.402111
+      },
+      {
+        "at": 1791335289269,
+        "phase": "setup",
+        "cpuPercent": 0.3632,
+        "elu": 0.0021334550277745203,
+        "lagP99Ms": 10.379263,
+        "lagMaxMs": 13.189119
+      },
+      {
+        "at": 1791335290269,
+        "phase": "setup",
+        "cpuPercent": 0.325,
+        "elu": 0.0017786791808047436,
+        "lagP99Ms": 11.288575,
+        "lagMaxMs": 13.205503
+      },
+      {
+        "at": 1791335291270,
+        "phase": "setup",
+        "cpuPercent": 0.404995004995005,
+        "elu": 0.00221845007951264,
+        "lagP99Ms": 10.477567,
+        "lagMaxMs": 13.033471
+      },
+      {
+        "at": 1791335292269,
+        "phase": "setup",
+        "cpuPercent": 0.3738738738738739,
+        "elu": 0.0020655843958878764,
+        "lagP99Ms": 12.009471,
+        "lagMaxMs": 13.393919
+      },
+      {
+        "at": 1791335293270,
+        "phase": "setup",
+        "cpuPercent": 0.37102897102897103,
+        "elu": 0.0021937561056249453,
+        "lagP99Ms": 12.378111,
+        "lagMaxMs": 14.180351
+      },
+      {
+        "at": 1791335294270,
+        "phase": "setup",
+        "cpuPercent": 6.676900000000001,
+        "elu": 0.05051912592212145,
+        "lagP99Ms": 13.729791,
+        "lagMaxMs": 23.937023
+      },
+      {
+        "at": 1791335295270,
+        "phase": "setup",
+        "cpuPercent": 1.3818000000000001,
+        "elu": 0.011761553397554915,
+        "lagP99Ms": 13.090815,
+        "lagMaxMs": 13.877247
+      },
+      {
+        "at": 1791335296271,
+        "phase": "setup",
+        "cpuPercent": 2.445754245754246,
+        "elu": 0.01769503494411787,
+        "lagP99Ms": 11.001855,
+        "lagMaxMs": 13.008895
+      },
+      {
+        "at": 1791335297271,
+        "phase": "setup",
+        "cpuPercent": 2.2602,
+        "elu": 0.015963029035315473,
+        "lagP99Ms": 11.001855,
+        "lagMaxMs": 12.287999
+      },
+      {
+        "at": 1791335298271,
+        "phase": "setup",
+        "cpuPercent": 1.7581,
+        "elu": 0.015433967379496432,
+        "lagP99Ms": 11.304959,
+        "lagMaxMs": 12.050431
+      },
+      {
+        "at": 1791335299272,
+        "phase": "setup",
+        "cpuPercent": 2.562937062937063,
+        "elu": 0.01954509440876161,
+        "lagP99Ms": 10.657791,
+        "lagMaxMs": 12.591103
+      },
+      {
+        "at": 1791335300273,
+        "phase": "setup",
+        "cpuPercent": 1.8217782217782217,
+        "elu": 0.012942359394187655,
+        "lagP99Ms": 11.862015,
+        "lagMaxMs": 12.615679
+      },
+      {
+        "at": 1791335301274,
+        "phase": "setup",
+        "cpuPercent": 8.087312687312686,
+        "elu": 0.03531513730703425,
+        "lagP99Ms": 12.025855,
+        "lagMaxMs": 13.230079
+      },
+      {
+        "at": 1791335302275,
+        "phase": "setup",
+        "cpuPercent": 1.5107892107892107,
+        "elu": 0.014254526725720007,
+        "lagP99Ms": 14.163967,
+        "lagMaxMs": 14.942207
+      },
+      {
+        "at": 1791335303275,
+        "phase": "setup",
+        "cpuPercent": 0.693,
+        "elu": 0.0037677227596252067,
+        "lagP99Ms": 12.476415,
+        "lagMaxMs": 14.819327
+      },
+      {
+        "at": 1791335304274,
+        "phase": "setup",
+        "cpuPercent": 0.4478478478478478,
+        "elu": 0.002432605806697372,
+        "lagP99Ms": 10.829823,
+        "lagMaxMs": 13.271039
+      },
+      {
+        "at": 1791335305274,
+        "phase": "setup",
+        "cpuPercent": 1.3191000000000002,
+        "elu": 0.009140161067218867,
+        "lagP99Ms": 11.059199,
+        "lagMaxMs": 12.222463
+      },
+      {
+        "at": 1791335306274,
+        "phase": "setup",
+        "cpuPercent": 0.31739999999999996,
+        "elu": 0.0016848160546713345,
+        "lagP99Ms": 10.461183,
+        "lagMaxMs": 11.526143
+      },
+      {
+        "at": 1791335307275,
+        "phase": "setup",
+        "cpuPercent": 0.34655344655344655,
+        "elu": 0.001849319168908594,
+        "lagP99Ms": 10.469375,
+        "lagMaxMs": 13.721599
+      },
+      {
+        "at": 1791335308275,
+        "phase": "setup",
+        "cpuPercent": 0.3357,
+        "elu": 0.0019752668285449517,
+        "lagP99Ms": 13.025279,
+        "lagMaxMs": 13.123583
+      },
+      {
+        "at": 1791335309275,
+        "phase": "setup",
+        "cpuPercent": 2.9645,
+        "elu": 0.02377075269581452,
+        "lagP99Ms": 11.780095,
+        "lagMaxMs": 12.017663
+      },
+      {
+        "at": 1791335310275,
+        "phase": "setup",
+        "cpuPercent": 6.5463,
+        "elu": 0.0477796323240338,
+        "lagP99Ms": 11.706367,
+        "lagMaxMs": 11.755519
+      },
+      {
+        "at": 1791335311275,
+        "phase": "setup",
+        "cpuPercent": 1.8654,
+        "elu": 0.016387386725602814,
+        "lagP99Ms": 11.894783,
+        "lagMaxMs": 12.001279
+      },
+      {
+        "at": 1791335312276,
+        "phase": "setup",
+        "cpuPercent": 1.7069930069930068,
+        "elu": 0.014608206122366416,
+        "lagP99Ms": 11.485183,
+        "lagMaxMs": 11.952127
+      },
+      {
+        "at": 1791335313276,
+        "phase": "setup",
+        "cpuPercent": 2.3654,
+        "elu": 0.022924377413971585,
+        "lagP99Ms": 11.214847,
+        "lagMaxMs": 13.942783
+      },
+      {
+        "at": 1791335314277,
+        "phase": "setup",
+        "cpuPercent": 1.7891108891108891,
+        "elu": 0.01549524233582161,
+        "lagP99Ms": 12.345343,
+        "lagMaxMs": 13.205503
+      },
+      {
+        "at": 1791335315277,
+        "phase": "setup",
+        "cpuPercent": 2.2114000000000003,
+        "elu": 0.015599496199406574,
+        "lagP99Ms": 11.051007,
+        "lagMaxMs": 14.065663
+      },
+      {
+        "at": 1791335316278,
+        "phase": "setup",
+        "cpuPercent": 3.2183816183816183,
+        "elu": 0.023604783613344102,
+        "lagP99Ms": 12.632063,
+        "lagMaxMs": 13.500415
+      },
+      {
+        "at": 1791335317277,
+        "phase": "setup",
+        "cpuPercent": 2.7319319319319324,
+        "elu": 0.011149782029903533,
+        "lagP99Ms": 12.607487,
+        "lagMaxMs": 12.967935
+      },
+      {
+        "at": 1791335318278,
+        "phase": "setup",
+        "cpuPercent": 0.4071928071928072,
+        "elu": 0.0023388038263637357,
+        "lagP99Ms": 13.385727,
+        "lagMaxMs": 13.672447
+      },
+      {
+        "at": 1791335319278,
+        "phase": "setup",
+        "cpuPercent": 0.43310000000000004,
+        "elu": 0.0023694365072887175,
+        "lagP99Ms": 11.329535,
+        "lagMaxMs": 11.804671
+      },
+      {
+        "at": 1791335320278,
+        "phase": "setup",
+        "cpuPercent": 0.4473,
+        "elu": 0.002517580039112868,
+        "lagP99Ms": 10.600447,
+        "lagMaxMs": 11.247615
+      },
+      {
+        "at": 1791335321279,
+        "phase": "setup",
+        "cpuPercent": 0.9044955044955045,
+        "elu": 0.0025060305115183375,
+        "lagP99Ms": 14.704639,
+        "lagMaxMs": 15.990783
+      },
+      {
+        "at": 1791335322279,
+        "phase": "setup",
+        "cpuPercent": 0.4519,
+        "elu": 0.0024324270801725644,
+        "lagP99Ms": 10.780671,
+        "lagMaxMs": 11.263999
+      },
+      {
+        "at": 1791335323279,
+        "phase": "setup",
+        "cpuPercent": 2.3636,
+        "elu": 0.015682452737458216,
+        "lagP99Ms": 11.108351,
+        "lagMaxMs": 13.041663
+      },
+      {
+        "at": 1791335324280,
+        "phase": "setup",
+        "cpuPercent": 6.3413586413586405,
+        "elu": 0.05200683104901694,
+        "lagP99Ms": 13.099007,
+        "lagMaxMs": 14.589951
+      },
+      {
+        "at": 1791335325281,
+        "phase": "setup",
+        "cpuPercent": 1.0440559440559443,
+        "elu": 0.008196057787386636,
+        "lagP99Ms": 11.313151,
+        "lagMaxMs": 11.763711
+      },
+      {
+        "at": 1791335326280,
+        "phase": "setup",
+        "cpuPercent": 1.7595595595595597,
+        "elu": 0.015314513312105902,
+        "lagP99Ms": 12.476415,
+        "lagMaxMs": 13.574143
+      },
+      {
+        "at": 1791335327281,
+        "phase": "setup",
+        "cpuPercent": 2.9000000000000004,
+        "elu": 0.024754377130115687,
+        "lagP99Ms": 11.681791,
+        "lagMaxMs": 13.934591
+      },
+      {
+        "at": 1791335328280,
+        "phase": "setup",
+        "cpuPercent": 1.7946946946946947,
+        "elu": 0.014703013233903621,
+        "lagP99Ms": 11.984895,
+        "lagMaxMs": 13.352959
+      },
+      {
+        "at": 1791335329280,
+        "phase": "setup",
+        "cpuPercent": 2.0091,
+        "elu": 0.017147720835352376,
+        "lagP99Ms": 11.239423,
+        "lagMaxMs": 13.352959
+      },
+      {
+        "at": 1791335330281,
+        "phase": "setup",
+        "cpuPercent": 2.007092907092907,
+        "elu": 0.016356498842392108,
+        "lagP99Ms": 10.993663,
+        "lagMaxMs": 12.509183
+      },
+      {
+        "at": 1791335331281,
+        "phase": "setup",
+        "cpuPercent": 9.772300000000001,
+        "elu": 0.039246840055222186,
+        "lagP99Ms": 13.836287,
+        "lagMaxMs": 15.359999
+      },
+      {
+        "at": 1791335332282,
+        "phase": "setup",
+        "cpuPercent": 0.6828171828171828,
+        "elu": 0.004625299481710794,
+        "lagP99Ms": 10.559487,
+        "lagMaxMs": 11.517951
+      },
+      {
+        "at": 1791335333281,
+        "phase": "setup",
+        "cpuPercent": 0.4880880880880881,
+        "elu": 0.002832652693632566,
+        "lagP99Ms": 11.198463,
+        "lagMaxMs": 11.362303
+      },
+      {
+        "at": 1791335334282,
+        "phase": "setup",
+        "cpuPercent": 0.41938061938061943,
+        "elu": 0.0022397437979721027,
+        "lagP99Ms": 10.387455,
+        "lagMaxMs": 11.149311
+      },
+      {
+        "at": 1791335335282,
+        "phase": "setup",
+        "cpuPercent": 0.4026,
+        "elu": 0.0021757207046280303,
+        "lagP99Ms": 10.289151,
+        "lagMaxMs": 10.649599
+      },
+      {
+        "at": 1791335336282,
+        "phase": "setup",
+        "cpuPercent": 0.36,
+        "elu": 0.001932210025199349,
+        "lagP99Ms": 11.862015,
+        "lagMaxMs": 13.385727
+      },
+      {
+        "at": 1791335337282,
+        "phase": "setup",
+        "cpuPercent": 7.6269,
+        "elu": 0.06319627620510364,
+        "lagP99Ms": 11.042815,
+        "lagMaxMs": 15.532031
+      },
+      {
+        "at": 1791335338283,
+        "phase": "sse-idle",
+        "cpuPercent": 17.474425574425574,
+        "elu": 0.10436005471991071,
+        "lagP99Ms": 12.378111,
+        "lagMaxMs": 12.476415
+      },
+      {
+        "at": 1791335338998,
+        "phase": "teardown",
+        "cpuPercent": 0.7878321678321679,
+        "elu": 0.005999011710637768,
+        "lagP99Ms": 10.485759,
+        "lagMaxMs": 10.534911
+      }
+    ],
+    "judgeRuns": [],
+    "emissions": [
+      {
+        "seq": 1,
+        "endedAt": 1791335232590,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.028354999999919528,
+        "stages": null
+      },
+      {
+        "seq": 2,
+        "endedAt": 1791335233587,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0014929999997548293,
+        "stages": null
+      },
+      {
+        "seq": 3,
+        "endedAt": 1791335234588,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0011800000002040179,
+        "stages": null
+      },
+      {
+        "seq": 4,
+        "endedAt": 1791335235587,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0337760000002163,
+        "stages": null
+      },
+      {
+        "seq": 5,
+        "endedAt": 1791335236587,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.001029000000016822,
+        "stages": null
+      },
+      {
+        "seq": 6,
+        "endedAt": 1791335237587,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.000998999999865191,
+        "stages": null
+      },
+      {
+        "seq": 7,
+        "endedAt": 1791335238587,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0011589999994612299,
+        "stages": null
+      },
+      {
+        "seq": 8,
+        "endedAt": 1791335239588,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0021019999985583127,
+        "stages": null
+      },
+      {
+        "seq": 9,
+        "endedAt": 1791335240587,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002739000001383829,
+        "stages": null
+      },
+      {
+        "seq": 10,
+        "endedAt": 1791335241588,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0023890000011306256,
+        "stages": null
+      },
+      {
+        "seq": 11,
+        "endedAt": 1791335242588,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0006620000003749738,
+        "stages": null
+      },
+      {
+        "seq": 12,
+        "endedAt": 1791335243588,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0007530000002589077,
+        "stages": null
+      },
+      {
+        "seq": 13,
+        "endedAt": 1791335244589,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0006290000001172302,
+        "stages": null
+      },
+      {
+        "seq": 14,
+        "endedAt": 1791335245590,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0008390000002691522,
+        "stages": null
+      },
+      {
+        "seq": 15,
+        "endedAt": 1791335246590,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0007320000004256144,
+        "stages": null
+      },
+      {
+        "seq": 16,
+        "endedAt": 1791335247591,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0011029999986931216,
+        "stages": null
+      },
+      {
+        "seq": 17,
+        "endedAt": 1791335248592,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0007919999989098869,
+        "stages": null
+      },
+      {
+        "seq": 18,
+        "endedAt": 1791335249592,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0006809999977122061,
+        "stages": null
+      },
+      {
+        "seq": 19,
+        "endedAt": 1791335250593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0006930000017746352,
+        "stages": null
+      },
+      {
+        "seq": 20,
+        "endedAt": 1791335251593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0010640000000421423,
+        "stages": null
+      },
+      {
+        "seq": 21,
+        "endedAt": 1791335252593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0006400000020221341,
+        "stages": null
+      },
+      {
+        "seq": 22,
+        "endedAt": 1791335253593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0006390000016835984,
+        "stages": null
+      },
+      {
+        "seq": 23,
+        "endedAt": 1791335254593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.000818000000435859,
+        "stages": null
+      },
+      {
+        "seq": 24,
+        "endedAt": 1791335255593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0006859999994048849,
+        "stages": null
+      },
+      {
+        "seq": 25,
+        "endedAt": 1791335256593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0008110000017040875,
+        "stages": null
+      },
+      {
+        "seq": 26,
+        "endedAt": 1791335257593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0007809999988239724,
+        "stages": null
+      },
+      {
+        "seq": 27,
+        "endedAt": 1791335258593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0006810000013501849,
+        "stages": null
+      },
+      {
+        "seq": 28,
+        "endedAt": 1791335259593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0011799999992945231,
+        "stages": null
+      },
+      {
+        "seq": 29,
+        "endedAt": 1791335260592,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0007269999987329356,
+        "stages": null
+      },
+      {
+        "seq": 30,
+        "endedAt": 1791335261592,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0006140000004961621,
+        "stages": null
+      },
+      {
+        "seq": 31,
+        "endedAt": 1791335262593,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.000884999997651903,
+        "stages": null
+      },
+      {
+        "seq": 32,
+        "endedAt": 1791335263736,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0014440000013564713,
+        "stages": null
+      },
+      {
+        "seq": 33,
+        "endedAt": 1791335264640,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0020149999982095324,
+        "stages": null
+      },
+      {
+        "seq": 34,
+        "endedAt": 1791335265641,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0019130000000586733,
+        "stages": null
+      },
+      {
+        "seq": 35,
+        "endedAt": 1791335266642,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002533999999286607,
+        "stages": null
+      },
+      {
+        "seq": 36,
+        "endedAt": 1791335267646,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002850000004400499,
+        "stages": null
+      },
+      {
+        "seq": 37,
+        "endedAt": 1791335268647,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002070999995339662,
+        "stages": null
+      },
+      {
+        "seq": 38,
+        "endedAt": 1791335269646,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002073999996355269,
+        "stages": null
+      },
+      {
+        "seq": 39,
+        "endedAt": 1791335270646,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.000990000000456348,
+        "stages": null
+      },
+      {
+        "seq": 40,
+        "endedAt": 1791335271647,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.003385000003618188,
+        "stages": null
+      },
+      {
+        "seq": 41,
+        "endedAt": 1791335272650,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0026999999972758815,
+        "stages": null
+      },
+      {
+        "seq": 42,
+        "endedAt": 1791335273649,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0031909999961499125,
+        "stages": null
+      },
+      {
+        "seq": 43,
+        "endedAt": 1791335274648,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0012999999962630682,
+        "stages": null
+      },
+      {
+        "seq": 44,
+        "endedAt": 1791335275651,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.004241000002366491,
+        "stages": null
+      },
+      {
+        "seq": 45,
+        "endedAt": 1791335276650,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0019329999995534308,
+        "stages": null
+      },
+      {
+        "seq": 46,
+        "endedAt": 1791335277650,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002905999994254671,
+        "stages": null
+      },
+      {
+        "seq": 47,
+        "endedAt": 1791335278845,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0034890000024461187,
+        "stages": null
+      },
+      {
+        "seq": 48,
+        "endedAt": 1791335279739,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0038300000014714897,
+        "stages": null
+      },
+      {
+        "seq": 49,
+        "endedAt": 1791335280739,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0028800000000046566,
+        "stages": null
+      },
+      {
+        "seq": 50,
+        "endedAt": 1791335281738,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.001909999999043066,
+        "stages": null
+      },
+      {
+        "seq": 51,
+        "endedAt": 1791335282737,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.001600999996298924,
+        "stages": null
+      },
+      {
+        "seq": 52,
+        "endedAt": 1791335283738,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.004160999997111503,
+        "stages": null
+      },
+      {
+        "seq": 53,
+        "endedAt": 1791335284741,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002537000000302214,
+        "stages": null
+      },
+      {
+        "seq": 54,
+        "endedAt": 1791335285745,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.001207000001159031,
+        "stages": null
+      },
+      {
+        "seq": 55,
+        "endedAt": 1791335286746,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0010140000013052486,
+        "stages": null
+      },
+      {
+        "seq": 56,
+        "endedAt": 1791335287745,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0007870000044931658,
+        "stages": null
+      },
+      {
+        "seq": 57,
+        "endedAt": 1791335288745,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002945000000181608,
+        "stages": null
+      },
+      {
+        "seq": 58,
+        "endedAt": 1791335289745,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0031190000008791685,
+        "stages": null
+      },
+      {
+        "seq": 59,
+        "endedAt": 1791335290745,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0023629999996046536,
+        "stages": null
+      },
+      {
+        "seq": 60,
+        "endedAt": 1791335291745,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0026989999969373457,
+        "stages": null
+      },
+      {
+        "seq": 61,
+        "endedAt": 1791335292751,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0029070000018691644,
+        "stages": null
+      },
+      {
+        "seq": 62,
+        "endedAt": 1791335293746,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0012100000021746382,
+        "stages": null
+      },
+      {
+        "seq": 63,
+        "endedAt": 1791335294747,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0054359999994630925,
+        "stages": null
+      },
+      {
+        "seq": 64,
+        "endedAt": 1791335295749,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002812999999150634,
+        "stages": null
+      },
+      {
+        "seq": 65,
+        "endedAt": 1791335296750,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.003484999993816018,
+        "stages": null
+      },
+      {
+        "seq": 66,
+        "endedAt": 1791335297747,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0029230000072857365,
+        "stages": null
+      },
+      {
+        "seq": 67,
+        "endedAt": 1791335298747,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0024239999911515042,
+        "stages": null
+      },
+      {
+        "seq": 68,
+        "endedAt": 1791335299747,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0031230000022333115,
+        "stages": null
+      },
+      {
+        "seq": 69,
+        "endedAt": 1791335300753,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002439000003505498,
+        "stages": null
+      },
+      {
+        "seq": 70,
+        "endedAt": 1791335301755,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.010443999999552034,
+        "stages": null
+      },
+      {
+        "seq": 71,
+        "endedAt": 1791335302753,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0027479999989736825,
+        "stages": null
+      },
+      {
+        "seq": 72,
+        "endedAt": 1791335303756,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0061160000041127205,
+        "stages": null
+      },
+      {
+        "seq": 73,
+        "endedAt": 1791335304754,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0033590000093681738,
+        "stages": null
+      },
+      {
+        "seq": 74,
+        "endedAt": 1791335305755,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0028519999905256554,
+        "stages": null
+      },
+      {
+        "seq": 75,
+        "endedAt": 1791335306754,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0008529999904567376,
+        "stages": null
+      },
+      {
+        "seq": 76,
+        "endedAt": 1791335307756,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0010880000045290217,
+        "stages": null
+      },
+      {
+        "seq": 77,
+        "endedAt": 1791335308851,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002949000001535751,
+        "stages": null
+      },
+      {
+        "seq": 78,
+        "endedAt": 1791335309756,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0031100000051083043,
+        "stages": null
+      },
+      {
+        "seq": 79,
+        "endedAt": 1791335310758,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.008135999989463016,
+        "stages": null
+      },
+      {
+        "seq": 80,
+        "endedAt": 1791335311756,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0008689999958733097,
+        "stages": null
+      },
+      {
+        "seq": 81,
+        "endedAt": 1791335312757,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0014789999986533076,
+        "stages": null
+      },
+      {
+        "seq": 82,
+        "endedAt": 1791335313756,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0025080000050365925,
+        "stages": null
+      },
+      {
+        "seq": 83,
+        "endedAt": 1791335314761,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0017549999902257696,
+        "stages": null
+      },
+      {
+        "seq": 84,
+        "endedAt": 1791335315837,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002303999994182959,
+        "stages": null
+      },
+      {
+        "seq": 85,
+        "endedAt": 1791335316760,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0010000000038417056,
+        "stages": null
+      },
+      {
+        "seq": 86,
+        "endedAt": 1791335317762,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.005202000000281259,
+        "stages": null
+      },
+      {
+        "seq": 87,
+        "endedAt": 1791335318760,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0018189999973401427,
+        "stages": null
+      },
+      {
+        "seq": 88,
+        "endedAt": 1791335319761,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0032809999975143,
+        "stages": null
+      },
+      {
+        "seq": 89,
+        "endedAt": 1791335320838,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002187999998568557,
+        "stages": null
+      },
+      {
+        "seq": 90,
+        "endedAt": 1791335321838,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0025549999991199,
+        "stages": null
+      },
+      {
+        "seq": 91,
+        "endedAt": 1791335322837,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.003265000006649643,
+        "stages": null
+      },
+      {
+        "seq": 92,
+        "endedAt": 1791335323839,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0032060000085039064,
+        "stages": null
+      },
+      {
+        "seq": 93,
+        "endedAt": 1791335324840,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0036149999941699207,
+        "stages": null
+      },
+      {
+        "seq": 94,
+        "endedAt": 1791335325839,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002806000004056841,
+        "stages": null
+      },
+      {
+        "seq": 95,
+        "endedAt": 1791335326843,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.006456999995862134,
+        "stages": null
+      },
+      {
+        "seq": 96,
+        "endedAt": 1791335327843,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.00189200000022538,
+        "stages": null
+      },
+      {
+        "seq": 97,
+        "endedAt": 1791335328843,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0031339999986812472,
+        "stages": null
+      },
+      {
+        "seq": 98,
+        "endedAt": 1791335329843,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.003754999997909181,
+        "stages": null
+      },
+      {
+        "seq": 99,
+        "endedAt": 1791335330845,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.004269999990356155,
+        "stages": null
+      },
+      {
+        "seq": 100,
+        "endedAt": 1791335331844,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.00274100000387989,
+        "stages": null
+      },
+      {
+        "seq": 101,
+        "endedAt": 1791335332845,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.003388000011909753,
+        "stages": null
+      },
+      {
+        "seq": 102,
+        "endedAt": 1791335333845,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.003635999994003214,
+        "stages": null
+      },
+      {
+        "seq": 103,
+        "endedAt": 1791335334845,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0005939999973634258,
+        "stages": null
+      },
+      {
+        "seq": 104,
+        "endedAt": 1791335335848,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.002546999996411614,
+        "stages": null
+      },
+      {
+        "seq": 105,
+        "endedAt": 1791335336847,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0009750000026542693,
+        "stages": null
+      },
+      {
+        "seq": 106,
+        "endedAt": 1791335337854,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0007289999921340495,
+        "stages": null
+      },
+      {
+        "seq": 107,
+        "endedAt": 1791335338847,
+        "kind": "heartbeat",
+        "subscribers": 0,
+        "publishMs": 0.0007909999985713512,
+        "stages": null
+      }
+    ],
+    "connects": []
+  }
+}

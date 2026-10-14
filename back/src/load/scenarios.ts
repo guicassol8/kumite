@@ -2,11 +2,18 @@ import { availableParallelism, loadavg } from 'node:os'
 
 import { type BackSample, startBackSampler } from './back-sampler'
 import type { LoadConfig } from './config'
+import { type HarnessSample, startHarnessSampler } from './harness-sampler'
 import { createRecorder } from './recorder'
 import { buildReport, type LoadReport, type SettleReport, type WorldSummary } from './report'
 import { sleep } from './schedule'
 import { waitForConsistency, waitForDrain } from './settle'
-import { connectSse, type FetchLike, type SseConnection } from './sse-client'
+import {
+  connectSse,
+  createPayloadCache,
+  type FetchLike,
+  type PayloadCache,
+  type SseConnection,
+} from './sse-client'
 import { runSubmissions } from './submitter'
 import { createTransport, type Transport } from './transport'
 import {
@@ -53,6 +60,7 @@ async function rampSse({
   gapMs,
   connectTimeoutMs,
   recorder,
+  payloads,
   signal,
 }: {
   transport: Transport
@@ -61,6 +69,7 @@ async function rampSse({
   gapMs: number
   connectTimeoutMs: number
   recorder: ReturnType<typeof createRecorder>
+  payloads: PayloadCache
   signal?: AbortSignal
 }): Promise<SseConnection[]> {
   if (count === 0 || users.length === 0) return []
@@ -75,6 +84,7 @@ async function rampSse({
         fetch: transport.rawFetch,
         connectTimeoutMs,
         recorder,
+        payloads,
       }),
     )
     const nextAt = started + (i + 1) * gapMs
@@ -121,9 +131,15 @@ export async function runScenario({
   let samples: BackSample[] = []
   let settle: SettleReport | null = null
   let storm: Parameters<typeof buildReport>[0]['storm'] = null
+  // #442: one validation per distinct payload across every stream of the
+  // run, and the harness's own load sampled next to the back's.
+  const payloads = createPayloadCache()
+  let harnessSampler: ReturnType<typeof startHarnessSampler> | null = null
+  let harnessSamples: HarnessSample[] = []
 
   try {
     recorder.setPhase('rest')
+    harnessSampler = startHarnessSampler({ recorder, intervalMs: config.sampleIntervalMs })
     log(`run ${runId}: ${config.scenario} against ${config.url}`)
     organizerToken = await loginOrganizer(transport, recorder, {
       email: config.organizerEmail,
@@ -154,6 +170,7 @@ export async function runScenario({
         gapMs: 1000 / config.sseRamp,
         connectTimeoutMs: config.requestTimeoutMs,
         recorder,
+        payloads,
         signal,
       })
     }
@@ -204,6 +221,7 @@ export async function runScenario({
         gapMs: open > 0 ? (config.stormWindowSeconds * 1000) / open : 0,
         connectTimeoutMs: config.requestTimeoutMs,
         recorder,
+        payloads,
         signal,
       })
       const consistency = await waitForConsistency({
@@ -234,6 +252,7 @@ export async function runScenario({
       }
     }
     if (sampler) samples = await sampler.stop()
+    if (harnessSampler) harnessSamples = harnessSampler.stop()
     recorder.endPhases()
   }
 
@@ -256,6 +275,8 @@ export async function runScenario({
     settle,
     storm: storm ? { ...storm, connections: stormConnections.map((c) => c.report()) } : null,
     samples,
+    harnessSamples,
+    payloadCache: payloads.stats(),
   })
 }
 

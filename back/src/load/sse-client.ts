@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks'
 
-import { SseEventSchema } from '../modules/sse/sse.schema'
+import { type SseEvent, SseEventSchema } from '../modules/sse/sse.schema'
 
 import { rankingDigest } from './ranking-digest'
 import type { Recorder } from './recorder'
@@ -8,7 +8,81 @@ import { type ByteStats, createEventTally, createSseParser } from './sse-parser'
 
 // One `/sse` connection held open by the load harness (#136). fetch with the
 // Authorization header (the route reads no query token, so no EventSource),
-// every payload validated against the back's own `SseEventSchema`.
+// every payload validated against the back's own `SseEventSchema` — each
+// distinct payload once per run, through a shared cache (#442, below).
+
+// --- One validation per distinct payload (#442) ---
+//
+// Every open stream receives the same frames; since #439 the bytes are
+// identical on every connection. Validating each frame on all 400 connections
+// (JSON.parse, the zod union, and for a ranking two more zod parses, a
+// canonical JSON and a sha256) saturated the harness's single thread, and its
+// heartbeat gaps and poll gaps then measured the harness. The answer depends
+// only on the text, so a cache keyed by the `data:` text validates each
+// distinct payload once; every connection still counts its own invalid
+// payloads and keeps its own last ranking digest.
+
+export type PayloadClass =
+  | { ok: true; type: SseEvent['type']; rankingDigest: string | null; bytes: number }
+  | { ok: false }
+
+export type PayloadCache = {
+  classify: (data: string) => PayloadClass
+  // distinct: payloads validated; reused: answers served from the cache.
+  stats: () => { distinct: number; reused: number }
+}
+
+function validatePayload(data: string): PayloadClass {
+  let payload: unknown
+  try {
+    payload = JSON.parse(data)
+  } catch {
+    payload = undefined
+  }
+  const parsed = SseEventSchema.safeParse(payload)
+  if (!parsed.success) return { ok: false }
+  return {
+    ok: true,
+    type: parsed.data.type,
+    rankingDigest: parsed.data.type === 'ranking.updated' ? rankingDigest(parsed.data) : null,
+    bytes: Buffer.byteLength(data),
+  }
+}
+
+/**
+ * The answers for the last `maxEntries` distinct payloads, the least recently
+ * used dropped first (64 rankings of 130 KB: about 8 MB of keys).
+ */
+export function createPayloadCache({
+  maxEntries = 64,
+}: {
+  maxEntries?: number
+} = {}): PayloadCache {
+  const entries = new Map<string, PayloadClass>()
+  let distinct = 0
+  let reused = 0
+  return {
+    classify(data) {
+      const hit = entries.get(data)
+      if (hit) {
+        reused += 1
+        // Refreshed: a Map iterates in insertion order, oldest first.
+        entries.delete(data)
+        entries.set(data, hit)
+        return hit
+      }
+      distinct += 1
+      const answer = validatePayload(data)
+      entries.set(data, answer)
+      if (entries.size > maxEntries) {
+        const oldest = entries.keys().next()
+        if (!oldest.done) entries.delete(oldest.value)
+      }
+      return answer
+    },
+    stats: () => ({ distinct, reused }),
+  }
+}
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -82,6 +156,7 @@ export async function connectSse({
   connectTimeoutMs,
   recorder,
   now = () => performance.now(),
+  payloads = createPayloadCache(),
 }: {
   url: string
   token: string
@@ -89,6 +164,8 @@ export async function connectSse({
   connectTimeoutMs: number
   recorder?: Pick<Recorder, 'recordHttp'>
   now?: () => number
+  // Shared by every connection of a run (#442); one of its own otherwise.
+  payloads?: PayloadCache
 }): Promise<SseConnection> {
   const tally = createEventTally()
   const started = now()
@@ -177,25 +254,17 @@ export async function connectSse({
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   const parser = createSseParser((frame) => {
-    let payload: unknown
-    try {
-      payload = JSON.parse(frame.data)
-    } catch {
-      payload = undefined
-    }
-    const parsed = SseEventSchema.safeParse(payload)
-    if (!parsed.success) {
+    const payload = payloads.classify(frame.data)
+    if (!payload.ok) {
       report.invalidPayloads += 1
       if (report.invalidSamples.length < MAX_INVALID_SAMPLES) {
         report.invalidSamples.push(frame.data.slice(0, 200))
       }
       return
     }
-    lastType = parsed.data.type
-    if (parsed.data.type === 'ranking.updated') {
-      report.lastRankingDigest = rankingDigest(parsed.data)
-    }
-    tally.record(parsed.data.type, now(), Buffer.byteLength(frame.data))
+    lastType = payload.type
+    if (payload.rankingDigest !== null) report.lastRankingDigest = payload.rankingDigest
+    tally.record(payload.type, now(), payload.bytes)
   })
 
   const ended = (async () => {

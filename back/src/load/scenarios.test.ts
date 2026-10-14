@@ -100,6 +100,12 @@ describe('runScenario', { timeout: 120_000 }, () => {
     expect(report.timeline.samples.length).toBeGreaterThan(0)
     expect(report.timeline.windows.length).toBeGreaterThan(0)
     expect(report.phases.find((phase) => phase.phase === 'load')?.rssMaxBytes).toBeGreaterThan(0)
+    // #442: the harness's own process, one row per phase that ran.
+    expect(report.harness.map((phase) => phase.phase)).toEqual(
+      report.phases.map((phase) => phase.phase),
+    )
+    expect(report.timeline.harness.length).toBeGreaterThan(0)
+    expect(report.payloadCache?.distinct).toBeGreaterThan(0)
   })
 
   it('runs a mini burst: every kind coherent, the judge drained, one ranking before and after the storm', async () => {
@@ -169,6 +175,10 @@ describe('runScenario', { timeout: 120_000 }, () => {
       consistency: { compared: 2, distinctDigests: 1, matchesApi: true },
     })
     expect(report.storm?.consistency.apiDigest).toBe(report.settle?.consistency.apiDigest)
+    // #442: the streams share one cache, so a frame both of them received
+    // was validated once — and the checks above still hold.
+    expect(report.payloadCache?.reused).toBeGreaterThan(0)
+    expect(report.sse.invalidPayloads).toBe(0)
     expect(report.judge?.byOutcome).toEqual({ passed: 2, timeout: 1, runtime_error: 1 })
     expect(report.judge?.workers?.alive).toBe(report.judge?.workers?.idle)
     expect(report.sse.closedByHarness).toBe(2)

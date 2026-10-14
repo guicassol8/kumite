@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { BlocklyWorkspaceHandle } from '@/components/blockly/blockly-workspace'
 import { applyBlocklyLocale, registerVariablesFlyout } from '@/lib/blockly-setup'
+import type { VariableDialogRequest } from '@/lib/blockly-variable-field'
 
 function toBlockLocale(language: string): BlockLocale {
   return language === 'es' || language === 'en' ? language : 'pt'
@@ -23,13 +24,14 @@ function toBlockLocale(language: string): BlockLocale {
  * for why: React StrictMode's dev-only double-mount can otherwise leave the
  * registration on an instance Blockly has already disposed).
  *
- * `onCreateVariable` is what the flyout's "create variable" button calls
- * (#205). It is read through a ref, so both registrations — on ready and on
- * a language switch — always reach the latest one.
+ * `onVariableDialog` is what the flyout's "create variable" button (#205) and
+ * a variable dropdown's "rename" and "delete" (#335) call. It is read through
+ * a ref, so both registrations — on ready and on a language switch — always
+ * reach the latest one.
  */
 export function useBlocklyLocale(
   workspaceRef: RefObject<BlocklyWorkspaceHandle | null>,
-  onCreateVariable: (target: Blockly.WorkspaceSvg) => void,
+  onVariableDialog: (request: VariableDialogRequest) => void,
 ): {
   toolbox: Blockly.utils.toolbox.ToolboxDefinition
   onReady: (workspace: Blockly.WorkspaceSvg) => void
@@ -40,18 +42,18 @@ export function useBlocklyLocale(
   const appliedLocaleRef = useRef(locale)
   const localeRef = useRef(locale)
   localeRef.current = locale
-  const onCreateVariableRef = useRef(onCreateVariable)
-  onCreateVariableRef.current = onCreateVariable
+  const onVariableDialogRef = useRef(onVariableDialog)
+  onVariableDialogRef.current = onVariableDialog
 
-  const createVariable = useCallback((target: Blockly.WorkspaceSvg) => {
-    onCreateVariableRef.current(target)
+  const variableDialog = useCallback((request: VariableDialogRequest) => {
+    onVariableDialogRef.current(request)
   }, [])
 
   const onReady = useCallback(
     (workspace: Blockly.WorkspaceSvg) => {
-      registerVariablesFlyout(workspace, localeRef.current, createVariable)
+      registerVariablesFlyout(workspace, localeRef.current, variableDialog)
     },
-    [createVariable],
+    [variableDialog],
   )
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export function useBlocklyLocale(
     const handle = workspaceRef.current
     if (!handle) return
     const workspace = handle.getWorkspace()
-    if (workspace) registerVariablesFlyout(workspace, locale, createVariable)
+    if (workspace) registerVariablesFlyout(workspace, locale, variableDialog)
 
     const state = handle.serialize()
     Blockly.Events.disable()
@@ -73,7 +75,7 @@ export function useBlocklyLocale(
     } finally {
       Blockly.Events.enable()
     }
-  }, [locale, workspaceRef, createVariable])
+  }, [locale, workspaceRef, variableDialog])
 
   return { toolbox, onReady }
 }

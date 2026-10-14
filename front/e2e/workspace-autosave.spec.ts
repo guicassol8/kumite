@@ -60,12 +60,28 @@ test.describe('the workspace auto-save (#6)', () => {
     await expect(host.locator('g.blocklyDraggable:visible').first()).toBeVisible()
     await page.screenshot({ path: evidence('02-restored-on-reopen') })
 
-    // 03 — confirming "Limpar blocos" resets the workspace to just the root
-    // block (it isn't offered by the toolbox, so losing it would strand the
-    // user) and removes the saved state, so it stays that way after a reload.
-    page.once('dialog', (dialog) => dialog.accept())
+    // 03 — "Limpar blocos" asks in the app's own dialog (#283), not the
+    // browser's: cancelling it leaves every block where it was.
+    const blocks = host.locator('g.blocklyDraggable:visible')
+    const before = await blocks.count()
+    expect(before).toBeGreaterThan(1)
+    const clearDialog = page.getByTestId('problem-clear-dialog')
     await page.getByTestId('problem-clear-button').click()
+    await expect(clearDialog).toBeVisible()
+    await page.screenshot({ path: 'e2e/evidence/283/01-dialogo-limpar.png' })
+    await page.getByTestId('problem-clear-cancel').click()
+    await expect(clearDialog).toBeHidden()
+    await expect(blocks).toHaveCount(before)
+    await page.screenshot({ path: 'e2e/evidence/283/02-cancelado-blocos-intactos.png' })
+
+    // Confirming resets the workspace to just the root block (it isn't
+    // offered by the toolbox, so losing it would strand the user) and removes
+    // the saved state, so it stays that way after a reload.
+    await page.getByTestId('problem-clear-button').click()
+    await page.getByTestId('problem-clear-confirm').click()
+    await expect(clearDialog).toBeHidden()
     await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)
+    await page.screenshot({ path: 'e2e/evidence/283/03-confirmado-so-a-raiz.png' })
     await page.reload()
     await expectBlocklyInjected(page)
     await expect(host.locator('g.blocklyDraggable:visible')).toHaveCount(1)

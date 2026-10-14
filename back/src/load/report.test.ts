@@ -7,6 +7,7 @@ import type { JudgeRun } from '../modules/judge/judge.schema'
 import type { BackSample } from './back-sampler'
 import { PRESETS } from './config'
 import { emptyTimings } from './fixtures'
+import type { HarnessSample } from './harness-sampler'
 import { createRecorder, type RecorderSnapshot } from './recorder'
 
 import {
@@ -15,6 +16,7 @@ import {
   firstWaveCurve,
   type ReportInput,
   renderMarkdown,
+  summarizeHarness,
   summarizePhases,
   summarizeSse,
   writeReport,
@@ -607,5 +609,112 @@ describe('buildReport judge and SSE cost sections', () => {
     ]) {
       expect(markdown).toContain(section)
     }
+  })
+})
+
+describe('summarizeHarness (#442)', () => {
+  const harness = (
+    at: number,
+    phase: HarnessSample['phase'],
+    elu: number,
+    lagMaxMs: number,
+  ): HarnessSample => ({
+    at,
+    phase,
+    cpuPercent: elu * 100,
+    elu,
+    lagP99Ms: lagMaxMs / 2,
+    lagMaxMs,
+  })
+  const poll = (at: number): BackSample => ({ at, phase: 'rest', process: null, live: null })
+  const spans = [
+    { phase: 'rest' as const, startedAt: 0, endedAt: 1_999 },
+    { phase: 'setup' as const, startedAt: 2_000, endedAt: 3_999 },
+    { phase: 'load' as const, startedAt: 4_000, endedAt: 9_999 },
+  ]
+
+  it('cuts the harness samples by phase and flags saturation by ELU or by a stall', () => {
+    const samples = [
+      harness(1_000, 'rest', 0.5, 200),
+      harness(1_900, 'rest', 0.5, 200),
+      // setup: a mean ELU of 0.92, no stall.
+      harness(3_000, 'setup', 0.9, 10),
+      harness(3_500, 'setup', 0.94, 10),
+      // load: a low mean, but one 1000 ms stall.
+      harness(5_000, 'load', 0.3, 1_000),
+      harness(6_000, 'load', 0.4, 50),
+    ]
+    const [rest, setup, load] = summarizeHarness(spans, samples, [])
+
+    expect(rest).toMatchObject({
+      phase: 'rest',
+      cpuPercent: { mean: 50, max: 50 },
+      elu: { mean: 0.5, max: 0.5 },
+      lag: { p99OfWindowP99Ms: 100, maxMs: 200 },
+      samples: 2,
+      saturated: false,
+    })
+    expect(setup?.elu.mean).toBeCloseTo(0.92)
+    expect(setup?.saturated).toBe(true)
+    expect(load).toMatchObject({ lag: { maxMs: 1_000 }, saturated: true })
+  })
+
+  it('reads the largest gap between two answers of the back sampler in each phase', () => {
+    const polls = [poll(0), poll(1_000), poll(2_000), poll(2_500), poll(7_500), poll(8_500)]
+    const [rest, setup, load] = summarizeHarness(spans, [], polls)
+
+    expect(rest?.maxPollGapMs).toBe(1_000)
+    expect(setup?.maxPollGapMs).toBe(1_000)
+    expect(load?.maxPollGapMs).toBe(5_000)
+    expect(load?.samples).toBe(0)
+    expect(load?.saturated).toBe(false)
+  })
+
+  it('is saturated from a mean ELU of exactly 0.9 or a stall of exactly 1000 ms, not below', () => {
+    const samples = [
+      harness(1_000, 'rest', 0.9, 10),
+      harness(3_000, 'setup', 0.89, 999),
+      harness(5_000, 'load', 0.1, 1_000),
+    ]
+    const [rest, setup, load] = summarizeHarness(spans, samples, [])
+    expect(rest?.saturated).toBe(true)
+    expect(setup?.saturated).toBe(false)
+    expect(load?.saturated).toBe(true)
+  })
+})
+
+describe('buildReport harness section (#442)', () => {
+  const saturatedLoad: HarnessSample[] = [
+    { at: 1_000, phase: 'load', cpuPercent: 99, elu: 0.97, lagP99Ms: 600, lagMaxMs: 1_400 },
+    { at: 2_000, phase: 'load', cpuPercent: 101, elu: 0.99, lagP99Ms: 800, lagMaxMs: 2_100 },
+  ]
+
+  it('warns about a saturated phase without failing the run, and renders the table and the cache', () => {
+    const report = buildReport(
+      input({ harnessSamples: saturatedLoad, payloadCache: { distinct: 12, reused: 4_788 } }),
+    )
+    const markdown = renderMarkdown(report)
+
+    expect(report.status).toBe('PASS')
+    expect(report.failures).toEqual([])
+    expect(report.warnings).toEqual([
+      'harness saturated in load (ELU mean 0.98, lag max 2100 ms): heartbeat gaps, poll gaps and latencies of this phase measure the harness, not the back',
+    ])
+    expect(report.harness.find((phase) => phase.phase === 'load')?.saturated).toBe(true)
+    expect(report.payloadCache).toEqual({ distinct: 12, reused: 4_788 })
+    expect(report.timeline.harness).toEqual(saturatedLoad)
+    expect(markdown.indexOf('## Phases (harness process)')).toBeGreaterThan(
+      markdown.indexOf('## Phases (back process)'),
+    )
+    expect(markdown).toContain('| load | 100 | 101 | 0.980 | 0.990 | 800 | 2100 | — | 2 | yes |')
+    expect(markdown).toContain('| payloads validated (distinct / reused) | 12 / 4788 |')
+  })
+
+  it('has no warning and no cache figures without harness samples nor a cache', () => {
+    const report = buildReport(input())
+    expect(report.warnings).toEqual([])
+    expect(report.payloadCache).toBeNull()
+    expect(report.timeline.harness).toEqual([])
+    expect(renderMarkdown(report)).toContain('| payloads validated (distinct / reused) | — |')
   })
 })

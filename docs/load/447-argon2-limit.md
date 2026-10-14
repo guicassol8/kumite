@@ -158,7 +158,11 @@ thread free it stays at the event-loop floor.
   `ea8f503` (the unit test and the unused wrapper; the services still
   called `argon2` directly) plus the uncommitted probe. "after" ran at
   `fe0ed59`, the change complete. The harness ran from the same tree, so
-  each report's `commit` is the back's.
+  each report's `commit` is the back's. Both were on top of develop's
+  `9232995`. After the measurements the branch was rebased onto develop's
+  `e46a7d1` (#443, the judge's worker pool and the harness's judge
+  section; nothing on the auth path, and these runs send no submission),
+  so the same code is now `5b5c9e1` and `8931c32`.
 - **Each cycle** followed #436's protocol. The database was reset (`pnpm
   worktree:env --reset`), the back booted, the harness ran, and the back
   stopped. The whole cycle held `flock /tmp/kumite-load.lock` and the

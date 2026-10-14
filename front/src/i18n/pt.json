@@ -440,6 +440,7 @@
       },
       "noName": "—",
       "unnamedTeam": "Time sem nome · {{id}}",
+      "noMembers": "Este time não tem integrantes.",
       "rename": {
         "editAction": "Renomear",
         "save": "Salvar",

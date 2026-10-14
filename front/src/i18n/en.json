@@ -440,6 +440,7 @@
       },
       "noName": "—",
       "unnamedTeam": "Unnamed team · {{id}}",
+      "noMembers": "This team has no members.",
       "rename": {
         "editAction": "Rename",
         "save": "Save",

@@ -12,6 +12,12 @@ import * as en from 'blockly/msg/en'
 import * as es from 'blockly/msg/es'
 import * as ptBr from 'blockly/msg/pt-br'
 
+import {
+  installVariableField,
+  setVariableDialogHandler,
+  type VariableDialogHandler,
+} from '@/lib/blockly-variable-field'
+
 /**
  * Single entry point for the editor's Blockly configuration.
  *
@@ -29,6 +35,47 @@ const BLOCKLY_MESSAGE_PACKS: Record<BlockLocale, Record<string, string>> = {
   es: es as unknown as Record<string, string>,
   en: en as unknown as Record<string, string>,
 }
+
+const BLOCK_DISABLE_ITEM_ID = 'blockDisable'
+let noManualDisableInstalled = false
+
+/**
+ * Hides Blockly's "Disable block" from the block context menu (#239). A
+ * disabled block in the solution is refused by `generateSolution` with
+ * `disabled-block` (#181) — that refusal is the trust boundary and stays —
+ * so offering the action only leads the participant into a state that exists
+ * to be rejected.
+ *
+ * `options.disable: false` would hide the item too, but it also takes away
+ * "Enable block", leaving a block disabled before this change (an old
+ * autosave, a forged workspace) with no way back, while the `disabled-block`
+ * message tells the participant to re-enable it. So the item stays registered
+ * and only its precondition changes: hidden on any block that is not already
+ * manually disabled, Blockly's own rule otherwise.
+ *
+ * Global to the registry, so once per page; it runs at module load.
+ */
+export function installNoManualDisable(): void {
+  if (noManualDisableInstalled) return
+  const registry = Blockly.ContextMenuRegistry.registry
+  const original = registry.getItem(BLOCK_DISABLE_ITEM_ID)
+  if (!original || !('preconditionFn' in original) || !original.preconditionFn) return
+  const originalPrecondition = original.preconditionFn
+  noManualDisableInstalled = true
+
+  registry.unregister(BLOCK_DISABLE_ITEM_ID)
+  registry.register({
+    ...original,
+    preconditionFn(scope, menuOpenEvent) {
+      if (!scope.block?.hasDisabledReason(Blockly.constants.MANUALLY_DISABLED)) return 'hidden'
+      return originalPrecondition(scope, menuOpenEvent)
+    },
+  })
+}
+
+installNoManualDisable()
+// Variable dropdowns hand "rename" and "delete" to the app's dialogs (#335).
+installVariableField()
 
 /**
  * Applies a locale to both the native Blockly blocks and the kumite blocks,
@@ -56,21 +103,25 @@ export const workspaceOptions: Partial<Blockly.BlocklyOptions> = {
  * the toolbox definition, so this runs once per injected workspace (and again
  * whenever the locale changes, to relabel the flyout).
  *
- * The button opens the app's own dialog through `onCreateVariable` instead of
+ * The button opens the app's own dialog through `onVariableDialog` instead of
  * `Blockly.Variables.createVariableButtonHandler` (#205): Blockly's prompt
- * cannot refuse an empty or duplicate name inside itself.
+ * cannot refuse an empty or duplicate name inside itself. The variable
+ * dropdowns' "rename" and "delete" reach the same callback, through the
+ * handler registered here on the workspace (#335, `blockly-variable-field`).
  */
 export function registerVariablesFlyout(
   workspace: Blockly.WorkspaceSvg | null | undefined,
   locale: BlockLocale,
-  onCreateVariable: (target: Blockly.WorkspaceSvg) => void,
+  onVariableDialog: VariableDialogHandler,
 ): void {
   if (!workspace) return
+
+  setVariableDialogHandler(workspace, onVariableDialog)
 
   workspace.registerToolboxCategoryCallback(VARIABLES_CATEGORY_KEY, (target) =>
     variablesFlyout(target, locale),
   )
   workspace.registerButtonCallback(CREATE_VARIABLE_BUTTON_KEY, (button) => {
-    onCreateVariable(button.getTargetWorkspace())
+    onVariableDialog({ kind: 'create', workspace: button.getTargetWorkspace() })
   })
 }

@@ -1,0 +1,170 @@
+# Load report: baseline `muxfcy6p`
+
+**PASS**
+
+## Run
+
+| field | value |
+| --- | --- |
+| target | http://localhost:3443 |
+| started | 2026-10-07T01:24:22.421Z |
+| ended | 2026-10-07T01:26:04.888Z |
+| node | v24.21.0 |
+| commit | 685bfa8 |
+| harness loadavg (1/5/15 min) at start | 1.85 / 3.00 / 2.84 |
+| harness loadavg (1/5/15 min) at end | 2.75 / 3.18 / 2.93 |
+| harness available parallelism | 12 |
+
+## Config
+
+| option | value |
+| --- | --- |
+| scenario | baseline |
+| url | http://localhost:3443 |
+| teams | 100 |
+| members | 3 |
+| sse | 0 |
+| submissions | 0 |
+| badFraction | 0 |
+| memoryShare | 0 |
+| problems | 1 |
+| untilDone | false |
+| storm | false |
+| stormWindowSeconds | 0 |
+| pastRounds | 0 |
+| resendStale | false |
+| restSeconds | 30 |
+| durationSeconds | 1 |
+| setupConcurrency | 16 |
+| sseRamp | 50 |
+| sampleIntervalMs | 1000 |
+| requestTimeoutMs | 60000 |
+| cooldownMs | 5000 |
+| out | /tmp/claude-1000/-home-guilherme-code-kumite/3210b158-b9d5-45cb-a9bc-211e0876da65/scratchpad/runs/436/N16b-3/raw |
+| allowRemote | false |
+| organizerEmail | organizer@edu.pucrs.br |
+
+## World
+
+| field | value |
+| --- | --- |
+| teams | 100 |
+| participants | 300 |
+| members per team | 3 (maxTeamSize 3) |
+| already in the database before setup | 0 participant(s), 0 team(s) |
+| round | — |
+| problem | — |
+| problems in the round | 0 |
+| past rounds | — |
+| leftover rounds closed | — |
+
+## Phases (back process)
+
+| phase | duration s | CPU % mean | CPU % max | RSS max MiB | heap max MiB | lag p99 ms | lag max ms | ELU mean | judge waiting max | SSE (server) max | samples |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| rest | 30.1 | 0.8 | 1.5 | 279.5 | 66.4 | 1.9 | 1.9 | 0.006 | 0 | 0 | 30 |
+| setup | 71.4 | 134.4 | 147.0 | 488.1 | 100.9 | 92.3 | 92.3 | 0.078 | 0 | 0 | 40 |
+| sse-ramp | 0 | — | — | — | — | — | — | — | — | — | 0 |
+| sse-idle | 1.0 | 59.4 | 59.4 | 282.0 | 75.6 | 9.0 | 9.0 | 0.640 | 0 | 0 | 1 |
+| teardown | 0.0 | 0.7 | 0.7 | 282.0 | 76.2 | — | — | — | 0 | 0 | 1 |
+
+CPU % is of one core (the judge threads count, so it can pass 100). Lag p99 is the 99th percentile of the per-second windows’ p99.
+
+## Phases (harness process)
+
+| phase | CPU % mean | CPU % max | ELU mean | ELU max | lag p99 ms | lag max ms | largest poll gap ms | samples | saturated |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| rest | 0.7 | 8.9 | 0.003 | 0.024 | 10.8 | 11.4 | 1006 | 30 | — |
+| setup | 2.2 | 6.9 | 0.016 | 0.049 | 17.0 | 19.1 | 2495 | 71 | — |
+| sse-ramp | — | — | — | — | — | — | — | 0 | — |
+| sse-idle | 12.2 | 12.2 | 0.106 | 0.106 | 11.0 | 11.1 | 1003 | 1 | — |
+| teardown | 0.6 | 0.6 | 0.004 | 0.004 | 10.2 | 10.2 | 456 | 1 | — |
+
+The load harness’s own process: CPU % of one core, event-loop utilization and delay per sample window. Largest poll gap: the longest time between two answers of the back sampler (one poll per `--sample-interval` when the harness keeps up). A phase is saturated at a mean ELU ≥ 0.9 or a lag ≥ 1000 ms (the heartbeat’s period): its heartbeat gaps, poll gaps and latencies measure the harness, not the back. A warning, never a failure.
+
+## HTTP by route
+
+### rest
+
+| route | count | statuses | p50 ms | p95 ms | p99 ms | max ms | network errors |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `GET /organizer/stats/live` | 30 | 200×30 | 3.3 | 5.3 | 15.2 | 15.2 | 0 |
+| `GET /organizer/stats/process` | 30 | 200×30 | 3.1 | 5.0 | 8.2 | 8.2 | 0 |
+| `POST /auth/login` | 1 | 200×1 | 81.0 | 81.0 | 81.0 | 81.0 | 0 |
+
+### setup
+
+| route | count | statuses | p50 ms | p95 ms | p99 ms | max ms | network errors |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `GET /organizer/event-codes` | 1 | 200×1 | 3.8 | 3.8 | 3.8 | 3.8 | 0 |
+| `GET /organizer/event-config` | 1 | 200×1 | 3.9 | 3.9 | 3.9 | 3.9 | 0 |
+| `GET /organizer/stats` | 1 | 200×1 | 26.5 | 26.5 | 26.5 | 26.5 | 0 |
+| `GET /organizer/stats/live` | 40 | 200×40 | 716.5 | 1409.7 | 1494.0 | 1494.0 | 0 |
+| `GET /organizer/stats/process` | 40 | 200×40 | 717.2 | 1406.6 | 1492.2 | 1492.2 | 0 |
+| `POST /auth/login` | 300 | 200×300 | 1990.3 | 2593.6 | 2908.8 | 3020.2 | 0 |
+| `POST /auth/signup` | 300 | 201×300 | 1799.2 | 2411.1 | 2587.9 | 2696.6 | 0 |
+| `POST /teams` | 100 | 201×100 | 26.3 | 37.2 | 39.5 | 39.8 | 0 |
+| `POST /teams/:id/join` | 200 | 200×200 | 36.4 | 53.7 | 61.0 | 62.6 | 0 |
+
+### sse-idle
+
+| route | count | statuses | p50 ms | p95 ms | p99 ms | max ms | network errors |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `GET /organizer/stats/live` | 1 | 200×1 | 2.5 | 2.5 | 2.5 | 2.5 | 0 |
+| `GET /organizer/stats/process` | 1 | 200×1 | 2.5 | 2.5 | 2.5 | 2.5 | 0 |
+
+### teardown
+
+| route | count | statuses | p50 ms | p95 ms | p99 ms | max ms | network errors |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `GET /organizer/stats/live` | 1 | 200×1 | 2.6 | 2.6 | 2.6 | 2.6 | 0 |
+| `GET /organizer/stats/process` | 1 | 200×1 | 2.5 | 2.5 | 2.5 | 2.5 | 0 |
+
+Latency is until the end of the body; for `GET /sse`, until the headers.
+
+## Retries
+
+None.
+
+A submission is sent again once, and only once, when the back closed a reused keep-alive socket before any byte of a response. Each retry is also a network error in the table above.
+
+## Verdicts
+
+No submissions.
+
+## Actions
+
+| action | started | completed |
+| --- | --- | --- |
+| signup | 300 | 300 |
+| login | 300 | 300 |
+| create-team | 100 | 100 |
+| join-team | 200 | 200 |
+
+## SSE
+
+| field | value |
+| --- | --- |
+| requested | 0 |
+| opened | 0 |
+| failed to open | 0 |
+| dropped | 0 |
+| closed by the harness | 0 |
+| invalid payloads | 0 |
+| payloads validated (distinct / reused) | 0 / 0 |
+| largest heartbeat gap per connection ms (p50 / p95 / p99 / max) | — / — / — / — |
+| heartbeat interval ms (p50 / p95 / p99 / max) | — / — / — / — |
+
+| event | per connection min | mean | max |
+| --- | --- | --- | --- |
+
+### Emissions (back)
+
+| phase | kind | count | subscribers max | publish ms p50 / p95 / max | open round ms p50 / p95 / max | round ranking ms p50 / p95 / max | event ranking ms p50 / p95 / max |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| rest | heartbeat | 30 | 0 | 0.00 / 0.00 / 0.04 | — / — / — | — / — / — | — / — / — |
+| setup | heartbeat | 71 | 0 | 0.00 / 0.00 / 0.01 | — / — / — | — / — / — | — / — / — |
+| sse-idle | heartbeat | 1 | 0 | 0.00 / 0.00 / 0.00 | — / — / — | — / — / — | — / — / — |
+
+publish: the synchronous `bus.publish` — one `JSON.stringify` per subscriber and the write queued, not the socket write.
+

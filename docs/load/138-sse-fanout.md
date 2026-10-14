@@ -120,6 +120,11 @@ which the back is closing in the same batch. That is what happened to 2 of
   - Caddy's upstream idle timeout is about 2 min, far above the back's 5 s;
   - Go's `http.Transport` does not resend a non-idempotent POST that fails on
     a reused connection.
+
+  **Verified since (#438):** both hold in the source of the versions on the
+  VPS, Caddy v2.11.4 (built with Go 1.25.1). The files and lines are in
+  `back/src/lib/http-server.ts`, and the rerun of R8 and R9 with the fix is
+  [`438-keepalive.md`](438-keepalive.md).
 - **So the same race would most likely become a 502 on submit** for a
   participant, in the final rush of a round.
 - **The harness without a resend models Caddy.** undici behaves the same way

@@ -132,6 +132,18 @@
         "empty": "Dê um nome à variável.",
         "duplicate": "Já existe uma variável chamada \"{{name}}\"."
       }
+    },
+    "renameVariable": {
+      "title": "Renomear a variável \"{{name}}\"",
+      "label": "Novo nome",
+      "confirm": "Renomear",
+      "cancel": "Cancelar"
+    },
+    "deleteVariable": {
+      "title": "Excluir a variável \"{{name}}\"?",
+      "description": "{{uses}} blocos usam essa variável e vão ser apagados junto.",
+      "confirm": "Excluir",
+      "cancel": "Cancelar"
     }
   },
   "organizer": {
@@ -850,7 +862,12 @@
     "submitButton": "Submeter",
     "submitProgress": "Enviando...",
     "clearButton": "Limpar blocos",
-    "clearConfirm": "Isso vai apagar todos os blocos deste problema. Continuar?",
+    "clearDialog": {
+      "title": "Limpar os blocos?",
+      "description": "Isso vai apagar todos os blocos deste problema.",
+      "confirm": "Limpar",
+      "cancel": "Cancelar"
+    },
     "executeRunning": "Executando...",
     "submitError": {
       "cooldown": "Aguarde antes de submeter de novo.",

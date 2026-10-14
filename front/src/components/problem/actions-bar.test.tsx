@@ -146,16 +146,39 @@ describe('ActionsBar', () => {
     expect(screen.getByTestId('problem-clear-button')).toBeDefined()
   })
 
-  it('still asks before clearing the blocks', () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  // #283: the app's own AlertDialog, never the browser's `window.confirm`.
+  it('asks in an app dialog before clearing the blocks, and never through window.confirm', () => {
+    const confirm = vi.spyOn(window, 'confirm')
     const { onClear } = renderBar()
 
     fireEvent.click(screen.getByTestId('problem-clear-button'))
-    expect(confirm).toHaveBeenCalled()
-    expect(onClear).not.toHaveBeenCalled()
 
-    confirm.mockReturnValue(true)
+    const dialog = screen.getByTestId('problem-clear-dialog')
+    expect(dialog.textContent).toContain('Limpar os blocos?')
+    expect(dialog.textContent).toContain('Isso vai apagar todos os blocos deste problema.')
+    expect(onClear).not.toHaveBeenCalled()
+    expect(confirm).not.toHaveBeenCalled()
+  })
+
+  it('leaves the blocks alone when the dialog is cancelled', () => {
+    const { onClear } = renderBar()
+
     fireEvent.click(screen.getByTestId('problem-clear-button'))
+    fireEvent.click(screen.getByTestId('problem-clear-cancel'))
+
+    expect(screen.queryByTestId('problem-clear-dialog')).toBeNull()
+    expect(onClear).not.toHaveBeenCalled()
+  })
+
+  it('clears the blocks once the dialog is confirmed', () => {
+    const confirm = vi.spyOn(window, 'confirm')
+    const { onClear } = renderBar()
+
+    fireEvent.click(screen.getByTestId('problem-clear-button'))
+    fireEvent.click(screen.getByTestId('problem-clear-confirm'))
+
     expect(onClear).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('problem-clear-dialog')).toBeNull()
+    expect(confirm).not.toHaveBeenCalled()
   })
 })

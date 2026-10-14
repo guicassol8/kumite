@@ -11,7 +11,8 @@ organizer.
 It lives in `back/src/load/` rather than in a package of its own, so it
 shares the back's `tsc`, vitest and `tsx`. It reaches the API through the
 typed client (`hc<AppType>`, type-only) and validates SSE payloads with the
-back's own `SseEventSchema`. It is not a kata module.
+back's own `SseEventSchema`, each distinct payload once per run (#442). It
+is not a kata module.
 
 ## Scenarios
 
@@ -36,7 +37,7 @@ pnpm load --help
 | `--past-rounds` (closed rounds before the run's) | 0 | 0 | 0 |
 | `--until-done` / `--no-until-done` | off | off | on |
 | `--storm` / `--no-storm` · `--storm-window` s | off · 0 | off · 0 | on · 0 |
-| `--resend-stale` / `--no-resend-stale` (masks the Caddy→back race, below) | off | off | off |
+| `--resend-stale` / `--no-resend-stale` (for a back before #438, below) | off | off | off |
 | `--rest` s / `--duration` s | 60 / 120 | 10 / 90 | 30 / 600 |
 | `--request-timeout` ms | 60000 | 60000 | 290000 |
 | `--setup-concurrency` · `--sse-ramp` (connections/s) · `--sample-interval` ms · `--cooldown` ms | 4 · 50 · 1000 · 5000 | same | same |
@@ -138,6 +139,8 @@ E2E use. `PORT` is read the same way when `--url`/`LOAD_API_URL` is unset.
    the same time: they share the CPU and move every number (#431). Check
    `cat /proc/loadavg` first. The report's header records the harness
    machine's load average at the start and at the end, so a noisy run shows.
+   The report's `Phases (harness process)` table is the run's own check:
+   a phase marked saturated measured the harness, not the back (below).
 
 5. **Run**, e.g. `pnpm load:baseline --sse 300`.
 
@@ -195,7 +198,9 @@ stdout; progress goes to stderr. The reports worth keeping are copied into
 The report has: the run (target, Node, commit, start/end, the harness
 machine's load average and parallelism), the config, the world built, a
 table per phase of the back's CPU %, RSS, heap, event-loop lag and
-utilization, judge queue and server-side SSE count, HTTP latency
+utilization, judge queue and server-side SSE count, the same per phase for
+the harness's own process (CPU %, ELU, lag, the largest gap between two
+back polls, and whether it saturated — #442), HTTP latency
 (p50/p95/p99/max) and status counts per route and phase, the verdict matrix
 (sent × verdict), actions started vs completed, and SSE (opened, failed,
 dropped and why, events per connection, heartbeat gaps and each
@@ -240,24 +245,60 @@ Only these, each counted and listed — the run never stops at the first:
 Latency, queue wait, spawn, CPU, memory, lag, bytes and heartbeat cadence
 are observations: they never fail a run.
 
-### The stale-socket resend, off by default (#138)
+### The harness's own load (#442)
 
-Node's server closes a keep-alive socket after 5 s idle
-(`keepAliveTimeout`), and a team's next submission comes after a 5 s
-cooldown: the harness can reuse a socket at the moment the back closes it.
-undici then fails the POST with `UND_ERR_SOCKET` ("other side closed")
+The harness is one Node process holding every stream. Each frame reaches
+all of them, and since #439 its bytes are identical on every connection;
+validating it 400 times (JSON, the zod union, and for a `ranking.updated`
+of 90–130 KB two more zod parses, a canonical JSON and a sha256) kept the
+harness at 100% of one core through a burst's `load` phase. Its heartbeat
+gaps and its back polls (15–46 s apart) then measured the harness, not the
+back.
+
+- **One validation per distinct payload.** A cache shared by the run's
+  streams, keyed by the `data:` text, keeps the answer for the last 64
+  distinct payloads (valid or not, the type, the ranking digest, the bytes).
+  The answer depends only on the text, so every connection still counts its
+  own invalid payloads and keeps its own last ranking digest: settle and
+  the storm compare exactly what they compared before. The SSE table shows
+  `payloads validated (distinct / reused)`.
+- **The harness reports its own load.** Every `--sample-interval` it reads
+  its CPU (`process.cpuUsage`), event-loop utilization and event-loop delay
+  (`monitorEventLoopDelay`), tagged with the phase. `## Phases (harness
+  process)` shows them per phase, with the largest gap between two answers
+  of the back sampler. That gap includes the back's answer time, so a slow
+  back widens it too (the panel's 8 s in #436's signup peak): it points at
+  the harness only next to a high ELU or lag.
+- **Saturated:** a phase whose mean ELU is ≥ 0.9, or where the harness's
+  loop stalled ≥ 1000 ms (the heartbeat's period). Each saturated phase adds
+  a warning — `harness saturated in <phase> …: heartbeat gaps, poll gaps
+  and latencies of this phase measure the harness, not the back` — and
+  **never fails the run**: like CPU and lag, it is an observation. Read
+  that phase's heartbeat gaps and latencies as an upper bound.
+
+### The stale-socket resend, off by default (#138, #438)
+
+Before #438, Node's server closed a keep-alive socket after 5 s idle (its
+default `keepAliveTimeout`), and a team's next submission comes after a 5 s
+cooldown: the harness could reuse a socket at the moment the back closed it.
+undici then failed the POST with `UND_ERR_SOCKET` ("other side closed")
 before any byte of a response — the request never reached a handler. A
-browser silently resends a request in exactly that case; undici does not.
-**This race is a finding, not a harness defect.** In production the
-browsers talk to Caddy, and Caddy keeps its own keep-alive pool to the back
-(`reverse_proxy back:3000`): like undici, it does not resend a POST that
-fails on a reused connection, so a participant would likely get a 502 (see
-`docs/load/138-sse-fanout.md` and its issue). The harness therefore leaves
-it visible by default.
+browser silently resends a request in exactly that case; undici does not,
+and neither does Caddy, which keeps its own keep-alive pool to the back
+(`reverse_proxy back:3000`): in production that race is a 502 on submit
+(`docs/load/138-sse-fanout.md`).
 
-`--resend-stale` **masks the Caddy→back race**: a submission — and likewise
-one of the harness's own reads (the sampler's polls, settle's checks) — is
-sent again **once**, only for `UND_ERR_SOCKET` or `ECONNRESET` on a reused
-socket before any response. It is off so the harness models production. Every retry is counted
-in the report's `Retries` section and stays in the HTTP table as the network
-error it answered; a second failure is not retried and fails the run.
+**The back now announces `Keep-Alive: timeout=130` and closes an idle socket
+at 131 s** (`back/src/lib/http-server.ts`, #438), after Caddy's pinned 120 s
+upstream idle time. Caddy always drops an idle socket first, and undici,
+which honors the header, keeps one a little under 130 s — the race is closed for both
+paths. `docs/load/438-keepalive.md` reruns R8 and R9 without the resend.
+
+`--resend-stale` stays, off, to measure a back from before #438: a
+submission — and likewise one of the harness's own reads (the sampler's
+polls, settle's checks) — is sent again **once**, only for `UND_ERR_SOCKET`
+or `ECONNRESET` on a reused socket before any response. Every retry is
+counted in the report's `Retries` section and stays in the HTTP table as the
+network error it answered; a second failure is not retried and fails the
+run. On a current back, a network error with the resend off is a real
+failure to investigate, not this race.

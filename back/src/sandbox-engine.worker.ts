@@ -11,8 +11,10 @@ import {
 /**
  * Worker-thread entry point for the judge sandbox engine — ADR-0001
  * (back/docs/adr/0001-judge-sandbox-engine.md): quickjs-emscripten runs
- * inside a `worker_thread`, one persistent worker per submission, a fresh
- * QuickJS runtime+context per test case within it.
+ * inside a `worker_thread`, a fresh QuickJS runtime+context per test case.
+ * Since #277 a worker serves many submissions from judge.service.ts's warm
+ * pool (ADR-0001's Amendment): nothing of a guest survives its case, and the
+ * QuickJS module loaded below is the only state a submission inherits.
  *
  * Spawned by sandbox-engine.test.ts for characterization; #19 owns the
  * production request/reply protocol and lifecycle (respawn on crash,

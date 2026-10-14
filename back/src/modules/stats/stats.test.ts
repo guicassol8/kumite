@@ -601,6 +601,9 @@ describe('process stats: judge and SSE timings', { timeout: 20_000 }, () => {
 
     expect(stats.judge.config.concurrency).toBe(JUDGE_CONCURRENCY)
     expect(stats.judge.workers.alive).toBe(stats.judge.workers.spawned - stats.judge.workers.exited)
+    // #277: the warm pool's idle workers are alive ones.
+    expect(stats.judge.workers.idle).toBeGreaterThanOrEqual(0)
+    expect(stats.judge.workers.idle).toBeLessThanOrEqual(stats.judge.workers.alive)
     expect(stats.judge.runs.length).toBeGreaterThanOrEqual(1)
     expect(stats.sse.emissions.some((emission) => emission.kind === 'heartbeat')).toBe(true)
     expect(ProcessStatsSchema.parse(stats)).toEqual(stats)

@@ -282,3 +282,52 @@ That is what #19 actually shipped:
 
 The Decision itself is unchanged — only the reading of that one phrase is
 corrected here.
+
+## Amendment (2026-10-05, #277): warm worker pool
+
+The Decision's "one persistent worker per submission" is corrected here: a
+worker now outlives its submission and serves the next ones, from a pool of
+at most `JUDGE_CONCURRENCY` workers in `judge.service.ts`. #137 measured the
+spawn (starting the worker thread and loading QuickJS's WASM) at 79–97% of a
+correct submission's judge time outside the queue, on a CPU-bound judge, so
+paying it once per worker instead of once per submission is the largest
+throughput gain available in the judge.
+
+- **Isolation is unchanged.** Between cases and between submissions it still
+  comes from a fresh `QuickJSRuntime` + `QuickJSContext` per case, disposed
+  after it. The only thing a submission inherits from the previous one on the
+  same worker is the loaded QuickJS module. `judge.test.ts` proves a global
+  written by one submission is gone in the next one on the same worker.
+- **When a worker is discarded** instead of going back to the pool: it exited
+  or emitted `error`, the watchdog fired on one of its cases, or a case came
+  back `memory` or `error` from the sandbox. `memory` because WASM linear
+  memory never shrinks — a worker that grew to the limit would keep it — and
+  because an out-of-memory is exactly where a corrupted QuickJS module would
+  show, hurting the *next* participant's submission; `error` (a host-side
+  failure) for the second reason. `timeout` and `blocked` are ordinary guest
+  outcomes and keep the worker, as they always kept it for the rest of the
+  same submission's cases. Inside a submission nothing changed: after an
+  `exit`, the remaining cases are `runtime_error`.
+- **Created on demand.** A submission takes the most recently returned idle
+  worker, or spawns one when there is none. The pool reaches
+  `JUDGE_CONCURRENCY` after that many simultaneous submissions and never
+  shrinks; a discarded worker is replaced by the next submission that finds
+  no idle one. The first submissions after a boot still pay the spawn.
+- **Case ids are unique per process**, from a counter that never restarts:
+  on a reused worker, a late reply meant for an earlier submission can never
+  be read as the current one's.
+- **Listeners for the worker's life.** `ready`, `error` and `exit` are bound
+  once, when the worker is created: an idle worker emitting `error` with no
+  listener would otherwise crash the main process.
+- **Idle workers are `unref()`'d** (and `ref()`'d when checked out): a worker
+  waiting in the pool never keeps the process, vitest or the harness alive.
+- **Observability.** `GET /organizer/stats/process` reports
+  `judge.workers.idle`; a leak is now `alive − idle` above zero with nothing
+  in flight, and a run's `spawnMs` is 0 on a warm worker.
+
+Measured before and after with the load harness's burst, same session, same
+limits: `docs/load/277-judge-pool.md` (raw reports in `docs/load/277/`). With
+100 teams at once and every solution correct, a correct submission's p50
+went from 8.0 s to 0.26 s and the back's CPU from its 200% cap to 28%; with
+10% and 30% bad solutions, from 15.1 s to 6.1 s and from 36.6 s to 28.8 s,
+where the infinite loops holding their slots for 10 s are now the floor.

@@ -125,7 +125,8 @@ jsonpath "$.memory.external" >= 0
 jsonpath "$.eventLoop.windowMs" == 1000
 jsonpath "$.eventLoop.windows" exists
 # The judge's and the fan-out's timings (#137/#138): the config the process
-# judges with, its worker counters and the three rings. The heartbeat tick
+# judges with, its worker counters (the warm pool's idle ones included,
+# #277) and the three rings. The heartbeat tick
 # runs every second, so an emission has always been recorded by now.
 jsonpath "$.judge.config.concurrency" >= 1
 jsonpath "$.judge.config.timeoutMs" >= 1
@@ -133,6 +134,7 @@ jsonpath "$.judge.config.memoryMb" >= 1
 jsonpath "$.judge.workers.spawned" >= 0
 jsonpath "$.judge.workers.exited" >= 0
 jsonpath "$.judge.workers.alive" >= 0
+jsonpath "$.judge.workers.idle" >= 0
 jsonpath "$.judge.runs" exists
 jsonpath "$.sse.emissions" exists
 jsonpath "$.sse.connects" exists

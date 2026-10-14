@@ -160,7 +160,10 @@ describe('runScenario', { timeout: 120_000 }, () => {
       incoherent: 0,
     })
     expect(report.world?.problemIds).toHaveLength(2)
-    expect(report.settle?.drain).toMatchObject({ drained: true, workersAlive: 0 })
+    // The warm pool's idle workers stay alive (#277): drained means every
+    // live worker is an idle one.
+    expect(report.settle?.drain.drained).toBe(true)
+    expect(report.settle?.drain.workersAlive).toBe(report.settle?.drain.workersIdle)
     expect(report.settle?.consistency).toMatchObject({
       compared: 2,
       distinctDigests: 1,
@@ -177,7 +180,7 @@ describe('runScenario', { timeout: 120_000 }, () => {
     expect(report.payloadCache?.reused).toBeGreaterThan(0)
     expect(report.sse.invalidPayloads).toBe(0)
     expect(report.judge?.byOutcome).toEqual({ passed: 2, timeout: 1, runtime_error: 1 })
-    expect(report.judge?.workers?.alive).toBe(0)
+    expect(report.judge?.workers?.alive).toBe(report.judge?.workers?.idle)
     expect(report.sse.closedByHarness).toBe(2)
     expect(Object.keys(report.submissions.latencyMs).sort()).toEqual(['correct', 'loop', 'memory'])
   })

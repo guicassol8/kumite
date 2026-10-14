@@ -45,7 +45,7 @@ export const Route = createFileRoute('/organizer/rounds/')({
 const ORGANIZER_ROUNDS_QUERY_KEY = ['organizer-rounds']
 
 // The back only says *why* a round action was refused (rounds.service.ts);
-// the front turns that reason into a sentence for the action-error banner.
+// the front turns that reason into a sentence under the row's own buttons.
 const ACTION_ERROR_KEYS: Record<string, string> = {
   another_round_open: 'organizer.rounds.actionError.anotherRoundOpen',
   round_not_draft: 'organizer.rounds.actionError.roundNotDraft',
@@ -62,6 +62,9 @@ async function fetchOrganizerRounds() {
 
 type RoundSummary = Awaited<ReturnType<typeof fetchOrganizerRounds>>[number]
 
+/** A refused row action, kept with the round it was about (#200.3). */
+type ActionError = { key: string; roundId: string }
+
 function OrganizerRoundsList() {
   const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
@@ -70,7 +73,11 @@ function OrganizerRoundsList() {
   const [extendTargetId, setExtendTargetId] = useState<string | null>(null)
   const [extendMinutes, setExtendMinutes] = useState('')
   const [extendMinutesError, setExtendMinutesError] = useState<string | null>(null)
-  const [actionErrorKey, setActionErrorKey] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<ActionError | null>(null)
+
+  function reportAction(roundId: string, key: string | null) {
+    setActionError(key ? { key, roundId } : null)
+  }
 
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ORGANIZER_ROUNDS_QUERY_KEY })
@@ -95,6 +102,12 @@ function OrganizerRoundsList() {
   const anotherRoundOpenId = openRound?.id ?? eventStream.currentRoundId
   const anotherRoundOpenName =
     openRound?.name ?? rounds.data?.find((round) => round.id === eventStream.currentRoundId)?.name
+  // The banner is only for a refusal whose row is no longer there to carry it
+  // — a round deleted under the organizer (`not_found`).
+  const orphanActionError =
+    actionError && !rounds.data?.some((round) => round.id === actionError.roundId)
+      ? actionError
+      : null
 
   const open = useMutation({
     mutationFn: async (id: string) => {
@@ -103,8 +116,8 @@ function OrganizerRoundsList() {
       const body = await res.json().catch(() => null)
       return ACTION_ERROR_KEYS[body?.error ?? ''] ?? 'organizer.rounds.actionError.unexpected'
     },
-    onSuccess: (errorKey) => setActionErrorKey(errorKey),
-    onError: () => setActionErrorKey('organizer.rounds.actionError.unexpected'),
+    onSuccess: (errorKey, id) => reportAction(id, errorKey),
+    onError: (_error, id) => reportAction(id, 'organizer.rounds.actionError.unexpected'),
     onSettled: invalidate,
   })
 
@@ -118,8 +131,8 @@ function OrganizerRoundsList() {
       const body = await res.json().catch(() => null)
       return ACTION_ERROR_KEYS[body?.error ?? ''] ?? 'organizer.rounds.actionError.unexpected'
     },
-    onSuccess: (errorKey) => setActionErrorKey(errorKey),
-    onError: () => setActionErrorKey('organizer.rounds.actionError.unexpected'),
+    onSuccess: (errorKey, { id }) => reportAction(id, errorKey),
+    onError: (_error, { id }) => reportAction(id, 'organizer.rounds.actionError.unexpected'),
     onSettled: invalidate,
   })
 
@@ -130,8 +143,8 @@ function OrganizerRoundsList() {
       const body = await res.json().catch(() => null)
       return ACTION_ERROR_KEYS[body?.error ?? ''] ?? 'organizer.rounds.actionError.unexpected'
     },
-    onSuccess: (errorKey) => setActionErrorKey(errorKey),
-    onError: () => setActionErrorKey('organizer.rounds.actionError.unexpected'),
+    onSuccess: (errorKey, id) => reportAction(id, errorKey),
+    onError: (_error, id) => reportAction(id, 'organizer.rounds.actionError.unexpected'),
     onSettled: invalidate,
   })
 
@@ -167,9 +180,9 @@ function OrganizerRoundsList() {
         </Button>
       </div>
 
-      {actionErrorKey && (
+      {orphanActionError && (
         <Alert variant="destructive" data-testid="organizer-rounds-action-error">
-          <AlertDescription>{t(actionErrorKey)}</AlertDescription>
+          <AlertDescription>{t(orphanActionError.key)}</AlertDescription>
         </Alert>
       )}
 
@@ -360,6 +373,17 @@ function OrganizerRoundsList() {
                             i18n.resolvedLanguage ?? i18n.language,
                           ),
                         })}
+                      </span>
+                    )}
+                    {actionError?.roundId === round.id && (
+                      // `basis-full` drops it onto its own line of the cell's
+                      // flex-wrap, right under the button that was refused.
+                      <span
+                        role="alert"
+                        className={`${PANEL_FIELD_ERROR} basis-full`}
+                        data-testid={`organizer-rounds-action-error-${round.id}`}
+                      >
+                        {t(actionError.key)}
                       </span>
                     )}
                   </>

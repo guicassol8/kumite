@@ -3,8 +3,14 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PANEL_FORM_HEADING } from '@/components/organizer/panel-form'
-import { RoundForm, type RoundFormValues } from '@/components/organizer/round-form'
+import {
+  type RoundFieldErrors,
+  RoundForm,
+  type RoundFormValues,
+  roundFieldErrorKeys,
+} from '@/components/organizer/round-form'
 import { api } from '@/lib/api'
+import { errorCodeFrom, fieldIssuesFrom, readEnvelope } from '@/lib/api-issues'
 
 export const Route = createFileRoute('/organizer/rounds/$id/edit')({
   component: EditRoundScreen,
@@ -57,38 +63,49 @@ function EditRoundScreen() {
     queryClient.invalidateQueries({ queryKey: ROUNDS_QUERY_KEY })
   }
 
-  async function handleSave(values: RoundFormValues) {
+  async function handleSave(values: RoundFormValues): Promise<RoundFieldErrors | undefined> {
     setIsSubmitting(true)
     setRootError(undefined)
     setSuccessMessage(undefined)
     try {
       const res = await api.organizer.rounds[':id'].$patch({ param: { id }, json: values })
-      if (res.status !== 200) {
-        if (res.status === 400) {
-          const body = await res.json().catch(() => null)
-          if (body?.error === 'invalid_problem_ids') {
-            setRootError(t('organizer.roundForm.errors.invalidProblemIds'))
-            return
-          }
-        }
-        if (res.status === 404) {
-          setRootError(t('organizer.roundForm.errors.notFound'))
-          return
-        }
-        if (res.status === 409) {
-          const body = await res.json().catch(() => null)
-          if (body?.error === 'round_not_draft') {
-            setRootError(t('organizer.roundForm.errors.roundNotDraft'))
-            invalidate()
-            return
-          }
-        }
-        setRootError(t('organizer.roundForm.errors.saveFailed'))
-        return
+      if (res.status === 200) {
+        invalidate()
+        setSuccessMessage(t('organizer.roundForm.savedMessage'))
+        return undefined
+      }
+      if (res.status === 404) {
+        setRootError(t('organizer.roundForm.errors.notFound'))
+        return undefined
       }
 
-      invalidate()
-      setSuccessMessage(t('organizer.roundForm.savedMessage'))
+      // Read once: the screen needs both the error code (400, 409) and the
+      // field issues of kata's 422 (#312), and the body is a one-shot stream.
+      const envelope = await readEnvelope(res)
+      const code = errorCodeFrom(envelope)
+      if (code === 'invalid_problem_ids') {
+        setRootError(t('organizer.roundForm.errors.invalidProblemIds'))
+        return undefined
+      }
+      if (code === 'round_not_draft') {
+        setRootError(t('organizer.roundForm.errors.roundNotDraft'))
+        invalidate()
+        return undefined
+      }
+
+      const fieldErrors: RoundFieldErrors = {}
+      for (const [field, key] of Object.entries(roundFieldErrorKeys(fieldIssuesFrom(envelope)))) {
+        fieldErrors[field as keyof RoundFieldErrors] = t(key)
+      }
+      if (Object.keys(fieldErrors).length > 0) return fieldErrors
+
+      setRootError(t('organizer.roundForm.errors.saveFailed'))
+      return undefined
+    } catch {
+      // No answer at all (offline, DNS): without this the save would reject
+      // and leave the organizer with no message (#312).
+      setRootError(t('organizer.roundForm.errors.saveFailed'))
+      return undefined
     } finally {
       setIsSubmitting(false)
     }

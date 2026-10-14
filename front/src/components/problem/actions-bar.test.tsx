@@ -146,6 +146,29 @@ describe('ActionsBar', () => {
     expect(screen.getByTestId('problem-clear-button')).toBeDefined()
   })
 
+  // #200.2: Executar still works on a closed round, and nothing said it no
+  // longer counts. The hint sits where Submeter used to, tied to the button.
+  it('says beside Executar that a run on a closed round scores no points', () => {
+    renderBar({ isClosed: true })
+
+    const hint = screen.getByTestId('problem-run-closed-hint')
+    expect(hint.textContent).toBe(
+      'Rodada encerrada: executar só testa os exemplos e não vale pontos.',
+    )
+    expect(screen.getByTestId('problem-run-button').getAttribute('aria-describedby')).toBe(hint.id)
+    expect(hint.id).not.toBe('')
+  })
+
+  it.each([
+    ['a round in progress', {}],
+    ['practice', { onSubmit: undefined }],
+  ])('shows no closed-round hint in %s', (_label, overrides) => {
+    renderBar(overrides)
+
+    expect(screen.queryByTestId('problem-run-closed-hint')).toBeNull()
+    expect(screen.getByTestId('problem-run-button').getAttribute('aria-describedby')).toBeNull()
+  })
+
   // #283: the app's own AlertDialog, never the browser's `window.confirm`.
   it('asks in an app dialog before clearing the blocks, and never through window.confirm', () => {
     const confirm = vi.spyOn(window, 'confirm')

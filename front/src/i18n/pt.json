@@ -880,7 +880,8 @@
     "closedRound": {
       "notice": "Esta rodada foi encerrada — o problema agora é somente leitura.",
       "bestScore": "Melhor pontuação do seu time: {{score}}/{{maxScore}} ({{attempts}} tentativas, em {{date}})",
-      "neverSubmitted": "Seu time não chegou a submeter uma solução para este problema."
+      "neverSubmitted": "Seu time não chegou a submeter uma solução para este problema.",
+      "runHint": "Rodada encerrada: executar só testa os exemplos e não vale pontos."
     },
     "results": {
       "title": "Resultados",

@@ -880,7 +880,8 @@
     "closedRound": {
       "notice": "This round has closed — the problem is now read-only.",
       "bestScore": "Your team's best score: {{score}}/{{maxScore}} ({{attempts}} attempts, on {{date}})",
-      "neverSubmitted": "Your team never submitted a solution for this problem."
+      "neverSubmitted": "Your team never submitted a solution for this problem.",
+      "runHint": "Round closed: running only tests the examples and scores no points."
     },
     "results": {
       "title": "Results",

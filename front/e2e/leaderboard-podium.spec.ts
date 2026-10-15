@@ -210,12 +210,18 @@ test.describe('leaderboard podium (#284)', () => {
     // pódio, the user's own (light) theme back and the chrome back. Taken
     // here, while the button's real fullscreen is still on: headless
     // Chromium does enter it, and nothing can resize a fullscreen window.
+    // Leaving it is asynchronous: exit() navigates without awaiting
+    // document.exitFullscreen(), so fullscreenchange lands after the URL,
+    // focus, theme and header are already back — hence the polls (#432).
+    // The entry poll first, or the exit one would pass on a fullscreen that
+    // never happened.
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true)
     await page.keyboard.press('Escape')
     await expect(page).toHaveURL(/\/leaderboard$/)
     await expect(page.getByTestId('leaderboard-podium-link')).toBeFocused()
     await expect(page.locator('html')).not.toHaveClass(/\bdark\b/)
     await expect(page.getByTestId('app-header')).toBeVisible()
-    expect(await page.evaluate(() => document.fullscreenElement)).toBeNull()
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true)
     await page.screenshot({ path: evidence('08-volta-ao-placar') })
 
     // 02 — it fits the projector, at 1920×1080 and at WXGA 1280×800, with

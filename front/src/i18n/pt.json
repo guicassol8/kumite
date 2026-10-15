@@ -146,6 +146,12 @@
       "description": "{{uses}} blocos usam essa variável e vão ser apagados junto.",
       "confirm": "Excluir",
       "cancel": "Cancelar"
+    },
+    "deleteBlocks": {
+      "title": "Apagar {{blocks}} blocos?",
+      "description": "Todos os blocos do canvas vão ser apagados, menos o \"resolver\".",
+      "confirm": "Apagar",
+      "cancel": "Cancelar"
     }
   },
   "organizer": {

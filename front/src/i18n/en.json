@@ -146,6 +146,12 @@
       "description": "{{uses}} blocks use this variable and will be deleted with it.",
       "confirm": "Delete",
       "cancel": "Cancel"
+    },
+    "deleteBlocks": {
+      "title": "Delete {{blocks}} blocks?",
+      "description": "Every block on the canvas will be deleted except \"solve\".",
+      "confirm": "Delete",
+      "cancel": "Cancel"
     }
   },
   "organizer": {

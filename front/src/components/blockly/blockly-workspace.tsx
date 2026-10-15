@@ -4,9 +4,15 @@ import { X } from 'lucide-react'
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { DeleteBlocksDialog } from '@/components/blockly/delete-blocks-dialog'
 import { Button } from '@/components/ui/button'
 import { DESKTOP_QUERY, useMediaQuery } from '@/hooks/use-media-query'
 import { type CanvasControls, createCanvasControls } from '@/lib/blockly-canvas-controls'
+import {
+  type DeleteAllRequest,
+  installDeleteAllConfirm,
+  setDeleteAllHandler,
+} from '@/lib/blockly-delete-all'
 import { installBodyPopovers, keepCanvasFocusIntoPopovers } from '@/lib/blockly-popovers'
 import { cn } from '@/lib/utils'
 
@@ -67,6 +73,9 @@ Blockly.ToolboxCategory.borderWidth = KUMITE_CATEGORY_BAR_PX
 // Every `Blockly.inject` in the app goes through this module, so this runs
 // before the first one.
 installBodyPopovers()
+// #445: the canvas menu's "Delete N blocks" confirms in the app's dialog,
+// rendered by each BlocklyWorkspace below for its own workspace.
+installDeleteAllConfirm()
 
 const defaultOptions: Partial<Blockly.BlocklyOptions> = {
   // Blockly's own default is https://static.blockly.com/media/, which would put
@@ -124,6 +133,7 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
     const [flyoutOpen, setFlyoutOpen] = useState(false)
     const isDesktop = useMediaQuery(DESKTOP_QUERY)
     const flyoutCloseRef = useRef<HTMLButtonElement>(null)
+    const [deleteRequest, setDeleteRequest] = useState<DeleteAllRequest | null>(null)
 
     // The workspace is injected once, so the injection effect reads the props
     // from here instead of depending on them.
@@ -151,6 +161,9 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
       appliedThemeRef.current = injectedTheme
       const canvasControls = createCanvasControls(workspace, labelsRef.current)
       canvasControlsRef.current = canvasControls
+      // On the instance itself, so StrictMode's disposed first injection never
+      // keeps it (see `onReady`).
+      setDeleteAllHandler(workspace, setDeleteRequest)
       propsRef.current.onReady?.(workspace)
       const releasePopoverFocus = keepCanvasFocusIntoPopovers(container)
 
@@ -321,6 +334,7 @@ export const BlocklyWorkspace = forwardRef<BlocklyWorkspaceHandle, BlocklyWorksp
             {t('editor.flyoutClose.label')}
           </Button>
         )}
+        <DeleteBlocksDialog request={deleteRequest} onClose={() => setDeleteRequest(null)} />
       </div>
     )
   },

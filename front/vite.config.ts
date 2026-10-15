@@ -5,6 +5,7 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 
+import { ROUTE_FILE_IGNORE_PATTERN } from './src/lib/route-file-ignore'
 import { resolveSiteUrl } from './src/lib/site-url'
 
 // {{SITE_URL}} instead of Vite's native %VITE_SITE_URL% substitution: the
@@ -27,7 +28,11 @@ function kumiteSiteUrl(): Plugin {
 
 export default defineConfig({
   plugins: [
-    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+      routeFileIgnorePattern: ROUTE_FILE_IGNORE_PATTERN,
+    }),
     react(),
     tailwindcss(),
     kumiteSiteUrl(),

@@ -14,7 +14,12 @@ import '@/i18n'
 
 import { api } from '@/lib/api'
 
-import { RoundForm, type RoundFormValues } from './round-form'
+import {
+  type RoundFieldErrors,
+  RoundForm,
+  type RoundFormValues,
+  roundFieldErrorKeys,
+} from './round-form'
 
 const mockedList = vi.mocked(api.organizer.problems.$get)
 
@@ -180,6 +185,77 @@ describe('RoundForm', () => {
         problemIds: ['p1'],
       }),
     )
+  })
+
+  // #312: a field the server refused gets its message under that field, the
+  // way the problem form does it — `onSave` hands the messages back.
+  it('shows the field errors onSave hands back under their fields', async () => {
+    const onSave = vi.fn(async () => ({
+      name: 'Nome recusado pelo servidor',
+      problemIds: 'Problemas recusados pelo servidor',
+    }))
+    renderForm({
+      initialValues: { name: 'Rodada final', durationMinutes: 60, problemIds: ['p1'] },
+      onSave,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('round-form')).toBeDefined())
+    fireEvent.click(screen.getByTestId('round-form-save'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('round-form-name-error').textContent).toBe(
+        'Nome recusado pelo servidor',
+      ),
+    )
+    expect(screen.getByTestId('round-form-problems-error').textContent).toBe(
+      'Problemas recusados pelo servidor',
+    )
+  })
+
+  it('clears the server field errors on the next save', async () => {
+    const onSave = vi
+      .fn<(values: RoundFormValues) => Promise<RoundFieldErrors | undefined>>()
+      .mockResolvedValueOnce({ problemIds: 'Problemas recusados pelo servidor' })
+      .mockResolvedValueOnce(undefined)
+    renderForm({
+      initialValues: { name: 'Rodada final', durationMinutes: 60, problemIds: ['p1'] },
+      onSave,
+    })
+
+    await waitFor(() => expect(screen.getByTestId('round-form')).toBeDefined())
+    fireEvent.click(screen.getByTestId('round-form-save'))
+    await screen.findByTestId('round-form-problems-error')
+
+    fireEvent.click(screen.getByTestId('round-form-save'))
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByTestId('round-form-problems-error')).toBeNull())
+  })
+})
+
+describe('roundFieldErrorKeys', () => {
+  function issue(path: string) {
+    return { path, message: 'English text from the API', code: 'custom' }
+  }
+
+  it('maps each round field to its catalog key', () => {
+    expect(
+      roundFieldErrorKeys([issue('name'), issue('durationMinutes'), issue('problemIds')]),
+    ).toEqual({
+      name: 'organizer.roundForm.errors.fieldRejected',
+      durationMinutes: 'organizer.roundForm.errors.durationInvalid',
+      problemIds: 'organizer.roundForm.errors.invalidProblemIds',
+    })
+  })
+
+  it('folds an issue on one problem id into the problems field', () => {
+    expect(roundFieldErrorKeys([issue('problemIds[2]')])).toEqual({
+      problemIds: 'organizer.roundForm.errors.invalidProblemIds',
+    })
+  })
+
+  it('ignores a path that belongs to no field of the form', () => {
+    expect(roundFieldErrorKeys([issue('status'), issue('problemIdsExtra')])).toEqual({})
   })
 })
 

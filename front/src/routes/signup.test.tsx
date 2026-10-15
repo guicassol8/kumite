@@ -175,6 +175,53 @@ describe('SignupScreen', () => {
     })
   })
 
+  // kata's 422 is defensive here — the client zod catches the same rules —
+  // but when it does arrive, the field gets the catalog string, never the
+  // English `issue.message` written for the API's own logs (#312).
+  it('puts a 422 body issue under its field, in the catalog language (#312)', async () => {
+    mockedSignup.mockResolvedValue(
+      jsonResponse(422, {
+        error: 'validation_failed',
+        message: 'Invalid input',
+        issues: { body: [{ path: 'email', message: 'Invalid email', code: 'invalid_string' }] },
+      }),
+    )
+    renderSignup()
+    await waitFor(() => screen.getByTestId('signup-email-input'))
+    await fillForm()
+
+    fireEvent.click(screen.getByTestId('signup-submit-button'))
+
+    const error = await screen.findByTestId('signup-email-error')
+    expect(error.textContent).toBe('Valor inválido')
+    expect(screen.queryByText('Invalid email')).toBeNull()
+    expect(screen.queryByTestId('signup-form-error')).toBeNull()
+  })
+
+  it('falls back to the generic error on a 422 with no field issues (#312)', async () => {
+    mockedSignup.mockResolvedValue(jsonResponse(422, { error: 'validation_failed' }))
+    renderSignup()
+    await waitFor(() => screen.getByTestId('signup-email-input'))
+    await fillForm()
+
+    fireEvent.click(screen.getByTestId('signup-submit-button'))
+
+    const error = await screen.findByTestId('signup-form-error')
+    expect(error.textContent).toContain('Não foi possível concluir o cadastro')
+  })
+
+  it('shows the generic error when the request never gets an answer (#312)', async () => {
+    mockedSignup.mockRejectedValue(new TypeError('Failed to fetch'))
+    renderSignup()
+    await waitFor(() => screen.getByTestId('signup-email-input'))
+    await fillForm()
+
+    fireEvent.click(screen.getByTestId('signup-submit-button'))
+
+    const error = await screen.findByTestId('signup-form-error')
+    expect(error.textContent).toContain('Não foi possível concluir o cadastro')
+  })
+
   it('auto-logs in and stores the session on a successful signup', async () => {
     mockedSignup.mockResolvedValue(jsonResponse(201, fakeUser))
     mockedLogin.mockResolvedValue(jsonResponse(200, { token: 'tok-1' }))

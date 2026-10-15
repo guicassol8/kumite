@@ -129,63 +129,74 @@ function TeamCard({
         <RemoveTeamAction teamId={team.id} onRemoved={onChanged} />
       </CardHeader>
       <CardContent>
-        <PanelTable
-          testId={`team-moderation-members-${team.id}`}
-          rows={team.members}
-          rowKey={(member) => member.userId}
-          rowTestId={(member) => `team-moderation-member-row-${member.userId}`}
-          columns={[
-            {
-              id: 'name',
-              header: t('organizer.teamModeration.columns.name'),
-              width: 'w-[22%]',
-              cell: (member) => (
-                <span className="font-medium">
-                  {member.name ?? t('organizer.teamModeration.noName')}
-                </span>
-              ),
-            },
-            {
-              id: 'email',
-              header: t('organizer.teamModeration.columns.email'),
-              width: 'w-[26%]',
-              wrapAnywhere: true,
-              cell: (member) => member.email,
-            },
-            {
-              id: 'university',
-              header: t('organizer.teamModeration.columns.university'),
-              width: 'w-[12%]',
-              cell: (member) => <UniversityBadge university={member.university} />,
-            },
-            {
-              id: 'role',
-              header: t('organizer.teamModeration.columns.role'),
-              width: 'w-[14%]',
-              cell: (member) => (
-                <Badge variant="outline" className="whitespace-normal wrap-normal">
-                  {t(ROLE_KEYS[member.role])}
-                </Badge>
-              ),
-            },
-            {
-              id: 'actions',
-              header: t('organizer.teamModeration.columns.actions'),
-              width: 'w-[26%]',
-              mobileLabelVisible: false,
-              cell: (member) => (
-                <>
-                  <MoveMemberAction
-                    userId={member.userId}
-                    destinations={allTeams.filter((candidate) => candidate.id !== team.id)}
-                    onMoved={onChanged}
-                  />
-                  <RemoveMemberAction userId={member.userId} onRemoved={onChanged} />
-                </>
-              ),
-            },
-          ]}
-        />
+        {team.members.length === 0 ? (
+          // #200.4: nothing ever deletes a team that loses its last member, so
+          // an empty one is normal — say so instead of a header with no rows.
+          <p
+            className="text-muted-foreground text-sm"
+            data-testid={`team-moderation-members-empty-${team.id}`}
+          >
+            {t('organizer.teamModeration.noMembers')}
+          </p>
+        ) : (
+          <PanelTable
+            testId={`team-moderation-members-${team.id}`}
+            rows={team.members}
+            rowKey={(member) => member.userId}
+            rowTestId={(member) => `team-moderation-member-row-${member.userId}`}
+            columns={[
+              {
+                id: 'name',
+                header: t('organizer.teamModeration.columns.name'),
+                width: 'w-[22%]',
+                cell: (member) => (
+                  <span className="font-medium">
+                    {member.name ?? t('organizer.teamModeration.noName')}
+                  </span>
+                ),
+              },
+              {
+                id: 'email',
+                header: t('organizer.teamModeration.columns.email'),
+                width: 'w-[26%]',
+                wrapAnywhere: true,
+                cell: (member) => member.email,
+              },
+              {
+                id: 'university',
+                header: t('organizer.teamModeration.columns.university'),
+                width: 'w-[12%]',
+                cell: (member) => <UniversityBadge university={member.university} />,
+              },
+              {
+                id: 'role',
+                header: t('organizer.teamModeration.columns.role'),
+                width: 'w-[14%]',
+                cell: (member) => (
+                  <Badge variant="outline" className="whitespace-normal wrap-normal">
+                    {t(ROLE_KEYS[member.role])}
+                  </Badge>
+                ),
+              },
+              {
+                id: 'actions',
+                header: t('organizer.teamModeration.columns.actions'),
+                width: 'w-[26%]',
+                mobileLabelVisible: false,
+                cell: (member) => (
+                  <>
+                    <MoveMemberAction
+                      userId={member.userId}
+                      destinations={allTeams.filter((candidate) => candidate.id !== team.id)}
+                      onMoved={onChanged}
+                    />
+                    <RemoveMemberAction userId={member.userId} onRemoved={onChanged} />
+                  </>
+                ),
+              },
+            ]}
+          />
+        )}
       </CardContent>
     </Card>
   )

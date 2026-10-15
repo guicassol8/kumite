@@ -353,7 +353,8 @@
         "saveFailed": "Couldn't save the round. Try again.",
         "invalidProblemIds": "One or more selected problems are invalid.",
         "notFound": "Round not found.",
-        "roundNotDraft": "That round is no longer a draft."
+        "roundNotDraft": "That round is no longer a draft.",
+        "fieldRejected": "The server rejected this value. Check the field."
       },
       "notDraft": {
         "title": "This round has already been opened or closed and can no longer be edited.",
@@ -447,6 +448,7 @@
       },
       "noName": "—",
       "unnamedTeam": "Unnamed team · {{id}}",
+      "noMembers": "This team has no members.",
       "rename": {
         "editAction": "Rename",
         "save": "Save",
@@ -887,7 +889,8 @@
     "closedRound": {
       "notice": "This round has closed — the problem is now read-only.",
       "bestScore": "Your team's best score: {{score}}/{{maxScore}} ({{attempts}} attempts, on {{date}})",
-      "neverSubmitted": "Your team never submitted a solution for this problem."
+      "neverSubmitted": "Your team never submitted a solution for this problem.",
+      "runHint": "Round closed: running only tests the examples and scores no points."
     },
     "results": {
       "title": "Results",

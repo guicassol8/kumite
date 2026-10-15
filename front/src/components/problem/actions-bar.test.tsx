@@ -146,6 +146,46 @@ describe('ActionsBar', () => {
     expect(screen.getByTestId('problem-clear-button')).toBeDefined()
   })
 
+  // #200.2: Executar still works on a closed round, and nothing said it no
+  // longer counts. The hint sits where Submeter used to, tied to the button.
+  it('says beside Executar that a run on a closed round scores no points', () => {
+    renderBar({ isClosed: true })
+
+    const hint = screen.getByTestId('problem-run-closed-hint')
+    expect(hint.textContent).toBe(
+      'Rodada encerrada: executar só testa os exemplos e não vale pontos.',
+    )
+    expect(screen.getByTestId('problem-run-button').getAttribute('aria-describedby')).toBe(hint.id)
+    expect(hint.id).not.toBe('')
+  })
+
+  // On a phone (< 640px wide) 700px tall or less the hint's second line took
+  // the results band down to a 25px sliver (problem-layout.spec.ts, #155).
+  // There it is only for screen readers, still named by Executar's
+  // aria-describedby; the real-browser half of this is that e2e at 360x640.
+  it('keeps the closed-round hint for screen readers only on a short phone', () => {
+    renderBar({ isClosed: true })
+
+    const hint = screen.getByTestId('problem-run-closed-hint')
+    // Short AND narrow: a laptop at 1366x768 is short too, but its single
+    // line costs the band nothing, so it keeps the visible hint.
+    expect(classesOf(hint)).toContain('max-sm:short:sr-only')
+    expect(classesOf(hint).filter((token) => token.endsWith('sr-only'))).toEqual([
+      'max-sm:short:sr-only',
+    ])
+    expect(screen.getByTestId('problem-run-button').getAttribute('aria-describedby')).toBe(hint.id)
+  })
+
+  it.each([
+    ['a round in progress', {}],
+    ['practice', { onSubmit: undefined }],
+  ])('shows no closed-round hint in %s', (_label, overrides) => {
+    renderBar(overrides)
+
+    expect(screen.queryByTestId('problem-run-closed-hint')).toBeNull()
+    expect(screen.getByTestId('problem-run-button').getAttribute('aria-describedby')).toBeNull()
+  })
+
   // #283: the app's own AlertDialog, never the browser's `window.confirm`.
   it('asks in an app dialog before clearing the blocks, and never through window.confirm', () => {
     const confirm = vi.spyOn(window, 'confirm')

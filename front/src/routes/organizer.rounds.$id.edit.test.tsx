@@ -152,6 +152,74 @@ describe('EditRoundScreen', () => {
     })
   })
 
+  async function saveAnswered(answer: () => Promise<unknown>) {
+    mockedDetail.mockResolvedValue(jsonResponse(200, draftRound))
+    mockedPatch.mockImplementation(answer as never)
+    renderEdit()
+    await waitFor(() => expect(screen.getByTestId('round-form')).toBeDefined())
+    fireEvent.click(screen.getByTestId('round-form-save'))
+  }
+
+  // #312: kata's 422 names the refused field; the message goes under it, from
+  // the catalog, and no generic banner joins it.
+  it('puts a 422 body issue under the field it names', async () => {
+    await saveAnswered(async () =>
+      jsonResponse(422, {
+        error: 'validation_failed',
+        message: 'Invalid input',
+        issues: { body: [{ path: 'name', message: 'Too big', code: 'too_big' }] },
+      }),
+    )
+
+    await waitFor(() =>
+      expect(screen.getByTestId('round-form-name-error').textContent).toBe(
+        'O servidor recusou este valor. Revise o campo.',
+      ),
+    )
+    expect(screen.queryByText('Too big')).toBeNull()
+    expect(screen.queryByTestId('round-form-error')).toBeNull()
+  })
+
+  it('falls back to the generic error on a 422 that names no field', async () => {
+    await saveAnswered(async () => jsonResponse(422, { error: 'validation_failed' }))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('round-form-error').textContent).toContain(
+        'Não foi possível salvar a rodada',
+      ),
+    )
+  })
+
+  it('shows the generic error when the request never gets an answer', async () => {
+    await saveAnswered(async () => {
+      throw new TypeError('Failed to fetch')
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('round-form-error').textContent).toContain(
+        'Não foi possível salvar a rodada',
+      ),
+    )
+    expect((screen.getByTestId('round-form-save') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('keeps the invalid_problem_ids and round_not_draft messages', async () => {
+    await saveAnswered(async () => jsonResponse(400, { error: 'invalid_problem_ids' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('round-form-error').textContent).toContain(
+        'Um ou mais problemas selecionados são inválidos.',
+      ),
+    )
+
+    mockedPatch.mockResolvedValue(jsonResponse(409, { error: 'round_not_draft' }))
+    fireEvent.click(screen.getByTestId('round-form-save'))
+    await waitFor(() =>
+      expect(screen.getByTestId('round-form-error').textContent).toContain(
+        'Essa rodada não é mais um rascunho.',
+      ),
+    )
+  })
+
   // #233 — the form routes wear the same H2 as the listings restyled by #223.
   it('renders the screen heading in the display face, upper case', async () => {
     mockedDetail.mockResolvedValue(jsonResponse(200, draftRound))

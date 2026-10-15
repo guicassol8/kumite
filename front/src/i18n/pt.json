@@ -353,7 +353,8 @@
         "saveFailed": "Não foi possível salvar a rodada. Tente novamente.",
         "invalidProblemIds": "Um ou mais problemas selecionados são inválidos.",
         "notFound": "Rodada não encontrada.",
-        "roundNotDraft": "Essa rodada não é mais um rascunho."
+        "roundNotDraft": "Essa rodada não é mais um rascunho.",
+        "fieldRejected": "O servidor recusou este valor. Revise o campo."
       },
       "notDraft": {
         "title": "Essa rodada já foi aberta ou encerrada e não pode mais ser editada.",
@@ -447,6 +448,7 @@
       },
       "noName": "—",
       "unnamedTeam": "Time sem nome · {{id}}",
+      "noMembers": "Este time não tem integrantes.",
       "rename": {
         "editAction": "Renomear",
         "save": "Salvar",
@@ -887,7 +889,8 @@
     "closedRound": {
       "notice": "Esta rodada foi encerrada — o problema agora é somente leitura.",
       "bestScore": "Melhor pontuação do seu time: {{score}}/{{maxScore}} ({{attempts}} tentativas, em {{date}})",
-      "neverSubmitted": "Seu time não chegou a submeter uma solução para este problema."
+      "neverSubmitted": "Seu time não chegou a submeter uma solução para este problema.",
+      "runHint": "Rodada encerrada: executar só testa os exemplos e não vale pontos."
     },
     "results": {
       "title": "Resultados",

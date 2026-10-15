@@ -353,7 +353,8 @@
         "saveFailed": "No se pudo guardar la ronda. Intenta de nuevo.",
         "invalidProblemIds": "Uno o más problemas seleccionados son inválidos.",
         "notFound": "Ronda no encontrada.",
-        "roundNotDraft": "Esa ronda ya no es un borrador."
+        "roundNotDraft": "Esa ronda ya no es un borrador.",
+        "fieldRejected": "El servidor rechazó este valor. Revisa el campo."
       },
       "notDraft": {
         "title": "Esa ronda ya fue abierta o cerrada y ya no se puede editar.",
@@ -447,6 +448,7 @@
       },
       "noName": "—",
       "unnamedTeam": "Equipo sin nombre · {{id}}",
+      "noMembers": "Este equipo no tiene integrantes.",
       "rename": {
         "editAction": "Renombrar",
         "save": "Guardar",
@@ -887,7 +889,8 @@
     "closedRound": {
       "notice": "Esta ronda fue cerrada — el problema ahora es de solo lectura.",
       "bestScore": "Mejor puntuación de tu equipo: {{score}}/{{maxScore}} ({{attempts}} intentos, el {{date}})",
-      "neverSubmitted": "Tu equipo no llegó a enviar una solución para este problema."
+      "neverSubmitted": "Tu equipo no llegó a enviar una solución para este problema.",
+      "runHint": "Ronda cerrada: ejecutar solo prueba los ejemplos y no suma puntos."
     },
     "results": {
       "title": "Resultados",

@@ -177,10 +177,55 @@ describe('OrganizerRoundsList', () => {
     fireEvent.click(screen.getByTestId('organizer-rounds-open-confirm'))
 
     await waitFor(() =>
-      expect(screen.getByTestId('organizer-rounds-action-error').textContent).toContain(
+      expect(screen.getByTestId('organizer-rounds-action-error-r1').textContent).toContain(
         'Já existe outra rodada aberta.',
       ),
     )
+    expect(screen.queryByTestId('organizer-rounds-action-error')).toBeNull()
+  })
+
+  // #200.3: the refusal lands under the button that asked for it, not in a
+  // banner above a long list the organizer may have scrolled away from.
+  it('shows no_problems under the Abrir of the row that was refused', async () => {
+    mockedList.mockResolvedValue(
+      jsonResponse(200, [
+        roundSummary({ id: 'r1', name: 'Rodada 1', problemCount: 0 }),
+        roundSummary({ id: 'r2', name: 'Rodada 2' }),
+      ]),
+    )
+    mockedOpen.mockResolvedValue(jsonResponse(409, { error: 'no_problems' }))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-open-r1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('organizer-rounds-open-r1'))
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-open-confirm')).toBeDefined())
+    fireEvent.click(screen.getByTestId('organizer-rounds-open-confirm'))
+
+    const error = await screen.findByTestId('organizer-rounds-action-error-r1')
+    expect(error.textContent).toBe('Adicione ao menos um problema antes de abrir a rodada.')
+    expect(error.getAttribute('role')).toBe('alert')
+    expect(screen.getByTestId('organizer-rounds-row-r1').contains(error)).toBe(true)
+    expect(screen.queryByTestId('organizer-rounds-action-error-r2')).toBeNull()
+    expect(screen.queryByTestId('organizer-rounds-action-error')).toBeNull()
+  })
+
+  it('falls back to the banner when the refused round is gone from the list', async () => {
+    mockedList.mockResolvedValueOnce(jsonResponse(200, [roundSummary()]))
+    mockedOpen.mockResolvedValue(jsonResponse(404, { error: 'not_found' }))
+    renderList()
+
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-open-r1')).toBeDefined())
+    fireEvent.click(screen.getByTestId('organizer-rounds-open-r1'))
+    await waitFor(() => expect(screen.getByTestId('organizer-rounds-open-confirm')).toBeDefined())
+    mockedList.mockResolvedValueOnce(jsonResponse(200, [roundSummary({ id: 'r2' })]))
+    fireEvent.click(screen.getByTestId('organizer-rounds-open-confirm'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('organizer-rounds-action-error').textContent).toContain(
+        'Essa rodada não existe mais.',
+      ),
+    )
+    expect(screen.queryByTestId('organizer-rounds-action-error-r1')).toBeNull()
   })
 
   it('extends an open round and updates the displayed remaining time', async () => {
@@ -220,10 +265,11 @@ describe('OrganizerRoundsList', () => {
     fireEvent.click(screen.getByTestId('organizer-rounds-extend-confirm'))
 
     await waitFor(() =>
-      expect(screen.getByTestId('organizer-rounds-action-error').textContent).toContain(
+      expect(screen.getByTestId('organizer-rounds-action-error-r1').textContent).toContain(
         'Essa rodada não está aberta.',
       ),
     )
+    expect(screen.queryByTestId('organizer-rounds-action-error')).toBeNull()
   })
 
   it('closes an open round on confirm and flips the row to closed', async () => {

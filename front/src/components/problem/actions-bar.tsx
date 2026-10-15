@@ -1,5 +1,5 @@
 import { Lightbulb, Play, Send, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -53,16 +53,24 @@ export function ActionsBar({
   // the identity, never translated its OK/Cancel, and blocked browser
   // automation.
   const [confirmingClear, setConfirmingClear] = useState(false)
+  const closedHintId = useId()
 
   return (
     <div
       data-testid="problem-actions-bar"
-      className={cn('flex shrink-0 items-center gap-2 border-t pt-4', className)}
+      className={cn(
+        'flex shrink-0 items-center gap-2 border-t pt-4',
+        // Lets the closed-round hint drop to its own line on a phone instead
+        // of squeezing into a column beside the two buttons.
+        isClosed && 'flex-wrap',
+        className,
+      )}
     >
       <Button
         type="button"
         variant="outline"
         data-testid="problem-run-button"
+        aria-describedby={isClosed ? closedHintId : undefined}
         disabled={isRunning}
         onClick={onRun}
       >
@@ -132,6 +140,21 @@ export function ActionsBar({
           <Send aria-hidden="true" />
           {isSubmitting ? t('problem.submitProgress') : t('problem.submitButton')}
         </Button>
+      )}
+      {isClosed && (
+        // #200.2: Executar keeps working once the round closes, and nothing
+        // said it no longer counts. Quiet text where Submeter used to sit. On
+        // a phone (< 640px wide) 700px tall or less it wraps to an extra line
+        // that came out of the results band (#155), so there it is for screen
+        // readers only — Executar's aria-describedby still names it. A short
+        // laptop keeps it: there it sits on the buttons' line for free.
+        <p
+          id={closedHintId}
+          className="ml-auto flex-[1_1_14rem] text-right text-muted-foreground text-xs max-sm:short:sr-only"
+          data-testid="problem-run-closed-hint"
+        >
+          {t('problem.closedRound.runHint')}
+        </p>
       )}
     </div>
   )

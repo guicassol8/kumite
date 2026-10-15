@@ -159,16 +159,20 @@ describe('ActionsBar', () => {
     expect(hint.id).not.toBe('')
   })
 
-  // On a phone 700px tall or less the hint's second line took the results
-  // band down to a 25px sliver (problem-layout.spec.ts, #155). There it is
-  // only for screen readers, still named by Executar's aria-describedby; the
-  // real-browser half of this is that e2e at 360x640.
-  it('keeps the closed-round hint for screen readers only on a short screen', () => {
+  // On a phone (< 640px wide) 700px tall or less the hint's second line took
+  // the results band down to a 25px sliver (problem-layout.spec.ts, #155).
+  // There it is only for screen readers, still named by Executar's
+  // aria-describedby; the real-browser half of this is that e2e at 360x640.
+  it('keeps the closed-round hint for screen readers only on a short phone', () => {
     renderBar({ isClosed: true })
 
     const hint = screen.getByTestId('problem-run-closed-hint')
-    expect(classesOf(hint)).toContain('short:sr-only')
-    expect(classesOf(hint)).not.toContain('sr-only')
+    // Short AND narrow: a laptop at 1366x768 is short too, but its single
+    // line costs the band nothing, so it keeps the visible hint.
+    expect(classesOf(hint)).toContain('max-sm:short:sr-only')
+    expect(classesOf(hint).filter((token) => token.endsWith('sr-only'))).toEqual([
+      'max-sm:short:sr-only',
+    ])
     expect(screen.getByTestId('problem-run-button').getAttribute('aria-describedby')).toBe(hint.id)
   })
 

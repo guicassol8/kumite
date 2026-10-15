@@ -198,6 +198,9 @@ test.describe('#200 — acabamento', () => {
     for (const [label, size, shot] of [
       ['desktop', { width: 1280, height: 800 }, '01-executar-aviso-desktop'],
       ['390 px', { width: 390, height: 844 }, '02-executar-aviso-390'],
+      // Short but wide (a 1366x768 laptop's viewport): only a short *phone*
+      // hides the hint, so it stays visible here.
+      ['laptop baixo', { width: 1366, height: 650 }, '02b-executar-aviso-laptop-baixo'],
     ] as const) {
       test(`o aviso fica junto do Executar — ${label}`, async ({ page }) => {
         await page.setViewportSize(size)
@@ -210,7 +213,8 @@ test.describe('#200 — acabamento', () => {
           'Rodada encerrada: executar só testa os exemplos e não vale pontos.',
         )
         await expect(page.getByTestId('problem-submit-button')).toHaveCount(0)
-        // Visible here; only a screen 700px tall or less keeps it sr-only.
+        // Visible here; only a screen < 640px wide and 700px tall or less
+        // keeps it sr-only (problem-layout.spec.ts, 360x640).
         expect((await hint.boundingBox())?.height ?? 0).toBeGreaterThan(10)
         const hintId = await hint.getAttribute('id')
         expect(hintId).toBeTruthy()

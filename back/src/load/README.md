@@ -54,12 +54,15 @@ counted.
 
 ### The burst (#137, #138)
 
-- **Submissions.** Each team sends one at a time, as in `smoke`; with 300
-  over 100 teams, the first wave is all 100 teams at the same moment. A
-  submission is the correct solution, an infinite loop (a `timeout` on every
-  case, `JUDGE_TIMEOUT_MS` each) or a memory bomb (a string doubled with
-  `text_join` until QuickJS runs out of memory: `runtime_error`). Which one
-  is deterministic: the same flags send the same sequence.
+- **Submissions.** Each team sends one at a time, as in `smoke`, and its
+  own fixed share of the total (#453): team t of T sends ceil((N−t)/T), so
+  300 over 100 teams is 3 per team, and the first wave is all 100 teams at
+  the same moment. A slow team (one that drew an infinite loop) keeps its
+  share; the fast ones never take it over. A submission is the correct
+  solution, an infinite loop (a `timeout` on every case, `JUDGE_TIMEOUT_MS`
+  each) or a memory bomb (a string doubled with `text_join` until QuickJS
+  runs out of memory: `runtime_error`). Which one is deterministic: the same
+  flags send the same kind on each team's k-th submission, on every run.
 - **Problems.** `--problems n` clones the base problem n−1 times through
   the organizer API (`load-<runId>-p<k>`, same cases and statements,
   published), so the round has n problems and the correct solution scores on

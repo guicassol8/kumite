@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isBadAt, kindAt, mapLimit, sleep } from './schedule'
+import { isBadAt, kindAt, mapLimit, sleep, submissionIndex } from './schedule'
 
 describe('isBadAt', () => {
   it('marks exactly 3 of 30 submissions bad at f = 0.1, always the same ones', () => {
@@ -44,6 +44,46 @@ describe('kindAt', () => {
   it('turns every bad one into a memory bomb at a share of 1', () => {
     expect(kinds(10, 0.2, 1).filter((kind) => kind === 'memory')).toHaveLength(2)
     expect(kinds(10, 0.2, 1)).not.toContain('loop')
+  })
+})
+
+describe('submissionIndex (#453)', () => {
+  /** Each team's indices below `n`, in turn order. */
+  function shares(n: number, teams: number): number[][] {
+    return Array.from({ length: teams }, (_, team) => {
+      const indices: number[] = []
+      for (let turn = 0; ; turn++) {
+        const index = submissionIndex(turn, team, teams)
+        if (index >= n) return indices
+        indices.push(index)
+      }
+    })
+  }
+
+  it.each([0, 1, 6, 7, 30, 300].flatMap((n) => [1, 2, 3, 10, 100].map((teams) => ({ n, teams }))))(
+    'splits $n submissions over $teams teams, each index exactly once',
+    ({ n, teams }) => {
+      const byTeam = shares(n, teams)
+      expect(byTeam.flat().sort((a, b) => a - b)).toEqual(Array.from({ length: n }, (_, i) => i))
+      const sizes = byTeam.map((indices) => indices.length)
+      expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThanOrEqual(1)
+      // The first n mod T teams get the larger share: ceil((n − t) / T), none
+      // past the n-th team (max: the ceil of a negative fraction is −0).
+      expect(sizes).toEqual(byTeam.map((_, team) => Math.max(0, Math.ceil((n - team) / teams))))
+    },
+  )
+
+  it('keeps the first wave as before: turn 0 is 0..T−1 in team order', () => {
+    expect(Array.from({ length: 10 }, (_, team) => submissionIndex(0, team, 10))).toEqual(
+      Array.from({ length: 10 }, (_, i) => i),
+    )
+  })
+
+  it('gives 2 teams of 6 submissions three each', () => {
+    expect(shares(6, 2)).toEqual([
+      [0, 2, 4],
+      [1, 3, 5],
+    ])
   })
 })
 

@@ -6,6 +6,7 @@ import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
+  createStatement,
   ensureDatabase,
   gitDiscoveryEnv,
   resolveDatabaseUrl,
@@ -231,23 +232,93 @@ describe('resolveDatabaseUrl', () => {
 })
 
 describe('ensureDatabase (db:create and the globalSetup)', () => {
-  it('creates a missing database once, then reports it as existing', async () => {
-    const probe = new URL(process.env['DATABASE_URL'] ?? '')
-    probe.pathname = `${probe.pathname}_probe`
-    const name = decodeURIComponent(probe.pathname.slice(1))
-    const admin = new URL(probe)
+  // No real CREATE/DROP DATABASE here (#453): a DROP forces an immediate
+  // checkpoint, and with two other suites on the machine one took minutes on
+  // WSL and timed this test out — the failure dropDatabases hit first (#404).
+  // The SELECT on pg_database stays real; the create statement is recorded
+  // instead of run. The real create is proven by the globalSetup (it creates
+  // a worktree's suite database on its first run) and by hand in the PR.
+  const base = process.env['DATABASE_URL'] ?? ''
+  const absent = new URL(base)
+  absent.pathname = `${absent.pathname}_absent_453`
+  const absentName = databaseName(absent.toString())
+  const noWait = async () => {}
+
+  function pgError(code: string): Error {
+    return Object.assign(new Error(`pg ${code}`), { code })
+  }
+
+  async function exists(name: string): Promise<boolean> {
+    const admin = new URL(base)
     admin.pathname = '/postgres'
     const sql = postgres(admin.toString(), { max: 1, onnotice: () => {} })
     try {
-      await sql.unsafe(`drop database if exists "${name}"`)
-      expect(await ensureDatabase(probe.toString())).toBe('created')
-      expect(await ensureDatabase(probe.toString())).toBe('existed')
       const rows = await sql`select 1 from pg_database where datname = ${name}`
-      expect(rows).toHaveLength(1)
+      return rows.length > 0
     } finally {
-      await sql.unsafe(`drop database if exists "${name}"`)
       await sql.end()
     }
-    // create/drop database fsyncs a whole template copy: seconds on WSL.
-  }, 30_000)
+  }
+
+  it('reports the suite’s own database as existing and runs nothing', async () => {
+    const ran: string[] = []
+    expect(await ensureDatabase(base, async (s) => ran.push(s))).toBe('existed')
+    expect(ran).toEqual([])
+  })
+
+  it('issues the create statement for a missing database, through execute only', async () => {
+    expect(await exists(absentName)).toBe(false)
+    const ran: string[] = []
+    expect(await ensureDatabase(absent.toString(), async (s) => ran.push(s))).toBe('created')
+    expect(ran).toEqual([createStatement(absentName)])
+    // The recorder ran it, not the server: the database is still absent.
+    expect(await exists(absentName)).toBe(false)
+  })
+
+  it('counts a concurrent creator’s 42P04 duplicate_database as existing', async () => {
+    const execute = async () => {
+      throw pgError('42P04')
+    }
+    expect(await ensureDatabase(absent.toString(), execute, noWait)).toBe('existed')
+  })
+
+  it('retries a busy template (55006), then creates', async () => {
+    const ran: string[] = []
+    const execute = async (statement: string) => {
+      ran.push(statement)
+      if (ran.length === 1) throw pgError('55006')
+    }
+    expect(await ensureDatabase(absent.toString(), execute, noWait)).toBe('created')
+    expect(ran).toEqual([createStatement(absentName), createStatement(absentName)])
+  })
+
+  it('gives up after 6 attempts on a template that stays busy', async () => {
+    let calls = 0
+    const waits: number[] = []
+    const execute = async () => {
+      calls++
+      throw pgError('55006')
+    }
+    const wait = async (ms: number) => {
+      waits.push(ms)
+    }
+    await expect(ensureDatabase(absent.toString(), execute, wait)).rejects.toMatchObject({
+      code: '55006',
+    })
+    expect(calls).toBe(6)
+    expect(waits).toEqual([200, 400, 600, 800, 1000])
+  })
+
+  it('rethrows any other error', async () => {
+    const execute = async () => {
+      throw pgError('42501')
+    }
+    await expect(ensureDatabase(absent.toString(), execute, noWait)).rejects.toMatchObject({
+      code: '42501',
+    })
+  })
+
+  it('quotes the name in the create statement', () => {
+    expect(createStatement('a"b')).toBe('create database "a""b"')
+  })
 })

@@ -26,7 +26,8 @@ export const LoadConfigSchema = z.object({
   members: positiveInt,
   // Connections opened round-robin across the participants.
   sse: nonNegativeInt,
-  // Total across all teams.
+  // Total across all teams, each team its own fixed share: team t of T
+  // sends ceil((N−t)/T) (#453).
   submissions: nonNegativeInt,
   badFraction: z.coerce.number().min(0).max(1),
   // Among the bad submissions, the share that are memory bombs (#137); the

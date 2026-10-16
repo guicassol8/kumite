@@ -64,15 +64,20 @@ async function expectReadable(page: Page, field: Locator, value?: string) {
   expect(contrastRatio(text, background)).toBeGreaterThanOrEqual(AA_NORMAL)
 }
 
-/** Acceptance 2 — crimson outline, and the fill stays `card`: no red fill. */
-async function expectErrorOutlineOnly(page: Page, field: Locator) {
+/**
+ * Acceptance 2 — crimson outline and crimson message, and the fill stays
+ * `card`: no red fill. `message` is the field's error text, when it has a testid.
+ */
+async function expectErrorOutlineOnly(page: Page, field: Locator, message?: Locator) {
   await expect(field).toHaveAttribute('aria-invalid', 'true')
   // react-hook-form focuses the first invalid field; the focus ring repaints
   // the border, so the error is read with the field at rest.
   await field.evaluate((element) => (element as HTMLElement).blur())
   await settle(page)
-  await expect(field).toHaveCSS('border-top-color', await tokenRgb(page, '--destructive'))
+  const crimson = await tokenRgb(page, '--destructive')
+  await expect(field).toHaveCSS('border-top-color', crimson)
   await expect(field).toHaveCSS('background-color', await tokenRgb(page, '--card'))
+  if (message) await expect(message).toHaveCSS('color', crimson)
 }
 
 async function useTheme(page: Page, theme: Theme) {
@@ -178,8 +183,9 @@ for (const theme of THEMES) {
         for (const field of [email, password]) await expectCardFill(page, field)
 
         await page.getByTestId('login-submit-button').click()
-        await expect(page.getByTestId('login-password-error')).toBeVisible()
-        await expectErrorOutlineOnly(page, password)
+        const passwordError = page.getByTestId('login-password-error')
+        await expect(passwordError).toBeVisible()
+        await expectErrorOutlineOnly(page, password, passwordError)
         await capture(
           page,
           shot(
@@ -300,8 +306,9 @@ for (const theme of THEMES) {
 
           await points.fill('0')
           await page.getByTestId('problem-form-save').click()
-          await expect(page.getByTestId('problem-form-points-error')).toBeVisible()
-          await expectErrorOutlineOnly(page, points)
+          const pointsError = page.getByTestId('problem-form-points-error')
+          await expect(pointsError).toBeVisible()
+          await expectErrorOutlineOnly(page, points, pointsError)
 
           await expectReadable(page, statement, 'Some dois números inteiros.')
           await capture(

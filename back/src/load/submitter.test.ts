@@ -8,6 +8,7 @@ import { submissionsTable } from '../db/schema'
 import { resetSubmissionThrottle } from '../modules/submissions/submissions.service'
 
 import { createRecorder } from './recorder'
+import { sleep } from './schedule'
 import type { FetchLike } from './sse-client'
 import { MAX_THROTTLE_RETRIES, runSubmissions } from './submitter'
 import { createTransport } from './transport'
@@ -159,6 +160,32 @@ describe('runSubmissions', { timeout: 120_000 }, () => {
       const problems = rows.filter((row) => row.teamId === team.id).map((row) => row.problemId)
       expect(problems.sort()).toEqual([...built.problemIds].sort())
     }
+  })
+
+  it('sleeps no cooldown after a team’s last submission (#453)', async () => {
+    const { recorder, transport, built } = await world('last', 2)
+    // An hour of cooldown: one slept after either team's only submission
+    // would hold the run far past the race below.
+    const controller = new AbortController()
+    const run = runSubmissions({
+      transport,
+      recorder,
+      world: built,
+      config: { submissions: 2, badFraction: 0, cooldownMs: 3_600_000 },
+      deadline: Date.now() + 60_000,
+      signal: controller.signal,
+    }).then(() => 'resolved' as const)
+    const held = sleep(60_000, controller.signal).then(() => 'held in a cooldown' as const)
+
+    const outcome = await Promise.race([run, held])
+    controller.abort()
+    await run
+
+    expect(outcome).toBe('resolved')
+    expect(recorder.snapshot().verdicts).toEqual({
+      matrix: { correct: { accepted: 2 } },
+      incoherent: 0,
+    })
   })
 
   it('sends the memory bomb and gets a coherent runtime error back (#137)', async () => {

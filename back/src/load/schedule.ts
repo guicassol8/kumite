@@ -29,6 +29,19 @@ export function kindAt(i: number, badFraction: number, memoryShare: number): Sub
 }
 
 /**
+ * The global index (the `i` of {@link kindAt}) of team `teamIndex`'s
+ * `turn`-th submission, out of `teams` teams: `turn·teams + teamIndex`
+ * (#453). Taking the indices below `n` in turn order partitions `0..n−1`
+ * among the teams, so team `t` sends a fixed share of `ceil((n−t)/teams)` —
+ * the first `n mod teams` teams one more — whatever team is faster, and the
+ * kind of each submission is the same per (team, turn) on every run. Turn 0
+ * is `0..teams−1` in team order: the first wave.
+ */
+export function submissionIndex(turn: number, teamIndex: number, teams: number): number {
+  return turn * teams + teamIndex
+}
+
+/**
  * Maps `items` through `fn` with at most `limit` calls in flight, keeping the
  * input order. Every item settles before the first rejection (if any) is
  * rethrown, so a failed signup never leaves half the batch running unseen.

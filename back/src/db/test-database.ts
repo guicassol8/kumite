@@ -147,30 +147,46 @@ function errorCode(error: unknown): string | undefined {
     : undefined
 }
 
+/** The statement that creates `name`, quoted as a Postgres identifier. */
+export function createStatement(name: string): string {
+  return `create database "${name.replace(/"/g, '""')}"`
+}
+
 /**
  * Creates the database named in `url` when it does not exist yet, through the
  * `postgres` maintenance database of the same server. Safe to race: a
  * concurrent creator's `42P04 duplicate_database` counts as "existed", and a
- * busy template (`55006`) is retried.
+ * busy template (`55006`) is retried, up to 6 attempts.
+ *
+ * `execute` runs the create statement — the real connection by default; the
+ * test passes a recorder, and `wait` (the retry backoff) a no-op, because a
+ * real CREATE/DROP DATABASE in the suite forces a checkpoint that, on WSL
+ * beside two other suites, took minutes and timed the test out (#404, #453).
  */
-export async function ensureDatabase(url: string): Promise<'created' | 'existed'> {
+export async function ensureDatabase(
+  url: string,
+  execute?: (statement: string) => Promise<unknown>,
+  wait: (ms: number) => Promise<unknown> = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<'created' | 'existed'> {
   const target = new URL(url)
   const name = databaseNameOf(target)
   const maintenance = new URL(url)
   maintenance.pathname = '/postgres'
   const sql = postgres(maintenance.toString(), { max: 1, onnotice: () => {} })
+  const run = execute ?? ((statement: string) => sql.unsafe(statement))
   try {
     for (let attempt = 0; ; attempt++) {
       const rows = await sql`select 1 from pg_database where datname = ${name}`
       if (rows.length > 0) return 'existed'
       try {
-        await sql.unsafe(`create database "${name.replace(/"/g, '""')}"`)
+        await run(createStatement(name))
         return 'created'
       } catch (error) {
         const code = errorCode(error)
         if (code === '42P04') return 'existed'
         if (code === '55006' && attempt < 5) {
-          await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)))
+          await wait(200 * (attempt + 1))
           continue
         }
         throw error

@@ -11,8 +11,6 @@ let workspace: Blockly.Workspace
 let x: Blockly.IVariableModel<Blockly.IVariableState>
 let prompt: Mock<typeof Blockly.dialog.prompt>
 let confirm: Mock<typeof Blockly.dialog.confirm>
-let originalPrompt: typeof Blockly.dialog.prompt
-let originalConfirm: typeof Blockly.dialog.confirm
 
 /** A block using `x` through its `VAR` field (`variables_get`, `variables_set`).
  * Built from state, as a load does: `newBlock` would first create Blockly's
@@ -51,8 +49,6 @@ beforeEach(() => {
   installVariableField()
   workspace = new Blockly.Workspace()
   x = workspace.getVariableMap().createVariable('x', '')
-  originalPrompt = Blockly.dialog.prompt
-  originalConfirm = Blockly.dialog.confirm
   prompt = vi.fn<typeof Blockly.dialog.prompt>()
   confirm = vi.fn<typeof Blockly.dialog.confirm>()
   Blockly.dialog.setPrompt(prompt)
@@ -60,8 +56,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  Blockly.dialog.setPrompt(originalPrompt)
-  Blockly.dialog.setConfirm(originalConfirm)
+  Blockly.dialog.setPrompt()
+  Blockly.dialog.setConfirm()
   workspace.dispose()
 })
 

@@ -305,7 +305,10 @@ i18n. O wordmark é Barlow Condensed 600 minúsculo, tracking −1%.
   além do anel de foco.
 - **Controles**: 36 px de altura; 44 px em telas de toque e formulários de
   autenticação. Botões: primário (tinta), marca (vermelho, um por tela),
-  contorno, fantasma, destrutivo (contorno crimson).
+  contorno, fantasma, destrutivo (contorno crimson). Campos de formulário
+  (`Input`, `Textarea`, gatilho do `Select`) usam o preenchimento `card` nos
+  dois temas, sobre papel, cartão ou diálogo; o estado de erro muda só a borda
+  e o texto, nunca o fundo (#313).
 - **Badges**: dificuldade (Fácil verde / Médio âmbar-texto / Difícil crimson,
   contorno), estado (Publicado sólido tinta, Rascunho cinza, Arquivado cinza
   riscado, Aberta com ponto vermelho, Encerrada cinza), visibilidade (Prática

@@ -2,7 +2,7 @@ import { performance } from 'node:perf_hooks'
 
 import type { LoadConfig } from './config'
 import type { Recorder } from './recorder'
-import { kindAt, sleep } from './schedule'
+import { kindAt, sleep, submissionIndex } from './schedule'
 import { detailOf, isStaleSocket, readErrorCode, type Transport } from './transport'
 import { classifyVerdict, rejectedVerdict, type SubmissionKind } from './verdict'
 import { WORKSPACES } from './workspaces'
@@ -11,9 +11,12 @@ import type { LoadTeam, LoadUser, World } from './world'
 // The submission load (#136): one loop per team, as a team would play —
 // one submission at a time (the back allows one in flight per team), the
 // cooldown after each, the members taking turns, and the team's k-th
-// submission on the round's problem k mod n (#138). The kind of each
-// submission comes from a global index, so the sequence is the same on
-// every run with the same config.
+// submission on the round's problem k mod n (#138). Each team sends its own
+// fixed share of the total (#453): its k-th submission is global index
+// k·T + t, so a slow team (an infinite loop takes several JUDGE_TIMEOUT_MS)
+// never loses its turns to the fast ones. The kind of each submission comes
+// from that index, so it is the same per (team, turn) on every run with the
+// same config.
 
 // Retries of a 429 before the submission counts as rejected.
 export const MAX_THROTTLE_RETRIES = 3
@@ -100,8 +103,9 @@ async function submitOne({
 }
 
 /**
- * Sends `config.submissions` submissions in total, spread over the teams, and
- * stops starting new ones at `deadline` (epoch ms) or when `signal` aborts.
+ * Sends `config.submissions` submissions in total, each team its own fixed
+ * share (team t of T sends ceil((N−t)/T), see `submissionIndex`), and stops
+ * starting new ones at `deadline` (epoch ms) or when `signal` aborts.
  * Resolves when every loop is done; what is in flight at the deadline is
  * bounded by the transport's request timeout.
  */
@@ -129,16 +133,15 @@ export async function runSubmissions({
     throw new Error('a run with submissions needs a round and a problem')
   }
   const memoryShare = config.memoryShare ?? 0
-  let next = 0
+  const teams = world.teams.length
 
-  const teamLoop = async (team: LoadTeam) => {
-    let turn = 0
-    while (!signal?.aborted && clock() < deadline && next < config.submissions) {
-      const index = next
-      next += 1
+  const teamLoop = async (team: LoadTeam, teamIndex: number) => {
+    const indexAt = (turn: number) => submissionIndex(turn, teamIndex, teams)
+    for (let turn = 0; ; turn++) {
+      const index = indexAt(turn)
+      if (signal?.aborted || clock() >= deadline || index >= config.submissions) return
       const member = team.members[turn % team.members.length]
       const problemId = problemIds[turn % problemIds.length] as string
-      turn += 1
       if (!member) return
       const kind: SubmissionKind = kindAt(index, config.badFraction, memoryShare)
       await submitOne({
@@ -150,9 +153,11 @@ export async function runSubmissions({
         cooldownMs: config.cooldownMs,
         signal,
       })
-      // No cooldown after the last one: with --until-done it would only
-      // stretch the load phase.
-      if (config.cooldownMs > 0 && next < config.submissions) await sleep(config.cooldownMs, signal)
+      // No cooldown after this team's last one: with --until-done it would
+      // only stretch the load phase.
+      if (config.cooldownMs > 0 && indexAt(turn + 1) < config.submissions) {
+        await sleep(config.cooldownMs, signal)
+      }
     }
   }
 

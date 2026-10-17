@@ -30,6 +30,16 @@
 # reason) keeps the worktree untouched, with the command to unlock it. And a
 # `git worktree remove` that fails anyway is never counted as removed.
 #
+# The branch on origin goes too (#465), for every worktree whose branch is
+# merged — even one kept for its dirt or its lock: deleting the remote ref of
+# a merged PR destroys nothing local, and a later push recreates it. Only a
+# `task/*` branch, and only when gh reports a PR into develop MERGED whose
+# head is exactly the sha origin has now (`git ls-remote`): with squash-merge
+# that is what "nothing pushed after the merge" means. No merged PR, another
+# head, gh or ls-remote failing — the branch stays, with the reason and the
+# command to delete it by hand. A branch origin no longer has is left alone.
+# `--dry-run` still runs ls-remote and gh (read-only), and pushes nothing.
+#
 # Usage: pnpm worktree:prune [--dry-run]
 set -uo pipefail
 
@@ -115,40 +125,86 @@ drop_databases() {
   return "$drop_status"
 }
 
-removed=0
-kept=0
-while IFS= read -r line; do
-  path="${line#worktree }"
-  [ "$path" = "$main" ] && continue
-  branch="$(git -C "$path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+# origin's task/* heads, listed once: `<sha>\trefs/heads/task/...` lines. When
+# ls-remote fails, no remote branch is deleted this run.
+remote_ok=1
+if ! remote_heads="$(git ls-remote --heads origin 'refs/heads/task/*' 2>/dev/null)"; then
+  remote_ok=0
+  echo "worktree-prune: could not list origin's task/* branches — no remote branch is deleted this run"
+fi
+
+# delete_remote <branch>: origin's copy of a merged branch, under the rule in
+# the header. Prints one indented line under the worktree's own.
+delete_remote() {
+  local b="$1" remote_sha number head pr="" by_hand="git push origin --delete $1"
+  case "$b" in
+    task/*) ;;
+    *) return ;; # never develop, main or another prefix
+  esac
+  [ "$remote_ok" = 1 ] || return # warned once already
+  remote_sha="$(awk -v r="refs/heads/$b" '$2 == r { print $1 }' <<<"$remote_heads")"
+  [ -n "$remote_sha" ] || return # origin no longer has it
+  [ "$prs_branch" = "$b" ] || merged_prs "$b"
+  if [ "$prs_rc" != 0 ]; then
+    echo "        origin/$b: kept (gh could not list its merged PRs) — by hand: $by_hand"
+    return
+  fi
+  if [ -z "$prs_out" ]; then
+    echo "        origin/$b: kept (gh knows no PR from it merged into develop)"
+    return
+  fi
+  while read -r number head; do
+    [ "$head" = "$remote_sha" ] && pr="$number"
+  done <<<"$prs_out"
+  if [ -z "$pr" ]; then
+    echo "        origin/$b: kept (origin has commits after the head its merged PR had) — by hand: $by_hand"
+    return
+  fi
+  if [ "$dry_run" = 1 ]; then
+    echo "        origin/$b: would delete (PR #$pr)"
+  elif git push -q origin --delete "$b" 2>/dev/null; then
+    echo "        origin/$b: deleted (PR #$pr)"
+  else
+    echo "        origin/$b: kept (the push failed) — by hand: $by_hand"
+    return
+  fi
+  remote_deleted=$((remote_deleted + 1))
+}
+
+# prune_tree <worktree>: one worktree's verdict. Sets $branch, and $merged=1
+# once the branch is known merged — what the remote step needs.
+prune_tree() {
+  local path="$1" name reason ids err
   name="$(basename "$path")"
+  branch="$(git -C "$path" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 
   if [ -z "$branch" ]; then
     echo "keep    $name  (detached HEAD)"
     kept=$((kept + 1))
-    continue
+    return
   fi
   if [ "$(git rev-parse "$branch")" = "$(git rev-parse origin/develop)" ]; then
     echo "keep    $name  ($branch has no commits of its own yet)"
     kept=$((kept + 1))
-    continue
+    return
   fi
   if ! is_merged "$branch"; then
     echo "keep    $name  ($branch not merged into develop, or its PR state could not be checked)"
     kept=$((kept + 1))
-    continue
+    return
   fi
+  merged=1
   if [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
     echo "keep    $name  ($branch merged, but the tree has uncommitted changes)"
     kept=$((kept + 1))
-    continue
+    return
   fi
   if reason="$(lock_reason "$path")"; then
     if ! stale_harness_lock "$path" "$reason"; then
       echo "keep    $name  ($branch merged, clean, but locked: ${reason:-no reason given})"
       echo "        once its agent has returned: git worktree unlock $path — then prune again"
       kept=$((kept + 1))
-      continue
+      return
     fi
     if [ "$dry_run" = 1 ]; then
       echo "would unlock  $name  (stale harness lock: pid $lock_pid is gone)"
@@ -157,7 +213,7 @@ while IFS= read -r line; do
       if ! git worktree unlock "$path"; then
         echo "        kept instead: git worktree unlock failed"
         kept=$((kept + 1))
-        continue
+        return
       fi
     fi
   fi
@@ -167,7 +223,7 @@ while IFS= read -r line; do
     drop_databases "$path" --dry-run ||
       echo "        db:drop-worktree failed (exit $drop_status) — a real run would keep it"
     removed=$((removed + 1))
-    continue
+    return
   fi
 
   echo "remove  $name  ($branch merged, clean)"
@@ -175,7 +231,7 @@ while IFS= read -r line; do
   if ! drop_databases "$path"; then
     echo "        kept instead: db:drop-worktree failed (exit $drop_status) — the next prune retries"
     kept=$((kept + 1))
-    continue
+    return
   fi
   if [ -f "$path/docker-compose.yml" ]; then
     docker compose --project-directory "$path" -f "$path/docker-compose.yml" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -190,15 +246,26 @@ while IFS= read -r line; do
     printf '%s\n' "$err" | sed 's/^/        /'
     echo "        kept instead: git worktree remove failed (its databases were already dropped)"
     kept=$((kept + 1))
-    continue
+    return
   fi
   git branch -D "$branch" >/dev/null || echo "        could not delete the local branch $branch"
   removed=$((removed + 1))
+}
+
+removed=0
+kept=0
+remote_deleted=0
+while IFS= read -r line; do
+  path="${line#worktree }"
+  [ "$path" = "$main" ] && continue
+  merged=0
+  prune_tree "$path"
+  [ "$merged" = 1 ] && delete_remote "$branch"
 done < <(git worktree list --porcelain | grep '^worktree ')
 
 git worktree prune
 if [ "$dry_run" = 1 ]; then
-  echo "worktree-prune: $removed would be removed, $kept kept (dry run)"
+  echo "worktree-prune: $removed would be removed, $kept kept, $remote_deleted remote branches would be deleted (dry run)"
 else
-  echo "worktree-prune: $removed removed, $kept kept"
+  echo "worktree-prune: $removed removed, $kept kept, $remote_deleted remote branches deleted"
 fi

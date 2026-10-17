@@ -51,12 +51,12 @@ function HowItWorksScreen() {
           <Button
             type="button"
             data-testid="how-it-works-start-tour"
-            className="h-11 bg-brand text-brand-foreground shadow-none hover:bg-brand-hover md:h-9"
+            className="h-11 bg-brand text-brand-foreground hover:bg-brand-hover md:h-9"
             onClick={startTour}
           >
             {t('howItWorks.startTour')}
           </Button>
-          <Button asChild variant="outline" className="h-11 shadow-none md:h-9">
+          <Button asChild variant="outline" className="h-11 md:h-9">
             <Link to="/practice" data-testid="how-it-works-practice-link">
               {t('howItWorks.practiceLink')}
             </Link>

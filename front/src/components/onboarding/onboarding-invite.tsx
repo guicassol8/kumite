@@ -47,7 +47,7 @@ export function OnboardingInvite() {
           <Button
             type="button"
             data-testid="onboarding-invite-accept"
-            className="h-11 bg-brand text-brand-foreground shadow-none hover:bg-brand-hover md:h-9"
+            className="h-11 bg-brand text-brand-foreground hover:bg-brand-hover md:h-9"
             onClick={accept}
           >
             {t('onboarding.invite.accept')}
@@ -56,7 +56,7 @@ export function OnboardingInvite() {
             type="button"
             variant="outline"
             data-testid="onboarding-invite-decline"
-            className="h-11 shadow-none md:h-9"
+            className="h-11 md:h-9"
             onClick={decline}
           >
             {t('onboarding.invite.decline')}

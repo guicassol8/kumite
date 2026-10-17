@@ -34,7 +34,7 @@ export function LanguageSelector() {
           data-testid={`language-option-${lang}`}
           // The corners belong to the group, not to each option, and the
           // segments are divided by a hairline rather than by a gap.
-          className="rounded-none border-chrome-foreground/25 border-l px-1.5 shadow-none first:border-l-0 xl:px-2"
+          className="rounded-none border-chrome-foreground/25 border-l px-1.5 first:border-l-0 xl:px-2"
           onClick={() => i18n.changeLanguage(lang)}
         >
           {lang.toUpperCase()}

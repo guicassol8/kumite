@@ -73,7 +73,9 @@ at PR creation.
 
 After the PR merges, clean up from the main checkout — this removes every
 worktree whose branch already landed on `origin/develop` and is clean, with
-its throwaway Postgres:
+its throwaway Postgres, and deletes `origin/task/<N>-<slug>` once its PR is
+MERGED at the head origin has (a locked worktree is kept, with the unlock
+command — `docs/workflow.md` § Worktrees):
 
 ```bash
 pnpm worktree:prune          # --dry-run to list first

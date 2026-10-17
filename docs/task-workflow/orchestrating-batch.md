@@ -219,13 +219,30 @@ ladder in the Evidence, and the question says so. Ask explicitly, then:
 gh pr merge <PR> --squash          # no --delete-branch: it fails while the
                                    # branch is checked out in a worktree
 gh issue view <N> --json state     # Fixes #N closed it (develop is the default)
-pnpm worktree:prune                # from the main checkout; --dry-run first
-git branch -D task/<N>-<slug>      # only if it survived the prune
+pnpm worktree:prune --dry-run      # from the main checkout: read it first
+pnpm worktree:prune
 ```
 
 `reviewing-tasks.md` § Verdict prints `--delete-branch`; in batch mode the
 implementation worktree is usually still around, so drop the flag and let
-`pnpm worktree:prune` do the cleanup. `develop` is the default branch (#400),
+`pnpm worktree:prune` do the cleanup — the remote branch included: it deletes
+`origin/task/<N>-<slug>` when gh reports the PR MERGED at the very head
+origin has, and otherwise prints why it kept it and the command to delete it
+by hand (#465).
+
+The implementer's worktree (`.claude/worktrees/agent-<id>`) stays locked by
+the harness while **this** session lives, so the prune prints `keep …
+locked: claude agent agent-<id> (pid <P> …)` for it — the pid is this
+session's. Once that agent has returned, unlock it and prune again; the
+second run drops its databases and removes the worktree and its local branch:
+
+```bash
+git worktree unlock <path>         # the path the keep line printed
+pnpm worktree:prune
+```
+
+The prune unlocks on its own only a lock whose pid is gone (a session that
+ended); any other lock it leaves alone. `develop` is the default branch (#400),
 so `Fixes #N` closes the issue on merge; `gh issue close <N> --reason
 completed` only if it stayed open.
 

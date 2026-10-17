@@ -182,11 +182,32 @@ pnpm worktree:env   # its own database and ports (below) — when it runs the ap
   Postgres unreachable the step only reports it, and the worktree still goes —
   its `worktree:env` database is then left behind, to drop by hand. Dirty trees and unmerged branches are
   always kept — they may be another agent's.
+
+  Locked worktrees (#465): the harness locks each worktree it creates
+  (`claude agent agent-<id> (pid <P> start <S>)`) for as long as the session
+  that created it lives. The prune reads the lock before dropping anything:
+  the harness's own lock for that directory whose pid is gone is unlocked and
+  the worktree pruned as usual; any other lock — a live pid, typically the
+  session running the prune — is `keep … locked`, untouched, with the
+  `git worktree unlock <path>` to run once its agent has returned
+  (`orchestrating-batch.md` § 4c). A `git worktree remove` that fails anyway
+  is reported as kept, never as removed.
+
+  The remote branch goes too (#465): for every worktree whose branch is
+  merged — a kept one included — the prune deletes `origin/<branch>` when the
+  branch is `task/*` and gh reports a PR into `develop` MERGED whose head is
+  exactly the sha origin has now (with squash-merge, that is "nothing pushed
+  after the merge"). No merged PR, a different head, gh or `ls-remote`
+  failing: the branch stays, with the reason and the manual `git push origin
+  --delete`. The summary counts the remote branches deleted. The smoke is
+  `bash scripts/worktree-prune-smoke.sh`.
 - Playwright writes every spec's screenshots to `front/e2e/evidence/<n>/`,
   which git ignores (#402): a run never leaves changes behind, and the
   review attaches its own issue's folder to the PR instead of committing it.
 - In Claude Code, prefer the harness's managed isolation (EnterWorktree /
-  subagent `isolation: "worktree"`) — it creates and cleans worktrees itself.
+  subagent `isolation: "worktree"`) — it creates the worktrees, and keeps
+  each locked while the session that created it lives; `pnpm worktree:prune`
+  cleans them up (see the locked-worktrees paragraph above).
 
 ## Gate ladder — before opening or updating a PR
 

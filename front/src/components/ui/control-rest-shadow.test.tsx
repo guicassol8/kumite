@@ -44,13 +44,11 @@ const cases: Case[] = [
   { name: 'Textarea', ui: <Textarea data-testid="c" />, hasErrorState: true },
   {
     name: 'PasswordInput',
-
     ui: <PasswordInput data-testid="c" />,
     hasErrorState: true,
   },
   {
     name: 'SelectTrigger',
-
     ui: (
       <Select>
         <SelectTrigger data-testid="c">
@@ -64,7 +62,6 @@ const cases: Case[] = [
   { name: 'Switch', ui: <Switch data-testid="c" />, hasErrorState: false },
   ...BUTTON_VARIANTS.map((variant) => ({
     name: `Button ${variant}`,
-
     ui: (
       <Button data-testid="c" variant={variant}>
         Ok

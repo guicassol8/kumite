@@ -132,7 +132,7 @@ export function ActionsBar({
         // edge of the bar (identity § 5: "marca (vermelho, um por tela)").
         <Button
           type="button"
-          className="ml-auto bg-brand text-brand-foreground shadow-none hover:bg-brand-hover"
+          className="ml-auto bg-brand text-brand-foreground hover:bg-brand-hover"
           data-testid="problem-submit-button"
           disabled={isSubmitting || isPaused}
           onClick={onSubmit}

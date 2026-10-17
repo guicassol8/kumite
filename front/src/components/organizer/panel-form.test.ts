@@ -33,6 +33,10 @@ describe('panel form class tokens', () => {
     expect(PANEL_BRAND_BUTTON).not.toContain('bg-primary')
   })
 
+  it('the brand button carries no shadow utility (§ 5, #458: the Button primitive has none to cancel)', () => {
+    expect(PANEL_BRAND_BUTTON).not.toContain('shadow')
+  })
+
   it('headings and dialog titles use the display face', () => {
     expect(PANEL_FORM_HEADING).toContain('font-display')
     expect(PANEL_FORM_HEADING).toContain('uppercase')

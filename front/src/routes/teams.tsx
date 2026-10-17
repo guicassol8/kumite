@@ -234,7 +234,7 @@ function TeamsScreen() {
             type="button"
             data-testid="teams-create-open"
             onClick={openCreateDialog}
-            className="h-11 shadow-none md:h-9"
+            className="h-11 md:h-9"
           >
             {t('teams.createAction')}
           </Button>
@@ -302,7 +302,7 @@ function TeamsScreen() {
                 data-testid="my-team-leave"
                 disabled={myTeam.frozen || leave.isPending}
                 onClick={() => setLeaveDialogOpen(true)}
-                className="h-11 shadow-none md:h-8"
+                className="h-11 md:h-8"
               >
                 {t('teams.myTeam.leaveAction')}
               </Button>
@@ -444,7 +444,7 @@ function TeamsScreen() {
                           type="button"
                           size="sm"
                           variant={team.slotsAvailable === 0 ? 'ghost' : 'outline'}
-                          className={`h-11 shadow-none md:h-8 ${team.slotsAvailable === 0 ? 'text-muted-foreground disabled:opacity-100' : ''}`}
+                          className={`h-11 md:h-8 ${team.slotsAvailable === 0 ? 'text-muted-foreground disabled:opacity-100' : ''}`}
                           data-testid={`teams-join-${team.id}`}
                           disabled={team.joinBlockedReason !== null || join.isPending}
                           onClick={() => join.mutate(team.id)}

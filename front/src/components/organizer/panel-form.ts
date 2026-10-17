@@ -49,7 +49,7 @@ export const PANEL_MONO = 'font-mono text-[13px] leading-5 md:text-[13px]'
  * the problem form, "Abrir rodada" inside its confirmation dialog. Same string
  * the problem screen already uses in `components/problem/actions-bar.tsx`.
  */
-export const PANEL_BRAND_BUTTON = 'bg-brand text-brand-foreground shadow-none hover:bg-brand-hover'
+export const PANEL_BRAND_BUTTON = 'bg-brand text-brand-foreground hover:bg-brand-hover'
 
 /** Dialog title as an H2, matching the participant dialogs restyled by #222. */
 export const PANEL_DIALOG_TITLE = 'font-display font-semibold text-2xl'

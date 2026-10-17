@@ -167,7 +167,7 @@ function Home() {
                 <Button
                   asChild
                   data-testid="home-round-cta"
-                  className="h-11 shrink-0 bg-brand text-brand-foreground shadow-none hover:bg-brand-hover"
+                  className="h-11 shrink-0 bg-brand text-brand-foreground hover:bg-brand-hover"
                 >
                   <Link to="/rounds/$id" params={{ id: eventStream.currentRoundId }}>
                     {t('home.round.cta')}
@@ -224,7 +224,7 @@ function Home() {
                 variant="outline"
                 size="sm"
                 data-testid="home-team-cta"
-                className="h-11 shadow-none md:h-8"
+                className="h-11 md:h-8"
               >
                 <Link to="/teams">{t('home.team.cta')}</Link>
               </Button>

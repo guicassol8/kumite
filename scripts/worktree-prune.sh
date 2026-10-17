@@ -21,6 +21,15 @@
 # (its back/.env is what names its database), for the next prune to retry;
 # Postgres down is only reported.
 #
+# A locked worktree is checked before anything is dropped (#465). The harness
+# locks the worktrees it creates for subagents (`claude agent agent-<id> (pid
+# <P> start <S>)`) for as long as the session that created them lives — and in
+# a batch that is the session running this prune. A lock in that format, for
+# this very directory, whose pid no longer exists is stale: it is unlocked and
+# the worktree pruned as usual. Any other lock (a live pid, another format, no
+# reason) keeps the worktree untouched, with the command to unlock it. And a
+# `git worktree remove` that fails anyway is never counted as removed.
+#
 # Usage: pnpm worktree:prune [--dry-run]
 set -uo pipefail
 
@@ -59,11 +68,42 @@ fi
 # ancestors of origin/develop — the ancestor check only covers a fast-forward.
 # The PR's own state is the source of truth; when gh cannot answer (network
 # down on this machine happens), the branch is kept.
+#
+# merged_prs <branch>: the one gh query, kept for the branch it asked about —
+# $prs_branch, $prs_out (lines `<number> <headRefOid>`) and $prs_rc.
+merged_prs() {
+  prs_branch="$1"
+  prs_out="$(gh pr list --head "$1" --base develop --state merged \
+    --json number,headRefOid --jq '.[] | "\(.number) \(.headRefOid)"' 2>/dev/null)"
+  prs_rc=$?
+}
 is_merged() {
+  prs_branch=""
   git merge-base --is-ancestor "$1" origin/develop 2>/dev/null && return 0
-  local merged
-  merged="$(gh pr list --head "$1" --base develop --state merged --json number --jq 'length' 2>/dev/null || true)"
-  [ "${merged:-0}" -gt 0 ] 2>/dev/null
+  merged_prs "$1"
+  [ "$prs_rc" = 0 ] && [ -n "$prs_out" ]
+}
+
+# lock_reason <worktree>: prints its lock reason (empty for a bare lock) and
+# returns 0 when it is locked, 1 when it is not.
+lock_reason() {
+  git worktree list --porcelain | awk -v p="$1" '
+    /^worktree / { cur = substr($0, 10); next }
+    cur == p && /^locked( |$)/ { print substr($0, 8); found = 1; exit }
+    END { exit !found }'
+}
+
+# stale_harness_lock <worktree> <reason>: 0 when the reason is the harness's
+# own lock for this directory and its pid is gone ($lock_pid keeps it). A live
+# pid, another format, another agent-<id> or no `ps` all return 1 — a reused
+# pid only keeps the worktree, the safe side.
+stale_harness_lock() {
+  local re='^claude agent (agent-[0-9a-f]+) \(pid ([0-9]+)( start [0-9]+)?\)$'
+  [[ "$2" =~ $re ]] || return 1
+  [ "${BASH_REMATCH[1]}" = "$(basename "$1")" ] || return 1
+  lock_pid="${BASH_REMATCH[2]}"
+  command -v ps >/dev/null 2>&1 || return 1
+  ! ps -p "$lock_pid" >/dev/null 2>&1
 }
 
 # drop_databases <worktree> [--dry-run]: its local Postgres databases (#395).
@@ -103,6 +143,24 @@ while IFS= read -r line; do
     kept=$((kept + 1))
     continue
   fi
+  if reason="$(lock_reason "$path")"; then
+    if ! stale_harness_lock "$path" "$reason"; then
+      echo "keep    $name  ($branch merged, clean, but locked: ${reason:-no reason given})"
+      echo "        once its agent has returned: git worktree unlock $path — then prune again"
+      kept=$((kept + 1))
+      continue
+    fi
+    if [ "$dry_run" = 1 ]; then
+      echo "would unlock  $name  (stale harness lock: pid $lock_pid is gone)"
+    else
+      echo "unlock  $name  (stale harness lock: pid $lock_pid is gone)"
+      if ! git worktree unlock "$path"; then
+        echo "        kept instead: git worktree unlock failed"
+        kept=$((kept + 1))
+        continue
+      fi
+    fi
+  fi
 
   if [ "$dry_run" = 1 ]; then
     echo "would remove  $name  ($branch merged, clean)"
@@ -126,8 +184,15 @@ while IFS= read -r line; do
   # task-<N>-<slug>-db, review-<PR>-db) — only ones whose name starts with it.
   ids="$(docker ps -aq --filter "name=^${name}" 2>/dev/null || true)"
   [ -n "$ids" ] && docker rm -f -v $ids >/dev/null 2>&1 || true
-  git worktree remove --force "$path"
-  git branch -D "$branch" >/dev/null
+  # A remove that fails (a lock taken meanwhile, a busy file) must not count as
+  # removed, nor take the branch the worktree still has checked out.
+  if ! err="$(git worktree remove --force "$path" 2>&1)"; then
+    printf '%s\n' "$err" | sed 's/^/        /'
+    echo "        kept instead: git worktree remove failed (its databases were already dropped)"
+    kept=$((kept + 1))
+    continue
+  fi
+  git branch -D "$branch" >/dev/null || echo "        could not delete the local branch $branch"
   removed=$((removed + 1))
 done < <(git worktree list --porcelain | grep '^worktree ')
 

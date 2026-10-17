@@ -2,24 +2,34 @@ import { createServer, type Socket } from 'node:net'
 
 import { describe, expect, it } from 'vitest'
 
-import { app } from '../app'
-
 import { createRecorder } from './recorder'
+import type { FetchLike } from './sse-client'
 import { createTransport, detailOf, resendIfStale } from './transport'
 
+// #464: these cases test the transport — what it records and what it hands
+// back — not the database. They used to answer through `app.request`, and a
+// real GET /health is a `select 1` with a 500 ms ceiling (#287, #363): on a
+// machine loaded by other suites it answered 503 `degraded`, by design, and
+// the test failed for a latency it does not control. A local fetch answering
+// what the route's contract answers keeps the typed client (`hc<AppType>`)
+// building the request, with no database in the loop; the in-process path
+// stays covered by world, submitter, scenarios and sse-client tests.
+const healthy: FetchLike = async () => Response.json({ status: 'ok' })
+
 describe('createTransport', () => {
-  it('records a request made through the typed client, in-process', async () => {
+  it('records a request made through the typed client', async () => {
     const recorder = createRecorder()
     const transport = createTransport({
       baseUrl: 'http://localhost',
       recorder,
       requestTimeoutMs: 10_000,
-      fetch: async (input, init) => app.request(input, init),
+      fetch: healthy,
     })
 
     const res = await transport.api().health.$get()
 
     expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: 'ok' })
     expect(recorder.snapshot().http.rest?.['GET /health']).toMatchObject({
       count: 1,
       byStatus: { '200': 1 },
@@ -179,7 +189,7 @@ describe('createTransport', () => {
       fetch: async (input, init) => {
         const next = errors.shift()
         if (next) throw next()
-        return app.request(input, init)
+        return healthy(input, init)
       },
       resendStale: true,
     })

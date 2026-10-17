@@ -230,11 +230,12 @@ implementation worktree is usually still around, so drop the flag and let
 origin has, and otherwise prints why it kept it and the command to delete it
 by hand (#465).
 
-The implementer's worktree (`.claude/worktrees/agent-<id>`) stays locked by
-the harness while **this** session lives, so the prune prints `keep …
-locked: claude agent agent-<id> (pid <P> …)` for it — the pid is this
-session's. Once that agent has returned, unlock it and prune again; the
-second run drops its databases and removes the worktree and its local branch:
+The harness locks the implementer's worktree (`.claude/worktrees/agent-<id>`)
+while its agent runs, and the lock can outlive the agent (#462, #463). When it
+is still there, the prune prints `keep … locked: claude agent agent-<id> (pid
+<P> …)` for it — the pid is this session's. Once that agent has returned,
+unlock it and prune again; the second run drops its databases and removes the
+worktree and its local branch (with no lock left, the first run already does):
 
 ```bash
 git worktree unlock <path>         # the path the keep line printed

@@ -23,12 +23,13 @@
 #
 # A locked worktree is checked before anything is dropped (#465). The harness
 # locks the worktrees it creates for subagents (`claude agent agent-<id> (pid
-# <P> start <S>)`) for as long as the session that created them lives — and in
-# a batch that is the session running this prune. A lock in that format, for
-# this very directory, whose pid no longer exists is stale: it is unlocked and
-# the worktree pruned as usual. Any other lock (a live pid, another format, no
-# reason) keeps the worktree untouched, with the command to unlock it. And a
-# `git worktree remove` that fails anyway is never counted as removed.
+# <P> start <S>)`) while the agent runs, and at times past its return; <P> is
+# the session that spawned it — in a batch, the session running this prune. A
+# lock in that format, for this very directory, whose pid no longer exists is
+# stale: it is unlocked and the worktree pruned as usual. Any other lock (a
+# live pid, another format, no reason) keeps the worktree untouched, with the
+# command to unlock it. And a `git worktree remove` that fails anyway is never
+# counted as removed.
 #
 # The branch on origin goes too (#465), for every worktree whose branch is
 # merged — even one kept for its dirt or its lock: deleting the remote ref of

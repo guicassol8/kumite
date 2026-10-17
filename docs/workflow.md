@@ -184,8 +184,10 @@ pnpm worktree:env   # its own database and ports (below) — when it runs the ap
   always kept — they may be another agent's.
 
   Locked worktrees (#465): the harness locks each worktree it creates
-  (`claude agent agent-<id> (pid <P> start <S>)`) for as long as the session
-  that created it lives. The prune reads the lock before dropping anything:
+  (`claude agent agent-<id> (pid <P> start <S>)`, `<P>` the session that
+  spawned the agent) while its agent runs, and the lock can outlive the agent
+  (#462 and #463 were still locked at the prune; #465's was gone once its
+  agent returned). The prune reads the lock before dropping anything:
   the harness's own lock for that directory whose pid is gone is unlocked and
   the worktree pruned as usual; any other lock — a live pid, typically the
   session running the prune — is `keep … locked`, untouched, with the
@@ -205,8 +207,8 @@ pnpm worktree:env   # its own database and ports (below) — when it runs the ap
   which git ignores (#402): a run never leaves changes behind, and the
   review attaches its own issue's folder to the PR instead of committing it.
 - In Claude Code, prefer the harness's managed isolation (EnterWorktree /
-  subagent `isolation: "worktree"`) — it creates the worktrees, and keeps
-  each locked while the session that created it lives; `pnpm worktree:prune`
+  subagent `isolation: "worktree"`) — it creates the worktrees, and locks
+  each while its agent runs (at times longer); `pnpm worktree:prune`
   cleans them up (see the locked-worktrees paragraph above).
 
 ## Gate ladder — before opening or updating a PR

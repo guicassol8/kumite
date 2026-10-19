@@ -29,8 +29,8 @@ const TIMEOUT_MS = 2000
 const MEMORY_MB = 64
 // A backstop for a worker that never replies, not a clock any case races.
 // It was raised to 20 s for the old `while (true)` Array bomb, which took
-// 3.4-8 s to trip with the machine idle. Under load it took longer still:
-// 15 of 20 runs hit this watchdog with nproc × 2 CPU burners up (#469). That
+// 3.4-9.6 s to trip with the machine idle. Under load it took longer still:
+// 3 of 20 runs hit this watchdog with two full suites looping (#469). That
 // is why the memory case below is now one oversized allocation, refused in
 // milliseconds; the slow Array form is ADR-0001's, still covered by
 // judge.test.ts.
@@ -122,14 +122,14 @@ describe('sandbox engine (ADR-0001: quickjs-emscripten inside worker_thread)', (
     timeout: MEMORY_TEST_TIMEOUT_MS,
   }, async () => {
     // One allocation of twice MEMORY_MB: setMemoryLimit refuses it in
-    // milliseconds (16 ms p50, 92 ms max with nproc × 2 CPU burners up,
+    // milliseconds (37 ms p50, 160 ms max with two full suites looping,
     // #469), far from TIMEOUT_MS. Without setMemoryLimit it succeeds and
     // returns the byte length, so this case goes red on `ok` — the old
     // `while (true)` bomb could not tell: it also ended as 'memory' with no
-    // limit at all, at the WASM heap's ~2 GiB ceiling. It has to be a single
-    // allocation: this QuickJS build cannot measure a block's usable size, so
-    // the limit is per allocation, not a running total, and 16 × 8 MiB of
-    // ArrayBuffers comes back ok (#469's ## Causa).
+    // limit at all, at the WASM heap's ceiling. It has to be a single
+    // allocation: in this QuickJS build the limit refuses one block larger
+    // than itself, not a running total, so 16 × 8 MiB of ArrayBuffers comes
+    // back ok (#469's ## Causa; the production gap is #473).
     const source = `function solve(input) { const b = new ArrayBuffer(${2 * MEMORY_MB * 1024 * 1024}); return b.byteLength }`
     const result = await runOneCaseInWorker({ source, input: [] })
     console.log('sandbox-engine: memory bomb stopped after', result.ms.toFixed(2), 'ms')

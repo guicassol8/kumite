@@ -60,6 +60,30 @@ test.describe('the screenshot pixel meter (#258)', () => {
     )
   })
 
+  test('reads a transparent element against the ancestor named as painting it', async ({
+    page,
+  }) => {
+    await mount(
+      page,
+      `<div data-testid="page" style="padding:20px;background:#120f0d">
+         <div data-testid="bar" style="height:40px"></div>
+       </div>
+       <div data-testid="light" style="height:40px;background:rgb(242,240,236)"></div>`,
+    )
+    const png = await page.screenshot()
+
+    const painted = await expectPaintedAsComputed(page, page.getByTestId('bar'), png, {
+      paintedBy: page.getByTestId('page'),
+    })
+    expect(painted).toEqual({ r: 18, g: 15, b: 13 })
+    // The point is still the bar's: naming the wrong ancestor fails.
+    await expect(
+      expectPaintedAsComputed(page, page.getByTestId('bar'), png, {
+        paintedBy: page.getByTestId('light'),
+      }),
+    ).rejects.toThrow(/painted rgb\(18, 15, 13\) but computes rgb\(242, 240, 236\)/)
+  })
+
   test('refuses an element that does not paint its own background', async ({ page }) => {
     await mount(page, '<div data-testid="see-through" style="width:120px;height:80px"></div>')
     const png = await page.screenshot()

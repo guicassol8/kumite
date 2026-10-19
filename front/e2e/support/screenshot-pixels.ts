@@ -65,7 +65,7 @@ export function opaqueBackground(locator: Locator): Promise<Rgb> {
       const id = el.closest('[data-testid]')?.getAttribute('data-testid') ?? el.tagName
       throw new Error(
         `expectPaintedAsComputed: the background of "${id}" is not opaque (${value}) — ` +
-          'sample an element that paints its own background',
+          'sample an element that paints its own background, or name it in `paintedBy`',
       )
     }
     return { r, g, b }
@@ -79,14 +79,23 @@ export type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
  * inside one of its corners (top-left by default), within ±3 per channel —
  * the divergence #258 is about: computed dark, painted light. Returns the
  * colour that was expected, so a caller can also check it is the right one.
+ *
+ * A transparent element (a bar laid straight on the page) names the ancestor
+ * whose background shows through it in `paintedBy` — `body`, say: the point
+ * is still taken inside `locator`, the colour from `paintedBy`, and it is
+ * `paintedBy` that must be opaque.
  */
 export async function expectPaintedAsComputed(
   page: Page,
   locator: Locator,
   png: Buffer,
-  { inset = 4, corner = 'top-left' }: { inset?: number; corner?: Corner } = {},
+  {
+    inset = 4,
+    corner = 'top-left',
+    paintedBy = locator,
+  }: { inset?: number; corner?: Corner; paintedBy?: Locator } = {},
 ): Promise<Rgb> {
-  const expected = await opaqueBackground(locator)
+  const expected = await opaqueBackground(paintedBy)
   const box = await locator.boundingBox()
   if (!box) throw new Error('expectPaintedAsComputed: the element is not laid out')
   const x = corner.endsWith('left') ? box.x + inset : box.x + box.width - 1 - inset

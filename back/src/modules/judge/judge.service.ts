@@ -8,7 +8,11 @@ import { JUDGE_CONCURRENCY, JUDGE_MEMORY_MB, JUDGE_TIMEOUT_MS } from '../../conf
 import type { JsonValue } from '../../lib/json'
 import type { Locale } from '../../lib/locale'
 import { pushBounded } from '../../lib/ring'
-import type { SandboxCaseRequest, SandboxResult } from '../../sandbox-engine.worker'
+import type {
+  SandboxCaseRequest,
+  SandboxResult,
+  SandboxWorkerData,
+} from '../../sandbox-engine.worker'
 import type {
   CodegenErrorCode,
   GenerateSourceResult,
@@ -142,6 +146,9 @@ function poolKey(workerUrl: URL, memoryMb: number): string {
 function spawnWorker(key: string, workerUrl: URL, memoryMb: number): PooledWorker {
   const worker = new Worker(workerUrl, {
     resourceLimits: { maxOldGenerationSizeMb: memoryMb * 2 },
+    // The sandbox caps its WASM heap with this at spawn, and refuses to boot
+    // without it (#473): resourceLimits never reaches WASM memory.
+    workerData: { memoryMb } satisfies SandboxWorkerData,
   })
   workersSpawned++
   const pooled: PooledWorker = { worker, readyAt: null, dead: false }

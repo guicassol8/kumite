@@ -27,12 +27,13 @@ type WorkerMessage = { type: 'ready' } | ({ type: 'result'; id: number } & Sandb
 
 const TIMEOUT_MS = 2000
 const MEMORY_MB = 64
-// The memory-bomb probe measured ~3.4-3.85s to trip in the spike's session —
-// well past TIMEOUT_MS — because QuickJS's own memory accounting, not an
-// external clock, is what stops it. On this machine it took exactly 8000ms
-// three runs in a row, i.e. the old WATCHDOG_MS was racing (and losing to)
-// the real detection instead of just backstopping it. Raised with headroom
-// past any measured trip.
+// A backstop for a worker that never replies, not a clock any case races.
+// It was raised to 20 s for the old `while (true)` Array bomb, which took
+// 3.4-9.6 s to trip with the machine idle. Under load it took longer still:
+// 3 of 20 runs hit this watchdog with two full suites looping (#469). That
+// is why the memory case below is now one oversized allocation, refused in
+// milliseconds; the slow Array form is ADR-0001's, still covered by
+// judge.test.ts.
 const WATCHDOG_MS = 20_000
 const TEST_TIMEOUT_MS = 15_000
 const MEMORY_TEST_TIMEOUT_MS = 25_000
@@ -120,17 +121,31 @@ describe('sandbox engine (ADR-0001: quickjs-emscripten inside worker_thread)', (
   it('fails a memory bomb by memory limit — the worker exits, the main process does not', {
     timeout: MEMORY_TEST_TIMEOUT_MS,
   }, async () => {
-    const source =
-      'function solve(input) { const a = []; while (true) { a.push(new Array(1e6).fill(0)) } return a.length }'
+    // One allocation of twice MEMORY_MB: setMemoryLimit refuses it in
+    // milliseconds (37 ms p50, 160 ms max with two full suites looping,
+    // #469), far from TIMEOUT_MS. Without setMemoryLimit it succeeds and
+    // returns the byte length, so this case goes red on `ok` — the old
+    // `while (true)` bomb could not tell: it also ended as 'memory' with no
+    // limit at all, at the WASM heap's ceiling. It has to be a single
+    // allocation: in this QuickJS build the limit refuses one block larger
+    // than itself, not a running total, so 16 × 8 MiB of ArrayBuffers comes
+    // back ok (#469's ## Causa; the production gap is #473).
+    const source = `function solve(input) { const b = new ArrayBuffer(${2 * MEMORY_MB * 1024 * 1024}); return b.byteLength }`
     const result = await runOneCaseInWorker({ source, input: [] })
     console.log('sandbox-engine: memory bomb stopped after', result.ms.toFixed(2), 'ms')
-    // QuickJS's own memory accounting can take multiple seconds to trip
-    // (measured ~3.4-3.85s in this session) — either it reports 'memory'
-    // itself, or the worker's own resourceLimits kill it first and this
-    // reads back as 'blocked' (exited without a result). Both mean the
-    // same thing operationally: the payload never got a value out, and
-    // this test process is still running to say so.
+    // 'memory' is QuickJS refusing the allocation; 'blocked' would be the
+    // worker's own resourceLimits killing it first (exited without a
+    // result). Either way no value gets out.
     expect(['memory', 'blocked']).toContain(result.outcome)
+    expect(result.value).toBeUndefined()
+
+    // And this process still serves: a normal case, in a fresh worker.
+    const after = await runOneCaseInWorker({
+      source: generateSolution(somaDosPares),
+      input: [1, 2, 3, 4],
+    })
+    expect(after.outcome).toBe('ok')
+    expect(after.value).toBe(6)
   })
 
   const hostileProbes: Array<{ name: string; source: string }> = [

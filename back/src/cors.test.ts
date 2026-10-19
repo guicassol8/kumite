@@ -10,14 +10,27 @@ const FRONT = vi.hoisted(() => {
   return origin
 })
 
+// The CORS headers come from the app-level cors(), the first middleware, so
+// none of these assertions needs the database. Only the `/health` ping would
+// touch it, and on a pool busy with the rest of the machine's load that
+// `select 1` overruns HEALTH_DB_TIMEOUT_MS and the probe answers 503 (#466,
+// as #464 proved for transport.test.ts). The ping is stubbed so `/health`
+// still runs through the real app and middleware chain, minus the round trip;
+// `/health` against the database is health.test.ts's job.
+vi.mock('./modules/health/health.service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./modules/health/health.service')>()),
+  pingDatabase: async () => undefined,
+}))
+
 import { app } from './app'
 import { APP_MAX_BODY_BYTES, DEV_FRONT_ORIGIN } from './config'
 import { k } from './context'
 
 // Cross-module suite (#273), at src/ root like request-limits.test.ts: the
 // app-level cors() answers only the front's own origin (APP_BASE_URL) and the
-// local dev front. None of these requests needs database state, but importing
-// `app` resolves the `db` singleton, so its socket is closed like elsewhere.
+// local dev front. No request here touches the database (the `/health` ping is
+// the stub above), but importing `app` resolves the `db` singleton, so its
+// client is closed like elsewhere.
 const db = k.resolve('db')
 
 afterAll(async () => {

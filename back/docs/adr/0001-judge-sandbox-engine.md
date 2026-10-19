@@ -366,10 +366,16 @@ loads QuickJS through `newVariant(RELEASE_SYNC, { wasmMemory })` on its own
 Past `maximum`, Emscripten's `emscripten_resize_heap` catches the failed
 `grow` and returns false, `malloc` returns `NULL`, and QuickJS throws
 `InternalError: out of memory` — no abort; the case comes back `memory` and
-the worker is discarded, as since #277. `JUDGE_MEMORY_MB` keeps meaning what
-the solution may use. The effective ceiling sits between ~95% and 100% of
-`maximum`, because Emscripten grows the heap by at least 5% a step; with 64
-MiB a worker tops out at ~76–80 MiB in all. A case whose `memoryMb` differs
+the worker is discarded, as since #277. `JUDGE_MEMORY_MB` is the floor of
+what the solution may hold, not an exact cap: the module itself uses only
+~6 MiB of its initial 16 MiB, so the rest is the solution's too. The
+effective ceiling sits between ~95% and 100% of `maximum`, because
+Emscripten grows the heap by at least 5% a step; with 64 MiB a worker tops
+out at ~76–80 MiB in all. Measured in the review (one fresh worker,
+`memoryMb` 64, ArrayBuffers kept until `out of memory`), what a solution
+holds depends on its block size: 74.6 MiB in 64 KiB blocks, 74 in 1 MiB, 72
+in 4 and 8 MiB, 64 in 16 and 32 MiB. So a total between 64 and ~75 MiB still
+comes back `ok`; past that, always `memory`. A case whose `memoryMb` differs
 from its worker's spawn value is refused with `error`. `setMemoryLimit`
 stays: it refuses one oversized block at once, before the heap is asked to
 grow.
@@ -384,6 +390,7 @@ same machine, 5 runs after the change):
 | `while (true) a.push(new Array(1e6).fill(0))` | `memory`, ~3.6 s (at 2 GiB) | `memory`, 107–138 ms |
 | 1 × `new ArrayBuffer(128 MiB)` | `memory`, ~9 ms | `memory`, ~9 ms |
 | 6 × `new ArrayBuffer(8 MiB)` (48 MiB, within) | `ok`, 6 | `ok`, 6 |
+| 8 × `new ArrayBuffer(8 MiB)` (64 MiB, the whole budget; review) | `ok`, 8 | `ok`, 8 |
 
 **Rejected:** measuring the heap from the interrupt handler (the heap never
 shrinks, so after one case filled it every later case of the same submission

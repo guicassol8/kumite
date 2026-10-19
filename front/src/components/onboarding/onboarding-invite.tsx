@@ -39,7 +39,7 @@ export function OnboardingInvite() {
   if (!offer) return null
 
   return (
-    <Card className="w-full gap-3 border-brand py-5 shadow-none" data-testid="onboarding-invite">
+    <Card className="w-full gap-3 border-brand py-5" data-testid="onboarding-invite">
       <CardContent className="flex flex-col gap-3 px-5 md:px-6">
         <h2 className="font-display font-semibold text-xl">{t('onboarding.invite.title')}</h2>
         <p className="text-sm">{t('onboarding.invite.body')}</p>

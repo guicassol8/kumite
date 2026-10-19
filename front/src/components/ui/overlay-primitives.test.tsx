@@ -10,6 +10,7 @@ import {
   AlertDialogTitle,
 } from './alert-dialog'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './dialog'
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from './sheet'
 
 afterEach(cleanup)
 
@@ -20,8 +21,9 @@ function classesOf(element: Element): string[] {
 
 /**
  * `docs/design/identity.md` § 5: "Hairlines de 1 px, sem sombra além do anel de
- * foco". Both overlay primitives shipped with shadcn's `shadow-lg`; #233 takes
- * it out at the primitive, deliberately reaching every dialog in the app.
+ * foco". The overlay primitives shipped with shadcn's `shadow-lg`; #233 takes
+ * it out of the dialogs and #467 out of the sheet, at the primitive, so every
+ * dialog and side panel in the app loses it at once.
  */
 describe('overlay primitives carry no drop shadow', () => {
   it('DialogContent has no shadow class', () => {
@@ -50,6 +52,25 @@ describe('overlay primitives carry no drop shadow', () => {
     const classes = classesOf(screen.getByTestId('alert-dialog-under-test'))
     expect(classes).not.toContain('shadow-lg')
     expect(classes.filter((token) => token.startsWith('shadow-'))).toEqual([])
+  })
+
+  it.each([
+    ['top', 'border-b'],
+    ['right', 'border-l'],
+    ['bottom', 'border-t'],
+    ['left', 'border-r'],
+  ] as const)('SheetContent (side=%s) has no shadow class and keeps its %s', (side, border) => {
+    render(
+      <Sheet open>
+        <SheetContent side={side} data-testid="sheet-under-test">
+          <SheetTitle>Título</SheetTitle>
+          <SheetDescription>Descrição</SheetDescription>
+        </SheetContent>
+      </Sheet>,
+    )
+    const classes = classesOf(screen.getByTestId('sheet-under-test'))
+    expect(classes.filter((token) => token.startsWith('shadow-'))).toEqual([])
+    expect(classes).toContain(border)
   })
 })
 

@@ -6,8 +6,11 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card"
+      // Sem `shadow-sm` (docs/design/identity.md § 5: "Hairlines de 1 px,
+      // sem sombra alem do anel de foco"). O que separa o cartao do fundo e a
+      // hairline `border` sobre `bg-card`, como o `.card` da prancha.
       className={cn(
-        'flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm',
+        'flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground',
         className,
       )}
       {...props}

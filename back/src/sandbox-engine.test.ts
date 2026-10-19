@@ -207,16 +207,17 @@ describe('sandbox engine (ADR-0001: quickjs-emscripten inside worker_thread)', (
     MEMORY_TEST_TIMEOUT_MS,
   )
 
-  it('runs a solution that stays within MEMORY_MB, block by block', {
+  it('runs a solution that uses its whole MEMORY_MB, block by block', {
     timeout: MEMORY_TEST_TIMEOUT_MS,
   }, async () => {
-    // 6 × 8 MiB = 48 MiB of MEMORY_MB's 64: the ceiling is not tighter than
-    // the budget it advertises.
-    const source = `function solve(input) { const kept = []; for (let i = 0; i < 6; i++) kept.push(new ArrayBuffer(${8 * MIB})); return kept.length }`
+    // 8 × 8 MiB = all of MEMORY_MB's 64: the ceiling is not tighter than the
+    // budget it advertises. (A ceiling cut to 75% of the budget still ran 6 ×
+    // 8 MiB, so the whole budget is what this asks for.)
+    const source = arrayBufferBomb(MEMORY_MB / 8)
     const result = await runOneCaseInWorker({ source, input: [] })
-    console.log('sandbox-engine: 6 × 8 MiB took', result.ms.toFixed(2), 'ms')
+    console.log(`sandbox-engine: ${MEMORY_MB / 8} × 8 MiB took`, result.ms.toFixed(2), 'ms')
     expect(result.outcome).toBe('ok')
-    expect(result.value).toBe(6)
+    expect(result.value).toBe(MEMORY_MB / 8)
   })
 
   it("sizes the WASM heap at the module's 16 MiB plus the budget", () => {

@@ -133,7 +133,7 @@ function Home() {
       </div>
       {isAuthenticated && (
         <Card
-          className={`w-full gap-3 py-5 shadow-none ${hasOpenRound ? 'border-brand' : ''}`}
+          className={`w-full gap-3 py-5 ${hasOpenRound ? 'border-brand' : ''}`}
           data-testid="home-round-card"
         >
           <CardContent className="flex flex-col items-start gap-4 px-5 md:flex-row md:items-center md:justify-between md:px-6">
@@ -182,7 +182,7 @@ function Home() {
       )}
       {isAuthenticated && (
         <div className="grid min-w-0 gap-5 md:grid-cols-2">
-          <Card className="min-w-0 gap-4 shadow-none" data-testid="home-team-card">
+          <Card className="min-w-0 gap-4" data-testid="home-team-card">
             <CardHeader>
               <CardTitle className={`${eyebrow} text-muted-foreground`}>
                 {t('home.team.title')}
@@ -230,7 +230,7 @@ function Home() {
               </Button>
             </CardContent>
           </Card>
-          <Card className="min-w-0 gap-4 shadow-none" data-testid="home-closed-rounds">
+          <Card className="min-w-0 gap-4" data-testid="home-closed-rounds">
             <CardHeader>
               <CardTitle className={`${eyebrow} text-muted-foreground`}>
                 {t('home.closedRounds.title')}
@@ -286,7 +286,7 @@ function Home() {
         </div>
       )}
       {isAuthenticated && user?.role === 'organizer' && (
-        <Card className="gap-4 shadow-none" data-testid="home-organizer-shortcuts">
+        <Card className="gap-4" data-testid="home-organizer-shortcuts">
           <CardHeader>
             <CardTitle className={`${eyebrow} text-muted-foreground`}>
               {t('home.organizerShortcuts.title')}

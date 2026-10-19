@@ -7,6 +7,7 @@ import {
   installDeleteAllConfirm,
   setDeleteAllHandler,
 } from '@/lib/blockly-delete-all'
+import { flushBlocklyEvents } from '@/test/blockly-events'
 
 const ITEM_ID = 'workspaceDelete'
 
@@ -64,10 +65,6 @@ const ids = () =>
     .getAllBlocks(false)
     .map((block) => block.id)
     .sort()
-
-// Blockly queues its events and fires them (and fills the undo stack) on a
-// macrotask.
-const flushEvents = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 beforeEach(() => {
   installDeleteAllConfirm()
@@ -149,16 +146,16 @@ describe('deletableBlocks (#445)', () => {
 describe('deleteAllDeletable (#445)', () => {
   it('keeps only the root, and one undo brings every block back', async () => {
     seed(rootWithChildren, { type: 'math_number', id: 'loose', x: 300, y: 20 })
-    await flushEvents()
+    await flushBlocklyEvents()
     workspace.clearUndo()
 
     deleteAllDeletable(workspace)
-    await flushEvents()
+    await flushBlocklyEvents()
 
     expect(ids()).toEqual(['root'])
 
     workspace.undo(false)
-    await flushEvents()
+    await flushBlocklyEvents()
 
     expect(ids()).toEqual(['loose', 'print', 'root', 'text', 'times'])
   })

@@ -404,6 +404,7 @@ export function Header() {
                   <SheetContent
                     side="right"
                     showCloseButton={false}
+                    data-testid="header-mobile-menu"
                     className="w-full gap-0 border-chrome-border bg-chrome p-0 text-chrome-foreground sm:max-w-full"
                   >
                     <SheetTitle className="sr-only">{t('header.menu.title')}</SheetTitle>

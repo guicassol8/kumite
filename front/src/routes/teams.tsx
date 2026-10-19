@@ -242,7 +242,7 @@ function TeamsScreen() {
       </div>
 
       {myTeam && (
-        <Card data-testid="my-team-panel" className="gap-4 shadow-none">
+        <Card data-testid="my-team-panel" className="gap-4">
           <CardHeader className="flex-row flex-wrap items-center gap-3">
             <h2 className={`${eyebrow} text-muted-foreground`}>{t('teams.myTeam.title')}</h2>
             <Badge

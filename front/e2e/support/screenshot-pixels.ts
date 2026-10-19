@@ -2,9 +2,10 @@ import { expect, type Locator, type Page } from '@playwright/test'
 
 // What a screenshot actually shows, measured against what the CSS says it
 // should show (#258). A screenshot used as proof of a theme is only proof if
-// its pixels are asserted: headless Chromium can keep the old theme on screen
-// while every computed style already reads the new one, and a screenshot
-// taken then looks wrong without failing anything.
+// its pixels are asserted: computed styles say what the CSS asks for, not
+// what reached the screen (#258 reported headless Chromium keeping the old
+// theme while every computed style read the new one), and a screenshot that
+// looks wrong fails nothing on its own.
 //
 // The PNG is decoded in the browser (`createImageBitmap` + `OffscreenCanvas`)
 // because there is no PNG decoder among the dependencies. It runs after the

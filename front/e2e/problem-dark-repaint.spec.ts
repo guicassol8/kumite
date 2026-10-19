@@ -12,13 +12,15 @@ import {
 import { expectPaintedAsComputed, type Rgb } from './support/screenshot-pixels'
 
 // #258: toggling dark mode on `/problem/$id` after a reload, or after one
-// Executar, used to leave headless Chromium's screenshot in the light theme
-// while every computed style already read dark. The 2026-10-19 spike could not
-// reproduce it — not on develop, not at the #257 merge where it was reported,
-// with or without `--disable-audio-output` (#425), nor in `channel: 'chromium'`
-// — so there is no cure to apply, only this guard: each capture's pixels are
-// asserted against the computed theme, so a stale paint fails here instead of
-// passing as evidence. Findings and the matrix: the `## Achados` on #258.
+// Executar, was reported (#257 review) to leave headless Chromium's screenshot
+// in the light theme while every computed style already read dark. The
+// 2026-10-19 spike could not reproduce it — not on develop, not at the #257
+// merge where it was reported, with or without `--disable-audio-output`
+// (#425), nor in `channel: 'chromium'` — and the 08-modo-escuro.png committed
+// at that merge is itself dark everywhere but Blockly's canvas, which had no
+// dark theme until #344. So there is no cure to apply, only this guard: each
+// capture's pixels are asserted against the computed theme, so a stale paint
+// fails here instead of passing as evidence. Findings: `## Achados` on #258.
 const evidence = (name: string) => `e2e/evidence/258/${name}.png`
 
 test.use({ colorScheme: 'light', viewport: { width: 1280, height: 800 } })

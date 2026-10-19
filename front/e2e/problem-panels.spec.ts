@@ -9,6 +9,7 @@ import {
   seedParticipantToken,
   workspaceStorageKey,
 } from './support/editor-fixture'
+import { expectPaintedAsComputed } from './support/screenshot-pixels'
 
 // Visual walkthrough for #203: the desktop layout of `/problem/$id` gained
 // collapsible, resizable, persisted panels — none of it is provable in
@@ -291,7 +292,16 @@ test.describe('/problem/$id — painéis colapsáveis e redimensionáveis no des
       'aria-expanded',
       'false',
     )
-    await page.screenshot({ path: evidence('08-modo-escuro') })
+    // A screenshot is proof of the dark theme only if its pixels say so: the
+    // toggle comes after a reload and a run, the trigger of #258.
+    const png = await page.screenshot({ path: evidence('08-modo-escuro') })
+    await expectPaintedAsComputed(page, page.getByTestId('problem-statement-rail'), png, {
+      inset: 8,
+    })
+    await expectPaintedAsComputed(page, page.getByTestId('problem-actions-bar'), png, {
+      inset: 8,
+      paintedBy: page.locator('body'),
+    })
   })
 
   // #307 + #366, acceptance 3: the size the participant dragged the band to is

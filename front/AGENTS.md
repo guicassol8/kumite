@@ -39,7 +39,11 @@ TanStack Router (file-based) + TanStack Query · i18next · zod ^3.
 - Review evidence: Playwright specs in `e2e/` write screenshots to the
   git-ignored `e2e/evidence/<issue>/`; the review attaches them to a PR
   comment (`gh pr comment --attach`, #402), never commits them (see
-  `docs/task-workflow/reviewing-tasks.md`).
+  `docs/task-workflow/reviewing-tasks.md`). A screenshot offered as proof of a
+  theme asserts its pixels with `expectPaintedAsComputed`
+  (`e2e/support/screenshot-pixels.ts`): a computed style is not a pixel, and
+  #258 reported a headless capture in the old theme while every computed
+  style read the new one.
 - Telemetry lives ONLY in `<VercelAnalytics />` (`src/components/analytics.tsx`),
   mounted once in `src/routes/__root.tsx`. Nothing else imports
   `@vercel/analytics` or `@vercel/speed-insights`, and it reports the route

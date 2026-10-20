@@ -140,6 +140,27 @@ describe('runJudge', () => {
     expect(result?.outcome).toBe('runtime_error')
   })
 
+  // #473: many blocks, each under the limit, together over it. Before the
+  // worker's WASM heap was capped this came back 'passed' (16 × 8 MiB with
+  // memoryMb 64), the heap free to grow to 2 GiB per worker.
+  it('fails a bomb of many small blocks by memory, and the next submission still passes', {
+    timeout: 25_000,
+  }, async () => {
+    const bomb = `function solve(input) { const kept = []; for (let i = 0; i < 16; i++) kept.push(new ArrayBuffer(${8 * 1024 * 1024})); return kept.length }`
+    const [result] = await runJudge(bomb, [{ input: [], expected: 16 }], testConfig)
+    expect(result?.outcome).toBe('runtime_error')
+    expect(result && 'detail' in result ? result.detail : undefined).toMatch(/memory/)
+
+    // The worker that ran out was discarded, not the process: the same pool
+    // serves the next submission.
+    const [after] = await runJudge(
+      sourceOf(somaDosParesWorkspace),
+      [{ input: [1, 2, 3, 4], expected: 6 }],
+      testConfig,
+    )
+    expect(after?.outcome).toBe('passed')
+  })
+
   // #120 wants the judge to run submissions in parallel: the second
   // submission's worker is alive while the first one's still is. #294
   // replaced a wall-clock check (parallel pair < 0.75 × serial pair) that

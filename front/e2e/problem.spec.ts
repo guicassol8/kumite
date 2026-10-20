@@ -31,6 +31,8 @@ const evidence280 = (name: string) => `e2e/evidence/280/${name}.png`
 const evidence319 = (name: string) => `e2e/evidence/319/${name}.png`
 // #421: the round list's team best keeps the maximum it was judged against.
 const evidence421 = (name: string) => `e2e/evidence/421/${name}.png`
+// #422: one attempt reads in the singular.
+const evidence422 = (name: string) => `e2e/evidence/422/${name}.png`
 
 const PASSWORD = 'supersecret'
 const stamp = Date.now()
@@ -255,6 +257,10 @@ test.describe('problem screen (#7)', () => {
     await expectBlocklyInjected(page)
     await expect(page.getByTestId('problem-closed-notice')).toBeVisible()
     await expect(page.getByTestId('problem-closed-best-score')).toBeVisible()
+    // #422: the team submitted once, so the count agrees with its noun.
+    await expect(page.getByTestId('problem-closed-best-score')).toContainText('(1 tentativa,')
+    await expect(page.getByTestId('problem-closed-best-score')).not.toContainText('tentativas')
+    await page.screenshot({ path: evidence422('01-encerrada-1-tentativa'), fullPage: true })
     await expect(page.getByTestId('problem-submit-button')).toHaveCount(0)
     await page.screenshot({ path: evidence('05-rodada-encerrada-somente-leitura'), fullPage: true })
     // #206: closed is exactly as before — the notice carries the score, no badge.

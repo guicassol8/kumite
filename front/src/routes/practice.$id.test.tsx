@@ -27,6 +27,7 @@ import { api } from '@/lib/api'
 import { clearSession, type SessionUser, setSession } from '@/lib/session'
 import { saveWorkspaceState } from '@/lib/workspace-storage'
 import { routeTree } from '@/routeTree.gen'
+import { flushBlocklyEvents } from '@/test/blockly-events'
 
 const mockedGet = vi.mocked(api.problems[':id'].$get)
 const mockedRound = vi.mocked(api.rounds[':id'].$get)
@@ -123,9 +124,10 @@ afterEach(async () => {
   await act(() => i18n.changeLanguage('pt'))
 })
 
-// Blockly batches its events and flushes them on a macrotask.
-function flushBlocklyEvents() {
-  return act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+// Waits until the events Blockly queued have fired (and reached the autosave
+// listener), inside act: see @/test/blockly-events.
+function flushEvents() {
+  return act(() => flushBlocklyEvents())
 }
 
 // Mirrors lib/workspace-storage.ts: the autosave key carries user and problem.
@@ -138,7 +140,7 @@ async function openWithDemo() {
   renderAt('/practice/p1')
   await screen.findByTestId('blockly-workspace')
   await waitFor(() => expect(liveBlockIds()).toEqual(expect.arrayContaining(['blocoDaPratica'])))
-  await flushBlocklyEvents()
+  await flushEvents()
   const participant = Blockly.getMainWorkspace()
   return { participant }
 }
@@ -266,11 +268,11 @@ describe('/practice/$id demo (#212)', () => {
     await screen.findByTestId('practice-demo-canvas')
     fireEvent.click(screen.getByTestId('practice-demo-next'))
     fireEvent.click(screen.getByTestId('practice-demo-next'))
-    await flushBlocklyEvents()
+    await flushEvents()
     expect(localStorage.getItem(storageKey)).toBe(savedBefore)
 
     fireEvent.click(screen.getByTestId('practice-demo-exit'))
-    await flushBlocklyEvents()
+    await flushEvents()
 
     expect(screen.queryByTestId('practice-demo-canvas')).toBeNull()
     expect(screen.getByTestId('problem-run-button')).toBeTruthy()

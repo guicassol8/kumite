@@ -411,7 +411,7 @@ export function ProblemScreen({ id, mode }: ProblemScreenProps) {
             {t('problem.closedRound.bestScore', {
               score: data.bestSubmission.score,
               maxScore: data.bestSubmission.maxScore,
-              attempts: data.bestSubmission.attempts,
+              count: data.bestSubmission.attempts,
               date: formatDate(new Date(data.bestSubmission.achievedAt), lang),
             })}
           </span>

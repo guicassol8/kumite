@@ -888,7 +888,8 @@
     },
     "closedRound": {
       "notice": "This round has closed — the problem is now read-only.",
-      "bestScore": "Your team's best score: {{score}}/{{maxScore}} ({{attempts}} attempts, on {{date}})",
+      "bestScore_one": "Your team's best score: {{score}}/{{maxScore}} ({{count}} attempt, on {{date}})",
+      "bestScore_other": "Your team's best score: {{score}}/{{maxScore}} ({{count}} attempts, on {{date}})",
       "neverSubmitted": "Your team never submitted a solution for this problem.",
       "runHint": "Round closed: running only tests the examples and scores no points."
     },

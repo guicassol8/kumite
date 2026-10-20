@@ -888,7 +888,8 @@
     },
     "closedRound": {
       "notice": "Esta ronda fue cerrada — el problema ahora es de solo lectura.",
-      "bestScore": "Mejor puntuación de tu equipo: {{score}}/{{maxScore}} ({{attempts}} intentos, el {{date}})",
+      "bestScore_one": "Mejor puntuación de tu equipo: {{score}}/{{maxScore}} ({{count}} intento, el {{date}})",
+      "bestScore_other": "Mejor puntuación de tu equipo: {{score}}/{{maxScore}} ({{count}} intentos, el {{date}})",
       "neverSubmitted": "Tu equipo no llegó a enviar una solución para este problema.",
       "runHint": "Ronda cerrada: ejecutar solo prueba los ejemplos y no suma puntos."
     },

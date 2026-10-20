@@ -65,6 +65,9 @@ Configuration to carry into #19 (the execution service):
   `JUDGE_MEMORY_MB`, default ~64) and `runtime.setInterruptHandler(
   shouldInterruptAfterDeadline(Date.now() + timeoutMs))` (`timeoutMs` from
   `JUDGE_TIMEOUT_MS`, default 2000ms).
+  *Since #473 `setMemoryLimit` only refuses one block larger than the limit;
+  the total is capped by the worker's own `WebAssembly.Memory` — see the
+  "total memory ceiling" amendment below.*
 - Call the case through a `Promise.resolve(solve(input)).then(...).catch(...)`
   wrapper assigned to a `globalThis` slot, then `runtime.executePendingJobs()`
   before reading the result back out — `evalCode` never drains microtasks on
@@ -219,6 +222,9 @@ actually measured, per the agreed tie-break order.
   don't tune the watchdog down to `JUDGE_TIMEOUT_MS` expecting it to be a
   tight bound, and don't alert on a single case exceeding 2s as if it were
   necessarily a bug.
+  *Superseded by #473: those seconds were the heap growing to the WASM
+  maximum of 2 GiB, not `setMemoryLimit` firing. With the total memory
+  ceiling (amendment below) a memory bomb ends as `memory` in ~40–140 ms.*
 - **Worker lifecycle complexity.** A request/reply protocol with per-request
   ids, a main-side watchdog, and respawn-on-crash handling — none of which
   candidate B would have needed. This is the concrete cost of the isolation
@@ -331,3 +337,74 @@ limits: `docs/load/277-judge-pool.md` (raw reports in `docs/load/277/`). With
 went from 8.0 s to 0.26 s and the back's CPU from its 200% cap to 28%; with
 10% and 30% bad solutions, from 15.1 s to 6.1 s and from 36.6 s to 28.8 s,
 where the infinite loops holding their slots for 10 s are now the floor.
+
+## Amendment (2026-10-19, #473): total memory ceiling
+
+`runtime.setMemoryLimit(memoryMb * 1024 * 1024)` was never a total. The
+`@jitl/quickjs-wasmfile-release-sync@0.32.0` variant that
+`newQuickJSWASMModule()` loads vendors bellard/quickjs `f1139494`, whose
+`js_def_malloc_usable_size` returns 0 under `EMSCRIPTEN`. Its `js_def_malloc`
+refuses only when `malloc_size + size > malloc_limit`, then adds
+`usable_size + MALLOC_OVERHEAD` (0 + 8) to `malloc_size`: the running total
+grows by 8 bytes per live block, so the limit refuses one block larger than
+itself and nothing else. What actually stopped a bomb was the WASM heap's own
+maximum, 32768 pages (2 GiB) per worker, which `resourceLimits` does not
+cover — WASM memory is an `ArrayBuffer` outside V8's old generation. At the
+default `JUDGE_CONCURRENCY` of 4 that is up to 8 GiB in the back process.
+
+**The ceiling.** The worker is spawned with `workerData: { memoryMb }` (the
+pool passes it; the worker refuses to boot without a positive integer) and
+loads QuickJS through `newVariant(RELEASE_SYNC, { wasmMemory })` on its own
+`WebAssembly.Memory`:
+
+- `initial`: 256 pages (16 MiB), the minimum the `.wasm` declares for its
+  imported memory — anything smaller fails to instantiate;
+- `maximum`: `256 + memoryMb × 16` pages — the module's 16 MiB plus
+  `memoryMb` for the solution (`wasmMemoryPages` in
+  `sandbox-engine.worker.ts`).
+
+Past `maximum`, Emscripten's `emscripten_resize_heap` catches the failed
+`grow` and returns false, `malloc` returns `NULL`, and QuickJS throws
+`InternalError: out of memory` — no abort; the case comes back `memory` and
+the worker is discarded, as since #277. `JUDGE_MEMORY_MB` is the floor of
+what the solution may hold, not an exact cap: the module itself uses only
+~6 MiB of its initial 16 MiB, so the rest is the solution's too. The
+effective ceiling sits between ~95% and 100% of `maximum`, because
+Emscripten grows the heap by at least 5% a step; with 64 MiB a worker tops
+out at ~76–80 MiB in all. Measured in the review (one fresh worker,
+`memoryMb` 64, ArrayBuffers kept until `out of memory`), what a solution
+holds depends on its block size: 74.6 MiB in 64 KiB blocks, 74 in 1 MiB, 72
+in 4 and 8 MiB, 64 in 16 and 32 MiB. So a total between 64 and ~75 MiB still
+comes back `ok`; past that, always `memory`. A case whose `memoryMb` differs
+from its worker's spawn value is refused with `error`. `setMemoryLimit`
+stays: it refuses one oversized block at once, before the heap is asked to
+grow.
+
+Measured with `sandbox-engine.test.ts` (one worker per case, `memoryMb` 64,
+same machine, 5 runs after the change):
+
+| Case | Before | After |
+| --- | --- | --- |
+| 16 × `new ArrayBuffer(8 MiB)` (2 × the limit) | `ok`, 16 | `memory`, 40–67 ms |
+| 128 × `new ArrayBuffer(8 MiB)` (16 × the limit) | `ok`, 128 (570–919 ms) | `memory`, 39–56 ms |
+| `while (true) a.push(new Array(1e6).fill(0))` | `memory`, ~3.6 s (at 2 GiB) | `memory`, 107–138 ms |
+| 1 × `new ArrayBuffer(128 MiB)` | `memory`, ~9 ms | `memory`, ~9 ms |
+| 6 × `new ArrayBuffer(8 MiB)` (48 MiB, within) | `ok`, 6 | `ok`, 6 |
+| 8 × `new ArrayBuffer(8 MiB)` (64 MiB, the whole budget; review) | `ok`, 8 | `ok`, 8 |
+
+**Rejected:** measuring the heap from the interrupt handler (the heap never
+shrinks, so after one case filled it every later case of the same submission
+would read a false `memory`; and a C builtin allocates between two checks); a
+custom build with `malloc_usable_size` (an Emscripten toolchain and a variant
+we would maintain); the quickjs-ng variant (its `js__malloc_usable_size` also
+returns 0 outside Linux/Apple/Windows, and changing engines is its own ADR).
+
+**Residual risks, not addressed here:**
+
+- QuickJS's out-of-memory is an ordinary `InternalError`, catchable by a
+  guest `try/catch`. The curated toolbox has no `try` block, and the judge
+  only runs source it generated itself (`generateSolution`), so it is not
+  reachable today.
+- The host-side `malloc` calls in quickjs-emscripten's `interface.c` do not
+  check for `NULL` near the ceiling. The mitigation is the existing discard
+  of a worker that came back `memory`.

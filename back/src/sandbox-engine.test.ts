@@ -2,7 +2,12 @@ import { Worker } from 'node:worker_threads'
 import { generateSolution, somaDosPares } from '@kumite/blocks'
 import { describe, expect, it } from 'vitest'
 
-import type { SandboxCaseRequest, SandboxResult } from './sandbox-engine.worker'
+import {
+  type SandboxCaseRequest,
+  type SandboxResult,
+  type SandboxWorkerData,
+  wasmMemoryPages,
+} from './sandbox-engine.worker'
 
 /**
  * Behavioral characterization of the judge sandbox engine chosen in
@@ -30,23 +35,32 @@ const MEMORY_MB = 64
 // A backstop for a worker that never replies, not a clock any case races.
 // It was raised to 20 s for the old `while (true)` Array bomb, which took
 // 3.4-9.6 s to trip with the machine idle. Under load it took longer still:
-// 3 of 20 runs hit this watchdog with two full suites looping (#469). That
-// is why the memory case below is now one oversized allocation, refused in
-// milliseconds; the slow Array form is ADR-0001's, still covered by
-// judge.test.ts.
+// 3 of 20 runs hit this watchdog with two full suites looping (#469): the
+// heap was free to grow to the WASM maximum of 2 GiB before it ran out.
+// Since #473 the worker's heap is capped at 16 MiB + MEMORY_MB, and every
+// memory bomb below ends in well under a second.
 const WATCHDOG_MS = 20_000
 const TEST_TIMEOUT_MS = 15_000
 const MEMORY_TEST_TIMEOUT_MS = 25_000
 
 /** Spawns one fresh worker, runs exactly one case in it, then tears it down. */
-function runOneCaseInWorker(params: { source: string; input: unknown }): Promise<SandboxResult> {
+function runOneCaseInWorker(params: {
+  source: string
+  input: unknown
+  // Overrides for the guard tests only: the case's budget, and the
+  // workerData the worker is spawned with (null: none at all).
+  memoryMb?: number
+  workerData?: SandboxWorkerData | null
+}): Promise<SandboxResult> {
   const request: SandboxCaseRequest = {
     id: 1,
     source: params.source,
     input: params.input,
     timeoutMs: TIMEOUT_MS,
-    memoryMb: MEMORY_MB,
+    memoryMb: params.memoryMb ?? MEMORY_MB,
   }
+  const workerData =
+    params.workerData === undefined ? { memoryMb: MEMORY_MB } : (params.workerData ?? undefined)
 
   return new Promise<SandboxResult>((resolve) => {
     // Node itself (not vitest's transform) loads this worker file, and a
@@ -56,8 +70,11 @@ function runOneCaseInWorker(params: { source: string; input: unknown }): Promise
     // tsx's own automatic worker-thread patching apply their hooks to a
     // Worker's entry-point resolution on that Node version. `pretest`
     // (package.json) pre-compiles the worker to plain JS instead.
+    // workerData.memoryMb sizes the worker's WASM heap at spawn (#473): the
+    // worker refuses to boot without it, as judge.service.ts's pool passes.
     const worker = new Worker(new URL('../dist/sandbox-engine.worker.js', import.meta.url), {
       resourceLimits: { maxOldGenerationSizeMb: MEMORY_MB * 2 },
+      workerData,
     })
 
     let settled = false
@@ -98,6 +115,36 @@ function runOneCaseInWorker(params: { source: string; input: unknown }): Promise
   })
 }
 
+const MIB = 1024 * 1024
+
+/** Keeps `blocks` ArrayBuffers of 8 MiB alive at once, then returns how many. */
+function arrayBufferBomb(blocks: number): string {
+  return `function solve(input) { const kept = []; for (let i = 0; i < ${blocks}; i++) kept.push(new ArrayBuffer(${8 * MIB})); return kept.length }`
+}
+
+/** The bomb ends without a value, then a normal case still runs (fresh worker). */
+async function expectMemoryBombStopped(name: string, source: string): Promise<void> {
+  const result = await runOneCaseInWorker({ source, input: [] })
+  console.log(
+    `sandbox-engine: ${name} stopped as '${result.outcome}' after`,
+    result.ms.toFixed(2),
+    'ms',
+  )
+  // 'memory' is QuickJS refusing the allocation; 'blocked' would be the
+  // worker's own resourceLimits killing it first (exited without a result).
+  // Either way no value gets out.
+  expect(['memory', 'blocked']).toContain(result.outcome)
+  expect(result.value).toBeUndefined()
+
+  // And this process still serves: a normal case, in a fresh worker.
+  const after = await runOneCaseInWorker({
+    source: generateSolution(somaDosPares),
+    input: [1, 2, 3, 4],
+  })
+  expect(after.outcome).toBe('ok')
+  expect(after.value).toBe(6)
+}
+
 describe('sandbox engine (ADR-0001: quickjs-emscripten inside worker_thread)', () => {
   it('runs the generated solve(input) and returns the correct result', {
     timeout: TEST_TIMEOUT_MS,
@@ -123,29 +170,85 @@ describe('sandbox engine (ADR-0001: quickjs-emscripten inside worker_thread)', (
   }, async () => {
     // One allocation of twice MEMORY_MB: setMemoryLimit refuses it in
     // milliseconds (37 ms p50, 160 ms max with two full suites looping,
-    // #469), far from TIMEOUT_MS. Without setMemoryLimit it succeeds and
-    // returns the byte length, so this case goes red on `ok` — the old
-    // `while (true)` bomb could not tell: it also ended as 'memory' with no
-    // limit at all, at the WASM heap's ceiling. It has to be a single
-    // allocation: in this QuickJS build the limit refuses one block larger
-    // than itself, not a running total, so 16 × 8 MiB of ArrayBuffers comes
-    // back ok (#469's ## Causa; the production gap is #473).
-    const source = `function solve(input) { const b = new ArrayBuffer(${2 * MEMORY_MB * 1024 * 1024}); return b.byteLength }`
-    const result = await runOneCaseInWorker({ source, input: [] })
-    console.log('sandbox-engine: memory bomb stopped after', result.ms.toFixed(2), 'ms')
-    // 'memory' is QuickJS refusing the allocation; 'blocked' would be the
-    // worker's own resourceLimits killing it first (exited without a
-    // result). Either way no value gets out.
-    expect(['memory', 'blocked']).toContain(result.outcome)
-    expect(result.value).toBeUndefined()
+    // #469), far from TIMEOUT_MS — before the WASM heap's ceiling is even
+    // asked to grow. The block-by-block bombs below are the heap ceiling's.
+    const source = `function solve(input) { const b = new ArrayBuffer(${2 * MEMORY_MB * MIB}); return b.byteLength }`
+    await expectMemoryBombStopped('memory bomb (1 × 128 MiB)', source)
+  })
 
-    // And this process still serves: a normal case, in a fresh worker.
-    const after = await runOneCaseInWorker({
+  // #473: in this QuickJS build setMemoryLimit counts 8 bytes per live block
+  // (malloc_usable_size is 0 under Emscripten), so it only ever refuses one
+  // block larger than itself. Many small blocks are stopped by the worker's
+  // own WebAssembly.Memory instead, capped at the module's 16 MiB plus
+  // MEMORY_MB (sandbox-engine.worker.ts). Before it they all came back `ok`,
+  // the heap free to grow to the WASM maximum of 2 GiB per worker.
+  const smallBlockBombs: Array<{ name: string; source: string }> = [
+    {
+      name: '16 × 8 MiB ArrayBuffers (2 × MEMORY_MB)',
+      source: arrayBufferBomb(16),
+    },
+    {
+      name: '128 × 8 MiB ArrayBuffers (16 × MEMORY_MB)',
+      source: arrayBufferBomb(128),
+    },
+    {
+      // The shape the curated toolbox can reach: lists in a loop.
+      name: 'an unbounded loop pushing 1e6-element arrays',
+      source:
+        'function solve(input) { const a = []; while (true) { a.push(new Array(1e6).fill(0)) } return a.length }',
+    },
+  ]
+
+  it.each(smallBlockBombs)(
+    'fails a bomb of many small blocks by memory limit: $name',
+    async ({ name, source }) => {
+      await expectMemoryBombStopped(name, source)
+    },
+    MEMORY_TEST_TIMEOUT_MS,
+  )
+
+  it('runs a solution that uses its whole MEMORY_MB, block by block', {
+    timeout: MEMORY_TEST_TIMEOUT_MS,
+  }, async () => {
+    // 8 × 8 MiB = all of MEMORY_MB's 64: the ceiling is not tighter than the
+    // budget it advertises. (A ceiling cut to 75% of the budget still ran 6 ×
+    // 8 MiB, so the whole budget is what this asks for.)
+    const source = arrayBufferBomb(MEMORY_MB / 8)
+    const result = await runOneCaseInWorker({ source, input: [] })
+    console.log(`sandbox-engine: ${MEMORY_MB / 8} × 8 MiB took`, result.ms.toFixed(2), 'ms')
+    expect(result.outcome).toBe('ok')
+    expect(result.value).toBe(MEMORY_MB / 8)
+  })
+
+  it("sizes the WASM heap at the module's 16 MiB plus the budget", () => {
+    // 64 KiB pages: 256 is the .wasm's own minimum, 64 MiB is 1024 more.
+    expect(wasmMemoryPages(64)).toEqual({ initial: 256, maximum: 256 + 1024 })
+    expect(wasmMemoryPages(1)).toEqual({ initial: 256, maximum: 272 })
+  })
+
+  it('refuses a case whose memoryMb is not the one the worker was spawned with', {
+    timeout: TEST_TIMEOUT_MS,
+  }, async () => {
+    const result = await runOneCaseInWorker({
       source: generateSolution(somaDosPares),
       input: [1, 2, 3, 4],
+      memoryMb: MEMORY_MB * 2,
     })
-    expect(after.outcome).toBe('ok')
-    expect(after.value).toBe(6)
+    expect(result.outcome).toBe('error')
+    expect(result.detail).toContain(`memoryMb ${MEMORY_MB * 2}`)
+    expect(result.value).toBeUndefined()
+  })
+
+  it('fails to boot without workerData.memoryMb, never on the 2 GiB default', {
+    timeout: TEST_TIMEOUT_MS,
+  }, async () => {
+    const result = await runOneCaseInWorker({
+      source: generateSolution(somaDosPares),
+      input: [1, 2, 3, 4],
+      workerData: null,
+    })
+    expect(result.outcome).toBe('error')
+    expect(result.detail).toContain('workerData.memoryMb')
   })
 
   const hostileProbes: Array<{ name: string; source: string }> = [

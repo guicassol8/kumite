@@ -14,7 +14,8 @@ import { defineConfig } from 'vitest/config'
 // was 1187 ms with the default, 570 ms with 6 and 346 ms with 4 workers. With 4
 // every screen case stayed under half its budget. The pre-push `pnpm -r test`
 // waits on the back suite either way: 181 s mean idle by default, 191 s with 4.
-// Never above the default, so a smaller machine (CI) keeps its own count.
+// Never above `vitest run`'s default (cores - 1), so a smaller machine (CI)
+// keeps its own count; watch mode's default (cores / 2) is not the bound.
 const MAX_WORKERS = Math.max(1, Math.min(4, availableParallelism() - 1))
 
 export default defineConfig({

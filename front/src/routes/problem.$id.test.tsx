@@ -506,6 +506,46 @@ describe('ProblemScreen', () => {
     expect(screen.getByTestId('problem-points-badge').textContent).toBe('250 pts')
   })
 
+  // #422: the attempts count agrees in number with its noun in every language.
+  const attemptsCases = [
+    { language: 'pt', one: '(1 tentativa,', other: '(2 tentativas,', wrong: '1 tentativas' },
+    { language: 'es', one: '(1 intento,', other: '(2 intentos,', wrong: '1 intentos' },
+    { language: 'en', one: '(1 attempt,', other: '(2 attempts,', wrong: '1 attempts' },
+  ] as const
+
+  for (const expected of attemptsCases) {
+    for (const attempts of [1, 2] as const) {
+      it(`pluralizes ${attempts} attempt(s) in the closed best score in ${expected.language} (#422)`, async () => {
+        await i18n.changeLanguage(expected.language)
+        mockedGet.mockResolvedValue(
+          jsonResponse(
+            200,
+            participantProblem({
+              roundStatus: 'closed',
+              roundId: null,
+              bestSubmission: {
+                score: 8,
+                maxScore: 10,
+                achievedAt: '2026-09-02T13:00:00.000Z',
+                attempts,
+              },
+            }),
+          ),
+        )
+
+        renderProblem()
+
+        const best = (await screen.findByTestId('problem-closed-best-score')).textContent
+        if (attempts === 1) {
+          expect(best).toContain(expected.one)
+          expect(best).not.toContain(expected.wrong)
+        } else {
+          expect(best).toContain(expected.other)
+        }
+      })
+    }
+  }
+
   it('shows the never-submitted message for a closed round the team never submitted', async () => {
     withTeam()
     mockedGet.mockResolvedValue(

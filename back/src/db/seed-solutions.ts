@@ -25,7 +25,6 @@ function stack(statements: Block[]): Input {
 // --- Values ---
 const input = (): Block => ({ type: 'kumite_input' })
 const num = (value: number): Block => ({ type: 'math_number', fields: { NUM: value } })
-const text = (value: string): Block => ({ type: 'text', fields: { TEXT: value } })
 const bool = (value: boolean): Block => ({
   type: 'logic_boolean',
   fields: { BOOL: value ? 'TRUE' : 'FALSE' },
@@ -43,7 +42,7 @@ const remainder = (dividend: Block, divisor: Block): Block => ({
   type: 'math_modulo',
   inputs: { DIVIDEND: plug(dividend), DIVISOR: plug(divisor) },
 })
-const round = (op: 'ROUND' | 'ROUNDDOWN', value: Block): Block => ({
+const round = (op: 'ROUND', value: Block): Block => ({
   type: 'math_round',
   fields: { OP: op },
   inputs: { NUM: plug(value) },
@@ -68,11 +67,6 @@ const itemAt = (list: Block, position: Block): Block => ({
   type: 'lists_getIndex',
   fields: { MODE: 'GET', WHERE: 'FROM_START' },
   inputs: { VALUE: plug(list), AT: plug(position) },
-})
-const join = (a: Block, b: Block): Block => ({
-  type: 'text_join',
-  extraState: { itemCount: 2 },
-  inputs: { ADD0: plug(a), ADD1: plug(b) },
 })
 
 // --- Statements ---
@@ -101,7 +95,7 @@ const repeat = (times: Block, ...body: Block[]): Block => ({
   inputs: { TIMES: plug(times), DO: stack(body) },
 })
 
-/** A whole workspace: `resolver` running `body`, returning `result`. */
+/** A whole workspace: `resolver` running `body` (may be empty), returning `result`. */
 function solve(variables: string[], body: Block[], result: Block): WorkspaceState {
   return {
     blocks: {
@@ -111,7 +105,10 @@ function solve(variables: string[], body: Block[], result: Block): WorkspaceStat
           type: 'kumite_solve',
           x: 40,
           y: 40,
-          inputs: { BODY: stack(body), RETURN: plug(result) },
+          inputs:
+            body.length > 0
+              ? { BODY: stack(body), RETURN: plug(result) }
+              : { RETURN: plug(result) },
         },
       ],
     },
@@ -119,27 +116,11 @@ function solve(variables: string[], body: Block[], result: Block): WorkspaceStat
   }
 }
 
-const maiorValor = solve(
-  ['maior', 'numero'],
-  [
-    set('maior', itemAt(input(), num(1))),
-    forEach(
-      'numero',
-      input(),
-      ifThen(compare('GT', get('numero'), get('maior')), set('maior', get('numero'))),
-    ),
-  ],
-  get('maior'),
-)
+/** One arithmetic block: no loop, no variable — the entry pole (#483). */
+const pontosDeIppon = solve([], [], arithmetic('MULTIPLY', input(), num(10)))
 
-const contarNegativos = solve(
-  ['total', 'numero'],
-  [
-    set('total', num(0)),
-    forEach('numero', input(), ifThen(compare('LT', get('numero'), num(0)), increment('total'))),
-  ],
-  get('total'),
-)
+/** One comparison, `≥`: `>` leaves out the 12-year-olds. */
+const ageCheck = (op: CompareOp) => solve([], [], compare(op, input(), num(12)))
 
 const mediaArredondada = solve(
   ['total', 'numero'],
@@ -241,24 +222,6 @@ function bestCombo(start: Block): WorkspaceState {
   )
 }
 
-/** Prepends `n mod 2` while halving n; 0 never enters the loop. */
-function binary(handlesZero: boolean): WorkspaceState {
-  return solve(
-    ['resultado', 'resto'],
-    [
-      set('resultado', text('')),
-      set('resto', input()),
-      whileTrue(
-        compare('GT', get('resto'), num(0)),
-        set('resultado', join(remainder(get('resto'), num(2)), get('resultado'))),
-        set('resto', round('ROUNDDOWN', arithmetic('DIVIDE', get('resto'), num(2)))),
-      ),
-      ...(handlesZero ? [ifThen(compare('EQ', input(), num(0)), set('resultado', text('0')))] : []),
-    ],
-    get('resultado'),
-  )
-}
-
 /** Row i holds tiles i and n − i + 1; the centre only once when they meet. */
 const xDoTatame = solve(
   ['tamanho', 'linha', 'posicao', 'espelho', 'total'],
@@ -311,15 +274,14 @@ const lutadorDoMeio = solve(
 )
 
 export const SEED_SOLUTIONS: Record<string, WorkspaceState> = {
+  'Pontos de Ippon': pontosDeIppon,
+  'Idade Mínima': ageCheck('GTE'),
   'Soma dos Pares': somaDosPares,
-  'Maior Valor da Lista': maiorValor,
-  'Contar Números Negativos': contarNegativos,
   'Média Arredondada': mediaArredondada,
   'Inscritos Primos': primeTest('LTE'),
   'Escadaria do Dojo': escadariaDoDojo,
   'Medalha de Prata': medalhaDePrata,
   'Melhor Sequência de Golpes': bestCombo(itemAt(input(), num(1))),
-  'Placar em Binário': binary(true),
   'O X do Tatame': xDoTatame,
   'O Lutador do Meio': lutadorDoMeio,
 }
@@ -350,8 +312,8 @@ const prataComecandoEmZero = solve(
 // fail at least one hidden one — the proof that the hidden cases are what
 // makes these problems hard, not the statement alone.
 export const SEED_TRAPS: Record<string, WorkspaceState> = {
+  'Idade Mínima': ageCheck('GT'),
   'Inscritos Primos': primeTest('LT'),
   'Medalha de Prata': prataComecandoEmZero,
   'Melhor Sequência de Golpes': bestCombo(num(0)),
-  'Placar em Binário': binary(false),
 }

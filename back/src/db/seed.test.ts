@@ -116,9 +116,9 @@ describe('seed', () => {
 
     expect(await db.select().from(usersTable)).toHaveLength(1)
     expect(await db.select().from(eventCodesTable)).toHaveLength(2)
-    // 11 competition (#483) + 3 practice problems (#210), 3 locales each.
-    expect(await db.select().from(problemsTable)).toHaveLength(14)
-    expect(await db.select().from(problemTranslationsTable)).toHaveLength(42)
+    // 10 competition (#483) + 3 practice problems (#210), 3 locales each.
+    expect(await db.select().from(problemsTable)).toHaveLength(13)
+    expect(await db.select().from(problemTranslationsTable)).toHaveLength(39)
 
     const eventConfig = await db.select().from(eventConfigTable)
     expect(eventConfig).toHaveLength(1)
@@ -128,14 +128,14 @@ describe('seed', () => {
 })
 
 describe('problem seed', () => {
-  it('creates 11 published problems with complete translations and covered test cases', async () => {
+  it('creates 10 published problems with complete translations and covered test cases', async () => {
     await seed(db)
 
     const problems = await db
       .select()
       .from(problemsTable)
       .where(eq(problemsTable.visibility, 'round'))
-    expect(problems).toHaveLength(11)
+    expect(problems).toHaveLength(10)
 
     const translations = await db.select().from(problemTranslationsTable)
     const translationsByProblem = new Map<string, typeof translations>()
@@ -156,7 +156,7 @@ describe('problem seed', () => {
     }
   })
 
-  it('covers all three difficulties: 3 easy, 3 medium, 5 hard (#483)', async () => {
+  it('covers all three difficulties: 3 easy, 3 medium, 4 hard (#483)', async () => {
     await seed(db)
 
     const problems = await db
@@ -164,7 +164,7 @@ describe('problem seed', () => {
       .from(problemsTable)
       .where(eq(problemsTable.visibility, 'round'))
     const count = (difficulty: string) => problems.filter((p) => p.difficulty === difficulty).length
-    expect([count('easy'), count('medium'), count('hard')]).toEqual([3, 3, 5])
+    expect([count('easy'), count('medium'), count('hard')]).toEqual([3, 3, 4])
   })
 
   it('includes the "Soma dos Pares" problem identical to the demo hardcode', async () => {
@@ -223,7 +223,7 @@ describe('practice seed (#210)', () => {
       .select()
       .from(problemsTable)
       .where(eq(problemsTable.visibility, 'round'))
-    expect(rounds).toHaveLength(11)
+    expect(rounds).toHaveLength(10)
     for (const problem of rounds) expect(problem.status).toBe('published')
   })
 

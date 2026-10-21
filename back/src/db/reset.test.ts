@@ -89,7 +89,7 @@ describe('resetDatabase', () => {
     const [{ count }] = (await db.execute(
       sql`select count(*)::int as count from problems`,
     )) as unknown as [{ count: number }]
-    // 11 competition (#483) + 3 practice problems (#210).
-    expect(count).toBe(14)
+    // 10 competition (#483) + 3 practice problems (#210).
+    expect(count).toBe(13)
   })
 })

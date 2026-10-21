@@ -33,6 +33,97 @@ export const SEED_PROBLEMS: SeedProblem[] = [
     difficulty: 'easy',
     points: 100,
     testCases: [
+      { input: 1, expected: 10, hidden: false },
+      { input: 3, expected: 30, hidden: false },
+      { input: 0, expected: 0, hidden: true },
+      { input: 12, expected: 120, hidden: true },
+    ],
+    translations: [
+      {
+        locale: 'pt',
+        title: 'Pontos de Ippon',
+        statementMd: [
+          'No nosso torneio, cada ippon (o golpe perfeito) vale 10 pontos.',
+          '',
+          'A entrada é quantos ippons um lutador marcou. Devolva quantos pontos ele fez: 3 ippons valem 30 pontos.',
+          '',
+          'Dica: em **Matemática** há um bloco que faz contas. Troque o sinal dele para multiplicar e encaixe-o em **retornar**.',
+        ].join('\n'),
+      },
+      {
+        locale: 'es',
+        title: 'Puntos de Ippon',
+        statementMd: [
+          'En nuestro torneo, cada ippon (el golpe perfecto) vale 10 puntos.',
+          '',
+          'La entrada es cuántos ippons marcó un luchador. Devuelve cuántos puntos hizo: 3 ippons valen 30 puntos.',
+          '',
+          'Pista: en **Matemáticas** hay un bloque que hace cuentas. Cambia su signo para multiplicar y encájalo en **devolver**.',
+        ].join('\n'),
+      },
+      {
+        locale: 'en',
+        title: 'Ippon Points',
+        statementMd: [
+          'In our tournament, each ippon (the perfect strike) is worth 10 points.',
+          '',
+          'The input is how many ippons a fighter scored. Return how many points they made: 3 ippons are worth 30 points.',
+          '',
+          'Hint: **Math** has a block that does arithmetic. Switch its sign to multiply and plug it into **return**.',
+        ].join('\n'),
+      },
+    ],
+  },
+  {
+    difficulty: 'easy',
+    points: 100,
+    testCases: [
+      { input: 15, expected: true, hidden: false },
+      { input: 8, expected: false, hidden: false },
+      { input: 12, expected: true, hidden: true },
+      { input: 11, expected: false, hidden: true },
+      { input: 40, expected: true, hidden: true },
+    ],
+    translations: [
+      {
+        locale: 'pt',
+        title: 'Idade Mínima',
+        statementMd: [
+          'Para competir no torneio, o lutador precisa ter 12 anos ou mais.',
+          '',
+          'A entrada é a idade do lutador. Devolva `true` (verdadeiro) se ele pode competir e `false` (falso) se não pode.',
+          '',
+          'Dica: em **Lógica** há um bloco que compara dois valores. Encaixe-o direto em **retornar**: a comparação já é a resposta.',
+        ].join('\n'),
+      },
+      {
+        locale: 'es',
+        title: 'Edad Mínima',
+        statementMd: [
+          'Para competir en el torneo, el luchador tiene que tener 12 años o más.',
+          '',
+          'La entrada es la edad del luchador. Devuelve `true` (verdadero) si puede competir y `false` (falso) si no puede.',
+          '',
+          'Pista: en **Lógica** hay un bloque que compara dos valores. Encájalo directamente en **devolver**: la comparación ya es la respuesta.',
+        ].join('\n'),
+      },
+      {
+        locale: 'en',
+        title: 'Minimum Age',
+        statementMd: [
+          'To compete in the tournament, a fighter must be 12 years old or older.',
+          '',
+          "The input is the fighter's age. Return `true` if they can compete and `false` if they cannot.",
+          '',
+          'Hint: **Logic** has a block that compares two values. Plug it straight into **return**: the comparison is already the answer.',
+        ].join('\n'),
+      },
+    ],
+  },
+  {
+    difficulty: 'easy',
+    points: 100,
+    testCases: [
       { input: [1, 2, 3, 4], expected: 6, hidden: false },
       { input: [5, 7, 9], expected: 0, hidden: false },
       { input: [2, 4, 6, 8], expected: 20, hidden: false },
@@ -56,60 +147,6 @@ export const SEED_PROBLEMS: SeedProblem[] = [
         locale: 'en',
         title: 'Sum of Evens',
         statementMd: 'Given a list of integers, return the sum of all even numbers in the list.',
-      },
-    ],
-  },
-  {
-    difficulty: 'easy',
-    points: 100,
-    testCases: [
-      { input: [3, 1, 4, 1, 5], expected: 5, hidden: false },
-      { input: [-2, -8, -1], expected: -1, hidden: false },
-      { input: [7], expected: 7, hidden: true },
-      { input: [100, 42, 99], expected: 100, hidden: true },
-    ],
-    translations: [
-      {
-        locale: 'pt',
-        title: 'Maior Valor da Lista',
-        statementMd: 'Dada uma lista de números inteiros, retorne o maior valor da lista.',
-      },
-      {
-        locale: 'es',
-        title: 'Valor Máximo de la Lista',
-        statementMd: 'Dada una lista de números enteros, devuelve el valor más grande de la lista.',
-      },
-      {
-        locale: 'en',
-        title: 'Largest Value in the List',
-        statementMd: 'Given a list of integers, return the largest value in the list.',
-      },
-    ],
-  },
-  {
-    difficulty: 'easy',
-    points: 100,
-    testCases: [
-      { input: [1, -2, 3, -4, -5], expected: 3, hidden: false },
-      { input: [1, 2, 3], expected: 0, hidden: false },
-      { input: [-1, -1, -1, -1], expected: 4, hidden: true },
-      { input: [0, 0, 0], expected: 0, hidden: true },
-    ],
-    translations: [
-      {
-        locale: 'pt',
-        title: 'Contar Números Negativos',
-        statementMd: 'Dada uma lista de números inteiros, retorne quantos deles são negativos.',
-      },
-      {
-        locale: 'es',
-        title: 'Contar Números Negativos',
-        statementMd: 'Dada una lista de números enteros, devuelve cuántos de ellos son negativos.',
-      },
-      {
-        locale: 'en',
-        title: 'Count Negative Numbers',
-        statementMd: 'Given a list of integers, return how many of them are negative.',
       },
     ],
   },
@@ -307,55 +344,6 @@ export const SEED_PROBLEMS: SeedProblem[] = [
           'Each number in the list is the balance of one strike in the fight: positive when the strike scores, negative when it hands a point to the opponent. The coach wants to know the best run of consecutive strikes.',
           '',
           'The input is a list of integers with at least one item. Return the largest possible sum of a stretch of **consecutive** items of the list, with at least one item. In `[-2, 1, -3, 4, -1, 2, 1, -5, 4]` the best stretch is `4, -1, 2, 1`, which adds up to 6.',
-        ].join('\n'),
-      },
-    ],
-  },
-  {
-    difficulty: 'hard',
-    points: 200,
-    testCases: [
-      { input: 10, expected: '1010', hidden: false },
-      { input: 5, expected: '101', hidden: false },
-      { input: 1, expected: '1', hidden: false },
-      { input: 0, expected: '0', hidden: true },
-      { input: 2, expected: '10', hidden: true },
-      { input: 37, expected: '100101', hidden: true },
-      { input: 255, expected: '11111111', hidden: true },
-      { input: 1024, expected: '10000000000', hidden: true },
-    ],
-    translations: [
-      {
-        locale: 'pt',
-        title: 'Placar em Binário',
-        statementMd: [
-          'O placar eletrônico do dojo é antigo e só mostra os dígitos 0 e 1: toda pontuação precisa aparecer em binário.',
-          '',
-          'A entrada é um número inteiro, 0 ou maior. Devolva esse número escrito em binário, sem zeros à esquerda: 10 vira `"1010"`, porque 10 = 8 + 2, e 0 vira `"0"`.',
-          '',
-          'A resposta é um **texto**, não um número: monte-a com os blocos de **Texto**.',
-        ].join('\n'),
-      },
-      {
-        locale: 'es',
-        title: 'Marcador en Binario',
-        statementMd: [
-          'El marcador electrónico del dojo es antiguo y solo muestra los dígitos 0 y 1: toda puntuación tiene que aparecer en binario.',
-          '',
-          'La entrada es un número entero, 0 o mayor. Devuelve ese número escrito en binario, sin ceros a la izquierda: 10 se vuelve `"1010"`, porque 10 = 8 + 2, y 0 se vuelve `"0"`.',
-          '',
-          'La respuesta es un **texto**, no un número: ármala con los bloques de **Texto**.',
-        ].join('\n'),
-      },
-      {
-        locale: 'en',
-        title: 'Binary Scoreboard',
-        statementMd: [
-          "The dojo's electronic scoreboard is old and only shows the digits 0 and 1: every score has to appear in binary.",
-          '',
-          'The input is an integer, 0 or greater. Return that number written in binary, with no leading zeros: 10 becomes `"1010"`, because 10 = 8 + 2, and 0 becomes `"0"`.',
-          '',
-          'The answer is **text**, not a number: build it with the **Text** blocks.',
         ].join('\n'),
       },
     ],

@@ -3,9 +3,12 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 
 import {
   computeMissingLocales,
+  createProblem,
   evaluateTestCaseCoverage,
   getPublishedProblem,
   listPracticeProblems,
+  publishProblem,
+  updateProblem,
 } from '../modules/problems/problems.service'
 import { createDb } from './client'
 import {
@@ -186,6 +189,50 @@ describe('problem seed', () => {
       { input: [5, 7, 9], expected: 0, hidden: false },
       { input: [2, 4, 6, 8], expected: 20, hidden: false },
     ])
+  })
+
+  it('on a database seeded before #483, adds only the new problems and changes no old one', async () => {
+    // Production as v1.0.0 left it: "Média Arredondada" still hard/200, and
+    // "Maior Valor da Lista", which #483 dropped from the seed.
+    const seedOld = async (title: string, difficulty: 'easy' | 'hard', points: number) => {
+      const problem = await createProblem(db, { difficulty, points })
+      await updateProblem(db, problem.id, {
+        testCases: [
+          { input: [1], expected: 1, hidden: false },
+          { input: [2], expected: 2, hidden: true },
+        ],
+        translations: [
+          { locale: 'pt', title, statementMd: 'x' },
+          { locale: 'es', title, statementMd: 'x' },
+          { locale: 'en', title, statementMd: 'x' },
+        ],
+      })
+      const published = await publishProblem(db, problem.id)
+      if (!published.ok) throw new Error(`could not publish ${title}`)
+      return problem.id
+    }
+    const mediaId = await seedOld('Média Arredondada', 'hard', 200)
+    const maiorValorId = await seedOld('Maior Valor da Lista', 'easy', 100)
+
+    await seed(db)
+
+    const rounds = await db
+      .select()
+      .from(problemsTable)
+      .where(eq(problemsTable.visibility, 'round'))
+    // The 9 seed problems it did not have yet, next to the two old ones.
+    expect(rounds).toHaveLength(11)
+    expect(rounds.find((p) => p.id === mediaId)).toMatchObject({
+      difficulty: 'hard',
+      points: 200,
+      status: 'published',
+    })
+    expect(rounds.find((p) => p.id === maiorValorId)?.status).toBe('published')
+    const mediaTitles = await db
+      .select()
+      .from(problemTranslationsTable)
+      .where(eq(problemTranslationsTable.title, 'Média Arredondada'))
+    expect(new Set(mediaTitles.map((t) => t.problemId))).toEqual(new Set([mediaId]))
   })
 })
 
